@@ -3,17 +3,22 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
+from dotenv import load_dotenv  # <-- IMPORTANTE: Importa o leitor do arquivo .env
+
+# Carrega as variáveis salvas no arquivo .env
+load_dotenv()
 
 app = Flask(__name__)
 
 # Configurações de Segurança e Conexão Supabase
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'chave_secreta_padrao_local')
 
-# CORRETO: Colocamos apenas o NOME da variável dentro dos parênteses
+# Puxando as credenciais corretas direto do arquivo .env
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
 
 
