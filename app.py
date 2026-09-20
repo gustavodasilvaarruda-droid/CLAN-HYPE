@@ -31,7 +31,7 @@ def obter_permissoes_usuario(email):
         if not res_usr or not getattr(res_usr, 'data', None) or len(res_usr.data) == 0:
             return {}
         
-        # Garante a leitura correta seja em formato lista ou dicionário direto
+        # Correção segura para acessar o primeiro elemento se vier como lista
         usuario_dados = res_usr.data[0] if isinstance(res_usr.data, list) else res_usr.data
         cargo_id = usuario_dados.get('cargo')
         
@@ -113,6 +113,7 @@ def login_membro():
             flash('E-mail ou senha incorretos.', 'erro')
             return redirect(url_for('pagina_inicial'))
 
+        # Ajustado para extrair o objeto correto de dentro da lista de resposta
         usuario = res.data[0] if isinstance(res.data, list) else res.data
         if not check_password_hash(usuario['senha'], senha):
             flash('E-mail ou senha incorretos.', 'erro')
@@ -150,7 +151,6 @@ def painel():
     permissoes = obter_permissoes_usuario(email)
     pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False) if permissoes else False
 
-    # Notificação Inteligente e Segura de Ovos Prontos
     notificacao = None
     try:
         res_notif = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).eq('status', 'concluido').order('created_at', desc=True).execute()
@@ -216,7 +216,6 @@ def breed():
     pode_ver_fila = permissoes.get('pode_ver_fila_breed', False) if permissoes else False
 
     try:
-        # REGRA: Limpeza e cancelamento automático de pedidos ativos há mais de 3 dias
         res_verificacao = supabase.table('pedidos_breed').select('*').eq('status', 'em_andamento').execute()
         if res_verificacao and res_verificacao.data:
             agora = datetime.utcnow()
@@ -265,7 +264,6 @@ def assumir_breed(pedido_id):
         return redirect(url_for('breed'))
 
     try:
-        # REGRA: Impede que dois Breeders cliquem e peguem o mesmo pokemon
         checar_pedido = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).execute()
         if checar_pedido and checar_pedido.data:
             pedido_atual = checar_pedido.data[0] if isinstance(checar_pedido.data, list) else checar_pedido.data
@@ -273,7 +271,6 @@ def assumir_breed(pedido_id):
                 flash('Este pedido já foi assumido por outro Breeder!', 'erro')
                 return redirect(url_for('breed'))
 
-        # REGRA: Limita o acúmulo de trabalho (máximo 4 ativos por vez)
         pedidos_ativos = supabase.table('pedidos_breed').select('id').eq('breeder_responsavel', email).eq('status', 'em_andamento').execute()
         if pedidos_ativos and pedidos_ativos.data and len(pedidos_ativos.data) >= 4:
             flash('Você já atingiu o limite máximo de 4 pedidos ativos por vez! Conclua algum antes de pegar outro. ❌', 'erro')
