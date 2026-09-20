@@ -17,8 +17,6 @@ SUPABASE_URL = 'https://supabase.co'
 SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bGRvamNndnpnZG5tcG9vZHFwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTYxMjUzNiwiZXhwIjoyMTA1MTg4NTM2fQ.r95AHcWbRYdQpybBeVjrcmp5nvekhq2wR6TXXZDQtxo'
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
 # ============================================================================
 # HELPER FUNCTIONS & DECORATORS
 # ============================================================================
@@ -33,8 +31,9 @@ def obter_permissoes_usuario(email):
         if not res_usr or not getattr(res_usr, 'data', None) or len(res_usr.data) == 0:
             return {}
         
-        # Correção segura para acessar o primeiro elemento retornado da lista
-        cargo_id = res_usr.data[0].get('cargo') if isinstance(res_usr.data, list) else res_usr.data.get('cargo')
+        # Garante a leitura correta seja em formato lista ou dicionário direto
+        usuario_dados = res_usr.data[0] if isinstance(res_usr.data, list) else res_usr.data
+        cargo_id = usuario_dados.get('cargo')
         
         res_perm = supabase.table('permissoes_cargos').select('*').eq('cargo_id', cargo_id).execute()
         if res_perm and getattr(res_perm, 'data', None) and len(res_perm.data) > 0:
@@ -54,8 +53,6 @@ def login_required(f):
             return redirect(url_for('pagina_inicial'))
         return f(*args, **kwargs)
     return decorated_function
-
-
 # ============================================================================
 # ROTAS PRINCIPAIS
 # ============================================================================
@@ -153,6 +150,7 @@ def painel():
     permissoes = obter_permissoes_usuario(email)
     pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False) if permissoes else False
 
+    # Notificação Inteligente e Segura de Ovos Prontos
     notificacao = None
     try:
         res_notif = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).eq('status', 'concluido').order('created_at', desc=True).execute()
@@ -173,8 +171,6 @@ def painel():
         pode_gerenciar=pode_gerenciar,
         notificacao=notificacao
     )
-
-
 # ============================================================================
 # ROTAS DO BERÇÁRIO (SISTEMA DE BREED UPGRADED) 🌟
 # ============================================================================
@@ -220,6 +216,7 @@ def breed():
     pode_ver_fila = permissoes.get('pode_ver_fila_breed', False) if permissoes else False
 
     try:
+        # REGRA: Limpeza e cancelamento automático de pedidos ativos há mais de 3 dias
         res_verificacao = supabase.table('pedidos_breed').select('*').eq('status', 'em_andamento').execute()
         if res_verificacao and res_verificacao.data:
             agora = datetime.utcnow()
@@ -238,29 +235,6 @@ def breed():
         if pode_ver_fila:
             pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
         else:
- pode_ver_fila = permissoes.get('pode_ver_fila_breed', False) if permissoes else False
-
-    try:
-        # Busca TODOS os pedidos em andamento para verificar o limite de 3 dias
-        res_verificacao = supabase.table('pedidos_breed').select('*').eq('status', 'em_andamento').execute()
-        if res_verificacao and res_verificacao.data:
-            agora = datetime.utcnow()
-            for pedido in res_verificacao.data:
-                created_at_str = pedido.get('created_at', '').split('+')[0] # Limpa timezone de forma estável
-                try:
-                    data_pedido = datetime.fromisoformat(created_at_str)
-                    if agora - data_pedido > timedelta(days=3):
-                        supabase.table('pedidos_breed').update({
-                            'status': 'pendente',
-                            'breeder_responsavel': None
-                        }).eq('id', pedido['id']).execute()
-                except Exception as err_date:
-                    print(f"Erro ao processar data do pedido {pedido.get('id')}: {err_date}")
-
-        # Realiza a busca separada por nível de acesso
-        if pode_ver_fila:
-            pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
-        else:
             pedidos_query = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).order('created_at', desc=True).execute()
 
         todos_pedidos = pedidos_query.data if (pedidos_query and pedidos_query.data) else []
@@ -273,7 +247,7 @@ def breed():
 
     return render_template(
         'breed.html',
-        fila_active=fila_ativa,
+        fila_ativa=fila_ativa,
         historico_concluido=historico_concluido,
         permissoes=permissoes
     )
@@ -291,7 +265,7 @@ def assumir_breed(pedido_id):
         return redirect(url_for('breed'))
 
     try:
-        # REGRA 2: Bloqueia caso o pedido já tenha sido assumido por outrem
+        # REGRA: Impede que dois Breeders cliquem e peguem o mesmo pokemon
         checar_pedido = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).execute()
         if checar_pedido and checar_pedido.data:
             pedido_atual = checar_pedido.data[0] if isinstance(checar_pedido.data, list) else checar_pedido.data
@@ -299,7 +273,7 @@ def assumir_breed(pedido_id):
                 flash('Este pedido já foi assumido por outro Breeder!', 'erro')
                 return redirect(url_for('breed'))
 
-        # REGRA 3: Trava o Breeder se ele já acumular 4 ou mais trabalhos ativos
+        # REGRA: Limita o acúmulo de trabalho (máximo 4 ativos por vez)
         pedidos_ativos = supabase.table('pedidos_breed').select('id').eq('breeder_responsavel', email).eq('status', 'em_andamento').execute()
         if pedidos_ativos and pedidos_ativos.data and len(pedidos_ativos.data) >= 4:
             flash('Você já atingiu o limite máximo de 4 pedidos ativos por vez! Conclua algum antes de pegar outro. ❌', 'erro')
@@ -354,8 +328,6 @@ def entregar_breed(pedido_id):
         flash(f'Erro ao entregar pedido: {e}', 'erro')
 
     return redirect(url_for('breed'))
-
-
 # ============================================================================
 # ROTAS ADMINISTRATIVAS (CRIAR E ALTERAR CARGOS DO CLÃ) 👑
 # ============================================================================
