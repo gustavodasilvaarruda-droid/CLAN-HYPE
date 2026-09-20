@@ -140,27 +140,35 @@ def painel():
     """Painel principal do jogador com sistema de Notificação Inteligente."""
     email = session.get('usuario_email')
     
-    res_usr = supabase.table('usuarios_clan').select('*').eq('email', email).execute()
-    usr = res_usr.data[0] if res_usr.data else {}
+    try:
+        res_usr = supabase.table('usuarios_clan').select('*').eq('email', email).execute()
+        usr = res_usr.data[0] if (res_usr and res_usr.data) else {}
+    except Exception as e:
+        print(f"Erro ao buscar usuário: {e}")
+        usr = {}
 
     permissoes = obter_permissoes_usuario(email)
-    pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False)
+    pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False) if permissoes else False
 
-    # 🌟 NOTIFICAÇÃO: Avisa se o último Pokémon do usuário foi chocado com sucesso
+    # 🌟 NOTIFICAÇÃO SEGURA: Avisa se o último Pokémon do usuário foi chocado com sucesso
     notificacao = None
     try:
         res_notif = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).eq('status', 'concluido').order('created_at', desc=True).execute()
-        if res_notif.data:
+        
+        # CORREÇÃO CRÍTICA: Verifica se res_notif existe e se a lista 'data' não está vazia antes de acessar o índice [0]
+        if res_notif and getattr(res_notif, 'data', None) and len(res_notif.data) > 0:
             ultimo_pronto = res_notif.data[0]
             breeder = ultimo_pronto.get('breeder_responsavel', 'um Breeder')
-            notificacao = f"Excelente notícia! Seu pedido de {ultimo_pronto['pokemon'].upper()} foi chocado com sucesso por {breeder}! Combine a entrega no jogo. 🎉"
+            pokemon_nome = ultimo_pronto.get('pokemon', 'Pokémon')
+            notificacao = f"Excelente notícia! Seu pedido de {pokemon_nome.upper()} foi chocado com sucesso por {breeder}! Combine a entrega no jogo. 🎉"
     except Exception as e:
         print(f"Erro na notificação: {e}")
 
+    # Entrega os dados exatamente no formato que o seu painel.html espera receber
     return render_template(
         'painel.html',
-        usuario_email=usr.get('email'),
-        nick_jogo=usr.get('nick_jogo'),
+        usuario_email=usr.get('email', email),
+        nick_jogo=usr.get('nick_jogo', session.get('nick_jogo')),
         cargo=usr.get('cargo', 'membro'),
         pode_gerenciar=pode_gerenciar,
         notificacao=notificacao
@@ -172,15 +180,17 @@ def painel():
 # ROTAS DO BERÇÁRIO (SISTEMA DE BREED UPGRADED) 🌟
 # ============================================================================
 
+from datetime import datetime, timedelta
+
 @app.route('/breed', methods=['GET', 'POST'])
 @login_required
 def breed():
-    """Exibe fila ativa de trabalho, histórico separado e recebe pedidos."""
+    """Exibe fila ativa de trabalho, histórico separado e recebe pedidos com reset automático de 3 dias."""
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
     if request.method == 'POST':
-        if not permissoes.get('pode_fazer_pedido_breed', True):
+        if not permissoes or not permissoes.get('pode_fazer_pedido_breed', True):
             flash('Seu cargo não possui permissão para solicitar breeds.', 'erro')
             return redirect(url_for('breed'))
 
@@ -211,16 +221,38 @@ def breed():
         return redirect(url_for('breed'))
 
     # Método GET: Listagem Inteligente
-    pode_ver_fila = permissoes.get('pode_ver_fila_breed', False)
+    pode_ver_fila = permissoes.get('pode_ver_fila_breed', False) if permissoes else False
 
-    if pode_ver_fila:
-        pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
-    else:
-        pedidos_query = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).order('created_at', desc=True).execute()
+    try:
+        # Busca TODOS os pedidos em andamento para verificar o limite de 3 dias
+        res_verificacao = supabase.table('pedidos_breed').select('*').eq('status', 'em_andamento').execute()
+        if res_verificacao and res_verificacao.data:
+            agora = datetime.utcnow()
+            for pedido in res_verificacao.data:
+                # REGRA 1: Verifica se a data de criação passou de 3 dias (adaptar para 'updated_at' se tiver no banco)
+                created_at_str = pedido.get('created_at', '').split('+')[0] # Limpa timezone se houver
+                try:
+                    data_pedido = datetime.fromisoformat(created_at_str)
+                    if agora - data_pedido > timedelta(days=3):
+                        # Reseta o pedido de volta para pendente no Supabase
+                        supabase.table('pedidos_breed').update({
+                            'status': 'pendente',
+                            'breeder_responsavel': None
+                        }).eq('id', pedido['id']).execute()
+                except Exception as err_date:
+                    print(f"Erro ao processar data do pedido {pedido.get('id')}: {err_date}")
 
-    todos_pedidos = pedidos_query.data if pedidos_query.data else []
+        # Segue o fluxo normal de listagem após aplicar os resets automáticos
+        if pode_ver_fila:
+            pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
+        else:
+            pedidos_query = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).order('created_at', desc=True).execute()
+
+        todos_pedidos = pedidos_query.data if (pedidos_query and pedidos_query.data) else []
+    except Exception as e:
+        print(f"Erro ao buscar pedidos: {e}")
+        todos_pedidos = []
     
-    # 🌟 Separação de Dados para alimentar a Linha do Tempo e o Histórico
     fila_ativa = [p for p in todos_pedidos if p.get('status') in ['pendente', 'em_andamento']]
     historico_concluido = [p for p in todos_pedidos if p.get('status') in ['concluido', 'entregue']]
 
@@ -235,19 +267,32 @@ def breed():
 @app.route('/breed/assumir/<int:pedido_id>', methods=['POST'])
 @login_required
 def assumir_breed(pedido_id):
-    """Modifica o status para 'em_andamento' e assinala o E-MAIL do Breeder responsável."""
-    email = session.get('usuario_email')  # <-- PEGA O EMAIL DA SESSÃO
+    """Modifica o status para 'em_andamento' aplicando regras de travas (máx 4 pedidos e bloqueio duplo)."""
+    email = session.get('usuario_email')  
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes.get('pode_assumir_breed', False):
+    if not permissoes or not permissoes.get('pode_assumir_breed', False):
         flash('Você não tem permissão para assumir pedidos de breed.', 'erro')
         return redirect(url_for('breed'))
 
     try:
-        # SALVA O EMAIL PARA RESPEITAR A CHAVE ESTRANGEIRA DO SQL
+        # REGRA 2: Verifica se o pedido já está em andamento (Evita roubo/sobreposição de clique)
+        checar_pedido = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).execute()
+        if checar_pedido and checar_pedido.data:
+            if checar_pedido.data[0].get('status') == 'em_andamento':
+                flash('Este pedido já foi assumido por outro Breeder!', 'erro')
+                return redirect(url_for('breed'))
+
+        # REGRA 3: Verifica quantos pedidos esse Breeder específico possui ativos no momento
+        pedidos_ativos = supabase.table('pedidos_breed').select('id').eq('breeder_responsavel', email).eq('status', 'em_andamento').execute()
+        if pedidos_ativos and pedidos_ativos.data and len(pedidos_ativos.data) >= 4:
+            flash('Você já atingiu o limite máximo de 4 pedidos ativos por vez! Conclua algum antes de pegar outro. ❌', 'erro')
+            return redirect(url_for('breed'))
+
+        # Se passou em todas as regras, assume o pedido
         supabase.table('pedidos_breed').update({
             'status': 'em_andamento',
-            'breeder_responsavel': email  # <-- CERTIFIQUE-SE DE QUE ESTÁ 'email' AQUI
+            'breeder_responsavel': email  
         }).eq('id', pedido_id).execute()
 
         flash('Você assumiu este pedido de breed! Mãos à obra. 🥚', 'sucesso')
@@ -264,7 +309,7 @@ def concluir_breed(pedido_id):
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes.get('pode_assumir_breed', False):
+    if not permissoes or not permissoes.get('pode_assumir_breed', False):
         flash('Você não tem permissão para concluir pedidos de breed.', 'erro')
         return redirect(url_for('breed'))
 
@@ -296,12 +341,16 @@ def entregar_breed(pedido_id):
     return redirect(url_for('breed'))
 
 
+
 # ============================================================================
-# INICIALIZADOR DO SERVIDOR RENDER
+# INICIALIZADOR DO SERVIDOR (CORRIGIDO PARA WINDOWS E RENDER)
 # ============================================================================
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    # Pega a porta do Render ou usa a 5000 por padrão no seu PC
+    port = int(os.environ.get("PORT", 5000))
+    
+    # IMPORTANTE: debug=False desativa o recarregador automático que quebra no Windows com Python 3.14
+    app.run(host='0.0.0.0', port=port, debug=False)
 # ============================================================================
 # ROTAS ADMINISTRATIVAS (GESTÃO DE CARGOS)
 # ============================================================================
@@ -328,6 +377,33 @@ def admin_cargos():
     )
 
 
+@app.route('/admin/cargos', methods=['GET'])
+@login_required
+def admin_cargos():
+    """Página principal de gerenciamento de cargos do clã (Lista membros e cargos)."""
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+
+    # Bloqueia o acesso caso o usuário não tenha permissão de admin/dono
+    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
+        flash('Você não tem permissão para acessar a área administrativa.', 'erro')
+        return redirect(url_for('painel'))
+
+    try:
+        # Busca a lista de usuários e a lista de cargos disponíveis no Supabase
+        res_usuarios = supabase.table('usuarios_clan').select('*').execute()
+        res_cargos = supabase.table('cargos').select('*').execute()
+        
+        usuarios = res_usuarios.data if res_usuarios.data else []
+        cargos = res_cargos.data if res_cargos.data else []
+    except Exception as e:
+        print(f"Erro ao carregar dados administrativos: {e}")
+        usuarios = []
+        cargos = []
+
+    return render_template('admin_cargos.html', usuarios=usuarios, cargos=cargos)
+
+
 @app.route('/admin/criar-cargo', methods=['POST'])
 @login_required
 def criar_novo_cargo():
@@ -335,7 +411,7 @@ def criar_novo_cargo():
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes.get('pode_gerenciar_cargos', False):
+    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
         flash('Acesso negado.', 'erro')
         return redirect(url_for('painel'))
 
@@ -375,7 +451,7 @@ def alterar_cargo(email_usuario):
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes.get('pode_gerenciar_cargos', False):
+    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
         flash('Acesso negado.', 'erro')
         return redirect(url_for('painel'))
 
@@ -393,5 +469,11 @@ def alterar_cargo(email_usuario):
     return redirect(url_for('admin_cargos'))
 
 
+# ============================================================================
+# INICIALIZADOR DO SERVIDOR (CORRIGIDO PARA WINDOWS E RENDER)
+# ============================================================================
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    # debug=False resolve o bug de Soquetes/Network do Windows com Python 3.14
+    app.run(host='0.0.0.0', port=port, debug=False)
+
