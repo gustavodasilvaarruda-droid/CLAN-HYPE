@@ -16,7 +16,7 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'chave_secreta_padrao_local'
 
 # Puxando as credenciais corretas direto do arquivo .env
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
+SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY')
 
 # Validação para alertar caso as chaves não estejam configuradas no servidor (Render)
 if not SUPABASE_URL or not SUPABASE_KEY:
