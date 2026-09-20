@@ -7,15 +7,14 @@ from supabase import create_client, Client
 app = Flask(__name__)
 
 # Configurações de Segurança e Conexão Supabase
-app.secret_key = 'chave_secreta_super_segura_do_cla'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'chave_secreta_padrao_local')
 
-# AJUSTADO: Agora com o ID do seu projeto correto antes do '.supabase.co'
-SUPABASE_URL = 'https://fxldojcgvzgdnmpoodqp.supabase.co'
-
-# Sua chave perfeitamente limpa
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bGRvamNndnpnZG5tcG9vZHFwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTYxMjUzNiwiZXhwIjoyMTA1MTg4NTM2fQ.r95AHcWbRYdQpybBeVjrcmp5nvekhq2wR6TXXZDQtxo'
+# AGORA SEGURO: Puxando direto das variáveis de ambiente que configuramos na tela
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_KEY = os.environ.get('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bGRvamNndnpnZG5tcG9vZHFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MTI1MzYsImV4cCI6MjEwNTE4ODUzNn0.kHIj7TCWmMwyzdhWO01zrWwzhVfh9ZvbGlUFpRdMa7w')  # Use aqui a chave 'anon' (a segura) na sua tela
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
 
 
