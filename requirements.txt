@@ -29,7 +29,7 @@ propcache==0.5.4
 pycparser==2.22
 pydantic
 pydantic_core
-PyJWT==2.10.1
+PyJWT
 python-dotenv==1.2.3
 realtime==2.31.0
 requests==2.32.3
