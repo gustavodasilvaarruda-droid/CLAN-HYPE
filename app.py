@@ -222,7 +222,7 @@ def breed():
     
     # 🌟 Separação de Dados para alimentar a Linha do Tempo e o Histórico
     fila_ativa = [p for p in todos_pedidos if p.get('status') in ['pendente', 'em_andamento']]
-    historico_concluido = [p for p in todos_pedidos if p.get('status') == 'concluido']
+    historico_concluido = [p for p in todos_pedidos if p.get('status') in ['concluido', 'entregue']]
 
     return render_template(
         'breed.html',
@@ -261,6 +261,39 @@ def assumir_breed(pedido_id):
 @login_required
 def concluir_breed(pedido_id):
     """Marca o pedido como concluído e envia o Pokémon para o Histórico."""
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+
+    if not permissoes.get('pode_assumir_breed', False):
+        flash('Você não tem permissão para concluir pedidos de breed.', 'erro')
+        return redirect(url_for('breed'))
+
+    try:
+        supabase.table('pedidos_breed').update({
+            'status': 'concluido'
+        }).eq('id', pedido_id).execute()
+
+        flash('Pedido marcado como concluído! O jogador será notificado no painel. 🎉', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao concluir pedido: {e}', 'erro')
+
+    return redirect(url_for('breed'))
+
+
+@app.route('/breed/entregar/<int:pedido_id>', methods=['POST'])
+@login_required
+def entregar_breed(pedido_id):
+    """Marca o pedido como entregue ao jogador finalizando o ciclo."""
+    try:
+        supabase.table('pedidos_breed').update({
+            'status': 'entregue'
+        }).eq('id', pedido_id).execute()
+
+        flash('Pokémon entregue com sucesso! Obrigado pelo serviço. ⚔️', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao entregar pedido: {e}', 'erro')
+
+    return redirect(url_for('breed'))
 
 
 # ============================================================================
