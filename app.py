@@ -9,11 +9,13 @@ app = Flask(__name__)
 # Configurações de Segurança e Conexão Supabase
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'chave_secreta_padrao_local')
 
-# AGORA SEGURO: Puxando direto das variáveis de ambiente que configuramos na tela
-SUPABASE_URL = os.environ.get('https://fxldojcgvzdnmpoodqp.supabase.co')
-SUPABASE_KEY = os.environ.get('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bGRvamNndnpnZG5tcG9vZHFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MTI1MzYsImV4cCI6MjEwNTE4ODUzNn0.kHIj7TCWmMwyzdhWO01zrWwzhVfh9ZvbGlUFpRdMa7w')  # Use aqui a chave 'anon' (a segura) na sua tela
+# CORRETO: Colocamos apenas o NOME da variável dentro dos parênteses
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
 
 
 
