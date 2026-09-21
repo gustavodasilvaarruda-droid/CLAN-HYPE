@@ -358,6 +358,37 @@ def admin_cargos():
     return render_template('admin_cargos.html', usuarios=usuarios, cargos=cargos)
 
 
+# ============================================================================
+# ROTAS ADMINISTRATIVAS (GESTÃO DE CARGOS)
+# ============================================================================
+
+@app.route('/admin/cargos', methods=['GET'])
+@login_required
+def admin_cargos():
+    """Página principal de gerenciamento de cargos do clã (Lista membros e cargos)."""
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+
+    # Bloqueia o acesso caso o usuário não tenha permissão de admin/dono
+    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
+        flash('Você não tem permissão para acessar a área administrativa.', 'erro')
+        return redirect(url_for('painel'))
+
+    try:
+        # Busca a lista de usuários e a lista de cargos disponíveis no Supabase
+        res_usuarios = supabase.table('usuarios_clan').select('*').order('nick_jogo').execute()
+        res_cargos = supabase.table('cargos').select('*').execute()
+        
+        usuarios = res_usuarios.data if res_usuarios.data else []
+        cargos = res_cargos.data if res_cargos.data else []
+    except Exception as e:
+        print(f"Erro ao carregar dados administrativos: {e}")
+        usuarios = []
+        cargos = []
+
+    return render_template('admin_cargos.html', usuarios=usuarios, cargos=cargos)
+
+
 @app.route('/admin/criar-cargo', methods=['POST'])
 @login_required
 def criar_novo_cargo():
@@ -377,11 +408,13 @@ def criar_novo_cargo():
         return redirect(url_for('admin_cargos'))
 
     try:
+        # 1. Inserir Cargo
         supabase.table('cargos').insert({
             'id': id_cargo,
             'nome_cargo': nome_cargo
         }).execute()
 
+        # 2. Atualizar Permissões marcadas no formulário
         supabase.table('permissoes_cargos').update({
             'pode_ver_fila_breed': bool(request.form.get('pode_ver_fila_breed')),
             'pode_assumir_breed': bool(request.form.get('pode_assumir_breed')),
@@ -422,7 +455,7 @@ def alterar_cargo(email_usuario):
 
 
 # ============================================================================
-# INICIALIZADOR DO SERVIDOR (APENAS NO FINAL DO ARQUIVO)
+# INICIALIZADOR DO SERVIDOR
 # ============================================================================
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
