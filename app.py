@@ -3,7 +3,7 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
-from dotenv import load_dotenv  # Importa o leitor do arquivo .env
+from dotenv import load_dotenv
 
 # Carrega as variáveis salvas no arquivo .env
 load_dotenv()
@@ -13,11 +13,9 @@ app = Flask(__name__)
 # Configurações de Segurança e Conexão Supabase
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'chave_secreta_padrao_local')
 
-# Puxando as credenciais corretas direto do arquivo .env
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
-# Validação opcional para garantir que as chaves existem
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Atenção: SUPABASE_URL ou SUPABASE_KEY não foram definidos no arquivo .env!")
 
@@ -34,14 +32,12 @@ def obter_permissoes_usuario(email):
         return {}
     
     try:
-        # Busca o cargo do usuário sem usar .single() para evitar quebras
         res_usr = supabase.table('usuarios_clan').select('cargo').eq('email', email).execute()
         if not res_usr.data:
             return {}
         
         cargo_id = res_usr.data[0].get('cargo')
         
-        # Busca as permissões atreladas a esse cargo
         res_perm = supabase.table('permissoes_cargos').select('*').eq('cargo_id', cargo_id).execute()
         return res_perm.data[0] if res_perm.data else {}
     except Exception as e:
@@ -58,6 +54,8 @@ def login_required(f):
             return redirect(url_for('pagina_inicial'))
         return f(*args, **kwargs)
     return decorated_function
+
+
 # ============================================================================
 # ROTAS PRINCIPAIS
 # ============================================================================
@@ -86,7 +84,6 @@ def login_membro():
             flash('Informe seu Nick no Jogo para se cadastrar.', 'erro')
             return redirect(url_for('pagina_inicial'))
 
-        # Verificar duplicidade de e-mail
         checar_email = supabase.table('usuarios_clan').select('email').eq('email', email).execute()
         if checar_email.data:
             flash('Este e-mail já está cadastrado no Clã!', 'erro')
@@ -152,12 +149,9 @@ def painel():
     permissoes = obter_permissoes_usuario(email)
     pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False) if permissoes else False
 
-    # 🌟 NOTIFICAÇÃO SEGURA: Avisa se o último Pokémon do usuário foi chocado com sucesso
     notificacao = None
     try:
         res_notif = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).eq('status', 'concluido').order('created_at', desc=True).execute()
-        
-        # CORREÇÃO CRÍTICA: Verifica se res_notif existe e se a lista 'data' não está vazia antes de acessar o índice [0]
         if res_notif and getattr(res_notif, 'data', None) and len(res_notif.data) > 0:
             ultimo_pronto = res_notif.data[0]
             breeder = ultimo_pronto.get('breeder_responsavel', 'um Breeder')
@@ -166,7 +160,6 @@ def painel():
     except Exception as e:
         print(f"Erro na notificação: {e}")
 
-    # Entrega os dados exatamente no formato que o seu painel.html espera receber
     return render_template(
         'painel.html',
         usuario_email=usr.get('email', email),
@@ -175,7 +168,6 @@ def painel():
         pode_gerenciar=pode_gerenciar,
         notificacao=notificacao
     )
-
 
 
 # ============================================================================
@@ -187,7 +179,6 @@ from datetime import datetime, timedelta
 @app.route('/breed', methods=['GET', 'POST'])
 @login_required
 def breed():
-    """Exibe fila ativa de trabalho, histórico separado e recebe pedidos com reset automático de 3 dias."""
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
@@ -222,21 +213,17 @@ def breed():
 
         return redirect(url_for('breed'))
 
-    # Método GET: Listagem Inteligente
     pode_ver_fila = permissoes.get('pode_ver_fila_breed', False) if permissoes else False
 
     try:
-        # Busca TODOS os pedidos em andamento para verificar o limite de 3 dias
         res_verificacao = supabase.table('pedidos_breed').select('*').eq('status', 'em_andamento').execute()
         if res_verificacao and res_verificacao.data:
             agora = datetime.utcnow()
             for pedido in res_verificacao.data:
-                # REGRA 1: Verifica se a data de criação passou de 3 dias (adaptar para 'updated_at' se tiver no banco)
-                created_at_str = pedido.get('created_at', '').split('+')[0] # Limpa timezone se houver
+                created_at_str = pedido.get('created_at', '').split('+')[0]
                 try:
                     data_pedido = datetime.fromisoformat(created_at_str)
                     if agora - data_pedido > timedelta(days=3):
-                        # Reseta o pedido de volta para pendente no Supabase
                         supabase.table('pedidos_breed').update({
                             'status': 'pendente',
                             'breeder_responsavel': None
@@ -244,7 +231,6 @@ def breed():
                 except Exception as err_date:
                     print(f"Erro ao processar data do pedido {pedido.get('id')}: {err_date}")
 
-        # Segue o fluxo normal de listagem após aplicar os resets automáticos
         if pode_ver_fila:
             pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
         else:
@@ -269,7 +255,6 @@ def breed():
 @app.route('/breed/assumir/<int:pedido_id>', methods=['POST'])
 @login_required
 def assumir_breed(pedido_id):
-    """Modifica o status para 'em_andamento' aplicando regras de travas (máx 4 pedidos e bloqueio duplo)."""
     email = session.get('usuario_email')  
     permissoes = obter_permissoes_usuario(email)
 
@@ -278,20 +263,17 @@ def assumir_breed(pedido_id):
         return redirect(url_for('breed'))
 
     try:
-        # REGRA 2: Verifica se o pedido já está em andamento (Evita roubo/sobreposição de clique)
         checar_pedido = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).execute()
         if checar_pedido and checar_pedido.data:
             if checar_pedido.data[0].get('status') == 'em_andamento':
                 flash('Este pedido já foi assumido por outro Breeder!', 'erro')
                 return redirect(url_for('breed'))
 
-        # REGRA 3: Verifica quantos pedidos esse Breeder específico possui ativos no momento
         pedidos_ativos = supabase.table('pedidos_breed').select('id').eq('breeder_responsavel', email).eq('status', 'em_andamento').execute()
         if pedidos_ativos and pedidos_ativos.data and len(pedidos_ativos.data) >= 4:
             flash('Você já atingiu o limite máximo de 4 pedidos ativos por vez! Conclua algum antes de pegar outro. ❌', 'erro')
             return redirect(url_for('breed'))
 
-        # Se passou em todas as regras, assume o pedido
         supabase.table('pedidos_breed').update({
             'status': 'em_andamento',
             'breeder_responsavel': email  
@@ -307,7 +289,6 @@ def assumir_breed(pedido_id):
 @app.route('/breed/concluir/<int:pedido_id>', methods=['POST'])
 @login_required
 def concluir_breed(pedido_id):
-    """Marca o pedido como concluído e envia o Pokémon para o Histórico."""
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
@@ -330,7 +311,6 @@ def concluir_breed(pedido_id):
 @app.route('/breed/entregar/<int:pedido_id>', methods=['POST'])
 @login_required
 def entregar_breed(pedido_id):
-    """Marca o pedido como entregue ao jogador finalizando o ciclo."""
     try:
         supabase.table('pedidos_breed').update({
             'status': 'entregue'
@@ -343,69 +323,6 @@ def entregar_breed(pedido_id):
     return redirect(url_for('breed'))
 
 
-
-# ============================================================================
-# INICIALIZADOR DO SERVIDOR (CORRIGIDO PARA WINDOWS E RENDER)
-# ============================================================================
-if __name__ == '__main__':
-    # Pega a porta do Render ou usa a 5000 por padrão no seu PC
-    port = int(os.environ.get("PORT", 5000))
-    
-    # IMPORTANTE: debug=False desativa o recarregador automático que quebra no Windows com Python 3.14
-    app.run(host='0.0.0.0', port=port, debug=False)
-# ============================================================================
-# ROTAS ADMINISTRATIVAS (GESTÃO DE CARGOS)
-# ============================================================================
-
-@app.route('/admin/cargos')
-@login_required
-def admin_cargos():
-    """Painel Admin para criação de cargos e atribuição aos membros."""
-    email = session.get('usuario_email')
-    permissoes = obter_permissoes_usuario(email)
-
-    if not permissoes.get('pode_gerenciar_cargos', False):
-        flash('Acesso negado: Você não é um administrador do clã.', 'erro')
-        return redirect(url_for('painel'))
-
-    # Listar todos os usuários e cargos cadastrados
-    usuarios = supabase.table('usuarios_clan').select('*').order('nick_jogo').execute()
-    cargos = supabase.table('cargos').select('*').execute()
-
-    return render_template(
-        'admin_cargos.html',
-        usuarios=usuarios.data or [],
-        cargos=cargos.data or []
-    )
-
-
-@app.route('/admin/cargos', methods=['GET'])
-@login_required
-def admin_cargos():
-    """Página principal de gerenciamento de cargos do clã (Lista membros e cargos)."""
-    email = session.get('usuario_email')
-    permissoes = obter_permissoes_usuario(email)
-
-    # Bloqueia o acesso caso o usuário não tenha permissão de admin/dono
-    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
-        flash('Você não tem permissão para acessar a área administrativa.', 'erro')
-        return redirect(url_for('painel'))
-
-    try:
-        # Busca a lista de usuários e a lista de cargos disponíveis no Supabase
-        res_usuarios = supabase.table('usuarios_clan').select('*').execute()
-        res_cargos = supabase.table('cargos').select('*').execute()
-        
-        usuarios = res_usuarios.data if res_usuarios.data else []
-        cargos = res_cargos.data if res_cargos.data else []
-    except Exception as e:
-        print(f"Erro ao carregar dados administrativos: {e}")
-        usuarios = []
-        cargos = []
-
-    return render_template('admin_cargos.html', usuarios=usuarios, cargos=cargos)
-
-
 # ============================================================================
 # ROTAS ADMINISTRATIVAS (GESTÃO DE CARGOS)
 # ============================================================================
@@ -417,13 +334,11 @@ def admin_cargos():
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    # Bloqueia o acesso caso o usuário não tenha permissão de admin/dono
     if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
         flash('Você não tem permissão para acessar a área administrativa.', 'erro')
         return redirect(url_for('painel'))
 
     try:
-        # Busca a lista de usuários e a lista de cargos disponíveis no Supabase
         res_usuarios = supabase.table('usuarios_clan').select('*').order('nick_jogo').execute()
         res_cargos = supabase.table('cargos').select('*').execute()
         
@@ -456,13 +371,11 @@ def criar_novo_cargo():
         return redirect(url_for('admin_cargos'))
 
     try:
-        # 1. Inserir Cargo
         supabase.table('cargos').insert({
             'id': id_cargo,
             'nome_cargo': nome_cargo
         }).execute()
 
-        # 2. Atualizar Permissões marcadas no formulário
         supabase.table('permissoes_cargos').update({
             'pode_ver_fila_breed': bool(request.form.get('pode_ver_fila_breed')),
             'pode_assumir_breed': bool(request.form.get('pode_assumir_breed')),
