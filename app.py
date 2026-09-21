@@ -12,7 +12,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configurações de Segurança e Conexão Supabase
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bGRvamNndnpnZG5tcG9vZHFwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTYxMjUzNiwiZXhwIjoyMTA1MTg4NTM2fQ.r95AHcWbRYdQpybBeVjrcmp5nvekhq2wR6TXXZDQtxo')
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'cla_bercario_chave_super_segura_2026')
 
 # Puxando as credenciais corretas direto do arquivo .env
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
