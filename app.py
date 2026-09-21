@@ -3,23 +3,21 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
-from dotenv import load_dotenv
-
-# Carrega as variáveis salvas no arquivo .env
-load_dotenv()
 
 app = Flask(__name__)
 
 # Configurações de Segurança e Conexão Supabase
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'chave_secreta_padrao_local')
+app.secret_key = 'chave_secreta_super_segura_do_cla'
 
-SUPABASE_URL = os.environ.get('SUPABASE_URL')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
+# AJUSTADO: Agora com o ID do seu projeto correto antes do '.supabase.co'
+SUPABASE_URL = 'https://fxldojcgvzgdnmpoodqp.supabase.co'
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Atenção: SUPABASE_URL ou SUPABASE_KEY não foram definidos no arquivo .env!")
+# Sua chave perfeitamente limpa
+SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bGRvamNndnpnZG5tcG9vZHFwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTYxMjUzNiwiZXhwIjoyMTA1MTg4NTM2fQ.r95AHcWbRYdQpybBeVjrcmp5nvekhq2wR6TXXZDQtxo'
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
 
 
 # ============================================================================
@@ -27,17 +25,20 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ============================================================================
 
 def obter_permissoes_usuario(email):
-    """Busca as permissões do cargo atual do usuário logado de forma segura."""
+    """Busca as permissões do cargo atual do usuário logado."""
     if not email:
         return {}
     
     try:
+        # CORREÇÃO: Removeu .single() para evitar quebra estrutural do código
         res_usr = supabase.table('usuarios_clan').select('cargo').eq('email', email).execute()
         if not res_usr.data:
             return {}
         
+        # Coleta o cargo com segurança do primeiro registro da lista
         cargo_id = res_usr.data[0].get('cargo')
         
+        # CORREÇÃO: Removeu .single() para evitar falhas de cache
         res_perm = supabase.table('permissoes_cargos').select('*').eq('cargo_id', cargo_id).execute()
         return res_perm.data[0] if res_perm.data else {}
     except Exception as e:
@@ -68,7 +69,7 @@ def pagina_inicial():
 
 @app.route('/login', methods=['POST'])
 def login_membro():
-    """Processa tanto o Login quanto o Cadastro do clã."""
+    """Processa tanto Login quanto Cadastro do modal da Home."""
     acao = request.form.get('acao')
     email = request.form.get('email', '').strip().lower()
     senha = request.form.get('senha', '').strip()
@@ -78,12 +79,13 @@ def login_membro():
         flash('Preencha todos os campos obrigatórios!', 'erro')
         return redirect(url_for('pagina_inicial'))
 
-    # CADASTRO DE NOVO MEMBRO
+    # CADASTRO DE NOVO GUERREIRO
     if acao == 'cadastro':
         if not nick_jogo:
             flash('Informe seu Nick no Jogo para se cadastrar.', 'erro')
             return redirect(url_for('pagina_inicial'))
 
+        # Verificar se e-mail já existe
         checar_email = supabase.table('usuarios_clan').select('email').eq('email', email).execute()
         if checar_email.data:
             flash('Este e-mail já está cadastrado no Clã!', 'erro')
@@ -103,13 +105,13 @@ def login_membro():
             session['nick_jogo'] = nick_jogo
             session['cargo'] = 'membro'
 
-            flash(f'Bem-vindo ao Clã, {nick_jogo}! ⚔️', 'sucesso')
+            flash(f'Bem-vindo ao Clã, {nick_jogo}!', 'sucesso')
             return redirect(url_for('painel'))
         except Exception as e:
             flash(f'Erro ao cadastrar: {e}', 'erro')
             return redirect(url_for('pagina_inicial'))
 
-    # LOGIN DE USUÁRIO JÁ EXISTENTE
+    # LOGIN DE GUERREIRO EXISTENTE
     else:
         res = supabase.table('usuarios_clan').select('*').eq('email', email).execute()
         if not res.data or not check_password_hash(res.data[0]['senha'], senha):
@@ -127,7 +129,7 @@ def login_membro():
 
 @app.route('/logout')
 def logout():
-    """Encerra a sessão atual do usuário."""
+    """Encerra a sessão do usuário."""
     session.clear()
     flash('Você saiu da sua conta.', 'info')
     return redirect(url_for('pagina_inicial'))
@@ -136,54 +138,40 @@ def logout():
 @app.route('/painel')
 @login_required
 def painel():
-    """Painel principal do jogador com sistema de Notificação Inteligente."""
+    """Painel do Membro logado."""
     email = session.get('usuario_email')
     
-    try:
-        res_usr = supabase.table('usuarios_clan').select('*').eq('email', email).execute()
-        usr = res_usr.data[0] if (res_usr and res_usr.data) else {}
-    except Exception as e:
-        print(f"Erro ao buscar usuário: {e}")
-        usr = {}
+    # CORREÇÃO: Removeu .single() para garantir estabilidade mesmo se o cache falhar
+    res_usr = supabase.table('usuarios_clan').select('*').eq('email', email).execute()
+    usr = res_usr.data[0] if res_usr.data else {}
 
     permissoes = obter_permissoes_usuario(email)
-    pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False) if permissoes else False
-
-    notificacao = None
-    try:
-        res_notif = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).eq('status', 'concluido').order('created_at', desc=True).execute()
-        if res_notif and getattr(res_notif, 'data', None) and len(res_notif.data) > 0:
-            ultimo_pronto = res_notif.data[0]
-            breeder = ultimo_pronto.get('breeder_responsavel', 'um Breeder')
-            pokemon_nome = ultimo_pronto.get('pokemon', 'Pokémon')
-            notificacao = f"Excelente notícia! Seu pedido de {pokemon_nome.upper()} foi chocado com sucesso por {breeder}! Combine a entrega no jogo. 🎉"
-    except Exception as e:
-        print(f"Erro na notificação: {e}")
+    pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False)
 
     return render_template(
         'painel.html',
-        usuario_email=usr.get('email', email),
-        nick_jogo=usr.get('nick_jogo', session.get('nick_jogo')),
+        usuario_email=usr.get('email'),
+        nick_jogo=usr.get('nick_jogo'),
         cargo=usr.get('cargo', 'membro'),
-        pode_gerenciar=pode_gerenciar,
-        notificacao=notificacao
+        pode_gerenciar=pode_gerenciar
     )
 
 
-# ============================================================================
-# ROTAS DO BERÇÁRIO (SISTEMA DE BREED UPGRADED) 🌟
-# ============================================================================
 
-from datetime import datetime, timedelta
+# ============================================================================
+# ROTAS DO BERÇÁRIO (BREED)
+# ============================================================================
 
 @app.route('/breed', methods=['GET', 'POST'])
 @login_required
 def breed():
+    """Exibe pedidos de breed e processa novos pedidos."""
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
     if request.method == 'POST':
-        if not permissoes or not permissoes.get('pode_fazer_pedido_breed', True):
+        # Permissão para solicitar breed
+        if not permissoes.get('pode_fazer_pedido_breed', True):
             flash('Seu cargo não possui permissão para solicitar breeds.', 'erro')
             return redirect(url_for('breed'))
 
@@ -207,47 +195,25 @@ def breed():
                 'status': 'pendente'
             }).execute()
 
-            flash('Pedido enviado com sucesso! Acompanhe o progresso na linha do tempo. ⏳', 'sucesso')
+            flash('Pedido de breed enviado com sucesso!', 'sucesso')
         except Exception as e:
             flash(f'Erro ao registrar pedido: {e}', 'erro')
 
         return redirect(url_for('breed'))
 
-    pode_ver_fila = permissoes.get('pode_ver_fila_breed', False) if permissoes else False
+    # Método GET: Listar Pedidos
+    pode_ver_fila = permissoes.get('pode_ver_fila_breed', False)
 
-    try:
-        res_verificacao = supabase.table('pedidos_breed').select('*').eq('status', 'em_andamento').execute()
-        if res_verificacao and res_verificacao.data:
-            agora = datetime.utcnow()
-            for pedido in res_verificacao.data:
-                created_at_str = pedido.get('created_at', '').split('+')[0]
-                try:
-                    data_pedido = datetime.fromisoformat(created_at_str)
-                    if agora - data_pedido > timedelta(days=3):
-                        supabase.table('pedidos_breed').update({
-                            'status': 'pendente',
-                            'breeder_responsavel': None
-                        }).eq('id', pedido['id']).execute()
-                except Exception as err_date:
-                    print(f"Erro ao processar data do pedido {pedido.get('id')}: {err_date}")
-
-        if pode_ver_fila:
-            pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
-        else:
-            pedidos_query = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).order('created_at', desc=True).execute()
-
-        todos_pedidos = pedidos_query.data if (pedidos_query and pedidos_query.data) else []
-    except Exception as e:
-        print(f"Erro ao buscar pedidos: {e}")
-        todos_pedidos = []
-    
-    fila_ativa = [p for p in todos_pedidos if p.get('status') in ['pendente', 'em_andamento']]
-    historico_concluido = [p for p in todos_pedidos if p.get('status') in ['concluido', 'entregue']]
+    if pode_ver_fila:
+        # Breeders e Admins veem todos os pedidos da fila
+        pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
+    else:
+        # Membros comuns veem apenas os seus próprios pedidos
+        pedidos_query = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).order('created_at', desc=True).execute()
 
     return render_template(
         'breed.html',
-        fila_ativa=fila_ativa,
-        historico_concluido=historico_concluido,
+        pedidos=pedidos_query.data or [],
         permissoes=permissoes
     )
 
@@ -255,31 +221,21 @@ def breed():
 @app.route('/breed/assumir/<int:pedido_id>', methods=['POST'])
 @login_required
 def assumir_breed(pedido_id):
-    email = session.get('usuario_email')  
+    """Assume um pedido de breed na fila."""
+    email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes or not permissoes.get('pode_assumir_breed', False):
+    if not permissoes.get('pode_assumir_breed', False):
         flash('Você não tem permissão para assumir pedidos de breed.', 'erro')
         return redirect(url_for('breed'))
 
     try:
-        checar_pedido = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).execute()
-        if checar_pedido and checar_pedido.data:
-            if checar_pedido.data[0].get('status') == 'em_andamento':
-                flash('Este pedido já foi assumido por outro Breeder!', 'erro')
-                return redirect(url_for('breed'))
-
-        pedidos_ativos = supabase.table('pedidos_breed').select('id').eq('breeder_responsavel', email).eq('status', 'em_andamento').execute()
-        if pedidos_ativos and pedidos_ativos.data and len(pedidos_ativos.data) >= 4:
-            flash('Você já atingiu o limite máximo de 4 pedidos ativos por vez! Conclua algum antes de pegar outro. ❌', 'erro')
-            return redirect(url_for('breed'))
-
         supabase.table('pedidos_breed').update({
             'status': 'em_andamento',
-            'breeder_responsavel': email  
+            'breeder_responsavel': email
         }).eq('id', pedido_id).execute()
 
-        flash('Você assumiu este pedido de breed! Mãos à obra. 🥚', 'sucesso')
+        flash('Você assumiu este pedido de breed!', 'sucesso')
     except Exception as e:
         flash(f'Erro ao assumir pedido: {e}', 'erro')
 
@@ -289,11 +245,12 @@ def assumir_breed(pedido_id):
 @app.route('/breed/concluir/<int:pedido_id>', methods=['POST'])
 @login_required
 def concluir_breed(pedido_id):
+    """Marca um pedido de breed como concluído."""
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes or not permissoes.get('pode_assumir_breed', False):
-        flash('Você não tem permissão para concluir pedidos de breed.', 'erro')
+    if not permissoes.get('pode_concluir_breed', False):
+        flash('Você não tem permissão para concluir pedidos.', 'erro')
         return redirect(url_for('breed'))
 
     try:
@@ -301,24 +258,9 @@ def concluir_breed(pedido_id):
             'status': 'concluido'
         }).eq('id', pedido_id).execute()
 
-        flash('Pedido marcado como concluído! O jogador será notificado no painel. 🎉', 'sucesso')
+        flash('Pedido marcado como concluído!', 'sucesso')
     except Exception as e:
         flash(f'Erro ao concluir pedido: {e}', 'erro')
-
-    return redirect(url_for('breed'))
-
-
-@app.route('/breed/entregar/<int:pedido_id>', methods=['POST'])
-@login_required
-def entregar_breed(pedido_id):
-    try:
-        supabase.table('pedidos_breed').update({
-            'status': 'entregue'
-        }).eq('id', pedido_id).execute()
-
-        flash('Pokémon entregue com sucesso! Obrigado pelo serviço. ⚔️', 'sucesso')
-    except Exception as e:
-        flash(f'Erro ao entregar pedido: {e}', 'erro')
 
     return redirect(url_for('breed'))
 
@@ -327,29 +269,26 @@ def entregar_breed(pedido_id):
 # ROTAS ADMINISTRATIVAS (GESTÃO DE CARGOS)
 # ============================================================================
 
-@app.route('/admin/cargos', methods=['GET'])
+@app.route('/admin/cargos')
 @login_required
 def admin_cargos():
-    """Página principal de gerenciamento de cargos do clã (Lista membros e cargos)."""
+    """Painel Admin para criação de cargos e atribuição aos membros."""
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
-        flash('Você não tem permissão para acessar a área administrativa.', 'erro')
+    if not permissoes.get('pode_gerenciar_cargos', False):
+        flash('Acesso negado: Você não é um administrador do clã.', 'erro')
         return redirect(url_for('painel'))
 
-    try:
-        res_usuarios = supabase.table('usuarios_clan').select('*').order('nick_jogo').execute()
-        res_cargos = supabase.table('cargos').select('*').execute()
-        
-        usuarios = res_usuarios.data if res_usuarios.data else []
-        cargos = res_cargos.data if res_cargos.data else []
-    except Exception as e:
-        print(f"Erro ao carregar dados administrativos: {e}")
-        usuarios = []
-        cargos = []
+    # Listar todos os usuários e cargos cadastrados
+    usuarios = supabase.table('usuarios_clan').select('*').order('nick_jogo').execute()
+    cargos = supabase.table('cargos').select('*').execute()
 
-    return render_template('admin_cargos.html', usuarios=usuarios, cargos=cargos)
+    return render_template(
+        'admin_cargos.html',
+        usuarios=usuarios.data or [],
+        cargos=cargos.data or []
+    )
 
 
 @app.route('/admin/criar-cargo', methods=['POST'])
@@ -359,7 +298,7 @@ def criar_novo_cargo():
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
+    if not permissoes.get('pode_gerenciar_cargos', False):
         flash('Acesso negado.', 'erro')
         return redirect(url_for('painel'))
 
@@ -371,11 +310,13 @@ def criar_novo_cargo():
         return redirect(url_for('admin_cargos'))
 
     try:
+        # 1. Inserir Cargo (O Trigger no Postgres cria a linha em permissoes_cargos)
         supabase.table('cargos').insert({
             'id': id_cargo,
             'nome_cargo': nome_cargo
         }).execute()
 
+        # 2. Atualizar Permissões marcadas no formulário
         supabase.table('permissoes_cargos').update({
             'pode_ver_fila_breed': bool(request.form.get('pode_ver_fila_breed')),
             'pode_assumir_breed': bool(request.form.get('pode_assumir_breed')),
@@ -397,7 +338,7 @@ def alterar_cargo(email_usuario):
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
+    if not permissoes.get('pode_gerenciar_cargos', False):
         flash('Acesso negado.', 'erro')
         return redirect(url_for('painel'))
 
@@ -415,9 +356,5 @@ def alterar_cargo(email_usuario):
     return redirect(url_for('admin_cargos'))
 
 
-# ============================================================================
-# INICIALIZADOR DO SERVIDOR
-# ============================================================================
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(debug=True)
