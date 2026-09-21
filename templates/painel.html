@@ -5,23 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Jogador - Berçário do Clã</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Estilos Exclusivos para a Notificação de Pokémon Pronto */
+        .alert-notificacao-breed {
+            background-color: #1a4d2e !important;
+            border: 2px solid #00ff66 !important;
+            color: #e0ffe0 !important;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            text-align: center;
+            text-shadow: 0 0 5px rgba(0,255,102,0.3);
+            animation: pulsaNotificacao 2s infinite ease-in-out;
+        }
+
+        @keyframes pulsaNotificacao {
+            0% { box-shadow: 0 0 5px rgba(0, 255, 102, 0.4); transform: scale(1); }
+            50% { box-shadow: 0 0 18px rgba(0, 255, 102, 0.8); transform: scale(1.01); }
+            100% { box-shadow: 0 0 5px rgba(0, 255, 102, 0.4); transform: scale(1); }
+        }
+    </style>
 </head>
 <body>
 
+    <!-- CABEÇALHO DA PÁGINA -->
     <header class="cabecalho">
         <div class="logo"> 
-            <img class="logo-dragao logodragao-esquerda" src="{{ url_for('static', filename='imagens/logodragaoH.png') }}" alt="Logo Dragão Esquerda">
+            <img class="logo-dragao logodragao-esquerda" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Dragão Esquerda">
             <nav class="menu">
                 <a href="{{ url_for('pagina_inicial') }}" class="btn-menu inicio">Início</a>
-                <a href="{{ url_for('breed') }}" class="btn-menu breed">Breed</a>
-                <a href="{{ url_for('painel') }}" class="login active">{{ session.get('nick_jogo') }}</a>
+                <a href="{{ url_for('breed') }}" class="btn-menu breed">Berçário (Breed)</a>
+                <a href="{{ url_for('painel') }}" class="login active">⚔️ {{ session.get('nick_jogo') }}</a>
             </nav>
-            <img class="logo-dragao logodragao-direita" src="{{ url_for('static', filename='imagens/logodragaoH.png') }}" alt="Logo Dragão Direita">
+            <img class="logo-dragao logodragao-direita" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Dragão Direita">
         </div>
     </header>
 
+    <!-- CONTEÚDO PRINCIPAL -->
     <main class="conteudo-painel">
-        <!-- CONTAINER DE ALERTAS -->
+        <!-- CONTAINER DE ALERTAS E NOTIFICAÇÕES -->
         <div class="container-alertas">
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
@@ -30,8 +54,16 @@
                 {% endfor %}
               {% endif %}
             {% endwith %}
+
+            <!-- 🌟 CENTRAL DE NOTIFICAÇÃO DE BREED UPGRADED -->
+            {% if notificacao %}
+              <div class="alert-notificacao-breed">
+                  {{ notificacao }}
+              </div>
+            {% endif %}
         </div>
 
+        <!-- CARD DO PERFIL DO MEMBRO -->
         <section class="card-painel">
             <h1 class="titulo-principal">⚔️ Painel do Membro</h1>
             
@@ -44,9 +76,11 @@
             <div class="acoes-painel">
                 <a href="{{ url_for('breed') }}" class="btn-primario">Ir para o Berçário (Breed)</a>
                 
-                {% if pode_gerenciar %}
-                <a href="{{ url_for('admin_cargos') }}" class="btn-admin">👑 Gerenciar Cargos do Clã</a>
-                {% endif %}
+                <!-- MENU ADMINISTRATIVO DO DONO -->
+{% if pode_gerenciar %}
+<a href="/admin/cargos" class="btn-admin" style="background-color: #d4af37; color: #000; font-weight: bold; border: 1px solid #fff;">👑 Gerenciar Cargos do Clã</a>
+{% endif %}
+
 
                 <a href="{{ url_for('logout') }}" class="btn-perigo">Sair da Conta</a>
             </div>
