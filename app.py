@@ -13,7 +13,7 @@ app.secret_key = 'chave_secreta_super_segura_do_cla'
 SUPABASE_URL = 'SUPABASE_URL'
 
 # Sua chave perfeitamente limpa
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bGRvamNndnpnZG5tcG9vZHFwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTYxMjUzNiwiZXhwIjoyMTA1MTg4NTM2fQ.r95AHcWbRYdQpybBeVjrcmp5nvekhq2wR6TXXZDQtxo'
+SUPABASE_KEY = 'SUPABASE_KEY'
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
