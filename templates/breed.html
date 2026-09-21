@@ -5,68 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Berçário (Breed) - Clã</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        /* Estilos da Linha do Tempo e Progresso */
-        .timeline-progresso {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px 12px;
-            border-radius: 6px;
-            min-width: 260px;
-        }
-        .timeline-etapa {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-size: 0.75rem;
-            color: #888;
-            font-weight: bold;
-            position: relative;
-            flex: 1;
-        }
-        .timeline-etapa .icon {
-            font-size: 1.1rem;
-            margin-bottom: 2px;
-            opacity: 0.4;
-            transition: all 0.3s ease;
-        }
-        .timeline-linha {
-            height: 3px;
-            background: #444;
-            flex-grow: 1;
-            margin: 0 5px;
-            margin-top: -14px;
-        }
-        /* Estados Ativos da Fila Dinâmica */
-        .timeline-etapa.ativo { color: #fff; }
-        .timeline-etapa.ativo .icon { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 5px currentColor); }
-        .timeline-etapa.pendente.ativo .icon { color: #ffcc00; }
-        .timeline-etapa.andamento.ativo .icon { color: #36a2eb; }
-        .timeline-etapa.concluido.ativo .icon { color: #00ff66; }
-        .timeline-linha.preenchida { background: #36a2eb; }
-        .timeline-linha.concluida { background: #00ff66; }
-        
-        .secao-separadora {
-            margin-top: 40px;
-            border-top: 1px dashed rgba(212, 175, 55, 0.2);
-            padding-top: 20px;
-        }
-    </style>
 </head>
 <body>
 
     <!-- CABEÇALHO DA PÁGINA -->
     <header class="cabecalho">
         <div class="logo"> 
-            <img class="logo-dragao logodragao-esquerda" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Dragão Esquerda">
+            <img class="logo-dragao logodragao-esquerda" src="{{ url_for('static', filename='imagens/logodragaoH.png') }}" alt="Logo Dragão Esquerda">
             <nav class="menu">
                 <a href="{{ url_for('pagina_inicial') }}" class="btn-menu inicio">Início</a>
                 <a href="{{ url_for('breed') }}" class="btn-menu breed active">Berçário (Breed)</a>
                 <a href="{{ url_for('painel') }}" class="login">⚔️ {{ session.get('nick_jogo') }}</a>
             </nav>
-            <img class="logo-dragao logodragao-direita" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Dragão Direita">
+            <img class="logo-dragao logodragao-direita" src="{{ url_for('static', filename='imagens/logodragaoH.png') }}" alt="Logo Dragão Direita">
         </div>
     </header>
 
@@ -120,14 +71,12 @@
             </div>
             {% endif %}
 
-            <!-- ============================================================================
-                 TABELA 1: FILA ATIVA DE PEDIDOS (PENDENTES E EM ANDAMENTO)
-                 ============================================================================ -->
+            <!-- TABELA / FILA DE PEDIDOS -->
             <h2 style="color: #d4af37; font-size: 1.3rem; margin-top: 20px;">
                 {% if permissoes.get('pode_ver_fila_breed') %}
-                    📋 Fila de Espera Ativa do Clã (A Fazer)
+                    📋 Fila Geral de Breeds do Clã
                 {% else %}
-                    📋 Meus Pedidos em Andamento
+                    📋 Meus Pedidos Enviados
                 {% endif %}
             </h2>
 
@@ -139,36 +88,34 @@
                             <th>Pokémon</th>
                             <th>Nature</th>
                             <th>Habilidade</th>
-                            <th>Progresso Dinâmico</th>
+                            <th>Observações</th>
+                            <th>Status</th>
                             <th>Breeder Resp.</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% if fila_ativa %}
-                            {% for p in fila_ativa %}
+                        {% if pedidos %}
+                            {% for p in pedidos %}
                             <tr>
                                 <td><strong>{{ p.player }}</strong></td>
                                 <td class="destaque-gold">{{ p.pokemon }}</td>
                                 <td>{{ p.nature }}</td>
                                 <td>{{ p.ability or '-' }}</td>
+                                <td>{{ p.nao_precisa or '-' }}</td>
                                 <td>
-                                    <!-- 🌟 BARRA DE PROGRESSO EM LINHA DO TEMPO -->
-                                    <div class="timeline-progresso">
-                                        <div class="timeline-etapa pendente ativo">
-                                            <span class="icon">⏳</span>
-                                            <span>Pendente</span>
-                                        </div>
-                                        <div class="timeline-linha {% if p.status == 'em_andamento' %}preenchida{% endif %}"></div>
-                                        <div class="timeline-etapa andamento {% if p.status == 'em_andamento' %}ativo{% endif %}">
-                                            <span class="icon">🥚</span>
-                                            <span>Chocando</span>
-                                        </div>
-                                    </div>
+                                    {% if p.status == 'pendente' %}
+                                        <span class="status-badge pendente">Pendente</span>
+                                    {% elif p.status == 'em_andamento' %}
+                                        <span class="status-badge" style="background-color: rgba(54, 162, 235, 0.2); color: #36a2eb; border: 1px solid #36a2eb;">Em Andamento</span>
+                                    {% else %}
+                                        <span class="status-badge concluido">Concluído</span>
+                                    {% endif %}
                                 </td>
-                                <td>{{ p.breeder_responsavel or 'Aguardando Breeder' }}</td>
+                                <td>{{ p.breeder_responsavel or 'Ninguém' }}</td>
                                 <td>
                                     <div style="display: flex; gap: 5px;">
+                                        <!-- Botão Assumir Breed -->
                                         {% if p.status == 'pendente' and permissoes.get('pode_assumir_breed') %}
                                             <form action="{{ url_for('assumir_breed', pedido_id=p.id) }}" method="POST">
                                                 {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
@@ -176,11 +123,16 @@
                                             </form>
                                         {% endif %}
 
+                                        <!-- Botão Concluir Breed -->
                                         {% if p.status == 'em_andamento' and permissoes.get('pode_concluir_breed') %}
                                             <form action="{{ url_for('concluir_breed', pedido_id=p.id) }}" method="POST">
                                                 {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                                                 <button type="submit" class="btn-sucesso btn-sm">Concluir</button>
                                             </form>
+                                        {% endif %}
+
+                                        {% if p.status == 'concluido' %}
+                                            <span class="texto-secundario">✔ Finalizado</span>
                                         {% endif %}
                                     </div>
                                 </td>
@@ -188,14 +140,18 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="7" class="tabela-vazia">Nenhum pedido ativo na fila de espera no momento.</td>
+                                <td colspan="8" class="tabela-vazia">Nenhum pedido de breed cadastrado no momento.</td>
                             </tr>
                         {% endif %}
                     </tbody>
                 </table>
             </div>
 
-            <!-- ============================================================================
-                 TABELA 2: HISTÓRICO DE PEDIDOS ENTREGUES (CONCLUÍDOS)
-                 ============================================================================ -->
-            <div class="secao-separadora">
+            <div class="rodape-admin" style="margin-top: 25px;">
+                <a href="{{ url_for('painel') }}" class="link-voltar">← Voltar para o Painel</a>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>
