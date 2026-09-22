@@ -1,1 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranking de Breeds - Clã Hype</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="breed-page">
+<header class="cabecalho">
+    <div class="logo">
+        <img class="logo-dragao logodragao-esquerda" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Hype">
+        <nav class="menu">
+            <a href="{{ url_for('pagina_inicial') }}" class="btn-menu inicio">Início</a>
+            <a href="{{ url_for('breed') }}" class="btn-menu breed">Berçário (Breed)</a>
+            <a href="{{ url_for('ranking_breed') }}" class="btn-menu active">Ranking</a>
+            <a href="{{ url_for('painel') }}" class="login">⚔️ {{ session.get('nick_jogo') }}</a>
+        </nav>
+        <img class="logo-dragao logodragao-direita" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Hype">
+    </div>
+</header>
 
+<main class="breed-shell ranking-shell">
+    <section class="ranking-header-card">
+        <div>
+            <span class="breed-kicker">ESTATÍSTICAS DO BERÇÁRIO</span>
+            <h1>🏆 Pokémon Mais Pedidos</h1>
+            <p>Ranking atualizado automaticamente a partir dos pedidos reais de Breed do clã.</p>
+        </div>
+        <a href="{{ url_for('breed') }}" class="btn-breed-gold">+ Novo Pedido</a>
+    </section>
+
+    <section class="ranking-controls">
+        <input id="rankingSearch" type="search" placeholder="🔍 Pesquisar Pokémon...">
+        <select id="rankingLimit">
+            <option value="10">Top 10</option>
+            <option value="20">Top 20</option>
+            <option value="9999">Todos</option>
+        </select>
+    </section>
+
+    <section class="breed-list-card">
+        <div class="tabela-responsive">
+            <table class="tabela-pedidos breed-table ranking-table" id="rankingTable">
+                <thead>
+                    <tr>
+                        <th>#</th><th>Pokémon</th><th>Pedidos</th><th>Nature mais pedida</th>
+                        <th>Breed</th><th>IV / Zero Speed</th><th>HA</th><th>Gênero</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in ranking %}
+                    <tr data-name="{{ item.pokemon|lower }}" data-rank="{{ loop.index }}">
+                        <td class="rank-position">
+                            {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+                        </td>
+                        <td>
+                            <div class="pokemon-table-cell ranking-pokemon">
+                                {% if item.pokemon_id %}
+                                <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{ item.pokemon_id }}.png" alt="{{ item.pokemon }}">
+                                {% endif %}
+                                <strong>{{ item.pokemon }}</strong>
+                            </div>
+                        </td>
+                        <td><span class="count-pill">{{ item.total }}</span></td>
+                        <td>{{ item.nature }}</td>
+                        <td><span class="pedido-chip">{{ item.breed_tipo }}</span></td>
+                        <td>
+                            {% if item.iv_descartado == 'zero_speed' %}
+                                <span class="zero-speed-tag">0 Speed</span>
+                            {% elif item.iv_descartado and item.iv_descartado != '—' %}
+                                {{ item.iv_descartado|replace('_',' ')|title }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ item.ha }}</td>
+                        <td>{{ 'Fêmea' if item.genero == 'femea' else ('Macho' if item.genero == 'macho' else item.genero) }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="8" class="tabela-vazia">Ainda não existem pedidos suficientes para formar o ranking.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="ranking-footer-note">⚔️ Cada pedido fortalece o Berçário Hype.</div>
+</main>
+
+<script>
+const search = document.getElementById('rankingSearch');
+const limit = document.getElementById('rankingLimit');
+const rows = [...document.querySelectorAll('#rankingTable tbody tr[data-name]')];
+
+function filtrarRanking() {
+    const q = search.value.trim().toLowerCase();
+    const max = Number(limit.value);
+    let mostrados = 0;
+    rows.forEach(row => {
+        const combina = row.dataset.name.includes(q);
+        const podeMostrar = combina && mostrados < max;
+        row.hidden = !podeMostrar;
+        if (podeMostrar) mostrados++;
+    });
+}
+search.addEventListener('input', filtrarRanking);
+limit.addEventListener('change', filtrarRanking);
+filtrarRanking();
+</script>
+</body>
+</html>
