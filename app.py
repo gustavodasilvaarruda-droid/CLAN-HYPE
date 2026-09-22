@@ -29,6 +29,7 @@ if not SUPABASE_KEY:
 
 # Conexão com Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 # ============================================================================
 # HELPER FUNCTIONS & DECORATORS
 # ============================================================================
