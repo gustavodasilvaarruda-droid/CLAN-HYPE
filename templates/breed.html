@@ -50,7 +50,7 @@
                     <div>
                         <label for="nature">Nature</label>
                         <select id="nature" name="nature" required>
-                            <option value="">Selecionar...</option>
+                            <option value="">Sem Nature</option>
                             {% for n in ['Hardy','Lonely','Brave','Adamant','Naughty','Bold','Docile','Relaxed','Impish','Lax','Timid','Hasty','Serious','Jolly','Naive','Modest','Mild','Quiet','Bashful','Rash','Calm','Gentle','Sassy','Careful','Quirky'] %}
                             <option value="{{ n }}">{{ n }}</option>
                             {% endfor %}
@@ -67,7 +67,7 @@
                     <div>
                         <label for="genero">Gênero</label>
                         <select id="genero" name="genero" required>
-                            <option value="">Selecionar...</option>
+                            <option value="indiferente">Indiferente (sem adicional)</option>
                             <option value="femea">Fêmea</option>
                             <option value="macho">Macho</option>
                         </select>
@@ -82,6 +82,12 @@
                     </div>
                 </div>
 
+                <div class="breed-grid">
+                    <div><label>Usar Ditto?</label><select name="usa_ditto"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+                    <div><label>HPWR?</label><select name="hpwr"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+                    <div><label>Pokémon treinado?</label><select name="treinado"><option value="nao">Não</option><option value="sim">Sim (+ adicional)</option></select></div>
+                </div>
+                <div class="price-note">💰 O preço final é calculado novamente pelo servidor e salvo no pedido. A categoria Comum/Raro vem do cadastro administrativo do Pokémon.</div>
                 <div id="iv_box" class="iv-box" hidden>
                     <label for="iv_descartado">Qual IV não precisa?</label>
                     <select id="iv_descartado" name="iv_descartado">
@@ -152,7 +158,7 @@
                         <td>
                             <div class="pedido-tags">
                                 <span>{{ p.nature }}</span>
-                                {% if p.breed_tipo %}<span>{{ p.breed_tipo }}</span>{% endif %}
+                                {% if p.breed_tipo %}<span>{{ p.breed_tipo }}</span>{% endif %}{% if p.preco_total %}<span>💰 ${{ '{:,}'.format(p.preco_total)|replace(',', '.') }}</span>{% endif %}
                                 {% if p.ha is not none %}<span>HA: {{ 'Sim' if p.ha else 'Não' }}</span>{% endif %}
                                 {% if p.genero %}<span>{{ 'Fêmea' if p.genero == 'femea' else 'Macho' }}</span>{% endif %}
                                 {% if p.breed_tipo == 'F5' and p.iv_descartado %}
@@ -171,7 +177,7 @@
                                 <div class="timeline-etapa concluido"><span class="icon">✓</span><span>Pronto</span></div>
                             </div>
                         </td>
-                        <td>{{ p.breeder_responsavel or 'Aguardando' }}</td>
+                        <td>{% if p.breeder_nick %}<a class="nick-link" href="{{ url_for('perfil_publico', nick=p.breeder_nick) }}">{{ p.breeder_nick }}</a>{% else %}Aguardando{% endif %}</td>
                         <td>
                             <div class="action-stack">
                             {% if p.status == 'pendente' and permissoes.get('pode_assumir_breed') %}
@@ -215,7 +221,7 @@
                         </td>
                         <td>{{ p.nature }}{% if p.breed_tipo %} • {{ p.breed_tipo }}{% endif %}{% if p.iv_descartado == 'zero_speed' %} • Zero Speed{% endif %}</td>
                         <td><span class="status-badge concluido">{{ 'Entregue' if p.status == 'entregue' else 'Concluído' }}</span></td>
-                        <td>{{ p.breeder_responsavel or '—' }}</td>
+                        <td>{% if p.breeder_nick %}<a class="nick-link" href="{{ url_for('perfil_publico', nick=p.breeder_nick) }}">{{ p.breeder_nick }}</a>{% else %}—{% endif %}</td>
                         <td>
                         {% if p.status == 'concluido' and (p.breeder_responsavel == session.get('usuario_email') or permissoes.get('pode_gerenciar_cargos')) %}
                             <form method="POST" action="{{ url_for('entregar_breed', pedido_id=p.id) }}">
