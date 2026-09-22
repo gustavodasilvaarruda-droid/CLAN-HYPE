@@ -188,6 +188,59 @@ def painel():
 # ============================================================================
 
 from datetime import datetime, timedelta
+from collections import Counter, defaultdict
+
+NATURES_VALIDAS = {
+    'Hardy', 'Lonely', 'Brave', 'Adamant', 'Naughty',
+    'Bold', 'Docile', 'Relaxed', 'Impish', 'Lax',
+    'Timid', 'Hasty', 'Serious', 'Jolly', 'Naive',
+    'Modest', 'Mild', 'Quiet', 'Bashful', 'Rash',
+    'Calm', 'Gentle', 'Sassy', 'Careful', 'Quirky'
+}
+
+IVS_F5_VALIDOS = {
+    'hp', 'ataque', 'defesa', 'ataque_especial',
+    'defesa_especial', 'velocidade', 'zero_speed'
+}
+
+
+def _mais_comum(valores):
+    valores = [v for v in valores if v not in (None, '')]
+    return Counter(valores).most_common(1)[0][0] if valores else None
+
+
+def montar_ranking_breed(pedidos):
+    """Monta o ranking usando os pedidos reais do Supabase."""
+    grupos = defaultdict(list)
+
+    for pedido in pedidos:
+        nome = (pedido.get('pokemon') or '').strip()
+        if nome:
+            grupos[nome.lower()].append(pedido)
+
+    ranking = []
+
+    for _, itens in grupos.items():
+        primeiro = itens[0]
+        pokemon_id = next(
+            (p.get('pokemon_id') for p in itens if p.get('pokemon_id')),
+            None
+        )
+
+        ranking.append({
+            'pokemon': primeiro.get('pokemon'),
+            'pokemon_id': pokemon_id,
+            'quantidade': len(itens),
+            'nature': _mais_comum([p.get('nature') for p in itens]),
+            'breed_tipo': _mais_comum([p.get('breed_tipo') for p in itens]),
+            'iv_descartado': _mais_comum([p.get('iv_descartado') for p in itens]),
+            'ha': _mais_comum([p.get('ha') for p in itens]),
+            'genero': _mais_comum([p.get('genero') for p in itens]),
+        })
+
+    ranking.sort(key=lambda item: (-item['quantidade'], item['pokemon'].lower()))
+    return ranking
+
 
 @app.route('/breed', methods=['GET', 'POST'])
 @login_required
@@ -201,22 +254,62 @@ def breed():
             return redirect(url_for('breed'))
 
         pokemon = request.form.get('pokemon', '').strip()
+        pokemon_id_raw = request.form.get('pokemon_id', '').strip()
         nature = request.form.get('nature', '').strip()
-        ability = request.form.get('ability', '').strip()
-        nao_precisa = request.form.get('nao_precisa', '').strip()
+        ha = request.form.get('ha', '').strip().lower()
+        genero = request.form.get('genero', '').strip().lower()
+        breed_tipo = request.form.get('breed_tipo', '').strip().upper()
+        iv_descartado = request.form.get('iv_descartado', '').strip().lower()
 
-        if not pokemon or not nature:
-            flash('Os campos Pokémon e Nature são obrigatórios!', 'erro')
+        if not pokemon or not pokemon_id_raw or not nature or not ha or not genero or not breed_tipo:
+            flash('Preencha todos os campos obrigatórios do pedido.', 'erro')
             return redirect(url_for('breed'))
+
+        try:
+            pokemon_id = int(pokemon_id_raw)
+            if pokemon_id <= 0:
+                raise ValueError
+        except ValueError:
+            flash('Selecione um Pokémon válido na lista.', 'erro')
+            return redirect(url_for('breed'))
+
+        if nature not in NATURES_VALIDAS:
+            flash('Selecione uma Nature válida.', 'erro')
+            return redirect(url_for('breed'))
+
+        if ha not in {'sim', 'nao'}:
+            flash('Selecione se o Pokémon precisa de HA.', 'erro')
+            return redirect(url_for('breed'))
+
+        if genero not in {'macho', 'femea'}:
+            flash('Selecione o gênero do Pokémon.', 'erro')
+            return redirect(url_for('breed'))
+
+        if breed_tipo not in {'F5', 'F6'}:
+            flash('Selecione F5 ou F6.', 'erro')
+            return redirect(url_for('breed'))
+
+        if breed_tipo == 'F5':
+            if iv_descartado not in IVS_F5_VALIDOS:
+                flash('No F5, informe qual IV não precisa.', 'erro')
+                return redirect(url_for('breed'))
+        else:
+            iv_descartado = None
 
         try:
             supabase.table('pedidos_breed').insert({
                 'usuario_email': email,
                 'player': session.get('nick_jogo'),
                 'pokemon': pokemon,
+                'pokemon_id': pokemon_id,
                 'nature': nature,
-                'ability': ability,
-                'nao_precisa': nao_precisa,
+                'ha': ha == 'sim',
+                'genero': genero,
+                'breed_tipo': breed_tipo,
+                'iv_descartado': iv_descartado,
+                # Mantém compatibilidade com os campos antigos.
+                'ability': 'HA' if ha == 'sim' else 'Sem HA',
+                'nao_precisa': iv_descartado if breed_tipo == 'F5' else None,
                 'status': 'pendente'
             }).execute()
 
@@ -229,14 +322,29 @@ def breed():
     pode_ver_fila = permissoes.get('pode_ver_fila_breed', False) if permissoes else False
 
     try:
-        res_verificacao = supabase.table('pedidos_breed').select('*').eq('status', 'em_andamento').execute()
+        # Mantém a regra já existente: após 3 dias, um pedido em andamento
+        # volta para pendente. Atualmente a contagem usa created_at.
+        res_verificacao = (
+            supabase.table('pedidos_breed')
+            .select('*')
+            .eq('status', 'em_andamento')
+            .execute()
+        )
+
         if res_verificacao and res_verificacao.data:
             agora = datetime.utcnow()
+
             for pedido in res_verificacao.data:
-                created_at_str = pedido.get('created_at', '').split('+')[0]
+                created_at_str = (pedido.get('created_at') or '').replace('Z', '+00:00')
+
                 try:
                     data_pedido = datetime.fromisoformat(created_at_str)
-                    if agora - data_pedido > timedelta(days=3):
+                    if data_pedido.tzinfo is not None:
+                        agora_com_tz = datetime.now(data_pedido.tzinfo)
+                    else:
+                        agora_com_tz = agora
+
+                    if agora_com_tz - data_pedido > timedelta(days=3):
                         supabase.table('pedidos_breed').update({
                             'status': 'pendente',
                             'breeder_responsavel': None
@@ -245,17 +353,36 @@ def breed():
                     print(f"Erro ao processar data do pedido {pedido.get('id')}: {err_date}")
 
         if pode_ver_fila:
-            pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
+            pedidos_query = (
+                supabase.table('pedidos_breed')
+                .select('*')
+                .order('created_at', desc=True)
+                .execute()
+            )
         else:
-            pedidos_query = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).order('created_at', desc=True).execute()
+            pedidos_query = (
+                supabase.table('pedidos_breed')
+                .select('*')
+                .eq('usuario_email', email)
+                .order('created_at', desc=True)
+                .execute()
+            )
 
         todos_pedidos = pedidos_query.data if (pedidos_query and pedidos_query.data) else []
+
     except Exception as e:
         print(f"Erro ao buscar pedidos: {e}")
         todos_pedidos = []
-    
-    fila_ativa = [p for p in todos_pedidos if p.get('status') in ['pendente', 'em_andamento']]
-    historico_concluido = [p for p in todos_pedidos if p.get('status') in ['concluido', 'entregue']]
+
+    fila_ativa = [
+        p for p in todos_pedidos
+        if p.get('status') in ['pendente', 'em_andamento']
+    ]
+
+    historico_concluido = [
+        p for p in todos_pedidos
+        if p.get('status') in ['concluido', 'entregue']
+    ]
 
     return render_template(
         'breed.html',
@@ -265,10 +392,29 @@ def breed():
     )
 
 
+@app.route('/breed/ranking')
+@login_required
+def ranking_breed():
+    """Ranking automático dos Pokémon mais pedidos."""
+    try:
+        resultado = (
+            supabase.table('pedidos_breed')
+            .select('pokemon,pokemon_id,nature,ha,genero,breed_tipo,iv_descartado')
+            .execute()
+        )
+        pedidos = resultado.data if resultado and resultado.data else []
+        ranking = montar_ranking_breed(pedidos)
+    except Exception as e:
+        print(f"Erro ao montar ranking de breed: {e}")
+        ranking = []
+
+    return render_template('ranking_breed.html', ranking=ranking)
+
+
 @app.route('/breed/assumir/<int:pedido_id>', methods=['POST'])
 @login_required
 def assumir_breed(pedido_id):
-    email = session.get('usuario_email')  
+    email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
     if not permissoes or not permissoes.get('pode_assumir_breed', False):
@@ -276,23 +422,54 @@ def assumir_breed(pedido_id):
         return redirect(url_for('breed'))
 
     try:
-        checar_pedido = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).execute()
-        if checar_pedido and checar_pedido.data:
-            if checar_pedido.data[0].get('status') == 'em_andamento':
-                flash('Este pedido já foi assumido por outro Breeder!', 'erro')
-                return redirect(url_for('breed'))
+        checar = (
+            supabase.table('pedidos_breed')
+            .select('*')
+            .eq('id', pedido_id)
+            .execute()
+        )
 
-        pedidos_ativos = supabase.table('pedidos_breed').select('id').eq('breeder_responsavel', email).eq('status', 'em_andamento').execute()
+        if not checar.data:
+            flash('Pedido não encontrado.', 'erro')
+            return redirect(url_for('breed'))
+
+        pedido = checar.data[0]
+
+        if pedido.get('status') != 'pendente':
+            flash('Este pedido já foi assumido ou não está mais pendente.', 'erro')
+            return redirect(url_for('breed'))
+
+        pedidos_ativos = (
+            supabase.table('pedidos_breed')
+            .select('id')
+            .eq('breeder_responsavel', email)
+            .eq('status', 'em_andamento')
+            .execute()
+        )
+
         if pedidos_ativos and pedidos_ativos.data and len(pedidos_ativos.data) >= 4:
             flash('Você já atingiu o limite máximo de 4 pedidos ativos por vez! Conclua algum antes de pegar outro. ❌', 'erro')
             return redirect(url_for('breed'))
 
-        supabase.table('pedidos_breed').update({
-            'status': 'em_andamento',
-            'breeder_responsavel': email  
-        }).eq('id', pedido_id).execute()
+        # Atualização condicionada a status pendente reduz o risco de dois
+        # breeders assumirem o mesmo pedido ao mesmo tempo.
+        atualizado = (
+            supabase.table('pedidos_breed')
+            .update({
+                'status': 'em_andamento',
+                'breeder_responsavel': email
+            })
+            .eq('id', pedido_id)
+            .eq('status', 'pendente')
+            .execute()
+        )
+
+        if not atualizado.data:
+            flash('Outro Breeder assumiu este pedido antes de você.', 'erro')
+            return redirect(url_for('breed'))
 
         flash('Você assumiu este pedido de breed! Mãos à obra. 🥚', 'sucesso')
+
     except Exception as e:
         flash(f'Erro ao assumir pedido: {e}', 'erro')
 
@@ -305,16 +482,39 @@ def concluir_breed(pedido_id):
     email = session.get('usuario_email')
     permissoes = obter_permissoes_usuario(email)
 
-    if not permissoes or not permissoes.get('pode_assumir_breed', False):
+    if not permissoes or not permissoes.get('pode_concluir_breed', False):
         flash('Você não tem permissão para concluir pedidos de breed.', 'erro')
         return redirect(url_for('breed'))
 
     try:
+        resultado = (
+            supabase.table('pedidos_breed')
+            .select('id,status,breeder_responsavel')
+            .eq('id', pedido_id)
+            .execute()
+        )
+
+        if not resultado.data:
+            flash('Pedido não encontrado.', 'erro')
+            return redirect(url_for('breed'))
+
+        pedido = resultado.data[0]
+        pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False)
+
+        if pedido.get('status') != 'em_andamento':
+            flash('Este pedido não está em andamento.', 'erro')
+            return redirect(url_for('breed'))
+
+        if pedido.get('breeder_responsavel') != email and not pode_gerenciar:
+            flash('Este pedido está sendo feito por outro Breeder.', 'erro')
+            return redirect(url_for('breed'))
+
         supabase.table('pedidos_breed').update({
             'status': 'concluido'
-        }).eq('id', pedido_id).execute()
+        }).eq('id', pedido_id).eq('status', 'em_andamento').execute()
 
         flash('Pedido marcado como concluído! O jogador será notificado no painel. 🎉', 'sucesso')
+
     except Exception as e:
         flash(f'Erro ao concluir pedido: {e}', 'erro')
 
@@ -324,12 +524,38 @@ def concluir_breed(pedido_id):
 @app.route('/breed/entregar/<int:pedido_id>', methods=['POST'])
 @login_required
 def entregar_breed(pedido_id):
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+
     try:
+        resultado = (
+            supabase.table('pedidos_breed')
+            .select('id,status,breeder_responsavel')
+            .eq('id', pedido_id)
+            .execute()
+        )
+
+        if not resultado.data:
+            flash('Pedido não encontrado.', 'erro')
+            return redirect(url_for('breed'))
+
+        pedido = resultado.data[0]
+        pode_gerenciar = permissoes.get('pode_gerenciar_cargos', False) if permissoes else False
+
+        if pedido.get('status') != 'concluido':
+            flash('Este pedido ainda não está pronto para entrega.', 'erro')
+            return redirect(url_for('breed'))
+
+        if pedido.get('breeder_responsavel') != email and not pode_gerenciar:
+            flash('Somente o Breeder responsável ou um administrador pode marcar a entrega.', 'erro')
+            return redirect(url_for('breed'))
+
         supabase.table('pedidos_breed').update({
             'status': 'entregue'
-        }).eq('id', pedido_id).execute()
+        }).eq('id', pedido_id).eq('status', 'concluido').execute()
 
         flash('Pokémon entregue com sucesso! Obrigado pelo serviço. ⚔️', 'sucesso')
+
     except Exception as e:
         flash(f'Erro ao entregar pedido: {e}', 'erro')
 
