@@ -6,18 +6,10 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-# Configurações de Segurança e Conexão Supabase
-app.secret_key = 'chave_secreta_super_segura_do_cla'
-
-# AJUSTADO: Agora com o ID do seu projeto correto antes do '.supabase.co'
-SUPABASE_URL = 'SUPABASE_URL'
-
-# Sua chave perfeitamente limpa
-SUPABASE_KEY = 'SUPABASE_KEY'
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
 
 
 # ============================================================================
