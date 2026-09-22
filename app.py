@@ -134,6 +134,73 @@ def tem_permissao(chave, fallback_gerenciar=True):
     return bool(p.get('pode_gerenciar_cargos')) if fallback_gerenciar else False
 
 
+
+def converter_preco(valor):
+    """
+    Converte valores digitados no painel:
+    500k   -> 500000
+    100k   -> 100000
+    1.2kk  -> 1200000
+    1,5kk  -> 1500000
+    300000 -> 300000
+    """
+    if valor is None:
+        return 0
+
+    texto = str(valor).strip().lower()
+    texto = texto.replace("r$", "").replace("$", "").replace(" ", "")
+    texto = texto.replace(".", ".").replace(",", ".")
+
+    if not texto:
+        return 0
+
+    multiplicador = 1
+    if texto.endswith("kk"):
+        multiplicador = 1_000_000
+        texto = texto[:-2]
+    elif texto.endswith("k"):
+        multiplicador = 1_000
+        texto = texto[:-1]
+
+    try:
+        numero = float(texto)
+    except (TypeError, ValueError):
+        raise ValueError("Preço inválido. Use exemplos como 500k, 100k, 1.2kk ou 300000.")
+
+    if numero < 0:
+        raise ValueError("O preço não pode ser negativo.")
+
+    return int(round(numero * multiplicador))
+
+
+def formatar_preco(valor):
+    """
+    Formata o número salvo no banco para o padrão visual do clã.
+    500000  -> 500k
+    600000  -> 600k
+    1200000 -> 1.2kk
+    3000000 -> 3kk
+    """
+    try:
+        numero = int(valor or 0)
+    except (TypeError, ValueError):
+        return "0"
+
+    if numero >= 1_000_000:
+        texto = f"{numero / 1_000_000:.2f}".rstrip("0").rstrip(".")
+        return f"{texto}kk"
+
+    if numero >= 1_000:
+        texto = f"{numero / 1_000:.2f}".rstrip("0").rstrip(".")
+        return f"{texto}k"
+
+    return str(numero)
+
+
+# Permite usar {{ valor|preco }} em qualquer template Jinja.
+app.jinja_env.filters["preco"] = formatar_preco
+
+
 def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='comum',
                          usa_ditto=False, hpwr=False, treinado=False, nature=None):
     """Preço final calculado no servidor e salvo como snapshot no pedido."""
@@ -558,7 +625,7 @@ def breed():
                 'status': 'pendente'
             }).execute()
 
-            flash(f'Pedido enviado! Valor calculado: ${preco_total:,}. Acompanhe o progresso na fila. ⏳'.replace(',', '.'), 'sucesso')
+            flash(f'Pedido enviado! Valor calculado: {formatar_preco(preco_total)}. Acompanhe o progresso na fila. ⏳', 'sucesso')
         except Exception as e:
             flash(f'Erro ao registrar pedido: {e}', 'erro')
 
@@ -1292,12 +1359,17 @@ def admin_precos():
     if request.method=='POST':
         codigo=request.form.get('codigo','').strip()
         try:
-            valor=max(0,int(request.form.get('valor',0)))
-            supabase.table('precos_breed').update({'valor':valor}).eq('codigo',codigo).execute()
-            flash('Preço atualizado.','sucesso')
-        except Exception as e: flash(f'Erro: {e}','erro')
+            valor_digitado = request.form.get('valor', '').strip()
+            valor = converter_preco(valor_digitado)
+            supabase.table('precos_breed').update({'valor': valor}).eq('codigo', codigo).execute()
+            flash(f'Preço atualizado para {formatar_preco(valor)}.', 'sucesso')
+        except Exception as e:
+            flash(f'Erro ao atualizar preço: {e}', 'erro')
         return redirect(url_for('admin_precos'))
-    return render_template('admin_precos.html', precos=_safe_table('precos_breed','*'))
+    precos = _safe_table('precos_breed', '*')
+    for item in precos:
+        item['valor_formatado'] = formatar_preco(item.get('valor'))
+    return render_template('admin_precos.html', precos=precos)
 
 @app.route('/admin/feed', methods=['GET','POST'])
 @login_required
