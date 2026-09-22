@@ -3,16 +3,32 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Carrega o .env quando estiver rodando no computador.
+# No Render, os valores vêm das Environment Variables.
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Change this to a secure key
 
-# Supabase settings
-SUPABASE_URL = ""
-SUPABASE_KEY = ""
+# Chave de sessão do Flask
+app.secret_key = os.environ.get("SECRET_KEY", "").strip()
+
+if not app.secret_key:
+    raise RuntimeError("A variável SECRET_KEY não foi configurada.")
+
+# Configurações do Supabase
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+
+if not SUPABASE_URL:
+    raise RuntimeError("A variável SUPABASE_URL não foi configurada.")
+
+if not SUPABASE_KEY:
+    raise RuntimeError("A variável SUPABASE_KEY não foi configurada.")
+
+# Conexão com Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
 # ============================================================================
 # HELPER FUNCTIONS & DECORATORS
 # ============================================================================
