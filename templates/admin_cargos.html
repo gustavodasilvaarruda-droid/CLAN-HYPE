@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Cargos - Clã</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- CABEÇALHO DA PÁGINA -->
+    <header class="cabecalho">
+        <div class="logo"> 
+            <img class="logo-dragao logodragao-esquerda" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Dragão Esquerda">
+            <nav class="menu">
+                <a href="{{ url_for('pagina_inicial') }}" class="btn-menu inicio">Início</a>
+                <a href="{{ url_for('breed') }}" class="btn-menu breed">Berçário (Breed)</a>
+                <a href="{{ url_for('painel') }}" class="login">⚔️ {{ session.get('nick_jogo') }}</a>
+            </nav>
+            <img class="logo-dragao logodragao-direita" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Dragão Direita">
+        </div>
+    </header>
+
+    <!-- MENSAGENS FLASH (ALERTAS) -->
+    <div class="container-alertas">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- CONTEÚDO DA ÁREA ADMIN -->
+    <main class="conteudo-admin">
+        <div class="container-admin">
+            <h1 class="titulo-principal">👑 Painel Administrativo de Cargos</h1>
+
+            <!-- CRIAÇÃO DE NOVO CARGO -->
+            <div class="form-criar-cargo">
+                <h3>Criar Novo Cargo e Permissões</h3>
+                <form action="{{ url_for('criar_novo_cargo') }}" method="POST">
+                    {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+
+                    <div class="form-grid-2">
+                        <div>
+                            <label class="label-secao">Nome Exibido do Cargo *</label>
+                            <input type="text" name="nome_cargo" placeholder="Ex: Sub-Líder, Sub-Breeder" required>
+                        </div>
+                        <div>
+                            <label class="label-secao">Identificador Único (ID minúsculo) *</label>
+                            <input type="text" name="id_cargo" placeholder="Ex: sub_lider" required>
+                        </div>
+                    </div>
+
+                    <p class="label-secao">Permissões do Cargo:</p>
+                    <div class="grid-checkboxes">
+                        <label>
+                            <input type="checkbox" name="pode_ver_fila_breed" value="1">
+                            Ver fila geral de Breeds
+                        </label>
+                        <label>
+                            <input type="checkbox" name="pode_fazer_pedido_breed" value="1" checked>
+                            Fazer pedidos de Breed
+                        </label>
+                        <label>
+                            <input type="checkbox" name="pode_assumir_breed" value="1">
+                            Assumir pedidos de Breed
+                        </label>
+                        <label>
+                            <input type="checkbox" name="pode_concluir_breed" value="1">
+                            Concluir pedidos de Breed
+                        </label>
+                        <label>
+                            <input type="checkbox" name="pode_ver_gestao_breed" value="1">
+                            Ver Gestão do Berçário
+                        </label>
+                        <label>
+                            <input type="checkbox" name="pode_gerenciar_cargos" value="1">
+                            Gerenciar cargos do Clã (Admin)
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn-primario">Salvar Novo Cargo</button>
+                </form>
+            </div>
+
+            <!-- TABELA DE GERENCIAMENTO DE MEMBROS -->
+            <h2 style="color: #d4af37; font-size: 1.3rem; margin-top: 30px;">👥 Gerenciar Cargos dos Membros</h2>
+            
+            <div class="tabela-responsive">
+                <table class="tabela-pedidos">
+                    <thead>
+                        <tr>
+                            <th>Nick no Jogo</th>
+                            <th>E-mail</th>
+                            <th>Cargo Atual</th>
+                            <th>Alterar Para</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if usuarios %}
+                            {% for u in usuarios %}
+                            <tr>
+                                <td><strong>{{ u.nick_jogo }}</strong></td>
+                                <td class="texto-secundario">{{ u.email }}</td>
+                                <td>
+                                    <span class="badge-cargo">{{ u.cargo | upper }}</span>
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('alterar_cargo', email_usuario=u.email) }}" method="POST" class="form-alterar-cargo">
+                                        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                                        
+                                        <select name="novo_cargo" class="select-cargo" required>
+                                            {% for c in cargos %}
+                                                <option value="{{ c.id }}" {% if c.id == u.cargo %}selected{% endif %}>
+                                                    {{ c.nome_cargo }} ({{ c.id }})
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        
+                                        <button type="submit" class="btn-sucesso btn-sm">Atualizar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="tabela-vazia">Nenhum guerreiro cadastrado no clã ainda.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="rodape-admin" style="margin-top: 25px;">
+                <a href="{{ url_for('painel') }}" class="link-voltar">← Voltar para o Painel Principal</a>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

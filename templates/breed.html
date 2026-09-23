@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Berçário (Breed) - Clã Hype</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="breed-page">
+<header class="cabecalho">
+    <div class="logo">
+        <img class="logo-dragao logodragao-esquerda" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Hype">
+        <nav class="menu">
+            <a href="{{ url_for('pagina_inicial') }}" class="btn-menu inicio">Início</a>
+            <a href="{{ url_for('breed') }}" class="btn-menu breed active">Berçário (Breed)</a>
+            <a href="{{ url_for('ranking_breed') }}" class="btn-menu">Ranking</a>
+            <a href="{{ url_for('painel') }}" class="login">⚔️ {{ session.get('nick_jogo') }}</a>
+        </nav>
+        <img class="logo-dragao logodragao-direita" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Logo Hype">
+    </div>
+</header>
+
+<main class="breed-shell">
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+            {% for categoria, mensagem in mensagens %}
+                <div class="alerta {{ categoria }}">{{ mensagem }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <section class="breed-hero-card">
+        <div class="breed-form-side">
+            <div class="breed-kicker">BERÇÁRIO HYPE</div>
+            <h1>Pedido de Breed</h1>
+            <p class="breed-subtitle">Escolha seu Pokémon e monte o pedido. O sistema mostra a imagem automaticamente.</p>
+
+            {% if permissoes.get('pode_fazer_pedido_breed', True) %}
+            <form method="POST" id="breedForm" class="breed-modern-form" autocomplete="off">
+                <input type="hidden" name="pokemon_id" id="pokemon_id">
+
+                <label for="pokemon_search">Pokémon</label>
+                <div class="pokemon-search-wrap">
+                    <input id="pokemon_search" name="pokemon" type="text" placeholder="Digite para pesquisar..." required>
+                    <div id="pokemon_results" class="pokemon-results" hidden></div>
+                </div>
+                <small id="pokemon_status" class="campo-ajuda">Selecione um Pokémon válido da lista.</small>
+
+                <div class="breed-grid">
+                    <div>
+                        <label for="nature">Nature</label>
+                        <select id="nature" name="nature" required>
+                            <option value="">Sem Nature</option>
+                            {% for n in ['Hardy','Lonely','Brave','Adamant','Naughty','Bold','Docile','Relaxed','Impish','Lax','Timid','Hasty','Serious','Jolly','Naive','Modest','Mild','Quiet','Bashful','Rash','Calm','Gentle','Sassy','Careful','Quirky'] %}
+                            <option value="{{ n }}">{{ n }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="ha">HA</label>
+                        <select id="ha" name="ha" required>
+                            <option value="">Selecionar...</option>
+                            <option value="sim">Sim</option>
+                            <option value="nao">Não</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="genero">Gênero</label>
+                        <select id="genero" name="genero" required>
+                            <option value="indiferente">Indiferente (sem adicional)</option>
+                            <option value="femea">Fêmea</option>
+                            <option value="macho">Macho</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="breed_tipo">Breed</label>
+                        <select id="breed_tipo" name="breed_tipo" required>
+                            <option value="">Selecionar...</option>
+                            <option value="F5">F5</option>
+                            <option value="F6">F6</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="breed-grid">
+                    <div><label>Pokémon treinado?</label><select name="treinado"><option value="nao">Não</option><option value="sim">Sim (+ adicional)</option></select></div>
+                </div>
+                <div class="price-note">💰 O preço final é calculado novamente pelo servidor e salvo no pedido. A categoria Comum/Raro vem do cadastro administrativo do Pokémon.</div>
+                <div id="iv_box" class="iv-box" hidden>
+                    <label for="iv_descartado">Qual IV não precisa?</label>
+                    <select id="iv_descartado" name="iv_descartado">
+                        <option value="">Selecionar...</option>
+                        <option value="hp">HP</option>
+                        <option value="ataque">Ataque</option>
+                        <option value="defesa">Defesa</option>
+                        <option value="ataque_especial">Ataque Especial</option>
+                        <option value="defesa_especial">Defesa Especial</option>
+                        <option value="velocidade">Velocidade</option>
+                    </select>
+                    <label class="zero-speed-option">
+                        <input type="checkbox" id="zero_speed" name="zero_speed" value="sim">
+                        <span>Quero Zero Speed (0 IV em Velocidade)</span>
+                    </label>
+                    <small class="campo-ajuda">Zero Speed é adicional: você ainda escolhe qual outro IV não precisa.</small>
+                </div>
+
+                <div class="breed-form-actions">
+                    <button type="submit" class="btn-breed-gold">Solicitar Breed</button>
+                    <a href="{{ url_for('ranking_breed') }}" class="btn-ranking-outline">🏆 Ver Pokémon Mais Pedidos</a>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+
+        <div class="pokemon-preview-side">
+            <div class="preview-glow"></div>
+            <img id="pokemon_preview" alt="Pokémon selecionado" hidden>
+            <div id="pokemon_placeholder" class="pokemon-placeholder">
+                <span>?</span>
+                <strong>Escolha um Pokémon</strong>
+                <small>A imagem aparecerá aqui</small>
+            </div>
+            <div id="pokemon_preview_name" class="pokemon-preview-name"></div>
+            <div id="breed_special_alert" class="breed-special-alert" hidden>
+                <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/132.png" alt="Ditto">
+                <div><b>BREED ESPECIAL • DITTO OBRIGATÓRIO</b><span>Este Pokémon só pode breedar com Ditto e usa a tabela de preço especial.</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="breed-info-strip">
+        <strong>Como funciona:</strong> F6 não pede IV descartável. No F5, escolha o IV que não precisa; <b>Zero Speed</b> pode ser marcado separadamente.
+    </section>
+
+    <section class="breed-list-card">
+        <div class="section-title-row">
+            <div>
+                <span class="breed-kicker">ACOMPANHAMENTO</span>
+                <h2>Fila de Breeds</h2>
+            </div>
+            <a href="{{ url_for('ranking_breed') }}" class="btn-ranking-outline">🏆 Ranking</a>
+        </div>
+
+        <div class="tabela-responsive">
+            <table class="tabela-pedidos breed-table">
+                <thead>
+                    <tr>
+                        <th>Player</th><th>Pokémon</th><th>Pedido</th><th>Progresso</th><th>Breeder</th><th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for p in fila_ativa %}
+                    <tr>
+                        <td>{{ p.player }}</td>
+                        <td>
+                            <div class="pokemon-table-cell">
+                                {% if p.pokemon_id %}
+                                <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{ p.pokemon_id }}.png" alt="{{ p.pokemon }}">
+                                {% endif %}
+                                <strong>{{ p.pokemon }}</strong>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="pedido-tags">
+                                <span>{{ p.nature }}</span>
+                                {% if p.breed_tipo %}<span>{{ p.breed_tipo }}</span>{% endif %}{% if p.zero_speed %}<span>0 Speed</span>{% endif %}{% if p.breed_especial %}<span class="tag-special">Ditto Especial</span>{% endif %}{% if p.preco_total %}<span>💰 ${{ '{:,}'.format(p.preco_total)|replace(',', '.') }}</span>{% endif %}
+                                {% if p.ha is not none %}<span>HA: {{ 'Sim' if p.ha else 'Não' }}</span>{% endif %}
+                                {% if p.genero %}<span>{{ 'Fêmea' if p.genero == 'femea' else 'Macho' }}</span>{% endif %}
+                                {% if p.breed_tipo == 'F5' and p.iv_descartado %}
+                                <span class="{{ 'zero-speed-tag' if p.iv_descartado == 'zero_speed' else '' }}">
+                                    {{ 'Zero Speed' if p.iv_descartado == 'zero_speed' else 'Sem ' ~ p.iv_descartado|replace('_',' ')|title }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="timeline-progresso">
+                                <div class="timeline-etapa pendente ativo"><span class="icon">🥚</span><span>Pedido</span></div>
+                                <div class="timeline-linha {{ 'preenchida' if p.status == 'em_andamento' else '' }}"></div>
+                                <div class="timeline-etapa andamento {{ 'ativo' if p.status == 'em_andamento' else '' }}"><span class="icon">⚒️</span><span>Chocando</span></div>
+                                <div class="timeline-linha"></div>
+                                <div class="timeline-etapa concluido"><span class="icon">✓</span><span>Pronto</span></div>
+                            </div>
+                        </td>
+                        <td>{% if p.breeder_nick %}<a class="nick-link" href="{{ url_for('perfil_publico', nick=p.breeder_nick) }}">{{ p.breeder_nick }}</a>{% else %}Aguardando{% endif %}</td>
+                        <td>
+                            <div class="action-stack"><a class="btn-dourado btn-sm" href="{{ url_for('chat_pedido', tipo='breed', pedido_id=p.id) }}">💬 Chat</a>
+                            {% if p.usuario_email == session.get('usuario_email') and p.status in ['pendente','em_andamento'] %}
+<form method="POST" action="{{ url_for('cancelar_breed', pedido_id=p.id) }}" onsubmit="return confirm('Cancelar este pedido?')">
+<input name="motivo" placeholder="Motivo (opcional)"><button class="btn-perigo btn-sm" type="submit">Cancelar</button></form>
+{% endif %}
+
+                            {% if p.status == 'pendente' and permissoes.get('pode_assumir_breed') %}
+                                <form method="POST" action="{{ url_for('assumir_breed', pedido_id=p.id) }}">
+                                    <button class="btn-sucesso btn-sm" type="submit">Assumir</button>
+                                </form>
+                            {% endif %}
+
+                            {% if p.status == 'em_andamento' and permissoes.get('pode_concluir_breed') and (p.breeder_responsavel == session.get('usuario_email') or permissoes.get('pode_gerenciar_cargos')) %}
+                                <form method="POST" action="{{ url_for('concluir_breed', pedido_id=p.id) }}">
+                                    <button class="btn-dourado btn-sm" type="submit">Concluir</button>
+                                </form>
+                            {% elif p.status == 'em_andamento' and permissoes.get('pode_concluir_breed') %}
+                                <span class="locked-breeder">🔒 Outro Breeder</span>
+                            {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="tabela-vazia">Nenhum pedido ativo no momento.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="breed-list-card secao-separadora">
+        <div class="section-title-row"><div><span class="breed-kicker">HISTÓRICO</span><h2>Breeds Concluídos</h2></div></div>
+        <div class="tabela-responsive">
+            <table class="tabela-pedidos breed-table">
+                <thead><tr><th>Player</th><th>Pokémon</th><th>Configuração</th><th>Status</th><th>Breeder</th><th>Ações</th></tr></thead>
+                <tbody>
+                {% for p in historico_concluido %}
+                    <tr>
+                        <td>{{ p.player }}</td>
+                        <td>
+                            <div class="pokemon-table-cell">
+                                {% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{ p.pokemon_id }}.png" alt="{{ p.pokemon }}">{% endif %}
+                                <strong>{{ p.pokemon }}</strong>
+                            </div>
+                        </td>
+                        <td>{{ p.nature or 'Sem Nature' }}{% if p.breed_tipo %} • {{ p.breed_tipo }}{% endif %}{% if p.zero_speed %} • Zero Speed{% endif %}{% if p.breed_especial %} • Ditto Especial{% endif %}</td>
+                        <td><span class="status-badge concluido">{{ 'Entregue' if p.status == 'entregue' else 'Concluído' }}</span></td>
+                        <td>{% if p.breeder_nick %}<a class="nick-link" href="{{ url_for('perfil_publico', nick=p.breeder_nick) }}">{{ p.breeder_nick }}</a>{% else %}—{% endif %}</td>
+                        <td>
+                        <a class="btn-dourado btn-sm" href="{{ url_for('chat_pedido', tipo='breed', pedido_id=p.id) }}">💬 Chat</a>
+                        {% if p.usuario_email == session.get('usuario_email') and p.status in ['concluido','entregue'] %}
+                        <form class="rating-form" method="post" action="{{url_for('avaliar_pedido',tipo='breed',pedido_id=p.id)}}"><select name="nota"><option value="5">5 ⭐</option><option value="4">4 ⭐</option><option value="3">3 ⭐</option><option value="2">2 ⭐</option><option value="1">1 ⭐</option></select><input name="comentario" placeholder="Avaliação"><button class="btn-sucesso btn-sm">Avaliar</button></form>
+                        {% endif %}
+                        {% if p.status == 'concluido' and (p.breeder_responsavel == session.get('usuario_email') or permissoes.get('pode_gerenciar_cargos')) %}
+                            <form method="POST" action="{{ url_for('entregar_breed', pedido_id=p.id) }}">
+                                <button class="btn-sucesso btn-sm" type="submit">Entregar</button>
+                            </form>
+                        {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="tabela-vazia">Ainda não há breeds concluídos.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<script>
+const searchInput = document.getElementById('pokemon_search');
+const idInput = document.getElementById('pokemon_id');
+const resultsBox = document.getElementById('pokemon_results');
+const statusEl = document.getElementById('pokemon_status');
+const preview = document.getElementById('pokemon_preview');
+const placeholder = document.getElementById('pokemon_placeholder');
+const previewName = document.getElementById('pokemon_preview_name');
+const breedTipo = document.getElementById('breed_tipo');
+const ivBox = document.getElementById('iv_box');
+const ivSelect = document.getElementById('iv_descartado');
+const form = document.getElementById('breedForm');
+const specialAlert = document.getElementById('breed_special_alert');
+
+let especies = [];
+let selecionadoValido = false;
+
+function nomeBonito(nome) {
+    return nome.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+
+async function carregarPokemon() {
+    try {
+        const r = await fetch('https://pokeapi.co/api/v2/pokemon-species?limit=2000');
+        const data = await r.json();
+        especies = data.results.map(item => {
+            const partes = item.url.split('/').filter(Boolean);
+            return { nome: item.name, id: Number(partes[partes.length - 1]), url: item.url };
+        });
+        statusEl.textContent = 'Digite o nome e escolha um Pokémon da lista.';
+    } catch (e) {
+        statusEl.textContent = 'Não foi possível carregar a lista de Pokémon agora.';
+    }
+}
+
+function mostrarResultados() {
+    const q = searchInput.value.trim().toLowerCase();
+    idInput.value = '';
+    selecionadoValido = false;
+    if (q.length < 1) {
+        resultsBox.hidden = true;
+        return;
+    }
+    const encontrados = especies.filter(p => p.nome.includes(q)).slice(0, 12);
+    resultsBox.innerHTML = encontrados.map(p => `
+        <button type="button" class="pokemon-result" data-id="${p.id}" data-name="${p.nome}" data-url="${p.url}">
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png" alt="">
+            <span>${nomeBonito(p.nome)}</span>
+        </button>`).join('');
+    resultsBox.hidden = encontrados.length === 0;
+}
+
+async function selecionarPokemon(btn) {
+    const id = Number(btn.dataset.id);
+    const nome = btn.dataset.name;
+    statusEl.textContent = 'Verificando se este Pokémon pode breedar...';
+
+    try {
+        const r = await fetch(btn.dataset.url);
+        const especie = await r.json();
+        const eggGroups = (especie.egg_groups || []).map(g => g.name);
+        const nomeNormalizado = (nome || '').toLowerCase();
+        const naoPodeBreedar = eggGroups.includes('no-eggs') || nomeNormalizado === 'ditto';
+
+        if (naoPodeBreedar) {
+            idInput.value = '';
+            selecionadoValido = false;
+            specialAlert.hidden = true;
+            statusEl.textContent = nomeNormalizado === 'ditto'
+                ? 'Ditto não pode ser solicitado como Pokémon alvo.'
+                : 'Este Pokémon pertence ao Egg Group No Eggs Discovered e não pode breedar.';
+            statusEl.classList.add('campo-erro');
+            return;
+        }
+
+        const rLocal = await fetch(`/api/breed/pokemon/${id}?nome=${encodeURIComponent(nome)}`);
+        const info = await rLocal.json();
+        if (!info.breedavel) {
+            idInput.value = '';
+            selecionadoValido = false;
+            specialAlert.hidden = true;
+            statusEl.textContent = info.motivo || 'Este Pokémon não está disponível para Breed.';
+            statusEl.classList.add('campo-erro');
+            return;
+        }
+
+        searchInput.value = nomeBonito(nome);
+        idInput.value = id;
+        selecionadoValido = true;
+        resultsBox.hidden = true;
+        specialAlert.hidden = !info.breed_especial;
+        statusEl.textContent = info.breed_especial
+            ? 'Breed Especial: Ditto obrigatório • valor especial ✓'
+            : 'Pokémon disponível para Breed ✓';
+        statusEl.classList.remove('campo-erro');
+
+        preview.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+        preview.hidden = false;
+        placeholder.hidden = true;
+        previewName.textContent = nomeBonito(nome);
+    } catch (e) {
+        statusEl.textContent = 'Não foi possível validar o Pokémon. Tente novamente.';
+        statusEl.classList.add('campo-erro');
+    }
+}
+
+searchInput?.addEventListener('input', mostrarResultados);
+resultsBox?.addEventListener('click', e => {
+    const btn = e.target.closest('.pokemon-result');
+    if (btn) selecionarPokemon(btn);
+});
+document.addEventListener('click', e => {
+    if (!e.target.closest('.pokemon-search-wrap')) resultsBox.hidden = true;
+});
+
+breedTipo?.addEventListener('change', () => {
+    const f5 = breedTipo.value === 'F5';
+    ivBox.hidden = !f5;
+    ivSelect.required = f5;
+    if (!f5) ivSelect.value = '';
+});
+
+form?.addEventListener('submit', e => {
+    if (!selecionadoValido || !idInput.value) {
+        e.preventDefault();
+        statusEl.textContent = 'Escolha um Pokémon válido na lista antes de enviar.';
+        statusEl.classList.add('campo-erro');
+        searchInput.focus();
+    }
+});
+
+carregarPokemon();
+</script>
+</body>
+</html>
