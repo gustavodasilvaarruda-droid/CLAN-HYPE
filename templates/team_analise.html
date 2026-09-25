@@ -1,0 +1,23 @@
+{% extends 'builders_base.html' %}
+{% block title %}Análise de Time - HYPE{% endblock %}
+{% block builders_content %}
+<div class="hgb-legacy-page hgb-integrated-tool">
+<section class="dash-welcome"><div><span class="breed-kicker">HYPE TEAM ANALYZER</span><h1>{{time.nome}}</h1><p>{{(analise.formato or {}).nome or time.formato or 'Formato livre'}} · {{analise.total_pokemon}} Pokémon</p></div></section>
+
+  <section class="dash-card"><h2>Composição</h2><div class="team-grid">{% for s in time.slots %}<article class="team-card detailed-set-card"><div class="set-card-top">{% if s.sprite %}<img src="{{s.sprite}}" alt="{{s.pokemon}}">{% endif %}<div><h3>{{s.pokemon}}</h3><p>{{(s.tipos or [])|join(' / ')}}</p></div></div><p><b>Item:</b> {{s.item or '-'}}</p><p><b>Ability:</b> {{s.ability or '-'}}</p><p><b>Nature:</b> {{s.nature or '-'}}</p><p><b>Papel:</b> {{s.papel or '-'}}</p><p><b>Mecânica:</b> {{s.mecanica or 'nenhuma'}}</p>{% if s.moves %}<div class="set-moves">{% for m in s.moves if m %}<span>{{m}}</span>{% endfor %}</div>{% endif %}{% if s.observacao %}<small>{{s.observacao}}</small>{% endif %}</article>{% endfor %}</div></section>
+
+  <div class="dash-grid">
+    <section class="dash-card"><h2>✅ Pontos atendidos</h2>{% for x in analise.ok %}<p>✓ {{x}}</p>{% else %}<p class="muted">Nenhum item validado automaticamente.</p>{% endfor %}</section>
+    <section class="dash-card"><h2>⚠️ Pontos para revisar</h2>{% for x in analise.avisos %}<p>• {{x}}</p>{% else %}<p>Nenhum aviso automático.</p>{% endfor %}</section>
+  </div>
+
+  <section class="dash-card coach-card"><span class="breed-kicker">ANÁLISE INTELIGENTE</span><h2>Como usar este time</h2>{% for x in analise.coach %}<p>◆ {{x}}</p>{% else %}<p class="muted">Complete os papéis, tipos e sets para liberar recomendações mais detalhadas.</p>{% endfor %}</section>
+
+  <div class="dash-grid">
+    <section class="dash-card"><h2>Fraquezas coletivas</h2>{% for tipo,qtd in analise.fraquezas_tipos[:8] %}<div class="dash-row"><b>{{tipo|title}}</b><span>{{qtd}} vulnerável(is)</span></div>{% else %}<p class="muted">Os tipos dos Pokémon ainda não foram registrados.</p>{% endfor %}</section>
+    <section class="dash-card"><h2>Resistências / imunidades</h2>{% for tipo,qtd in analise.resistencias_tipos[:8] %}<div class="dash-row"><b>{{tipo|title}}</b><span>{{qtd}} resposta(s)</span></div>{% else %}<p class="muted">Os tipos dos Pokémon ainda não foram registrados.</p>{% endfor %}</section>
+  </div>
+
+  <section class="dash-card"><div class="section-title-row"><h2>Cobertura de papéis</h2><a class="cta-secondary" href="{{url_for('buildershub.sinergia')}}?team_id={{time.id}}">Abrir Sinergia Completa</a></div><div class="admin-shortcuts">{% for nome,ativo in analise.cobertura_papeis.items() %}<span class="status-pill {{'entrada' if ativo else 'saida'}}">{{nome|replace('_',' ')|title}}: {{'SIM' if ativo else 'NÃO'}}</span>{% endfor %}</div><p class="muted">O analisador do time usa os dados salvos no set e as regras do formato. A análise é uma orientação estratégica, não uma garantia de resultado em batalha.</p></section>
+</div>
+{% endblock %}

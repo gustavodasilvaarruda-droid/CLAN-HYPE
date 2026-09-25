@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Tier List - HYPE</title>
+  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}">
+</head>
+<body class="hype-home builders-hub-page">
+<main class="dashboard-shell builders-shell">
+  <div class="page-topline"><a class="smart-back" href="{{url_for('competitive.admin_pokedex_competitiva')}}">← Pokédex Competitiva</a><span>Admin › Tiers por formato</span></div>
+  {% with ms=get_flashed_messages(with_categories=true) %}{% for c,m in ms %}<div class="alert alert-{{c}}">{{m}}</div>{% endfor %}{% endwith %}
+
+  <section class="dash-welcome builders-compact-hero">
+    <div><span class="breed-kicker">META HYPE</span><h1>Tier List por formato</h1><p>Defina OU, UU, NU, Untiered ou qualquer tier personalizado HYPE separadamente para cada formato competitivo.</p></div>
+    <a class="cta-secondary" href="{{url_for('buildershub.tier_list')}}">Ver Tier List</a>
+  </section>
+
+  <section class="dash-card">
+    <h2>Adicionar / atualizar tier</h2>
+    <form method="post" class="admin-form-grid">
+      <label>Pokémon
+        <select name="pokemon_id" required>
+          <option value="">Selecione...</option>
+          {% for p in pokemons %}<option value="{{p.id}}">{{p.pokemon}}{% if p.tier %} · global {{p.tier}}{% endif %}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Formato
+        <select name="formato_codigo" required>
+          <option value="">Selecione...</option>
+          {% for f in formatos %}<option value="{{f.codigo}}" {{'selected' if formato_filtro==f.codigo else ''}}>{{f.nome}}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Tier
+        <input name="tier" list="tiersComuns" placeholder="OU, UU, NU, HYPE S..." required>
+        <datalist id="tiersComuns"><option>S+</option><option>S</option><option>A+</option><option>A</option><option>A-</option><option>Uber</option><option>OU</option><option>UU</option><option>RU</option><option>NU</option><option>PU</option><option>LC</option><option>Untiered</option></datalist>
+      </label>
+      <label class="wide">Observação
+        <textarea name="observacao" placeholder="Ex.: ótimo speed control neste formato, banido em torneios especiais..."></textarea>
+      </label>
+      <button class="cta-gold" type="submit">Salvar tier</button>
+    </form>
+  </section>
+
+  <section class="dash-card">
+    <div class="section-title-row"><div><span class="breed-kicker">CADASTRADOS</span><h2>Tiers específicos</h2></div>
+      <form method="get" class="tier-admin-filter"><select name="formato" onchange="this.form.submit()"><option value="">Todos os formatos</option>{% for f in formatos %}<option value="{{f.codigo}}" {{'selected' if formato_filtro==f.codigo else ''}}>{{f.nome}}</option>{% endfor %}</select></form>
+    </div>
+    <div class="tier-admin-list">
+      {% for row in mappings %}
+      <article class="tier-admin-row">
+        <div><b>{{row._pokemon}}</b><span>{{row._formato}}</span>{% if row.observacao %}<small>{{row.observacao}}</small>{% endif %}</div>
+        <strong class="tier-mini">{{row.tier}}</strong>
+        <form method="post" onsubmit="return confirm('Remover este tier específico?')">
+          <input type="hidden" name="acao" value="excluir"><input type="hidden" name="pokemon_id" value="{{row.pokemon_id}}"><input type="hidden" name="formato_codigo" value="{{row.formato_codigo}}">
+          <button class="btn-perigo" type="submit">Remover</button>
+        </form>
+      </article>
+      {% else %}<p class="muted">Nenhum tier por formato cadastrado ainda.</p>{% endfor %}
+    </div>
+  </section>
+</main>
+</body></html>

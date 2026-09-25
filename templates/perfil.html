@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ membro.nick_jogo }} - Clã Hype</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body class="breed-page">
+<header class="home-nav">
+<a class="brand" href="{{ url_for('pagina_inicial') }}"><img src="{{ url_for('static', filename='imagens/logodragaoh.png') }}"><span>CLÃ <b>HYPE</b></span></a>
+<nav><a href="{{ url_for('pagina_inicial') }}">Início</a><a href="{{ url_for('breed') }}">Berçário</a>{% if session.get('usuario_email') %}<a class="home-login" href="{{ url_for('painel') }}">Painel</a>{% endif %}</nav>
+</header>
+<main class="profile-shell">
+<section class="profile-hero">
+<div class="profile-avatar">
+{% if membro.avatar_url %}<img src="{{ membro.avatar_url }}" alt="{{ membro.nick_jogo }}">{% else %}<span>{{ membro.nick_jogo[0]|upper }}</span>{% endif %}
+</div>
+<div><span class="breed-kicker">PERFIL HYPE</span><h1>{{ membro.nick_jogo }} {% if membro.membro_hype %}<span class="hype-member-badge">[HYPE]</span>{% endif %}</h1><span class="profile-role">{{ membro.cargo|replace('_',' ')|title }}</span>
+<p>{{ membro.bio or 'Guerreiro do Clã Hype.' }}</p></div>
+</section>
+<section class="profile-grid">
+<article><small>Pokémon favorito</small><strong>{{ membro.pokemon_favorito or 'Não definido' }}</strong></article>
+<article><small>Pedidos de Breed</small><strong>{{ membro.pedidos_feitos }}</strong></article>
+<article><small>Breeds concluídos</small><strong>{{ membro.breeds_concluidos }}</strong></article>
+<article><small>Membro HYPE</small><strong>{{ ('Sim · desde ' ~ membro.membro_hype_desde) if membro.membro_hype else 'Não confirmado' }}</strong></article>
+</section>
+<section class="dash-card"><h2>🏅 Conquistas</h2><div class="achievement-grid">{% for c in membro.conquistas %}<article><span>{{c.icone or '🏅'}}</span><b>{{c.titulo}}</b><small>{{c.descricao or ''}}</small></article>{% else %}<p class="muted">Nenhuma conquista ainda.</p>{% endfor %}</div></section>
+<a class="link-voltar" href="{{ url_for('pagina_inicial') }}">← Voltar para o início</a>
+</main>
+</body></html>

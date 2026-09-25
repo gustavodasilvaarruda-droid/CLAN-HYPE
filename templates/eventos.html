@@ -1,0 +1,91 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Eventos e Torneios - Clã HYPE{% endblock %}
+{% block body_class %}hype-events-page hype-v7-events{% endblock %}
+{% block content %}
+<div class="hype-v6-page hype-v7-page">
+  <section class="hype-v6-banner hype-v6-events-banner hype-v7-cinematic-banner">
+    <div class="hype-v6-banner-copy">
+      <span class="hype-v6-kicker">AGENDA OFICIAL HYPE</span>
+      <h1>EVENTOS E TORNEIOS</h1>
+      <p>Participe da programação do clã, acompanhe vagas, premiações e competições oficiais.</p>
+      <div class="hype-v7-banner-pills"><span>Eventos</span><span>Torneios</span><span>Premiações</span><span>HYPE Live</span></div>
+    </div>
+    <img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="" aria-hidden="true">
+  </section>
+
+  <div class="hype-v6-tabs hype-v7-tabs">
+    <a class="active" href="{{url_for('eventos')}}">Próximos</a>
+    <a href="{{url_for('torneios')}}">Torneios</a>
+    <a href="{{url_for('final.ranking_competitivo')}}">Ranking</a>
+    <a href="{{url_for('expansion.hype_live')}}">HYPE Live</a>
+  </div>
+
+  {% if hype_live_ativo %}
+  <section class="hype-v6-live hype-v7-live-card">
+    <div><span>● AO VIVO</span><h2>{{hype_live_titulo}}</h2><p>Acompanhe a transmissão oficial sem sair da Central HYPE.</p></div>
+    <div class="video-frame"><iframe src="{{hype_live_embed_url}}" title="HYPE Live" allowfullscreen></iframe></div>
+  </section>
+  {% endif %}
+
+  <section class="hype-v7-section-block">
+    <div class="hype-v7-section-heading">
+      <div><span class="hype-v6-kicker">PRÓXIMOS EVENTOS</span><h2>Agenda do Clã</h2></div>
+      <span class="hype-v7-count-badge">{{eventos|length}} publicados</span>
+    </div>
+    <div class="hype-v6-event-grid hype-v7-event-grid">
+      {% for e in eventos %}
+      <article class="hype-v6-event-card hype-v7-event-card">
+        <div class="hype-v6-event-cover">
+          {% if e.imagem_url %}<img src="{{e.imagem_url}}" alt="{{e.titulo}}">{% else %}<img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="">{% endif %}
+          <span class="hype-v6-card-badge">EVENTO</span>
+          <span class="hype-v7-cover-date">{{e.data_evento|replace('T',' ') if e.data_evento else 'Data a definir'}}</span>
+        </div>
+        <div class="hype-v6-event-body">
+          <h2>{{e.titulo}}</h2><p>{{e.descricao}}</p>
+          <div class="hype-v6-card-meta">
+            {% if e.local_evento %}<span>⌖ {{e.local_evento}}</span>{% endif %}
+            <span>♙ {{e.total_inscritos}}{% if e.limite_participantes %}/{{e.limite_participantes}}{% endif %}</span>
+          </div>
+          {% if session.get('usuario_email') %}
+            {% if e.usuario_inscrito %}
+              <form method="post" action="{{url_for('cancelar_evento',evento_id=e.id)}}"><button class="hype-v6-btn secondary" type="submit">Cancelar participação</button></form>
+            {% else %}
+              <form method="post" action="{{url_for('inscrever_evento',evento_id=e.id)}}"><button class="hype-v6-btn gold" type="submit">Inscrever-me</button></form>
+            {% endif %}
+          {% else %}
+            <a class="hype-v6-btn gold" href="{{url_for('pagina_inicial')}}#entrar">Entrar para participar</a>
+          {% endif %}
+        </div>
+      </article>
+      {% else %}<div class="hype-v6-panel"><p class="hype-v6-empty">Nenhum evento publicado no momento.</p></div>{% endfor %}
+    </div>
+  </section>
+
+  <section class="hype-v7-section-block">
+    <div class="hype-v7-section-heading">
+      <div><span class="hype-v6-kicker">ARENA HYPE</span><h2>Torneios em destaque</h2></div>
+      <a class="hype-v7-text-link" href="{{url_for('torneios')}}">Abrir todos os torneios →</a>
+    </div>
+    <div class="hype-v6-event-grid hype-v7-event-grid">
+      {% for t in torneios_resumo %}
+      <a class="hype-v6-event-card hype-v7-event-card tournament" href="{{url_for('torneios')}}">
+        <div class="hype-v6-event-cover">
+          {% if t.imagem_url %}<img src="{{t.imagem_url}}" alt="{{t.titulo}}">{% else %}<img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="">{% endif %}
+          <span class="hype-v6-card-badge">TORNEIO</span>
+          <span class="hype-v7-cover-date">{{t.data_torneio|replace('T',' ') if t.data_torneio else 'Data a definir'}}</span>
+        </div>
+        <div class="hype-v6-event-body">
+          <h2>{{t.titulo}}</h2><p>{{t.descricao}}</p>
+          <div class="hype-v6-card-meta">
+            {% if t.formato %}<span>⚔ {{t.formato}}</span>{% endif %}
+            {% if t.premio %}<span>♛ {{t.premio}}</span>{% endif %}
+            <span>♙ {{t.total_inscritos}}{% if t.limite_participantes %}/{{t.limite_participantes}}{% endif %}</span>
+          </div>
+          <span class="hype-v6-btn gold">Ver torneio</span>
+        </div>
+      </a>
+      {% else %}<div class="hype-v6-panel"><p class="hype-v6-empty">Nenhum torneio publicado no momento.</p></div>{% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

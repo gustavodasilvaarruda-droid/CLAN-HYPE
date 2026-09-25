@@ -1,0 +1,100 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Painel do Membro - Clã HYPE{% endblock %}
+{% block body_class %}hype-dashboard-page{% endblock %}
+{% block content %}
+<div class="hype-v6-page hype-v7-page">
+  <section class="hype-v6-banner hype-v6-member-banner hype-v7-cinematic-banner">
+    <div class="hype-v6-banner-copy">
+      <span class="hype-v6-kicker">CENTRAL DO MEMBRO</span>
+      <h1>PAINEL DO MEMBRO</h1>
+      <p>Bem-vindo de volta, <strong>{{nick_jogo}}</strong>. Acompanhe seus pedidos, eventos e tudo que acontece no Clã HYPE.</p>
+    </div>
+    <img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="Emblema HYPE" aria-hidden="true">
+  </section>
+
+  <section class="hype-v6-profile-grid">
+    <article class="hype-v6-profile-card">
+      <div class="hype-v6-avatar-xl">
+        {% if usuario.avatar_url %}<img src="{{usuario.avatar_url}}" alt="Avatar de {{nick_jogo}}">{% else %}<span>{{nick_jogo[0]|upper}}</span>{% endif %}
+      </div>
+      <div class="hype-v6-profile-copy">
+        <span class="hype-v6-kicker">SEU PERFIL</span>
+        <h2>{{nick_jogo}} {% if membro_hype %}<em>[HYPE]</em>{% endif %}</h2>
+        <p>{{usuario.bio or 'Guerreiro do Clã HYPE'}}</p>
+        <div class="hype-v6-profile-meta"><span>{{cargo|replace('_',' ')|title}}</span>{% if usuario.pokemon_favorito %}<span>★ {{usuario.pokemon_favorito}}</span>{% endif %}</div>
+      </div>
+      <a class="hype-v6-btn secondary" href="{{url_for('perfil_publico',nick=nick_jogo)}}">Ver perfil</a>
+    </article>
+
+    <div class="hype-v6-mini-stats">
+      <article><span>◈</span><div><b>{{cargo|replace('_',' ')|title}}</b><small>Cargo</small></div></article>
+      <article><span>✓</span><div><b>{{resumo.entregues}}</b><small>Pedidos entregues</small></div></article>
+      <article><span>☷</span><div><b>{{resumo.pedidos}}</b><small>Pedidos realizados</small></div></article>
+      <article><span>♛</span><div><b>{{minhas_inscricoes|length}}</b><small>Inscrições em torneios</small></div></article>
+    </div>
+  </section>
+
+  <section class="hype-v6-action-grid">
+    <a class="hype-v6-action-card gold" href="{{url_for('breed')}}#fazer-pedido"><span>◈</span><div><b>Fazer Pedido de Breed</b><small>Peça Pokémon com configuração completa.</small></div></a>
+    <a class="hype-v6-action-card purple" href="{{url_for('breed')}}#meus-pedidos"><span>▤</span><div><b>Meus Pedidos</b><small>Acompanhe andamento e histórico.</small></div></a>
+    <a class="hype-v6-action-card cyan" href="{{url_for('expansion.team_builder')}}"><span>♟</span><div><b>Team Builder</b><small>Monte e salve seus times.</small></div></a>
+    <a class="hype-v6-action-card pink" href="{{url_for('eventos')}}"><span>♛</span><div><b>Eventos e Torneios</b><small>Inscrições, regras e resultados.</small></div></a>
+  </section>
+
+  <div class="hype-v6-dashboard-columns">
+    <section class="hype-v6-panel">
+      <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">BERÇÁRIO</span><h2>Meus pedidos recentes</h2></div><a href="{{url_for('breed')}}#meus-pedidos">Ver todos →</a></div>
+      <div class="hype-v6-table-wrap">
+        <table class="hype-v6-table">
+          <thead><tr><th>#</th><th>Pokémon</th><th>Tipo</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for p in pedidos %}
+            <tr><td>#{{p.id}}</td><td><div class="hype-v7-dashboard-pokemon">{% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png" alt="">{% endif %}<b>{{p.pokemon}}</b></div></td><td>{{p.breed_tipo or '—'}}</td><td><span class="hype-v6-status {{p.status}}">{{p.status|replace('_',' ')}}</span></td></tr>
+          {% else %}<tr><td colspan="4" class="hype-v6-empty">Você ainda não fez pedidos de Breed.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="hype-v6-panel">
+      <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">AGENDA</span><h2>Próximos eventos</h2></div><a href="{{url_for('eventos')}}">Ver agenda →</a></div>
+      <div class="hype-v6-event-list">
+        {% for e in eventos_proximos %}<article><span>▣</span><div><b>{{e.titulo}}</b><small>{{e.data_evento|replace('T',' ')}}</small></div></article>{% else %}<p class="hype-v6-empty">Nenhum evento publicado.</p>{% endfor %}
+        {% for t in torneios_proximos %}<article><span>♛</span><div><b>{{t.titulo}}</b><small>{{t.data_torneio|replace('T',' ')}}</small></div></article>{% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <section class="hype-v6-panel">
+    <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">NOTIFICAÇÕES</span><h2>Central de avisos</h2></div>{% if notificacoes %}<form method="post" action="{{url_for('ler_notificacoes')}}"><button class="hype-v6-btn secondary" type="submit">Marcar como lidas</button></form>{% endif %}</div>
+    <div class="hype-v6-notifications">
+      {% for n in notificacoes %}<article><span class="hype-v6-notify-dot"></span><div><b>{{n.titulo}}</b><p>{{n.mensagem}}</p></div>{% if n.link %}<a href="{{n.link}}">Abrir →</a>{% endif %}</article>{% else %}<p class="hype-v6-empty">Nenhuma notificação no momento.</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="hype-v6-panel" id="configuracoes">
+    <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">PERFIL</span><h2>Editar meu perfil</h2></div></div>
+    <form class="hype-v6-profile-form" method="post" action="{{url_for('editar_perfil')}}">
+      <label>URL do avatar<input name="avatar_url" value="{{usuario.avatar_url or ''}}" placeholder="https://..."></label>
+      <label>Pokémon favorito<input name="pokemon_favorito" value="{{usuario.pokemon_favorito or ''}}" placeholder="Ex.: Rayquaza"></label>
+      <label class="wide">Bio<textarea name="bio" placeholder="Conte um pouco sobre você">{{usuario.bio or ''}}</textarea></label>
+      <div class="wide"><button class="hype-v6-btn gold" type="submit">Salvar perfil</button></div>
+    </form>
+  </section>
+
+  {% if pode_gerenciar %}
+  <section class="hype-v6-panel hype-v6-admin-panel">
+    <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">ADMINISTRAÇÃO</span><h2>Central administrativa</h2></div></div>
+    <div class="hype-v6-admin-grid">
+      <a href="{{url_for('admin_cargos')}}">Cargos</a><a href="{{url_for('admin_membros_hype')}}">Membros HYPE</a><a href="{{url_for('admin_reino')}}">Casas e Lojas</a><a href="{{url_for('gestao_breeders')}}">Gestão Breed</a><a href="{{url_for('admin_conteudo')}}">Eventos/Torneios</a><a href="{{url_for('admin_precos')}}">Preços</a><a href="{{url_for('admin_feed')}}">Mídia</a><a href="{{url_for('admin_logs')}}">Logs</a><a href="{{url_for('expansion.admin_dashboard')}}">Dashboard Geral</a><a href="{{url_for('expansion.admin_economia')}}">Economia HYPE</a><a href="{{url_for('competitive.admin_pokedex_competitiva')}}">Pokédex Competitiva</a><a href="{{url_for('competitive.admin_tiers_competitivos')}}">Tiers</a>
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+{% if mostrar_tour_hype %}
+<div class="onboarding-overlay" id="tourHype"><div class="onboarding-card"><span class="breed-kicker">PRIMEIRO ACESSO</span><h2>Bem-vindo ao seu Painel HYPE</h2><div class="tour-steps"><article><b>1. Perfil</b><p>Edite avatar, bio e Pokémon favorito.</p></article><article><b>2. Notificações</b><p>Acompanhe Breed, lojas, eventos e torneios.</p></article><article><b>3. Recursos</b><p>Use Berçário, Builders, Reino HYPE e HYPE Live.</p></article><article><b>4. Extrato</b><p>Consulte suas movimentações registradas.</p></article></div><form method="post" action="{{url_for('expansion.onboarding_concluir')}}"><button class="cta-gold">Concluir introdução</button></form></div></div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('{{url_for('expansion.service_worker')}}').catch(()=>{});}</script>{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Reino HYPE{% endblock %}
+{% block body_class %}hype-kingdom-page hype-v7-kingdom{% endblock %}
+{% block content %}
+<div class="hype-v6-page hype-v7-page">
+  <section class="hype-v6-banner hype-v6-kingdom-banner hype-v7-cinematic-banner">
+    <div class="hype-v6-banner-copy">
+      <span class="hype-v6-kicker">TERRITÓRIO DO CLÃ</span>
+      <h1>REINO HYPE</h1>
+      <p>Casas, lojas, estabelecimentos e atividades do clã em uma central única.</p>
+      <div class="hype-v7-banner-pills"><span>{{reino_resumo.casas_total}} casas</span><span>{{reino_resumo.lojas_total}} lojas</span><span>{{reino_resumo.casas_disponiveis}} disponíveis</span></div>
+    </div>
+    <img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="" aria-hidden="true">
+  </section>
+
+  <div class="hype-v6-tabs hype-v7-tabs">
+    <a class="active" href="{{url_for('painel_reino')}}">Visão geral</a>
+    <a href="{{url_for('casas_reino')}}">Casas ({{reino_resumo.casas_total}})</a>
+    <a href="{{url_for('lojas')}}">Lojas ({{reino_resumo.lojas_total}})</a>
+    <a href="{{url_for('construtores')}}">Construtores</a>
+    <a href="{{url_for('expansion.mapa_reino')}}">Mapa</a>
+  </div>
+
+  <section class="hype-v6-mini-stats kingdom-stats hype-v7-kingdom-stats">
+    <article><span>⌂</span><div><b>{{reino_resumo.casas_total}}</b><small>Casas do Reino</small></div></article>
+    <article><span>✓</span><div><b>{{reino_resumo.casas_disponiveis}}</b><small>Disponíveis</small></div></article>
+    <article><span>♙</span><div><b>{{reino_resumo.casas_ocupadas}}</b><small>Ocupadas</small></div></article>
+    <article><span>▣</span><div><b>{{reino_resumo.lojas_total}}</b><small>Lojas ativas</small></div></article>
+  </section>
+
+  <section class="hype-v7-section-block">
+    <div class="hype-v7-section-heading">
+      <div><span class="hype-v6-kicker">MORADIAS</span><h2>Casas do Reino</h2></div>
+      <a class="hype-v7-text-link" href="{{url_for('casas_reino')}}">Ver todas →</a>
+    </div>
+    <div class="hype-v6-unit-grid hype-v7-kingdom-grid">
+      {% for c in casas_preview %}
+      <a class="hype-v6-unit-card hype-v7-unit-card" href="{{url_for('casas_reino')}}">
+        <div class="hype-v6-unit-cover">
+          {% if c.imagem_url %}<img src="{{c.imagem_url}}" alt="{{c.nome}}">{% else %}<div class="hype-v6-unit-placeholder"><span>⌂</span></div>{% endif %}
+          <span class="hype-v6-status {{c.status}}">{{c.status|replace('_',' ')}}</span>
+        </div>
+        <div class="hype-v6-unit-body">
+          <span class="hype-v6-kicker">{{c.codigo or ('CASA ' ~ loop.index)}}{% if c.setor %} · {{c.setor}}{% endif %}</span>
+          <h2>{{c.nome}}</h2>
+          <div class="hype-v7-unit-price"><small>Aluguel semanal</small><b>{{c.valor_aluguel|default(0)|preco}}</b></div>
+          <span class="hype-v7-unit-action">{{'Ver detalhes' if c.status == 'ocupada' else 'Explorar casa'}}</span>
+        </div>
+      </a>
+      {% else %}<div class="hype-v6-panel"><p class="hype-v6-empty">Nenhuma casa ativa cadastrada.</p></div>{% endfor %}
+    </div>
+  </section>
+
+  <section class="hype-v7-section-block">
+    <div class="hype-v7-section-heading">
+      <div><span class="hype-v6-kicker">COMÉRCIO</span><h2>Lojas e estabelecimentos</h2></div>
+      <a class="hype-v7-text-link" href="{{url_for('lojas')}}">Abrir lojas →</a>
+    </div>
+    <div class="hype-v7-shop-preview-grid">
+      {% for l in lojas_preview %}
+      <a class="hype-v7-shop-preview" href="{{url_for('loja_detalhe',loja_id=l.id)}}">
+        <div class="hype-v7-shop-icon">▣</div>
+        <div><span class="hype-v6-kicker">{{l.codigo or ('LOJA ' ~ loop.index)}}</span><h3>{{l.nome}}</h3><p>{{l.descricao or 'Comércio oficial do Reino HYPE.'}}</p></div>
+        <span class="hype-v6-status {{l.status or 'disponivel'}}">{{(l.status or 'disponivel')|replace('_',' ')}}</span>
+      </a>
+      {% else %}<div class="hype-v6-panel"><p class="hype-v6-empty">Nenhuma loja ativa cadastrada.</p></div>{% endfor %}
+    </div>
+  </section>
+
+  <section class="hype-v6-kingdom-cards hype-v7-kingdom-services">
+    <a href="{{url_for('casas_reino')}}"><span>⌂</span><div><h2>Casas do Reino</h2><p>Moradias, disponibilidade e aluguel semanal.</p></div><b>Explorar →</b></a>
+    <a href="{{url_for('lojas')}}"><span>▣</span><div><h2>Lojas do Reino</h2><p>Produtos, reservas e comércio entre membros.</p></div><b>Explorar →</b></a>
+    <a href="{{url_for('construtores')}}"><span>⚒</span><div><h2>Construtores</h2><p>Solicite construções e acompanhe projetos.</p></div><b>Explorar →</b></a>
+  </section>
+
+  <div class="hype-v6-dashboard-columns hype-v7-activity-columns">
+    <section class="hype-v6-panel"><div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">BERÇÁRIO</span><h2>Breeds recentes</h2></div></div><div class="hype-v6-event-list">{% for x in breeds %}<article><span>◈</span><div><b>{{x.pokemon}}</b><small>{{x.status|replace('_',' ')}}</small></div></article>{% else %}<p class="hype-v6-empty">Sem registros.</p>{% endfor %}</div></section>
+    <section class="hype-v6-panel"><div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">AGENDA</span><h2>Próximos eventos</h2></div></div><div class="hype-v6-event-list">{% for x in eventos %}<article><span>♛</span><div><b>{{x.titulo}}</b><small>{{x.data_evento}}</small></div></article>{% else %}<p class="hype-v6-empty">Sem eventos.</p>{% endfor %}</div></section>
+  </div>
+
+  <section class="hype-v6-panel"><div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">ATIVIDADE</span><h2>Movimentações recentes</h2></div></div><div class="hype-v6-notifications">{% for x in atividades %}<article><span class="hype-v6-notify-dot"></span><div><b>{{x.descricao}}</b><p>{{x.created_at}}</p></div></article>{% else %}<p class="hype-v6-empty">Nenhuma atividade registrada ainda.</p>{% endfor %}</div></section>
+</div>
+{% endblock %}

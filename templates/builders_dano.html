@@ -1,0 +1,91 @@
+{% extends 'builders_base.html' %}
+{% block title %}Calculadora de Dano - HYPE Builders{% endblock %}
+{% block builders_content %}
+<div class="hgb-legacy-page builders-shell damage-pro-page">
+<section class="dash-welcome builders-compact-hero">
+    <div><span class="breed-kicker">HYPE DAMAGE CALCULATOR</span><h1>Calculadora de Dano</h1><p>Selecione atacante, defensor e golpe. O sistema busca stats/tipos na PokéAPI, calcula os stats finais e mostra dano, percentual de HP e faixa de KO.</p></div>
+  </section>
+
+  <section class="damage-pro-grid">
+    <form class="damage-panel" id="damageForm" autocomplete="off">
+      <div class="damage-section-head"><span class="step-number">1</span><div><b>Atacante</b><small>Pokémon, nível e investimento ofensivo</small></div></div>
+      <div class="damage-mon-picker">
+        <div class="damage-mon-preview"><img id="attackerSprite" alt=""><span id="attackerFallback">?</span></div>
+        <label>Pokémon<input id="attackerPokemon" list="pokemonDamageList" placeholder="Ex.: garchomp" required></label>
+      </div>
+      <div class="damage-mini-grid">
+        <label>Nível<input id="level" type="number" min="1" max="100" value="50"></label>
+        <label>EV ofensivo<input id="attackEV" type="number" min="0" max="252" step="4" value="252"></label>
+        <label>IV ofensivo<input id="attackIV" type="number" min="0" max="31" value="31"></label>
+        <label>Nature ofensiva<select id="attackNature"><option value="0.9">Desfavorável (0.9×)</option><option value="1" selected>Neutra (1×)</option><option value="1.1">Favorável (1.1×)</option></select></label>
+        <label>Boost<select id="attackStage">{% for x in range(-6,7) %}<option value="{{x}}" {{'selected' if x==0 else ''}}>{{'+' if x>0 else ''}}{{x}}</option>{% endfor %}</select></label>
+        <label>Item<select id="attackerItem"><option value="none">Nenhum / outro</option><option value="life-orb">Life Orb</option><option value="choice-band">Choice Band</option><option value="choice-specs">Choice Specs</option><option value="expert-belt">Expert Belt</option><option value="muscle-band">Muscle Band</option><option value="wise-glasses">Wise Glasses</option></select></label>
+        <label>Ability<select id="attackerAbility"><option value="none">Nenhuma / outra</option><option value="adaptability">Adaptability</option><option value="huge-power">Huge Power</option><option value="pure-power">Pure Power</option><option value="hustle">Hustle</option><option value="guts">Guts</option><option value="technician">Technician</option><option value="tinted-lens">Tinted Lens</option></select></label>
+        <label>Status<select id="attackerStatus"><option value="none">Sem status</option><option value="burn">Burn</option><option value="other">Outro status</option></select></label>
+      </div>
+
+      <div class="damage-section-head"><span class="step-number">2</span><div><b>Defensor</b><small>HP, investimento defensivo e respostas</small></div></div>
+      <div class="damage-mon-picker">
+        <div class="damage-mon-preview"><img id="defenderSprite" alt=""><span id="defenderFallback">?</span></div>
+        <label>Pokémon<input id="defenderPokemon" list="pokemonDamageList" placeholder="Ex.: corviknight" required></label>
+      </div>
+      <div class="damage-mini-grid">
+        <label>EV HP<input id="hpEV" type="number" min="0" max="252" step="4" value="252"></label>
+        <label>IV HP<input id="hpIV" type="number" min="0" max="31" value="31"></label>
+        <label>EV Def/SpD<input id="defenseEV" type="number" min="0" max="252" step="4" value="252"></label>
+        <label>IV Def/SpD<input id="defenseIV" type="number" min="0" max="31" value="31"></label>
+        <label>Nature defensiva<select id="defenseNature"><option value="0.9">Desfavorável (0.9×)</option><option value="1" selected>Neutra (1×)</option><option value="1.1">Favorável (1.1×)</option></select></label>
+        <label>Boost<select id="defenseStage">{% for x in range(-6,7) %}<option value="{{x}}" {{'selected' if x==0 else ''}}>{{'+' if x>0 else ''}}{{x}}</option>{% endfor %}</select></label>
+        <label>Item<select id="defenderItem"><option value="none">Nenhum / outro</option><option value="eviolite">Eviolite</option><option value="assault-vest">Assault Vest</option></select></label>
+        <label>Ability<select id="defenderAbility"><option value="none">Nenhuma / outra</option><option value="thick-fat">Thick Fat</option><option value="filter">Filter</option><option value="solid-rock">Solid Rock</option><option value="prism-armor">Prism Armor</option><option value="multiscale">Multiscale</option><option value="shadow-shield">Shadow Shield</option><option value="fur-coat">Fur Coat</option><option value="ice-scales">Ice Scales</option><option value="water-bubble">Water Bubble</option></select></label>
+        <label class="check-line damage-check"><input type="checkbox" id="fullHP" checked> HP cheio (Multiscale/Shadow Shield)</label>
+      </div>
+
+      <div class="damage-section-head"><span class="step-number">3</span><div><b>Golpe e campo</b><small>Tipo/categoria são preenchidos automaticamente</small></div></div>
+      <div class="damage-move-picker">
+        <label>Move<input id="moveName" list="moveDamageList" placeholder="Ex.: earthquake" required></label>
+        <label>Power<input id="movePower" type="number" min="1" max="500" value="80"></label>
+        <label>Categoria<select id="moveClass"><option value="physical">Physical</option><option value="special">Special</option></select></label>
+        <label>Tipo<select id="moveType">{% for key,label in type_labels.items() %}<option value="{{key}}">{{label}}</option>{% endfor %}</select></label>
+      </div>
+      <div class="damage-mini-grid">
+        <label>Clima<select id="weather"><option value="none">Nenhum</option><option value="sun">Sol</option><option value="rain">Chuva</option><option value="sand">Sand</option><option value="snow">Snow</option></select></label>
+        <label>Crítico<select id="critical"><option value="1" selected>Não</option><option value="1.5">Sim (1.5×)</option></select></label>
+        <label>Screen<select id="screen"><option value="1" selected>Não</option><option value="0.5">Reflect/Light Screen (0.5×)</option></select></label>
+        <label>Outro modificador<input id="otherModifier" type="number" min="0" step="0.01" value="1"></label>
+      </div>
+
+      <button class="cta-gold damage-calc-button" type="submit">Calcular dano</button>
+      <datalist id="pokemonDamageList"></datalist><datalist id="moveDamageList"></datalist>
+    </form>
+
+    <aside class="damage-results-column">
+      <section class="dash-card damage-result-card">
+        <span class="breed-kicker">RESULTADO</span>
+        <div id="damageState" class="damage-state">Escolha os Pokémon e o golpe</div>
+        <h2 id="damageRange">—</h2>
+        <h3 id="damagePercent">—</h3>
+        <div class="damage-hp-bar"><span id="damageHpFill"></span></div>
+        <p id="koResult" class="damage-ko-result">O resultado de KO aparecerá aqui.</p>
+      </section>
+      <section class="dash-card damage-breakdown-card">
+        <span class="breed-kicker">CÁLCULO</span><h2>Detalhes</h2>
+        <div class="damage-stat-row"><span>Atk/SpA usado</span><b id="usedAttack">—</b></div>
+        <div class="damage-stat-row"><span>Def/SpD usado</span><b id="usedDefense">—</b></div>
+        <div class="damage-stat-row"><span>HP do defensor</span><b id="defenderHP">—</b></div>
+        <div class="damage-stat-row"><span>STAB</span><b id="stabValue">—</b></div>
+        <div class="damage-stat-row"><span>Efetividade</span><b id="effectivenessValue">—</b></div>
+        <div class="damage-stat-row"><span>Modificador final</span><b id="modifierValue">—</b></div>
+        <p id="modifierNotes" class="muted"></p>
+      </section>
+      <section class="dash-card damage-warning-card">
+        <span class="breed-kicker">IMPORTANTE</span><h2>Escopo</h2>
+        <p class="muted">A calculadora usa a fórmula moderna padrão e cobre modificadores comuns listados no formulário. Golpes de dano fixo/variável, habilidades muito específicas, Terastal ofensivo, multi-hit, doubles e regras próprias do PokeMMO podem exigir ajustes manuais em “Outro modificador”.</p>
+      </section>
+    </aside>
+  </section>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{{url_for('static',filename='builders_damage.js')}}"></script>
+{% endblock %}
