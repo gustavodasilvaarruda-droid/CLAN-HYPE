@@ -33,6 +33,11 @@ def create_final_blueprint(supabase, login_required, safe_table, is_admin, regis
         ranking=[]
         if tid:
             ranking=supabase.table('ranking_temporada').select('*').eq('temporada_id',tid).order('pontos',desc=True).execute().data or []
+        usuarios = {x.get('email'): x for x in safe_table('usuarios_clan','email,nick_jogo,avatar_url')}
+        for r in ranking:
+            u = usuarios.get(r.get('usuario_email')) or {}
+            r['nick_jogo'] = u.get('nick_jogo') or r.get('usuario_email')
+            r['avatar_url'] = u.get('avatar_url')
         return render_template('ranking_competitivo.html', temporadas=temporadas, temporada_id=tid, ranking=ranking)
 
     @bp.route('/admin/temporadas', methods=['GET','POST'])
@@ -69,15 +74,32 @@ def create_final_blueprint(supabase, login_required, safe_table, is_admin, regis
     @login_required
     def builds_pokemon():
         if request.method=='POST':
-            data={k:request.form.get(k,'').strip() or None for k in ['pokemon','titulo','nature','ability','evs','ivs','moves','item','estrategia']}
-            data['autor_email']=current_email(); data['publicado']=True
+            campos=['pokemon','titulo','nature','ability','evs','ivs','moves','item','estrategia','formato','papel','tipo_tera','explicacao_moves','parceiros','fraquezas_coberturas','legalidade']
+            data={k:request.form.get(k,'').strip() or None for k in campos}
+            admin=bool(is_admin())
+            data.update({
+                'autor_email':current_email(),
+                'publicado':admin,
+                'status_publicacao':'publicado' if admin else 'em_revisao',
+                'versao':1
+            })
             if not data['pokemon'] or not data['titulo']:
                 flash('Informe Pokémon e título.','erro')
             else:
-                supabase.table('builds_pokemon').insert(data).execute(); registrar_log('criar','builds_pokemon','build',None,data['titulo']); flash('Build publicada.','sucesso')
+                supabase.table('builds_pokemon').insert(data).execute()
+                registrar_log('criar','builds_pokemon','build',None,data['titulo'])
+                flash('Build publicada.' if admin else 'Build enviada para revisão antes da publicação.','sucesso')
             return redirect(url_for('final.builds_pokemon'))
         rows=supabase.table('builds_pokemon').select('*').eq('publicado',True).order('created_at',desc=True).execute().data or []
-        return render_template('builds_pokemon.html', builds=rows)
+        minhas=[]
+        try:
+            minhas=supabase.table('builds_pokemon').select('*').eq('autor_email',current_email()).neq('status_publicacao','publicado').order('created_at',desc=True).execute().data or []
+        except Exception:
+            pass
+        favoritos=set()
+        if current_email():
+            favoritos={x.get('build_id') for x in safe_table('builds_favoritos','build_id',usuario_email=current_email())}
+        return render_template('builds_pokemon.html', builds=rows, minhas_pendentes=minhas, favoritos=favoritos)
 
     @bp.route('/admin/eventos/<int:evento_id>/resultado', methods=['POST'])
     @login_required
@@ -114,8 +136,12 @@ def create_final_blueprint(supabase, login_required, safe_table, is_admin, regis
     def configuracoes():
         if not is_admin(): return redirect(url_for('painel'))
         if request.method=='POST':
-            for chave in ['discord_url','discord_webhook_url','nome_clan']:
+            for chave in ['discord_url','discord_webhook_url','nome_clan','youtube_live_url','youtube_live_titulo']:
                 valor=request.form.get(chave,'').strip(); supabase.table('configuracoes_site').upsert({'chave':chave,'valor':valor},on_conflict='chave').execute()
+            supabase.table('configuracoes_site').upsert({
+                'chave':'youtube_live_ativo',
+                'valor':'true' if request.form.get('youtube_live_ativo')=='on' else 'false'
+            },on_conflict='chave').execute()
             registrar_log('alterar','configuracoes'); flash('Configurações salvas.','sucesso'); return redirect(url_for('final.configuracoes'))
         cfg={x.get('chave'):x.get('valor') for x in safe_table('configuracoes_site')}
         return render_template('admin_configuracoes.html',cfg=cfg)
