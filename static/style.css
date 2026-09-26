@@ -1435,3 +1435,6 @@ body.hype-core-ui::before,body.hype-v6-home::before{content:"";position:fixed;in
 @media(max-width:980px){.breed-v15-main{grid-template-columns:1fr}.breed-v15-progress{text-align:left}.breed-v15-side{text-align:left;justify-items:start}.breed-req-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.breed-v15-main{padding:12px}.breed-v15-details{padding:12px}.breed-req-grid{grid-template-columns:1fr}.breed-v15-actions,.breed-v15-actions form{display:grid;width:100%}.breed-v15-actions input,.breed-v15-actions button,.breed-v15-actions a{width:100%}}
 
 .breed-overdue{color:#ff7d70;font-weight:900}.breed-v15-card[hidden]{display:none!important}
+
+/* V15.1 */
+.breed-v15-card.breed-filter-hidden{display:none!important}.breed-cancel-history{margin-top:18px}.breed-cancel-history .status-badge{white-space:nowrap}
