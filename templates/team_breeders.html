@@ -1,0 +1,23 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Team HYPE Breeders{% endblock %}
+{% block body_class %}hype-team-breeders-page{% endblock %}
+{% block content %}
+<div class="hype-v6-page hype-v7-page team-breeders-page">
+  <section class="hype-v6-banner hype-v7-cinematic-banner">
+    <div class="hype-v6-banner-copy"><span class="hype-v6-kicker">BERÇÁRIO HYPE</span><h1>TEAM HYPE BREEDERS</h1><p>Conheça a equipe responsável pelos pedidos, veja disponibilidade e carga atual antes de acompanhar a fila.</p></div>
+    <img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="Emblema HYPE">
+  </section>
+  <nav class="hype-breed-subnav"><a href="{{url_for('breed')}}">Fazer Pedido</a><a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}<a class="active" href="{{url_for('team_breeders')}}">Team Breeders</a><a href="{{url_for('ranking_breeders')}}">Ranking</a></nav>
+  <section class="team-breeders-grid">
+  {% for b in breeders %}
+    <article class="team-breeder-card">
+      <div class="team-breeder-top"><div class="team-breeder-avatar">{% if b.avatar_url %}<img src="{{b.avatar_url}}" alt="{{b.nick}}">{% else %}<span>{{b.nick[0]|upper}}</span>{% endif %}</div><div><span class="breeder-status {{b.status}}">{{b.status|replace('_',' ')|title}}</span><h2>{{b.nick}}</h2><small>{{b.cargo|replace('_',' ')|title}}</small></div></div>
+      <p>{{b.bio or 'Breeder oficial da equipe HYPE.'}}</p>
+      <div class="team-breeder-stats"><div><b>{{b.ativos}}/{{b.max_ativos}}</b><span>Ativos</span></div><div><b>{{b.concluidos}}</b><span>Concluídos</span></div><div><b>{{b.avaliacao or '—'}}</b><span>Avaliação</span></div></div>
+      {% if b.especialidades %}<div class="breeder-specialties">{% for e in b.especialidades %}<span>{{e}}</span>{% endfor %}</div>{% endif %}
+      <a class="cta-dark full-btn" href="{{url_for('perfil_publico',nick=b.nick_url)}}">Ver perfil</a>
+    </article>
+  {% else %}<section class="dash-card"><p class="muted">Nenhum Breeder foi configurado ainda.</p></section>{% endfor %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Torneios - Clã HYPE{% endblock %}
+{% block body_class %}hype-tournaments-page{% endblock %}
+{% block content %}
+<div class="hype-v6-page hype-v7-page">
+  <section class="hype-v6-banner hype-v6-events-banner hype-v7-cinematic-banner">
+    <div class="hype-v6-banner-copy"><span class="hype-v6-kicker">ARENA HYPE</span><h1>TORNEIOS</h1><p>Competições oficiais, chaveamentos, regras, premiações e ranking.</p></div>
+    <img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="" aria-hidden="true">
+  </section>
+
+  <div class="hype-v6-tabs"><a href="{{url_for('eventos')}}">Eventos</a><a class="active" href="{{url_for('torneios')}}">Torneios</a><a href="{{url_for('final.ranking_competitivo')}}">Ranking competitivo</a></div>
+
+  {% if hype_live_ativo %}<section class="hype-v6-live"><div><span>● HYPE LIVE</span><h2>{{hype_live_titulo}}</h2></div><div class="video-frame"><iframe src="{{hype_live_embed_url}}" title="HYPE Live" allowfullscreen></iframe></div></section>{% endif %}
+
+  <section class="hype-v6-event-grid">
+    {% for t in torneios %}
+    <article class="hype-v6-event-card tournament">
+      <div class="hype-v6-event-cover">
+        {% if t.imagem_url %}<img src="{{t.imagem_url}}" alt="{{t.titulo}}">{% else %}<img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="">{% endif %}
+        <span class="hype-v6-card-badge">TORNEIO</span>
+      </div>
+      <div class="hype-v6-event-body">
+        <span class="hype-v6-date">{{t.data_torneio|replace('T',' ')}}</span>
+        <h2>{{t.titulo}}</h2><p>{{t.descricao}}</p>
+        <div class="hype-v6-card-meta">
+          {% if t.formato_nome_config or t.formato %}<span>⚔ {{t.formato_nome_config or t.formato}}</span>{% endif %}
+          {% if t.premio %}<span>♛ {{t.premio}}</span>{% endif %}
+          <span>♙ {{t.total_inscritos}}{% if t.limite_participantes %}/{{t.limite_participantes}}{% endif %}</span>
+        </div>
+        {% if t.temporada_nome %}<p class="hype-v6-season">Temporada: <b>{{t.temporada_nome}}</b>{% if t.ranking_ativo %} · {{t.pontos_campeao}} pts campeão / {{t.pontos_vice}} pts vice{% endif %}</p>{% endif %}
+        {% if t.campeao %}<div class="hype-v6-champion">♛ Campeão: <b>{{t.campeao}}</b>{% if t.vice_campeao_nick %}<small>Vice: {{t.vice_campeao_nick}}</small>{% endif %}</div>{% endif %}
+        {% if t.regras %}<details class="hype-v6-details"><summary>Ver regras</summary><p>{{t.regras}}</p></details>{% endif %}
+        {% if t.partidas %}<details class="hype-v6-details"><summary>Chaveamento / histórico</summary>{% for m in t.partidas %}<p>R{{m.rodada}} #{{m.ordem}} — {{m.jogador1_nick}} × {{m.jogador2_nick}} {% if m.vencedor_nick %}→ <b>{{m.vencedor_nick}}</b>{% endif %}</p>{% endfor %}</details>{% endif %}
+        {% if t.inscricoes_abertas %}
+          {% if session.get('usuario_email') %}{% if t.usuario_inscrito %}<form method="POST" action="{{url_for('cancelar_torneio',torneio_id=t.id)}}"><button class="hype-v6-btn secondary" type="submit">Cancelar inscrição</button></form>{% else %}<form method="POST" action="{{url_for('inscrever_torneio',torneio_id=t.id)}}"><button class="hype-v6-btn gold" type="submit">Inscrever-me</button></form>{% endif %}{% else %}<a class="hype-v6-btn gold" href="{{url_for('pagina_inicial')}}#entrar">Entrar para se inscrever</a>{% endif %}
+        {% else %}<span class="hype-v6-status cancelado">Inscrições fechadas</span>{% endif %}
+      </div>
+    </article>
+    {% else %}<div class="hype-v6-panel"><p class="hype-v6-empty">Nenhum torneio publicado ainda.</p></div>{% endfor %}
+  </section>
+</div>
+{% endblock %}

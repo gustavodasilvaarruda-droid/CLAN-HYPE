@@ -1,0 +1,17 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Casas do Reino - HYPE{% endblock %}
+{% block body_class %}hype-houses-page{% endblock %}
+{% block content %}
+<div class="hype-v6-page hype-v7-page">
+  <section class="hype-v6-banner hype-v6-kingdom-banner hype-v7-cinematic-banner"><div class="hype-v6-banner-copy"><span class="hype-v6-kicker">REINO HYPE</span><h1>CASAS E MORADIAS</h1><p>Unidades cadastradas dinamicamente para acompanhar o crescimento do clã.</p></div><img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="" aria-hidden="true"></section>
+  <div class="hype-v6-tabs"><a href="{{url_for('painel_reino')}}">Reino</a><a class="active" href="{{url_for('casas_reino')}}">Casas</a><a href="{{url_for('lojas')}}">Lojas</a><a href="{{url_for('expansion.mapa_reino')}}">Mapa</a></div>
+  <section class="hype-v6-unit-grid">
+    {% for c in casas %}
+      <article class="hype-v6-unit-card">
+        <div class="hype-v6-unit-cover">{% if c.imagem_url %}<img src="{{c.imagem_url}}" alt="{{c.nome}}">{% else %}<div class="hype-v6-unit-placeholder"><span>⌂</span></div>{% endif %}<span class="hype-v6-status {{c.status}}">{{c.status|replace('_',' ')}}</span></div>
+        <div class="hype-v6-unit-body"><span class="hype-v6-kicker">{{c.codigo}}{% if c.setor %} · {{c.setor}}{% endif %}</span><h2>{{c.nome}}</h2><p>{{c.descricao or 'Moradia oficial do Reino HYPE.'}}</p><div class="hype-v6-unit-footer"><div><small>Aluguel semanal</small><b>{{c.valor_aluguel|preco}}</b></div><div><small>Morador</small><b>{{c.ocupante_nick or 'Disponível'}}</b></div></div></div>
+      </article>
+    {% else %}<div class="hype-v6-panel"><p class="hype-v6-empty">Nenhuma casa ativa cadastrada.</p></div>{% endfor %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070707">
+  <title>{% block title %}HYPE Builders{% endblock %}</title>
+  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="builders-gold-ui hype-core-ui">
+<header class="hgb-topbar hype-core-topbar">
+  <a class="hgb-brand" href="{{url_for('pagina_inicial')}}"><span class="hgb-brand-glow"></span><img src="{{url_for('static',filename='imagens/hypeim.png')}}" alt="HYPE"></a>
+  <nav class="hgb-topnav hype-core-topnav">
+    <a href="{{url_for('pagina_inicial')}}"><span>⌂</span>Início</a>
+    <a href="{{url_for('breed')}}"><span>◈</span>Breed</a>
+    <a class="active" href="{{url_for('buildershub.hub')}}"><span>♟</span>Ferramentas</a>
+    <a href="{{url_for('eventos')}}"><span>▣</span>Eventos</a>
+    <a href="{{url_for('painel_reino')}}"><span>♛</span>Reino HYPE</a>
+    <a href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>
+  </nav>
+  <div class="hgb-top-actions">
+    <form class="hgb-global-search" action="{{url_for('competitive.pokedex_competitiva')}}" method="get"><span>⌕</span><input name="q" placeholder="Buscar Pokémon, move, item..."></form>
+    <a class="hgb-notify" href="{{url_for('painel')}}" title="Painel"><span>♢</span>{% if mensagens_nao_lidas|default(0) %}<b>{{mensagens_nao_lidas}}</b>{% endif %}</a>
+    {% if session.get('usuario_email') %}<a class="hgb-user" href="{{url_for('painel')}}"><span class="hgb-avatar">{{(session.get('nick_jogo') or 'H')[:1]|upper}}</span><span class="hgb-user-name">{{session.get('nick_jogo') or 'Membro HYPE'}}</span><span class="hgb-chevron">⌄</span></a>{% else %}<a class="hgb-user" href="{{url_for('pagina_inicial')}}"><span class="hgb-avatar">H</span><span class="hgb-user-name">Entrar</span></a>{% endif %}
+    <button class="hgb-mobile-menu" id="hgbMobileMenu" type="button">☰</button>
+  </div>
+</header>
+<div class="hgb-app hype-core-app">
+  <aside class="hgb-sidebar hype-core-sidebar" id="hgbSidebar">
+    <div class="hgb-sidebar-title">CENTRAL HYPE</div>
+    <nav class="hgb-side-nav">
+      <a href="{{url_for('painel')}}"><span>⌂</span>Painel do Membro</a>
+      {% if session.get('nick_jogo') %}<a href="{{url_for('perfil_publico',nick=session.get('nick_jogo'))}}"><span>♙</span>Meu Perfil</a>{% endif %}
+      <a href="{{url_for('breed')}}#fazer-pedido"><span>▣</span>Fazer Pedido</a>
+      <a href="{{url_for('breed')}}#meus-pedidos"><span>▤</span>Meus Pedidos</a>
+      <a href="{{url_for('breed')}}#fila-breed"><span>☷</span>Fila de Breed</a>
+    </nav>
+    <div class="hgb-side-divider"></div>
+    <div class="hgb-side-section-title">Pokémon</div>
+    <nav class="hgb-side-nav">
+      <a class="{{'active' if request.endpoint in ['expansion.team_builder','competitive.analisar_team'] else ''}}" href="{{url_for('expansion.team_builder')}}"><span>♟</span>Team Builder</a>
+      <a class="{{'active' if request.endpoint in ['competitive.pokedex_competitiva','competitive.pokedex_detalhe'] else ''}}" href="{{url_for('competitive.pokedex_competitiva')}}"><span>◉</span>Pokédex</a>
+      <a class="{{'active' if request.endpoint in ['buildershub.hub','buildershub.formatos'] else ''}}" href="{{url_for('buildershub.hub')}}"><span>✦</span>HYPE Builders</a>
+      <a class="{{'active' if request.endpoint=='buildershub.guias' else ''}}" href="{{url_for('buildershub.guias')}}"><span>▤</span>Guias e Builds</a>
+    </nav>
+    <div class="hgb-side-divider"></div>
+    <div class="hgb-side-section-title">Ferramentas competitivas</div>
+    <nav class="hgb-side-nav">
+      <a class="{{'active' if request.endpoint=='buildershub.sinergia' else ''}}" href="{{url_for('buildershub.sinergia')}}"><span>⌘</span>Sinergia de Times</a>
+      <a class="{{'active' if request.endpoint=='buildershub.calculadora_dano' else ''}}" href="{{url_for('buildershub.calculadora_dano')}}"><span>▦</span>Calculadora de Dano</a>
+      <a class="{{'active' if request.endpoint=='buildershub.tier_list' else ''}}" href="{{url_for('buildershub.tier_list')}}"><span>▥</span>Tier List</a>
+      <a href="{{url_for('final.builds_pokemon')}}"><span>✣</span>Comunidade</a>
+    </nav>
+    <div class="hgb-side-divider"></div>
+    <nav class="hgb-side-nav"><a href="{{url_for('eventos')}}"><span>♛</span>Eventos e Torneios</a><a href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a><a href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>{% if session.get('usuario_email') %}<a href="{{url_for('logout')}}"><span>↪</span>Sair</a>{% endif %}</nav>
+    <div class="hgb-sidebar-art"></div>
+  </aside>
+  <main class="hgb-main hype-core-main">
+    {% with ms=get_flashed_messages(with_categories=true) %}{% for c,m in ms %}<div class="alert alert-{{c}}">{{m}}</div>{% endfor %}{% endwith %}
+    {% block builders_content %}{% endblock %}
+  </main>
+</div>
+<script>(()=>{const btn=document.getElementById('hgbMobileMenu'),side=document.getElementById('hgbSidebar');if(btn&&side)btn.addEventListener('click',()=>side.classList.toggle('open'));})();</script>
+{% block extra_scripts %}{% endblock %}
+</body></html>

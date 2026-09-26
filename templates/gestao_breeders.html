@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão do Berçário - Clã Hype</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="breed-page">
+<header class="cabecalho">
+    <div class="logo">
+        <img class="logo-dragao" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Hype">
+        <nav class="menu">
+            <a href="{{ url_for('pagina_inicial') }}" class="btn-menu">Início</a>
+            <a href="{{ url_for('breed') }}" class="btn-menu">Berçário</a>
+            <a href="{{ url_for('gestao_breeders') }}" class="btn-menu active">Gestão</a>
+            <a href="{{ url_for('painel') }}" class="login">⚔️ {{ session.get('nick_jogo') }}</a>
+        </nav>
+        <img class="logo-dragao" src="{{ url_for('static', filename='imagens/logodragaoh.png') }}" alt="Hype">
+    </div>
+</header>
+
+<main class="breed-shell gestao-shell">
+    <section class="ranking-header-card">
+        <div>
+            <span class="breed-kicker">ADMINISTRAÇÃO HYPE</span>
+            <h1>📊 Gestão do Berçário</h1>
+            <p>Acompanhe produção e valor gerado pelos Breeders.</p>
+        </div>
+        <div class="periodo-links">
+            <a class="{{ 'ativo' if periodo == 'hoje' else '' }}" href="?periodo=hoje">Hoje</a>
+            <a class="{{ 'ativo' if periodo == 'semana' else '' }}" href="?periodo=semana">Semana</a>
+            <a class="{{ 'ativo' if periodo == 'mes' else '' }}" href="?periodo=mes">Mês</a>
+        </div>
+    </section>
+
+    <section class="gestao-cards">
+        <article><small>POKÉMON BREEDADOS</small><strong>{{ total_pokemons }}</strong><span>{{ titulo_periodo }}</span></article>
+        <article><small>VALOR GERADO</small><strong>{{ "{:,.0f}".format(total_valor).replace(',', '.') }}</strong><span>PokéYen</span></article>
+        <article><small>BREEDERS ATIVOS</small><strong>{{ breeders_ativos }}</strong><span>{{ titulo_periodo }}</span></article>
+        <article><small>MÉDIA / BREEDER</small><strong>{{ "%.1f"|format(total_pokemons / breeders_ativos) if breeders_ativos else "0" }}</strong><span>Pokémon</span></article>
+    </section>
+
+    <section class="breed-list-card">
+        <div class="section-title-row">
+            <div><span class="breed-kicker">ÚLTIMOS 7 DIAS</span><h2>Produção diária</h2></div>
+        </div>
+        <div class="mini-chart" id="prodChart">
+            {% set maior = (grafico | map(attribute='quantidade') | max) if grafico else 1 %}
+            {% for item in grafico %}
+            <div class="bar-col">
+                <span class="bar-value">{{ item.quantidade }}</span>
+                <div class="bar-track"><div class="bar-fill" style="height: {{ (item.quantidade / (maior if maior > 0 else 1) * 100)|round }}%"></div></div>
+                <small>{{ item.dia }}</small>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="breed-list-card">
+        <div class="section-title-row">
+            <div><span class="breed-kicker">DESEMPENHO</span><h2>Breeders — {{ titulo_periodo }}</h2></div>
+        </div>
+        <div class="tabela-responsive">
+            <table class="tabela-pedidos breed-table">
+                <thead><tr><th>Breeder</th><th>Pokémon feitos</th><th>Valor gerado</th><th>Média por Breed</th><th>Detalhes</th></tr></thead>
+                <tbody>
+                {% for b in breeders %}
+                <tr>
+                    <td><strong class="destaque-gold">{{ b.nick }}</strong><br><small class="texto-secundario">{{ b.cargo|replace('_',' ')|title }}</small></td>
+                    <td><span class="count-pill">{{ b.quantidade }}</span></td>
+                    <td>{{ "{:,.0f}".format(b.valor).replace(',', '.') }} ¥</td>
+                    <td>{{ "{:,.0f}".format(b.valor / b.quantidade).replace(',', '.') if b.quantidade else "0" }} ¥</td>
+                    <td>
+                        <details class="breed-details">
+                            <summary>Ver breeds</summary>
+                            {% for p in b.pedidos %}
+                            <div><b>{{ p.pokemon }}</b> · {{ p.breed_tipo }} · {{ p.data.strftime('%d/%m %H:%M') }} · {{ "{:,.0f}".format(p.valor).replace(',', '.') }} ¥</div>
+                            {% endfor %}
+                        </details>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="tabela-vazia">Nenhum Breed concluído neste período.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</body>
+</html>

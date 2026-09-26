@@ -1,0 +1,18 @@
+{% extends "hype_app_base.html" %}
+{% block title %}Preços do Breed · HYPE Admin{% endblock %}
+{% block content %}
+<div class="admin-price-shell">
+  <div class="admin-price-head"><div><span>ADMIN · HYPE BREED</span><h1>Preços do Breed</h1><p>Fonte oficial dos valores usados em novos pedidos. Pedidos já criados preservam o valor histórico.</p></div><a class="btn-ranking-outline" href="{{url_for('expansion.admin_dashboard')}}">← Central Administrativa</a></div>
+  <div class="admin-price-grid">
+  {% for p in precos %}
+    <form method="post" class="admin-price-card">
+      <input type="hidden" name="codigo" value="{{p.codigo}}">
+      <div><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3></div>
+      <label>Valor HYPE<input name="valor" value="{{p.valor}}" inputmode="numeric" required></label>
+      <div class="admin-price-current">Atual: <b>{{p.valor|preco}}</b></div>
+      <button class="cta-gold">Salvar valor</button>
+    </form>
+  {% else %}<div class="dash-card">Nenhum preço cadastrado.</div>{% endfor %}
+  </div>
+</div>
+{% endblock %}
