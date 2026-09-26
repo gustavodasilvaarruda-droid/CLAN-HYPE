@@ -1,0 +1,64 @@
+{% extends "hype_app_base.html" %}
+{% block title %}Painel Administrativo · HYPE{% endblock %}
+{% block content %}
+<div class="admin2-shell">
+  <aside class="admin2-side">
+    <div class="admin2-side-title">♛ <b>ADMIN</b></div>
+    <a class="admin2-member-return" href="{{url_for('painel')}}">← Painel do Membro</a>
+    <nav>
+      <a class="active" href="{{ url_for('expansion.admin_dashboard') }}">⌂ <span>Visão Geral</span></a>
+      <a href="{{ url_for('admin_membros_hype') }}">♙ <span>Gerenciar Membros</span></a>
+      <a href="{{ url_for('admin_cargos') }}">♜ <span>Cargos e Permissões</span></a>
+      <a href="{{ url_for('admin_reino') }}">⌂ <span>Casas e Lojas</span></a>
+      <a href="{{ url_for('expansion.admin_economia') }}">◉ <span>Preços e Economia</span></a>
+      <a href="{{ url_for('gestao_breeders') }}">☷ <span>Pedidos de Breed</span></a>
+      <a href="{{ url_for('admin_conteudo') }}">▣ <span>Eventos e Torneios</span></a>
+      <a href="{{ url_for('final.configuracoes') }}">◉ <span>HYPE Live</span></a>
+      <a href="{{ url_for('admin_logs') }}">▤ <span>Logs do Sistema</span></a>
+      <a href="{{ url_for('final.configuracoes') }}">⚙ <span>Configurações</span></a>
+    </nav>
+    <div class="admin2-brand"><img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="HYPE"><b>HYPE</b><small>PAINEL ADMINISTRATIVO</small></div>
+  </aside>
+
+  <main class="admin2-main">
+    <section class="admin2-hero">
+      <div><span>PAINEL ADMINISTRATIVO</span><h1>CLÃ <strong>HYPE</strong></h1><p>GERENCIE · ORGANIZE · EVOLUA</p></div>
+    </section>
+
+    <section class="admin2-metrics">
+      <article><i>♟</i><div><b>{{stats.membros}}</b><span>Membros HYPE</span><small>{{stats.usuarios}} contas cadastradas</small></div></article>
+      <article><i>◉</i><div><b>{{stats.pokemon_catalogo}}</b><span>Pokémon cadastrados</span><small>Base de preços/catálogo</small></div></article>
+      <article><i>⌂</i><div><b>{{stats.casas_total}}</b><span>Casas (Reino HYPE)</span><small>{{stats.casas_ocupadas}} ocupadas</small></div></article>
+      <article><i>▦</i><div><b>{{stats.lojas_total}}</b><span>Lojas (Reino HYPE)</span><small>{{stats.lojas_ocupadas}} ocupadas</small></div></article>
+      <article><i>▣</i><div><b>{{stats.eventos + stats.torneios}}</b><span>Eventos / Torneios</span><small>{{stats.eventos}} eventos · {{stats.torneios}} torneios</small></div></article>
+      <article><i>☷</i><div><b>{{stats.breed_total}}</b><span>Pedidos de Breed</span><small>{{stats.breed_pendentes}} pendentes</small></div></article>
+    </section>
+
+    <section class="admin2-grid admin2-grid-top">
+      <article class="admin2-card admin2-activity"><header><b>▣ ATIVIDADE RECENTE</b><a href="{{url_for('admin_logs')}}">Ver todos →</a></header>
+        {% for l in logs %}<div class="admin2-row"><span class="admin2-dot"></span><div><b>{{l.modulo or 'Sistema'}} · {{l.acao or 'atividade'}}</b><small>{{l.alvo_tipo or ''}} {{l.alvo_id or ''}}</small></div><time>{{(l.created_at or '')[:16]|replace('T',' ')}}</time></div>{% else %}<p class="admin2-empty">Nenhuma atividade administrativa registrada ainda.</p>{% endfor %}
+      </article>
+
+      <article class="admin2-card admin2-growth"><header><b>▣ CRESCIMENTO DO CLÃ</b><span>Histórico real</span></header>
+        <div class="admin2-chart" data-values='{{ crescimento|tojson }}'>
+          {% set maxv = crescimento|map(attribute='valor')|max if crescimento else 1 %}
+          {% for p in crescimento %}<div class="admin2-bar-wrap"><div class="admin2-bar" style="height:{{ ((p.valor / (maxv if maxv else 1))*100)|round }}%"><em>{{p.valor}}</em></div><small>{{p.label}}</small></div>{% endfor %}
+        </div>
+      </article>
+
+      <aside class="admin2-stack">
+        <article class="admin2-card"><header><b>▣ ESTATÍSTICAS GERAIS</b></header><div class="admin2-mini-grid"><div><b>{{stats.membros}}</b><small>Membros</small></div><div><b>{{stats.breed_total}}</b><small>Breed</small></div><div><b>{{stats.casas_ocupadas}}</b><small>Casas ocupadas</small></div><div><b>{{stats.eventos}}</b><small>Eventos</small></div></div></article>
+        <article class="admin2-card admin2-system"><header><b>⚙ SISTEMA</b><span>● Operacional</span></header><p>✓ Banco e autenticação</p><p>✓ Breed e breeders</p><p>✓ Eventos e torneios</p><p>✓ Reino HYPE</p></article>
+      </aside>
+    </section>
+
+    <section class="admin2-grid admin2-grid-bottom">
+      <article class="admin2-card"><header><b>⌂ PEDIDOS DE BREED (ÚLTIMOS)</b><a href="{{url_for('gestao_breeders')}}">Ver todos →</a></header><div class="admin2-table-wrap"><table><thead><tr><th>#</th><th>Pokémon</th><th>Solicitante</th><th>Status</th></tr></thead><tbody>{% for p in ultimos_breeds %}<tr><td>#{{p.id}}</td><td><b>{{p.pokemon}}</b></td><td>{{p.player or p.usuario_email}}</td><td><span class="admin2-status s-{{p.status}}">{{(p.status or '-')|replace('_',' ')}}</span></td></tr>{% else %}<tr><td colspan="4">Nenhum pedido ainda.</td></tr>{% endfor %}</tbody></table></div></article>
+
+      <article class="admin2-card"><header><b>⌂ OCUPAÇÃO DO REINO HYPE</b></header><div class="admin2-occupancy"><div class="admin2-ring" style="--pct:{{stats.casas_pct}}"><b>{{stats.casas_pct}}%</b><span>Casas<br>{{stats.casas_ocupadas}} / {{stats.casas_total}}</span></div><div class="admin2-ring purple" style="--pct:{{stats.lojas_pct}}"><b>{{stats.lojas_pct}}%</b><span>Lojas<br>{{stats.lojas_ocupadas}} / {{stats.lojas_total}}</span></div></div><a class="admin2-action" href="{{url_for('admin_reino')}}">Gerenciar Reino →</a></article>
+
+      <article class="admin2-card"><header><b>♛ PRÓXIMOS EVENTOS</b><a href="{{url_for('admin_conteudo')}}">Ver todos →</a></header>{% for e in agenda %}<div class="admin2-event"><time>{{(e.data or '')[:10]}}</time><div><b>{{e.titulo}}</b><small>{{e.tipo}}</small></div><span>{{e.status}}</span></div>{% else %}<p class="admin2-empty">Nenhum evento futuro publicado.</p>{% endfor %}</article>
+    </section>
+  </main>
+</div>
+{% endblock %}

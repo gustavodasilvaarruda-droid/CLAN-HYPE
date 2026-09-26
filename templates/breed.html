@@ -1,0 +1,390 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}HYPE Breed • Fazer Pedido{% endblock %}
+{% block body_class %}hype-breed-page hype-breed-reference-page{% endblock %}
+{% block content %}
+<div class="breed-ref-shell" id="fazer-pedido">
+  <section class="breed-ref-hero">
+    <div class="breed-ref-hero-copy">
+      <span class="breed-ref-kicker">HYPE BREED</span>
+      <h1>FAZER PEDIDO</h1>
+      <p>Monte seu Breed em etapas. Escolha o Pokémon, configure as características, revise e envie.</p>
+    </div>
+    <div class="breed-ref-hero-mark">HYPE</div>
+  </section>
+
+  <div class="breed-ref-titlebar">
+    <div><span class="breed-ref-kicker">HYPE BREED</span><h2 id="wizardTitle">ESCOLHA O POKÉMON</h2></div>
+    <div class="breed-ref-secure"><span>●</span> Sistema de Breed HYPE</div>
+  </div>
+
+  <div class="breed-ref-stepper" id="breedStepper" aria-label="Etapas do pedido">
+    <button type="button" class="active" data-step="1"><b>1</b><span>Pokémon</span></button><i></i>
+    <button type="button" data-step="2"><b>2</b><span>Características</span></button><i></i>
+    <button type="button" data-step="3"><b>3</b><span>IVs e Extras</span></button><i></i>
+    <button type="button" data-step="4"><b>4</b><span>Revisão</span></button><i></i>
+    <button type="button" data-step="5"><b>5</b><span>Envio</span></button>
+  </div>
+
+  {% if permissoes.get('pode_fazer_pedido_breed', True) %}
+  <form method="POST" id="breedForm" autocomplete="off">
+    <input type="hidden" name="pokemon_id" id="pokemon_id">
+
+    <section class="breed-wizard-panel active" data-panel="1">
+      <div class="breed-ref-picker-layout">
+        <div class="breed-ref-catalog">
+          <div class="breed-ref-search pokemon-search-wrap">
+            <span>⌕</span><input id="pokemon_search" name="pokemon" placeholder="Digite o nome do Pokémon..." required>
+            <kbd>ESC</kbd><div id="pokemon_results" class="pokemon-results" hidden></div>
+          </div>
+          <div class="breed-ref-filters">
+            <select id="typeFilter"><option value="">Todos os Tipos</option></select>
+            <select id="eggFilter"><option value="">Todos os Egg Groups</option></select>
+            <select id="sortFilter"><option value="name">Ordenar por Nome</option><option value="number">Número da Pokédex</option></select>
+            <button type="button" id="favoriteFilter" class="breed-filter-favorite">★ Favoritos</button>
+          </div>
+          <small id="pokemon_status" class="breed-ref-status">Escolha uma espécie disponível para Breed.</small>
+          <div class="breed-ref-pokemon-grid" id="hypeQuickPokemonGrid">
+            {% set populares = [(445,'garchomp','Garchomp'),(887,'dragapult','Dragapult'),(248,'tyranitar','Tyranitar'),(448,'lucario','Lucario'),(700,'sylveon','Sylveon'),(376,'metagross','Metagross'),(635,'hydreigon','Hydreigon'),(212,'scizor','Scizor'),(479,'rotom','Rotom'),(637,'volcarona','Volcarona'),(468,'togekiss','Togekiss'),(149,'dragonite','Dragonite'),(373,'salamence','Salamence'),(282,'gardevoir','Gardevoir'),(130,'gyarados','Gyarados'),(94,'gengar','Gengar'),(6,'charizard','Charizard'),(9,'blastoise','Blastoise'),(3,'venusaur','Venusaur'),(143,'snorlax','Snorlax')] %}
+            {% for pid,slug,nome in populares %}
+            <button type="button" class="breed-ref-poke-card" data-id="{{pid}}" data-name="{{slug}}" data-url="https://pokeapi.co/api/v2/pokemon-species/{{pid}}/">
+              <span class="breed-card-star" title="Favoritar">☆</span>
+              <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{{pid}}.png" alt="{{nome}}" loading="lazy">
+              <strong>{{nome}}</strong><small>#{{'%04d'|format(pid)}}</small><div class="breed-card-types"></div>
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <aside class="breed-ref-detail" id="pokemonDetail">
+          <div class="breed-detail-empty" id="detailEmpty"><span>◈</span><b>Selecione um Pokémon</b><small>As informações aparecerão aqui.</small></div>
+          <div id="detailContent" hidden>
+            <div class="breed-detail-head"><button type="button" id="detailFavorite">☆</button><div><h3 id="detailName">—</h3><span id="detailNumber">#0000</span></div></div>
+            <div id="detailTypes" class="breed-detail-types"></div>
+            <div class="breed-detail-art"><div class="breed-art-orbit"></div><img id="pokemon_preview" alt="Pokémon selecionado"></div>
+            <div class="breed-detail-info"><h4>♔ Informações</h4><dl><div><dt>Altura</dt><dd id="detailHeight">—</dd></div><div><dt>Peso</dt><dd id="detailWeight">—</dd></div><div><dt>Egg Groups</dt><dd id="detailEgg">—</dd></div><div><dt>Geração</dt><dd id="detailGeneration">—</dd></div><div><dt>Abilities</dt><dd id="detailAbilities">—</dd></div></dl></div>
+            <div class="breed-detail-stats"><h4>Status Base <span id="detailTotal">0</span></h4><div id="detailStats"></div></div>
+          </div>
+          <button type="button" class="breed-ref-next" data-next="2" id="pokemonNext" disabled>Próximo →</button>
+        </aside>
+      </div>
+    </section>
+
+    <section class="breed-wizard-panel" data-panel="2">
+      <div class="breed-stage-card">
+        <div class="breed-stage-copy"><span class="breed-ref-kicker">ETAPA 2</span><h2>CARACTERÍSTICAS</h2><p>Defina Nature, Ability/HA, gênero e o tipo do Breed.</p></div>
+        <div class="breed-selected-mini"><img class="selectedPokemonArt" alt=""><div><small>POKÉMON</small><b class="selectedPokemonName">—</b></div></div>
+        <div class="breed-ref-fields">
+          <label><span>Nature</span><select id="nature" name="nature"><option value="">Sem Nature</option>{% for n in ['Hardy','Lonely','Brave','Adamant','Naughty','Bold','Docile','Relaxed','Impish','Lax','Timid','Hasty','Serious','Jolly','Naive','Modest','Mild','Quiet','Bashful','Rash','Calm','Gentle','Sassy','Careful','Quirky'] %}<option value="{{n}}">{{n}}</option>{% endfor %}</select></label>
+          <label><span>Ability / HA</span><select id="ha" name="ha" required><option value="">Selecionar...</option><option value="sim">Hidden Ability (HA)</option><option value="nao">Ability normal</option></select></label>
+          <label><span>Gênero</span><select id="genero" name="genero" required><option value="indiferente">Indiferente</option><option value="femea">Fêmea</option><option value="macho">Macho</option></select></label>
+          <label><span>Breed</span><select id="breed_tipo" name="breed_tipo" required><option value="">Selecionar...</option><option value="F5">F5</option><option value="F6">F6</option></select></label>
+        </div>
+        <div id="breed_special_alert" class="breed-ref-alert" hidden><b>BREED ESPECIAL</b><span>Esta espécie exige regra especial com Ditto. O servidor aplicará a tabela correta.</span></div>
+        <div class="breed-stage-actions"><button type="button" class="breed-ref-back" data-back="1">← Voltar</button><button type="button" class="breed-ref-next" data-next="3">Próximo →</button></div>
+      </div>
+    </section>
+
+    <section class="breed-wizard-panel" data-panel="3">
+      <div class="breed-stage-card">
+        <div class="breed-stage-copy"><span class="breed-ref-kicker">ETAPA 3</span><h2>IVs E EXTRAS</h2><p>Escolha o IV descartável do F5 e os adicionais do pedido.</p></div>
+        <div class="breed-ref-ivs"><div><small>HP</small><b data-iv="hp">31</b></div><div><small>ATK</small><b data-iv="ataque">31</b></div><div><small>DEF</small><b data-iv="defesa">31</b></div><div><small>SP.ATK</small><b data-iv="ataque_especial">31</b></div><div><small>SP.DEF</small><b data-iv="defesa_especial">31</b></div><div><small>SPD</small><b data-iv="velocidade">31</b></div></div>
+        <div class="breed-ref-fields breed-ref-fields-two">
+          <label id="ivDiscardField"><span>No F5, qual IV não precisa?</span><select id="iv_descartado" name="iv_descartado"><option value="">Selecionar...</option><option value="hp">HP</option><option value="ataque">Ataque</option><option value="defesa">Defesa</option><option value="ataque_especial">Ataque Especial</option><option value="defesa_especial">Defesa Especial</option><option value="velocidade">Velocidade</option></select></label>
+          <label><span>Treinamento</span><select id="treinado" name="treinado"><option value="nao">Não treinado</option><option value="sim">Treinado (+ adicional)</option></select></label>
+        </div>
+        <label class="breed-ref-check"><input type="checkbox" id="zero_speed" name="zero_speed" value="sim"><span><b>Zero Speed</b><small>0 IV em Velocidade para estratégias específicas.</small></span></label>
+        <div class="breed-stage-actions"><button type="button" class="breed-ref-back" data-back="2">← Voltar</button><button type="button" class="breed-ref-next" data-next="4">Revisar Pedido →</button></div>
+      </div>
+    </section>
+
+    <section class="breed-wizard-panel" data-panel="4">
+      <div class="breed-stage-card">
+        <div class="breed-stage-copy"><span class="breed-ref-kicker">ETAPA 4</span><h2>REVISÃO DO PEDIDO</h2><p>Confira tudo antes de enviar para a fila HYPE.</p></div>
+        <div class="breed-review-card"><img class="selectedPokemonArt" alt=""><div class="breed-review-main"><small>POKÉMON</small><h3 class="selectedPokemonName">—</h3><div id="reviewTags"></div></div><dl id="reviewData"></dl></div>
+        <div class="breed-review-note">O preço final é calculado e validado pelo servidor usando a tabela configurada no Painel Administrativo.</div>
+        <div class="breed-stage-actions"><button type="button" class="breed-ref-back" data-back="3">← Voltar</button><button type="button" class="breed-ref-next" data-next="5">Confirmar →</button></div>
+      </div>
+    </section>
+
+    <section class="breed-wizard-panel" data-panel="5">
+      <div class="breed-stage-card breed-send-card">
+        <div class="breed-send-emblem">♛</div><span class="breed-ref-kicker">ETAPA 5</span><h2>PRONTO PARA ENVIAR</h2><p>Seu pedido será enviado para a fila de Breed e poderá ser acompanhado em Meus Pedidos.</p>
+        <div class="breed-send-summary"><img class="selectedPokemonArt" alt=""><div><small>SEU PEDIDO</small><b class="selectedPokemonName">—</b><span id="sendSummary">—</span></div></div>
+        <div class="breed-stage-actions"><button type="button" class="breed-ref-back" data-back="4">← Revisar</button><button type="submit" class="breed-submit-final">Enviar Pedido de Breed ✦</button></div>
+      </div>
+    </section>
+  </form>
+  {% else %}<div class="breed-stage-card"><h2>Breed indisponível</h2><p>Seu cargo não possui permissão para fazer pedidos.</p></div>{% endif %}
+
+  <nav class="hype-breed-subnav breed-ref-subnav"><a class="active" href="{{url_for('breed')}}">Fazer Pedido</a><a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}<a href="{{url_for('team_breeders')}}">Team Breeders</a><a href="{{url_for('ranking_breed')}}">Ranking</a></nav>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(() => {
+'use strict';
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const form=$('#breedForm');
+if(!form) return;
+const search=$('#pokemon_search'), idInput=$('#pokemon_id'), results=$('#pokemon_results'), status=$('#pokemon_status');
+const breedTipo=$('#breed_tipo'), ivSelect=$('#iv_descartado'), zeroSpeed=$('#zero_speed');
+let selected=null, currentStep=1, searchTimer=null;
+const favorites=new Set(JSON.parse(localStorage.getItem('hypeBreedFavorites')||'[]').map(Number));
+let onlyFavorites=false;
+const pretty=v=>(v||'').replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase());
+const romanGen=v=>({'generation-i':'I','generation-ii':'II','generation-iii':'III','generation-iv':'IV','generation-v':'V','generation-vi':'VI','generation-vii':'VII','generation-viii':'VIII','generation-ix':'IX'}[v]||pretty(v));
+
+function setStatus(msg,error=false){status.textContent=msg;status.classList.toggle('error',error)}
+function saveFavs(){localStorage.setItem('hypeBreedFavorites',JSON.stringify([...favorites]));renderFavs()}
+function renderFavs(){
+  $$('.breed-ref-poke-card').forEach(c=>{const st=c.querySelector('.breed-card-star');if(st)st.textContent=favorites.has(+c.dataset.id)?'★':'☆'});
+  const df=$('#detailFavorite'); if(df&&selected)df.textContent=favorites.has(selected.id)?'★':'☆';
+}
+function toggleFav(id){favorites.has(id)?favorites.delete(id):favorites.add(id);saveFavs();filterCards()}
+
+function localCatalog(){
+  return $$('.breed-ref-poke-card').map(c=>({
+    id:+c.dataset.id,
+    name:c.dataset.name,
+    display_name:pretty(c.dataset.name),
+    sprite:(c.querySelector('img')||{}).src||''
+  }));
+}
+const quickGrid=$('#hypeQuickPokemonGrid');
+const seedCatalog=localCatalog();
+let fullCatalog=[...seedCatalog];
+let catalogReady=false;
+let catalogLoading=null;
+let visibleLimit=40;
+let currentQuery='';
+
+function spriteFor(id,artwork=true){
+  return artwork
+    ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`
+    : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+}
+function normalizePokemonItem(x){
+  const id=Number(x&&x.id), name=String((x&&x.name)||'').trim().toLowerCase();
+  if(!id||!name)return null;
+  return {id,name,display_name:x.display_name||pretty(name),sprite:x.sprite||spriteFor(id,true)};
+}
+function uniquePokemon(items){
+  const out=[],seen=new Set();
+  (items||[]).forEach(raw=>{const x=normalizePokemonItem(raw);if(!x||seen.has(x.id))return;seen.add(x.id);out.push(x)});
+  return out;
+}
+function cardHTML(x){
+  return `<button type="button" class="breed-ref-poke-card search-generated" data-id="${x.id}" data-name="${x.name}" aria-label="Selecionar ${x.display_name}">
+    <span class="breed-card-star" title="Favoritar">${favorites.has(x.id)?'★':'☆'}</span>
+    <img src="${x.sprite||spriteFor(x.id,true)}" alt="${x.display_name}" loading="lazy" data-fallback="${spriteFor(x.id,false)}">
+    <strong>${x.display_name}</strong><small>#${String(x.id).padStart(4,'0')}</small><div class="breed-card-types"></div>
+  </button>`;
+}
+function attachImageFallbacks(root=document){
+  root.querySelectorAll('img[data-fallback]').forEach(img=>{img.addEventListener('error',()=>{if(img.dataset.fallback&&img.src!==img.dataset.fallback){img.src=img.dataset.fallback;img.dataset.fallback=''}},{once:true})});
+}
+function paintPokemonGrid(found,limit=visibleLimit){
+  const unique=uniquePokemon(found);
+  if(!unique.length){quickGrid.innerHTML='<div class="breed-search-empty">Nenhum Pokémon encontrado.</div>';return 0}
+  quickGrid.innerHTML=unique.slice(0,limit).map(cardHTML).join('');
+  attachImageFallbacks(quickGrid); renderFavs();
+  return Math.min(unique.length,limit);
+}
+function paintSearchResults(found){
+  const unique=uniquePokemon(found).slice(0,12);
+  results.innerHTML=unique.map(x=>`<button type="button" class="pokemon-result" data-id="${x.id}" data-name="${x.name}"><img src="${x.sprite||spriteFor(x.id,false)}" alt=""><span>${x.display_name}</span><small>#${String(x.id).padStart(4,'0')}</small></button>`).join('');
+  results.hidden=!unique.length; return unique.length;
+}
+
+async function loadFullCatalog(){
+  if(catalogReady)return fullCatalog;
+  if(catalogLoading)return catalogLoading;
+  catalogLoading=(async()=>{
+    let remote=[];
+    // Fonte 1: endpoint do próprio HYPE/PokéAPI.
+    try{
+      const r=await fetch('/api/breed/pokemon/catalogo',{headers:{Accept:'application/json'},cache:'no-store'});
+      if(r.ok){const d=await r.json();if(Array.isArray(d.results))remote=d.results}
+    }catch(_){ }
+    // Fonte 2: CSV oficial do projeto PokéAPI no GitHub. Os sprites já vêm deste host.
+    if(remote.length<100){
+      try{
+        const r=await fetch('https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_species.csv',{cache:'force-cache'});
+        if(r.ok){
+          const txt=await r.text();
+          remote=txt.split(/\r?\n/).slice(1).map(line=>{
+            const c=line.split(','); const id=Number(c[0]),name=(c[1]||'').trim().toLowerCase();
+            return id&&name?{id,name,display_name:pretty(name),sprite:spriteFor(id,true)}:null;
+          }).filter(Boolean);
+        }
+      }catch(_){ }
+    }
+    fullCatalog=uniquePokemon([...seedCatalog,...remote]).sort((a,b)=>a.id-b.id);
+    catalogReady=fullCatalog.length>seedCatalog.length;
+    return fullCatalog;
+  })().finally(()=>{catalogLoading=null});
+  return catalogLoading;
+}
+
+function matchesQuery(x,q){
+  const clean=v=>(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[ ._]/g,'-');
+  return clean(x.name).includes(clean(q))||clean(x.display_name).includes(clean(q));
+}
+async function searchPokemon(){
+  const q=search.value.trim(); currentQuery=q; visibleLimit=40;
+  if(!q){
+    results.hidden=true;
+    const catalog=await loadFullCatalog();
+    // Evita que o carregamento inicial sobrescreva uma pesquisa digitada enquanto o catálogo chegava.
+    if(search.value.trim()) return;
+    paintPokemonGrid(catalog.length>seedCatalog.length?catalog:seedCatalog,visibleLimit);
+    setStatus(catalogReady?'Catálogo HYPE carregado. Role para ver mais Pokémon.':'Escolha um Pokémon ou digite o nome para pesquisar.');
+    return;
+  }
+  const immediate=fullCatalog.filter(x=>matchesQuery(x,q));
+  paintPokemonGrid(immediate.length?immediate:seedCatalog.filter(x=>matchesQuery(x,q)),40);
+  paintSearchResults(immediate);
+  setStatus('Pesquisando Pokémon...');
+  const catalog=await loadFullCatalog();
+  if(search.value.trim()!==q)return;
+  let found=catalog.filter(x=>matchesQuery(x,q));
+  // O endpoint HYPE complementa buscas exatas mesmo se o catálogo externo não carregar.
+  try{
+    const r=await fetch(`/api/breed/pokemon/buscar?q=${encodeURIComponent(q)}`,{headers:{Accept:'application/json'},cache:'no-store'});
+    if(r.ok){const d=await r.json();found=uniquePokemon([...found,...(d.results||[])])}
+  }catch(_){ }
+  const count=paintPokemonGrid(found,40); paintSearchResults(found);
+  setStatus(count?`${found.length} resultado${found.length!==1?'s':''}. Clique no desenho para selecionar.`:'Nenhum Pokémon encontrado.',!count);
+}
+
+async function enrichPokemonInfoClient(id,info){
+  // Último fallback: se o servidor não conseguiu os metadados, o navegador tenta
+  // as duas rotas públicas da PokéAPI em paralelo. A seleção nunca é perdida.
+  if((info.stats||[]).length && (info.types||[]).length && info.height!=null) return info;
+  try{
+    const [pr,sr]=await Promise.all([
+      fetch(`https://pokeapi.co/api/v2/pokemon/${id}/`,{cache:'force-cache'}),
+      fetch(`https://pokeapi.co/api/v2/pokemon-species/${id}/`,{cache:'force-cache'})
+    ]);
+    const p=pr.ok?await pr.json():null, sp=sr.ok?await sr.json():null;
+    if(p){
+      if(!(info.types||[]).length) info.types=(p.types||[]).map(x=>x.type&&x.type.name).filter(Boolean);
+      if(!(info.abilities||[]).length) info.abilities=(p.abilities||[]).map(x=>({name:x.ability&&x.ability.name,hidden:!!x.is_hidden})).filter(x=>x.name);
+      if(!(info.stats||[]).length) info.stats=(p.stats||[]).map(x=>({name:x.stat&&x.stat.name,value:x.base_stat})).filter(x=>x.name);
+      if(info.height==null) info.height=p.height;
+      if(info.weight==null) info.weight=p.weight;
+    }
+    if(sp){
+      if(!(info.egg_groups||[]).length) info.egg_groups=(sp.egg_groups||[]).map(x=>x.name).filter(Boolean);
+      if(!info.generation) info.generation=sp.generation&&sp.generation.name;
+    }
+  }catch(_){ }
+  return info;
+}
+
+async function selectPokemon(id,name){
+  id=Number(id); name=(name||'').trim().toLowerCase(); if(!id||!name)return;
+  selected={id,name,info:{id,name,breedavel:true,sprite:spriteFor(id,true),types:[],abilities:[],stats:[],egg_groups:[]},validated:false};
+  idInput.value=String(id); search.value=pretty(name); results.hidden=true;
+  $$('.breed-ref-poke-card').forEach(c=>c.classList.toggle('selected',+c.dataset.id===id));
+  $('#pokemonNext').disabled=true;
+  renderDetail(true);
+  setStatus('Carregando informações e validando o Breed...');
+  try{
+    const r=await fetch(`/api/breed/pokemon/${id}?nome=${encodeURIComponent(name)}`,{headers:{Accept:'application/json'},cache:'no-store'});
+    if(!r.ok){let msg='Falha ao validar o Pokémon.';try{const x=await r.json();msg=x.error||x.motivo||msg}catch(_){ }throw new Error(msg)}
+    let info=await r.json();
+    if(!info.breedavel){
+      selected={id,name:info.name||name,info,validated:false};
+      idInput.value='';
+      $$('.breed-ref-poke-card').forEach(c=>{if(+c.dataset.id===id)c.classList.add('breed-blocked-card')});
+      renderDetail(false);
+      throw new Error(info.motivo||'Este Pokémon não pode ser solicitado no Breed.');
+    }
+    info=await enrichPokemonInfoClient(id,info);
+    selected={id,name:info.name||name,info,validated:true};
+    idInput.value=String(id); search.value=pretty(selected.name);
+    $('#pokemonNext').disabled=false; $('#breed_special_alert').hidden=!info.breed_especial;
+    renderDetail(false);
+    setStatus(info.breed_especial?'Pokémon válido • Breed especial com Ditto ✓':'Pokémon válido para Breed ✓');
+  }catch(e){
+    if(selected&&selected.id===id){selected.validated=false;$('#pokemonNext').disabled=true;renderDetail(false)}
+    setStatus((e&&e.message)||'Não foi possível validar o Pokémon.',true);
+  }
+}
+
+function renderDetail(loading=false){
+  if(!selected)return; const d=selected.info||{};
+  const empty=$('#detailEmpty'),content=$('#detailContent');
+  empty.hidden=true; empty.style.display='none'; content.hidden=false; content.style.display='block';
+  $('#detailName').textContent=pretty(selected.name); $('#detailNumber').textContent='#'+String(selected.id).padStart(4,'0');
+  const art=d.sprite||spriteFor(selected.id,true), preview=$('#pokemon_preview');
+  preview.src=art; preview.onerror=()=>{preview.onerror=null;preview.src=spriteFor(selected.id,false)};
+  $$('.selectedPokemonArt').forEach(x=>x.src=art); $$('.selectedPokemonName').forEach(x=>x.textContent=pretty(selected.name));
+  $('#detailTypes').innerHTML=(d.types||[]).map(t=>`<span class="type-${t}">${pretty(t)}</span>`).join('')||(loading?'<span class="breed-loading-chip">Carregando...</span>':'<span>—</span>');
+  $('#detailHeight').textContent=d.height!=null?(d.height/10).toFixed(1)+' m':(loading?'...':'—');
+  $('#detailWeight').textContent=d.weight!=null?(d.weight/10).toFixed(1)+' kg':(loading?'...':'—');
+  $('#detailEgg').textContent=(d.egg_groups||[]).map(pretty).join(' / ')||(loading?'Carregando...':'—');
+  $('#detailGeneration').textContent=d.generation?romanGen(d.generation):(loading?'...':'—');
+  $('#detailAbilities').textContent=(d.abilities||[]).map(a=>pretty(a.name)+(a.hidden?' (HA)':'')).join(', ')||(loading?'Carregando...':'—');
+  const stats=d.stats||[], total=stats.reduce((n,x)=>n+(Number(x.value)||0),0); $('#detailTotal').textContent=stats.length?total:(loading?'...':'—');
+  const labels={hp:'HP',attack:'Attack',defense:'Defense','special-attack':'Sp. Atk','special-defense':'Sp. Def',speed:'Speed'};
+  $('#detailStats').innerHTML=stats.length?stats.map(x=>`<div class="breed-stat-row"><span>${labels[x.name]||pretty(x.name)}</span><i><em style="--stat:${Math.min(100,(Number(x.value)||0)/255*100)}%"></em></i><b>${x.value}</b></div>`).join(''):(loading?'<div class="breed-detail-loading"><i></i><span>Carregando Base Stats...</span></div>':'<small>Base Stats indisponíveis no momento.</small>');
+  renderFavs(); setTimeout(()=>$$('.breed-stat-row em').forEach(x=>x.classList.add('animate')),60);
+}
+
+function validateStep(step){
+  if(step===1&&(!selected||!selected.validated||!idInput.value)){setStatus('Selecione e aguarde a validação do Pokémon antes de continuar.',true);return false}
+  if(step===2){if(!$('#ha').value){alert('Selecione Ability/HA.');return false}if(!$('#genero').value){alert('Selecione o gênero.');return false}if(!breedTipo.value){alert('Selecione F5 ou F6.');return false}}
+  if(step===3&&breedTipo.value==='F5'&&!ivSelect.value){alert('No F5, escolha qual IV não precisa.');return false}
+  return true;
+}
+function goStep(n){
+  if(n>currentStep&&!validateStep(currentStep))return; currentStep=n;
+  $$('.breed-wizard-panel').forEach(p=>p.classList.toggle('active',+p.dataset.panel===n));
+  $$('#breedStepper button').forEach(b=>{const x=+b.dataset.step;b.classList.toggle('active',x===n);b.classList.toggle('done',x<n)});
+  $('#wizardTitle').textContent=['','ESCOLHA O POKÉMON','CARACTERÍSTICAS','IVs E EXTRAS','REVISÃO DO PEDIDO','ENVIO'][n];
+  if(n>=4)renderReview(); window.scrollTo({top:0,behavior:'smooth'});
+}
+function updateIvs(){
+  $$('.breed-ref-ivs b').forEach(x=>{x.textContent='31';x.className=''}); const f5=breedTipo.value==='F5'; $('#ivDiscardField').hidden=!f5; ivSelect.required=f5;
+  if(!f5)ivSelect.value=''; if(f5&&ivSelect.value){const x=$(`.breed-ref-ivs b[data-iv="${ivSelect.value}"]`);if(x){x.textContent='—';x.classList.add('discarded')}}
+  if(zeroSpeed.checked&&f5){const x=$('.breed-ref-ivs b[data-iv="velocidade"]');if(x){x.textContent='0';x.className='zero'}}
+  if(!f5)zeroSpeed.checked=false;
+}
+function renderReview(){
+  if(!selected)return; const nature=$('#nature').value||'Sem Nature', ha=$('#ha').value==='sim'?'Hidden Ability (HA)':'Ability normal', gender=pretty($('#genero').value), kind=breedTipo.value;
+  $('#reviewTags').innerHTML=(selected.info.types||[]).map(t=>`<span class="type-${t}">${pretty(t)}</span>`).join('');
+  $('#reviewData').innerHTML=`<div><dt>Nature</dt><dd>${nature}</dd></div><div><dt>Ability</dt><dd>${ha}</dd></div><div><dt>Gênero</dt><dd>${gender}</dd></div><div><dt>Breed</dt><dd>${kind}</dd></div><div><dt>IV descartado</dt><dd>${kind==='F5'?(pretty(ivSelect.value)||'—'):'Não se aplica'}</dd></div><div><dt>Zero Speed</dt><dd>${zeroSpeed.checked?'Sim':'Não'}</dd></div><div><dt>Treinado</dt><dd>${$('#treinado').value==='sim'?'Sim':'Não'}</dd></div>`;
+  $('#sendSummary').textContent=`${kind} • ${nature} • ${ha}`;
+}
+function filterCards(){
+  $$('.breed-ref-poke-card').forEach(c=>c.hidden=onlyFavorites&&!favorites.has(+c.dataset.id));
+  const cards=$$('.breed-ref-poke-card:not([hidden])'), grid=$('#hypeQuickPokemonGrid');
+  cards.sort((a,b)=>$('#sortFilter').value==='number'?+a.dataset.id-+b.dataset.id:a.dataset.name.localeCompare(b.dataset.name)).forEach(c=>grid.appendChild(c));
+}
+
+search.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(searchPokemon,180)});
+results.addEventListener('click',e=>{const b=e.target.closest('.pokemon-result');if(b)selectPokemon(b.dataset.id,b.dataset.name)});
+quickGrid.addEventListener('click',e=>{const card=e.target.closest('.breed-ref-poke-card');if(!card)return;e.preventDefault();if(e.target.closest('.breed-card-star')){toggleFav(+card.dataset.id);return}selectPokemon(card.dataset.id,card.dataset.name)});
+$('#detailFavorite').addEventListener('click',()=>selected&&toggleFav(selected.id));
+$$('[data-next]').forEach(b=>b.addEventListener('click',()=>goStep(+b.dataset.next))); $$('[data-back]').forEach(b=>b.addEventListener('click',()=>goStep(+b.dataset.back)));
+breedTipo.addEventListener('change',updateIvs);ivSelect.addEventListener('change',updateIvs);zeroSpeed.addEventListener('change',updateIvs);
+$('#sortFilter').addEventListener('change',filterCards); $('#favoriteFilter').addEventListener('click',e=>{onlyFavorites=!onlyFavorites;e.currentTarget.classList.toggle('active',onlyFavorites);filterCards()});
+// Os filtros de tipo/Egg Group serão preenchidos visualmente quando houver dados; não bloqueiam o pedido.
+$('#typeFilter').disabled=true; $('#eggFilter').disabled=true;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')results.hidden=true}); document.addEventListener('click',e=>{if(!e.target.closest('.pokemon-search-wrap'))results.hidden=true});
+form.addEventListener('submit',e=>{
+  if(!validateStep(1)||!validateStep(2)||!validateStep(3)){e.preventDefault();return}
+  // Garante que o texto enviado corresponde à seleção validada pelo servidor.
+  search.value=selected.name; idInput.value=String(selected.id);
+  const btn=form.querySelector('.breed-submit-final'); if(btn){btn.disabled=true;btn.textContent='Enviando pedido...'}
+});
+renderFavs(); updateIvs(); loadFullCatalog().then(c=>{if(!search.value.trim()){paintPokemonGrid(c.length?c:seedCatalog,visibleLimit);setStatus(catalogReady?'Catálogo HYPE carregado. Role para ver mais Pokémon.':'Catálogo inicial carregado. Use a busca para encontrar Pokémon.')}});
+quickGrid.addEventListener('scroll',()=>{});
+window.addEventListener('scroll',()=>{if(currentQuery)return;const rect=quickGrid.getBoundingClientRect();if(rect.bottom<window.innerHeight+500&&fullCatalog.length>visibleLimit){visibleLimit+=40;paintPokemonGrid(fullCatalog,visibleLimit)}});
+})();
+</script>
+{% endblock %}
