@@ -1136,7 +1136,14 @@ def breed_fila_breeders():
             max_ativos = int(perfil[0]['max_ativos'])
     except Exception as e:
         print(f'Erro ao buscar limite do Breeder: {e}')
-    return render_template('breed_fila.html', fila_ativa=pedidos, permissoes=permissoes, breeder_email=email, meus_ativos=meus_ativos, max_ativos=max_ativos)
+    # V15.1: histórico cancelado visível na Fila, com restauração segura do mesmo pedido.
+    try:
+        historico_cancelados = supabase.table('pedidos_breed').select('*').eq('status','cancelado').order('created_at', desc=True).limit(100).execute().data or []
+    except Exception as e:
+        print(f'Erro ao buscar histórico cancelado da fila: {e}')
+        historico_cancelados = []
+    historico_cancelados = enriquecer_pedidos_com_nicks(historico_cancelados)
+    return render_template('breed_fila.html', fila_ativa=pedidos, historico_cancelados=historico_cancelados, permissoes=permissoes, breeder_email=email, meus_ativos=meus_ativos, max_ativos=max_ativos)
 
 
 
@@ -2457,6 +2464,52 @@ def admin_resetar_breed(pedido_id):
         flash('Pedido resetado e devolvido para Pendente.', 'sucesso')
     except Exception as e:
         flash(f'Erro ao resetar pedido: {e}', 'erro')
+    return redirect(url_for('breed_fila_breeders'))
+
+
+@app.route('/breed/restaurar/<int:pedido_id>', methods=['POST'])
+@login_required
+def restaurar_breed_cancelado(pedido_id):
+    """V15.1: restaura um pedido cancelado para Pendente sem criar duplicata."""
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+    try:
+        rows = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).limit(1).execute().data or []
+        if not rows:
+            flash('Pedido não encontrado.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+        pedido = rows[0]
+        if pedido.get('status') != 'cancelado':
+            flash('Somente pedidos cancelados podem ser restaurados.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+
+        admin = permissoes.get('pode_gerenciar_cargos', False)
+        era_breeder = pedido.get('breeder_responsavel') == email
+        cancelou = pedido.get('cancelado_por') == email
+        if not admin and not (permissoes.get('pode_assumir_breed', False) and (era_breeder or cancelou)):
+            flash('Você não tem permissão para restaurar este pedido.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+
+        updates = {
+            'status':'pendente', 'breeder_responsavel':None, 'assumido_em':None,
+            'pagamento_confirmado_em':None, 'pagamento_confirmado_por':None,
+            'concluido_em':None, 'entregue_em':None, 'prazo_notificado':False,
+            'cancelado_em':None, 'cancelado_por':None, 'motivo_cancelamento':None,
+            'cancelamento_solicitado_em':None, 'cancelamento_solicitado_por':None,
+            'motivo_cancelamento_solicitado':None, 'status_antes_cancelamento':None,
+            'cancelamento_decidido_em':None, 'cancelamento_decidido_por':None,
+            'cancelamento_decisao':None
+        }
+        resultado = supabase.table('pedidos_breed').update(updates).eq('id', pedido_id).eq('status','cancelado').execute()
+        if not resultado.data:
+            flash('O pedido mudou de estado antes da restauração. Atualize a página.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+        registrar_historico('breed', pedido_id, 'cancelado', 'pendente', f'Pedido restaurado para a fila por {email}.')
+        registrar_log('restaurar_pedido', 'breed', 'pedido_breed', pedido_id, {'status_anterior':'cancelado'})
+        criar_notificacao(pedido.get('usuario_email'), 'Pedido restaurado', f"Seu pedido #{pedido_id} de {pedido.get('pokemon')} voltou para a fila de Breeders.", 'aviso', url_for('breed_meus_pedidos'))
+        flash('Pedido restaurado e devolvido para Pendente.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao restaurar pedido: {e}', 'erro')
     return redirect(url_for('breed_fila_breeders'))
 
 
