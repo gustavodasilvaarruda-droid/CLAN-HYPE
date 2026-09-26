@@ -230,9 +230,11 @@ def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='
     linhas = _safe_table('precos_breed', '*')
     ativos = [x for x in linhas if x.get('ativo', True) is not False]
     precos = dict(PRECO_BREED_FALLBACK)
+    # Valor 0/inválido no banco não pode apagar a tabela oficial de fallback.
+    # Assim, uma instalação antiga/incompleta continua calculando o Breed.
     precos.update({
         x.get('codigo'): int(x.get('valor') or 0)
-        for x in ativos if x.get('codigo')
+        for x in ativos if x.get('codigo') and int(x.get('valor') or 0) > 0
     })
     bt = (breed_tipo or '').lower()
     naturado = bool(nature)
@@ -2367,15 +2369,56 @@ def proxima_rodada(torneio_id):
 @login_required
 def admin_precos():
     if not tem_permissao('pode_gerenciar_precos'): return redirect(url_for('painel'))
+    nomes = {
+        'comum_f5_naturado':'Comum F5 Naturado', 'comum_f5_sem_nature':'Comum F5 sem Nature',
+        'comum_f6_sem_nature':'Comum F6 sem Nature', 'comum_f6_naturado':'Comum F6 Naturado',
+        'raro_f5_naturado':'Raro F5 Naturado', 'raro_f5_sem_nature':'Raro F5 sem Nature',
+        'raro_f6_sem_nature':'Raro F6 sem Nature', 'raro_f6_naturado':'Raro F6 Naturado',
+        'ditto_f5_naturado':'Ditto F5 Naturado', 'ditto_f6_sem_nature':'Ditto F6 sem Nature',
+        'ditto_f6_naturado':'Ditto F6 Naturado',
+        'ha_com_ditto_f5':'HA com Ditto F5', 'ha_com_ditto_f5_naturado':'HA com Ditto F5 Naturado',
+        'ha_com_ditto_f5_sem_nature':'HA com Ditto F5 sem Nature',
+        'ha_com_ditto_f6_sem_nature':'HA com Ditto F6 sem Nature', 'ha_com_ditto_f6_naturado':'HA com Ditto F6 Naturado',
+        'ha_sem_ditto_f5':'HA sem Ditto F5', 'ha_sem_ditto_f5_naturado':'HA sem Ditto F5 Naturado',
+        'ha_sem_ditto_f5_sem_nature':'HA sem Ditto F5 sem Nature',
+        'ha_sem_ditto_f6_sem_nature':'HA sem Ditto F6 sem Nature', 'ha_sem_ditto_f6_naturado':'HA sem Ditto F6 Naturado',
+        'comum_genero':'Escolher gênero', 'ha_sem_ditto_genero':'Escolher gênero (HA sem Ditto)',
+        'femea_rara':'Adicional fêmea rara', 'treinado':'Serviço adicional - treinado'
+    }
     if request.method=='POST':
         codigo=request.form.get('codigo','').strip()
         try:
             valor=parse_valor_moeda(request.form.get('valor',0))
-            supabase.table('precos_breed').update({'valor':valor}).eq('codigo',codigo).execute()
+            if codigo not in PRECO_BREED_FALLBACK or valor <= 0:
+                raise ValueError('Código ou valor inválido.')
+            supabase.table('precos_breed').upsert({'codigo':codigo,'nome':nomes.get(codigo,codigo.replace('_',' ').title()),'valor':valor,'ativo':True}, on_conflict='codigo').execute()
             flash('Preço atualizado.','sucesso')
         except Exception as e: flash(f'Erro: {e}','erro')
         return redirect(url_for('admin_precos'))
-    return render_template('admin_precos.html', precos=_safe_table('precos_breed','*'))
+
+    banco = {x.get('codigo'):x for x in _safe_table('precos_breed','*') if x.get('codigo')}
+    codigos = [c for c in PRECO_BREED_FALLBACK if c not in ('escolher_genero',)]
+    precos=[]
+    for codigo in codigos:
+        row=dict(banco.get(codigo) or {})
+        valor=int(row.get('valor') or 0)
+        if valor <= 0: valor=int(PRECO_BREED_FALLBACK[codigo])
+        precos.append({'codigo':codigo,'nome':row.get('nome') or nomes.get(codigo,codigo.replace('_',' ').title()),'valor':valor,'fallback':codigo not in banco or int((banco.get(codigo) or {}).get('valor') or 0)<=0})
+
+    familias=[
+      ('Comum','comum',False,False),('Raro','raro',False,False),('Normal + Ditto','comum',False,True),
+      ('HA sem Ditto','comum',True,False),('HA com Ditto','comum',True,True)
+    ]
+    combinacoes=[]
+    for familia,categoria,ha,usa_ditto in familias:
+        for bt in ('F5','F6'):
+            for naturado in (True,False):
+                for genero in ('indiferente','macho','femea'):
+                    for treinado in (False,True):
+                        total,det=calcular_preco_breed(bt,ha=ha,genero=genero,categoria=categoria,usa_ditto=usa_ditto,treinado=treinado,nature='Bold' if naturado else None)
+                        combinacoes.append({'familia':familia,'breed':bt,'nature':'Com Nature' if naturado else 'Sem Nature','genero':genero.title(),'treinado':'Sim' if treinado else 'Não','total':total})
+    valores_possiveis=sorted({x['total'] for x in combinacoes if x['total']>0})
+    return render_template('admin_precos.html', precos=precos, combinacoes=combinacoes, valores_possiveis=valores_possiveis)
 
 @app.route('/admin/feed', methods=['GET','POST'])
 @login_required
