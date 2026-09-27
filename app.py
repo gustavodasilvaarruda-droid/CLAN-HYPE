@@ -4,7 +4,6 @@ import csv
 import io
 from functools import wraps, lru_cache
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -219,26 +218,6 @@ PRECO_BREED_FALLBACK = {
     'ha_sem_ditto_genero': 200000, 'femea_rara': 200000,
     'treinado': 200000,
 }
-
-HYPE_TZ = ZoneInfo('America/Sao_Paulo')
-
-def _promo_local_para_utc(valor):
-    """Converte o datetime-local do painel (horário de Brasília) para UTC antes de salvar no TIMESTAMPTZ."""
-    if not valor:
-        return None
-    dt = datetime.fromisoformat(str(valor).strip())
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=HYPE_TZ)
-    return dt.astimezone(timezone.utc).isoformat()
-
-@app.template_filter('data_hype')
-def filtro_data_hype(valor):
-    """Exibe TIMESTAMPTZ no horário oficial usado pelo painel HYPE (America/Sao_Paulo)."""
-    dt = _parse_promo_datetime(valor)
-    if not dt:
-        return ''
-    return dt.astimezone(HYPE_TZ).strftime('%d/%m/%Y %H:%M')
-
 
 def _parse_promo_datetime(valor):
     if not valor:
@@ -577,8 +556,88 @@ def criar_notificacao(usuario_email, titulo, mensagem, tipo='info', link=None):
         dm = json.loads(urlopen(dm_req, timeout=10).read().decode())
         channel_id = dm.get('id')
         if channel_id:
-            texto = f'**{titulo}**\n{mensagem}'
-            msg_req = __import__('urllib.request', fromlist=['Request']).Request(f'https://discord.com/api/v10/channels/{channel_id}/messages', data=json.dumps({'content': texto[:1900]}).encode(), headers=headers, method='POST')
+            # Notificações HYPE em Embed: mantém o conteúdo original, mas com
+            # apresentação visual consistente no Discord.
+            cores = {
+                'success': 0x57F287,
+                'sucesso': 0x57F287,
+                'warning': 0xFEE75C,
+                'aviso': 0xFEE75C,
+                'danger': 0xED4245,
+                'erro': 0xED4245,
+                'error': 0xED4245,
+                'info': 0xD4AF37,
+            }
+            cor = cores.get(str(tipo or 'info').lower(), 0xD4AF37)
+            titulo_embed = str(titulo or 'Notificação HYPE')[:256]
+            descricao_embed = str(mensagem or 'Você recebeu uma nova notificação no HYPE.')[:4000]
+
+            embed = {
+                'title': titulo_embed,
+                'description': descricao_embed,
+                'color': cor,
+                'thumbnail': {'url': 'attachment://emblema_hype_novo.png'},
+                'footer': {'text': 'HYPE • Central do Membro'},
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }
+
+            # Quando a notificação possui destino no site, transforma o título
+            # do Embed em um atalho clicável. Links relativos usam a URL atual.
+            if link:
+                try:
+                    destino = str(link).strip()
+                    if destino.startswith('/') and has_request_context():
+                        destino = request.url_root.rstrip('/') + destino
+                    elif destino.startswith('/'):
+                        base = os.environ.get('SITE_URL', '').strip().rstrip('/')
+                        if base:
+                            destino = base + destino
+                    if destino.startswith(('http://', 'https://')):
+                        embed['url'] = destino
+                except Exception:
+                    pass
+
+            payload = {
+                'content': '🔔 **Nova atualização HYPE**',
+                'embeds': [embed],
+                'allowed_mentions': {'parse': []},
+            }
+            # Anexa o emblema diretamente à DM. Assim o Discord consegue
+            # exibi-lo inclusive quando o HYPE está sendo testado em localhost,
+            # sem depender de uma URL pública para a imagem.
+            emblema_path = os.path.join(app.root_path, 'static', 'imagens', 'emblema_hype_novo.png')
+            if os.path.isfile(emblema_path):
+                boundary = '----HYPEDiscordEmbedBoundary7MA4YWxkTrZu0gW'
+                payload_json = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                with open(emblema_path, 'rb') as img_file:
+                    imagem_bytes = img_file.read()
+                partes = [
+                    f'--{boundary}\r\nContent-Disposition: form-data; name="payload_json"\r\nContent-Type: application/json; charset=utf-8\r\n\r\n'.encode('utf-8'),
+                    payload_json,
+                    b'\r\n',
+                    f'--{boundary}\r\nContent-Disposition: form-data; name="files[0]"; filename="emblema_hype_novo.png"\r\nContent-Type: image/png\r\n\r\n'.encode('utf-8'),
+                    imagem_bytes,
+                    b'\r\n',
+                    f'--{boundary}--\r\n'.encode('utf-8'),
+                ]
+                multipart_headers = dict(headers)
+                multipart_headers['Content-Type'] = f'multipart/form-data; boundary={boundary}'
+                msg_req = __import__('urllib.request', fromlist=['Request']).Request(
+                    f'https://discord.com/api/v10/channels/{channel_id}/messages',
+                    data=b''.join(partes),
+                    headers=multipart_headers,
+                    method='POST'
+                )
+            else:
+                # Fallback seguro: envia o Embed mesmo que a imagem tenha sido
+                # removida da pasta static por engano.
+                embed.pop('thumbnail', None)
+                msg_req = __import__('urllib.request', fromlist=['Request']).Request(
+                    f'https://discord.com/api/v10/channels/{channel_id}/messages',
+                    data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
+                    headers=headers,
+                    method='POST'
+                )
             urlopen(msg_req, timeout=10).read()
     except Exception as e:
         print(f"Aviso Discord não enviado: {e}")
@@ -2635,10 +2694,8 @@ def admin_precos():
                 if percentual <= 0 or percentual > 100: raise ValueError('O desconto deve ficar entre 0,01% e 100%.')
                 todos=request.form.get('aplicar_todos')=='1'; codigos=request.form.getlist('codigos_preco')
                 if not todos and not codigos: raise ValueError('Selecione pelo menos um preço ou marque Aplicar em todos.')
-                inicio_local=request.form.get('inicio_em') or None; fim_local=request.form.get('fim_em') or None
-                inicio=_promo_local_para_utc(inicio_local); fim=_promo_local_para_utc(fim_local)
-                if inicio and fim and _parse_promo_datetime(inicio) >= _parse_promo_datetime(fim):
-                    raise ValueError('O término precisa ser posterior ao início.')
+                inicio=request.form.get('inicio_em') or None; fim=request.form.get('fim_em') or None
+                if inicio and fim and inicio >= fim: raise ValueError('O término precisa ser posterior ao início.')
                 supabase.table('promocoes_breed').insert({'nome':nome,'percentual':percentual,'aplicar_todos':todos,'codigos_preco':codigos,'inicio_em':inicio,'fim_em':fim,'ativo':True,'criado_por':session.get('usuario_email')}).execute()
                 flash('Promoção criada. O desconto será aplicado automaticamente no período configurado.','sucesso')
             elif acao == 'toggle_promocao':
