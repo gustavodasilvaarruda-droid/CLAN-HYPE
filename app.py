@@ -10,7 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from uuid import uuid4
 from urllib.request import urlopen
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -541,6 +541,27 @@ def criar_notificacao(usuario_email, titulo, mensagem, tipo='info', link=None):
     except Exception as e:
         print(f"Notificação não registrada: {e}")
 
+    # Canal opcional: envia a mesma informação por DM quando o membro vinculou
+    # o Discord, habilitou avisos e o servidor possui DISCORD_BOT_TOKEN.
+    try:
+        bot_token = os.environ.get('DISCORD_BOT_TOKEN', '').strip()
+        if not bot_token or not usuario_email:
+            return
+        rows = supabase.table('usuarios_clan').select('discord_id,discord_notificacoes').eq('email', usuario_email).limit(1).execute().data or []
+        if not rows or not rows[0].get('discord_id') or not rows[0].get('discord_notificacoes'):
+            return
+        discord_id = str(rows[0]['discord_id'])
+        headers = {'Authorization': f'Bot {bot_token}', 'Content-Type':'application/json', 'User-Agent':'HYPE-Site/1.0'}
+        dm_req = __import__('urllib.request', fromlist=['Request']).Request('https://discord.com/api/v10/users/@me/channels', data=json.dumps({'recipient_id': discord_id}).encode(), headers=headers, method='POST')
+        dm = json.loads(urlopen(dm_req, timeout=10).read().decode())
+        channel_id = dm.get('id')
+        if channel_id:
+            texto = f'**{titulo}**\n{mensagem}'
+            msg_req = __import__('urllib.request', fromlist=['Request']).Request(f'https://discord.com/api/v10/channels/{channel_id}/messages', data=json.dumps({'content': texto[:1900]}).encode(), headers=headers, method='POST')
+            urlopen(msg_req, timeout=10).read()
+    except Exception as e:
+        print(f"Aviso Discord não enviado: {e}")
+
 
 def registrar_transacao_hype(usuario_email, tipo, categoria, descricao, valor, origem_tipo=None, origem_id=None, contraparte_email=None, chave_unica=None):
     """Registra movimentação no extrato HYPE sem bloquear o fluxo principal em caso de falha."""
@@ -792,7 +813,7 @@ def editar_perfil():
         supabase.table('usuarios_clan').update(dados).eq('email', session['usuario_email']).execute()
         flash('Perfil atualizado!', 'sucesso')
     except Exception as e: flash(f'Erro ao atualizar perfil: {e}', 'erro')
-    return redirect(url_for('painel'))
+    return redirect(url_for('conta_hype'))
 
 
 @app.route('/notificacoes/ler', methods=['POST'])
@@ -835,6 +856,127 @@ def perfil_publico(nick):
         flash('Não foi possível abrir este perfil.', 'erro')
         return redirect(url_for('pagina_inicial'))
 
+
+
+@app.context_processor
+def hype_account_context():
+    """Dados leves da conta usados no cabeçalho HYPE."""
+    if not session.get('usuario_email'):
+        return {'hype_header_user': {}, 'hype_notificacoes_nao_lidas': 0}
+    email = session.get('usuario_email')
+    usuario = {}
+    try:
+        rows = supabase.table('usuarios_clan').select('nick_jogo,nome_exibicao,avatar_url,cargo').eq('email', email).limit(1).execute().data or []
+        usuario = rows[0] if rows else {}
+    except Exception:
+        usuario = {'nick_jogo': session.get('nick_jogo'), 'cargo': session.get('cargo')}
+    try:
+        rows = supabase.table('notificacoes').select('id').eq('usuario_email', email).eq('lida', False).execute().data or []
+        unread = len(rows)
+    except Exception:
+        unread = 0
+    return {'hype_header_user': usuario, 'hype_notificacoes_nao_lidas': unread}
+
+
+@app.route('/conta')
+@login_required
+def conta_hype():
+    email = session['usuario_email']
+    rows = _safe_table('usuarios_clan', '*', email=email)
+    usuario = rows[0] if rows else {}
+    mh = _safe_table('membros_hype', '*', usuario_email=email)
+    membro_hype = mh[0] if mh and mh[0].get('ativo') else None
+    conquistas = sorted(_safe_table('conquistas_usuario', '*', usuario_email=email), key=lambda x: x.get('created_at') or '', reverse=True)[:6]
+    return render_template('conta.html', usuario=usuario, membro_hype=membro_hype, conquistas=conquistas)
+
+
+@app.route('/notificacoes')
+@login_required
+def central_notificacoes():
+    email = session['usuario_email']
+    notificacoes = sorted(_safe_table('notificacoes', '*', usuario_email=email), key=lambda x: x.get('created_at') or '', reverse=True)
+    return render_template('notificacoes.html', notificacoes=notificacoes)
+
+
+@app.route('/notificacoes/<int:notificacao_id>/ler', methods=['POST'])
+@login_required
+def ler_notificacao(notificacao_id):
+    try:
+        supabase.table('notificacoes').update({'lida': True}).eq('id', notificacao_id).eq('usuario_email', session['usuario_email']).execute()
+    except Exception as e:
+        print(f'Erro ao ler notificacao: {e}')
+    destino = request.form.get('destino', '').strip()
+    return redirect(destino if destino.startswith('/') else url_for('central_notificacoes'))
+
+
+@app.route('/discord/conectar')
+@login_required
+def discord_conectar():
+    client_id = os.environ.get('DISCORD_CLIENT_ID', '').strip()
+    redirect_uri = os.environ.get('DISCORD_REDIRECT_URI', '').strip() or url_for('discord_callback', _external=True)
+    if not client_id:
+        flash('Integração Discord ainda não foi configurada pelo administrador.', 'info')
+        return redirect(url_for('conta_hype') + '#discord')
+    state = uuid4().hex
+    session['discord_oauth_state'] = state
+    params = urlencode({'client_id': client_id, 'response_type': 'code', 'redirect_uri': redirect_uri, 'scope': 'identify', 'state': state, 'prompt': 'consent'})
+    return redirect('https://discord.com/oauth2/authorize?' + params)
+
+
+@app.route('/discord/callback')
+@login_required
+def discord_callback():
+    if request.args.get('state') != session.pop('discord_oauth_state', None):
+        flash('Não foi possível validar a conexão com o Discord.', 'erro')
+        return redirect(url_for('conta_hype') + '#discord')
+    code = request.args.get('code', '').strip()
+    client_id = os.environ.get('DISCORD_CLIENT_ID', '').strip()
+    client_secret = os.environ.get('DISCORD_CLIENT_SECRET', '').strip()
+    redirect_uri = os.environ.get('DISCORD_REDIRECT_URI', '').strip() or url_for('discord_callback', _external=True)
+    if not code or not client_id or not client_secret:
+        flash('Configuração do Discord incompleta.', 'erro')
+        return redirect(url_for('conta_hype') + '#discord')
+    try:
+        token_body = urlencode({'client_id': client_id, 'client_secret': client_secret, 'grant_type': 'authorization_code', 'code': code, 'redirect_uri': redirect_uri}).encode()
+        req = __import__('urllib.request', fromlist=['Request']).Request('https://discord.com/api/oauth2/token', data=token_body, headers={'Content-Type':'application/x-www-form-urlencoded','User-Agent':'HYPE-Site/1.0'})
+        token = json.loads(urlopen(req, timeout=12).read().decode())
+        access_token = token.get('access_token')
+        req_user = __import__('urllib.request', fromlist=['Request']).Request('https://discord.com/api/users/@me', headers={'Authorization': f'Bearer {access_token}', 'User-Agent':'HYPE-Site/1.0'})
+        du = json.loads(urlopen(req_user, timeout=12).read().decode())
+        did = str(du.get('id') or '')
+        if not did:
+            raise ValueError('Discord não retornou o ID do usuário.')
+        avatar = du.get('avatar')
+        avatar_url = f'https://cdn.discordapp.com/avatars/{did}/{avatar}.png?size=128' if avatar else None
+        supabase.table('usuarios_clan').update({'discord_id': did, 'discord_username': du.get('global_name') or du.get('username'), 'discord_avatar_url': avatar_url, 'discord_conectado_em': agora_iso()}).eq('email', session['usuario_email']).execute()
+        flash('Discord conectado à sua conta HYPE!', 'sucesso')
+    except Exception as e:
+        print(f'Erro Discord OAuth: {e}')
+        flash('Não foi possível conectar o Discord. Verifique a configuração do aplicativo Discord.', 'erro')
+    return redirect(url_for('conta_hype') + '#discord')
+
+
+@app.route('/discord/desconectar', methods=['POST'])
+@login_required
+def discord_desconectar():
+    try:
+        supabase.table('usuarios_clan').update({'discord_id': None, 'discord_username': None, 'discord_avatar_url': None, 'discord_conectado_em': None, 'discord_notificacoes': False}).eq('email', session['usuario_email']).execute()
+        flash('Discord desconectado da conta HYPE.', 'sucesso')
+    except Exception as e:
+        flash(f'Não foi possível desconectar o Discord: {e}', 'erro')
+    return redirect(url_for('conta_hype') + '#discord')
+
+
+@app.route('/discord/notificacoes', methods=['POST'])
+@login_required
+def discord_notificacoes():
+    ativo = request.form.get('ativo') == '1'
+    try:
+        supabase.table('usuarios_clan').update({'discord_notificacoes': ativo}).eq('email', session['usuario_email']).execute()
+        flash('Preferência de notificações do Discord atualizada.', 'sucesso')
+    except Exception as e:
+        flash(f'Não foi possível atualizar a preferência: {e}', 'erro')
+    return redirect(url_for('conta_hype') + '#discord')
 
 # ============================================================================
 # ROTAS DO BERÇÁRIO (SISTEMA DE BREED UPGRADED) 🌟
