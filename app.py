@@ -230,11 +230,9 @@ def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='
     linhas = _safe_table('precos_breed', '*')
     ativos = [x for x in linhas if x.get('ativo', True) is not False]
     precos = dict(PRECO_BREED_FALLBACK)
-    # Valor 0/inválido no banco não pode apagar a tabela oficial de fallback.
-    # Assim, uma instalação antiga/incompleta continua calculando o Breed.
     precos.update({
         x.get('codigo'): int(x.get('valor') or 0)
-        for x in ativos if x.get('codigo') and int(x.get('valor') or 0) > 0
+        for x in ativos if x.get('codigo')
     })
     bt = (breed_tipo or '').lower()
     naturado = bool(nature)
@@ -1095,9 +1093,23 @@ def breed_meus_pedidos():
         pedido['historico_status'] = historicos.get(pedido.get('id'), [])
         base = pedido.get('entregue_em') or pedido.get('concluido_em') or pedido.get('pagamento_confirmado_em') or pedido.get('assumido_em') or pedido.get('created_at')
         pedido['atualizado_em'] = base
-    ativos = [p for p in pedidos if p.get('status') in ('pendente','aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao')]
+    ativos = [p for p in pedidos if p.get('status') in ('pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao')]
     historico = [p for p in pedidos if p.get('status') in ('entregue','cancelado')]
     return render_template('breed_meus_pedidos.html', pedidos_ativos=ativos, historico=historico, permissoes=permissoes)
+
+
+@app.route('/breed/historico')
+@login_required
+def breed_historico_geral():
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+    try:
+        pedidos = supabase.table('pedidos_breed').select('*').eq('status','entregue').order('entregue_em', desc=True).limit(300).execute().data or []
+    except Exception as e:
+        print(f'Erro ao buscar histórico geral do Breed: {e}')
+        pedidos = []
+    pedidos = enriquecer_pedidos_com_nicks(pedidos)
+    return render_template('breed_historico.html', pedidos=pedidos, permissoes=permissoes, usuario_email=email)
 
 
 @app.route('/breed/fila')
@@ -1110,7 +1122,7 @@ def breed_fila_breeders():
         return redirect(url_for('breed_meus_pedidos'))
     try:
         pedidos = supabase.table('pedidos_breed').select('*').in_('status', [
-            'pendente','aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao'
+            'pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao'
         ]).order('created_at', desc=False).execute().data or []
     except Exception as e:
         print(f'Erro ao buscar fila dos Breeders: {e}')
@@ -1130,7 +1142,7 @@ def breed_fila_breeders():
         p['mensagens_nao_lidas']=nao_lidas.get(p.get('id'),0)
         inicio=parse_data_supabase(p.get('assumido_em'))
         p['atrasado']=bool(inicio and p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado') and (datetime.now(timezone.utc)-inicio).total_seconds()>3*86400)
-    meus_ativos = len([p for p in pedidos if p.get('breeder_responsavel') == email and p.get('status') in ('aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado')])
+    meus_ativos = len([p for p in pedidos if p.get('breeder_responsavel') == email and p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado')])
     max_ativos = 4
     try:
         perfil = supabase.table('breeders_perfil').select('max_ativos').eq('usuario_email', email).limit(1).execute().data or []
@@ -1147,20 +1159,6 @@ def breed_fila_breeders():
     historico_cancelados = enriquecer_pedidos_com_nicks(historico_cancelados)
     return render_template('breed_fila.html', fila_ativa=pedidos, historico_cancelados=historico_cancelados, permissoes=permissoes, breeder_email=email, meus_ativos=meus_ativos, max_ativos=max_ativos)
 
-
-
-@app.route('/breed/historico')
-@login_required
-def breed_historico_geral():
-    """Histórico geral: todos os Breeds efetivamente entregues pelo sistema."""
-    email=session.get('usuario_email')
-    permissoes=obter_permissoes_usuario(email)
-    try:
-        pedidos=supabase.table('pedidos_breed').select('*').eq('status','entregue').order('entregue_em',desc=True).limit(500).execute().data or []
-    except Exception as e:
-        print(f'Erro ao buscar histórico geral de Breed: {e}'); pedidos=[]
-    pedidos=enriquecer_pedidos_com_nicks(pedidos)
-    return render_template('breed_historico.html', pedidos=pedidos, permissoes=permissoes)
 
 
 def _breed_payload(pedidos, email):
@@ -1191,7 +1189,7 @@ def api_breed_fila_status():
     email=session.get('usuario_email'); perm=obter_permissoes_usuario(email)
     if not perm.get('pode_ver_fila_breed'): return jsonify({'ok':False}),403
     try:
-        pedidos=supabase.table('pedidos_breed').select('*').in_('status',['pendente','aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao']).order('created_at',desc=False).execute().data or []
+        pedidos=supabase.table('pedidos_breed').select('*').in_('status',['pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao']).order('created_at',desc=False).execute().data or []
         return jsonify({'ok':True,'pedidos':_breed_payload(pedidos,email),'server_time':agora_iso()})
     except Exception as e: return jsonify({'ok':False,'error':str(e)}),500
 
@@ -1204,9 +1202,9 @@ def confirmar_recebimento_breed(pedido_id):
         if not rows or rows[0].get('usuario_email')!=email:
             flash('Pedido não encontrado.','erro'); return redirect(url_for('breed_meus_pedidos'))
         p=rows[0]
-        if p.get('status') != 'aguardando_confirmacao':
+        if p.get('status') not in ('concluido','aguardando_confirmacao'):
             flash('Este pedido ainda não está pronto para confirmar recebimento.','erro'); return redirect(url_for('breed_meus_pedidos'))
-        supabase.table('pedidos_breed').update({'status':'entregue','entregue_em':agora_iso(),'recebimento_confirmado_em':agora_iso(),'recebimento_confirmado_por':email}).eq('id',pedido_id).eq('status','aguardando_confirmacao').execute()
+        supabase.table('pedidos_breed').update({'status':'entregue','entregue_em':agora_iso(),'recebimento_confirmado_em':agora_iso(),'recebimento_confirmado_por':email}).eq('id',pedido_id).in_('status',['concluido','aguardando_confirmacao']).execute()
         registrar_historico('breed',pedido_id,p.get('status'),'entregue','Recebimento confirmado pelo cliente.')
         if p.get('breeder_responsavel'): criar_notificacao(p.get('breeder_responsavel'),'Entrega confirmada',f"O cliente confirmou o recebimento do Breed #{pedido_id}.",'sucesso',url_for('breed_fila_breeders'))
         flash('Recebimento confirmado. Obrigado!','sucesso')
@@ -1221,10 +1219,10 @@ def relatar_problema_breed(pedido_id):
         rows=supabase.table('pedidos_breed').select('*').eq('id',pedido_id).limit(1).execute().data or []
         if not rows or rows[0].get('usuario_email')!=email: flash('Pedido não encontrado.','erro'); return redirect(url_for('breed_meus_pedidos'))
         p=rows[0]
-        if p.get('status')!='entregue': flash('Problemas pós-entrega só podem ser abertos após a entrega.','erro'); return redirect(url_for('breed_meus_pedidos'))
+        if p.get('status') not in ('concluido','aguardando_confirmacao','entregue'): flash('Problemas de entrega só podem ser abertos quando o Pokémon estiver pronto ou entregue.','erro'); return redirect(url_for('breed_meus_pedidos'))
         supabase.table('pedidos_breed').update({'problema_status':'aberto','problema_motivo':motivo or 'Problema informado pelo cliente','problema_aberto_em':agora_iso()}).eq('id',pedido_id).execute()
-        registrar_historico('breed',pedido_id,'entregue','entregue','Cliente abriu um problema pós-entrega: '+(motivo or 'sem detalhes'))
-        if p.get('breeder_responsavel'): criar_notificacao(p.get('breeder_responsavel'),'Problema pós-entrega',f"O cliente abriu um problema no Breed #{pedido_id}.",'aviso',url_for('chat_pedido',tipo='breed',pedido_id=pedido_id))
+        registrar_historico('breed',pedido_id,'entregue','entregue','Cliente abriu um problema de entrega: '+(motivo or 'sem detalhes'))
+        if p.get('breeder_responsavel'): criar_notificacao(p.get('breeder_responsavel'),'Problema na entrega',f"O cliente abriu um problema no Breed #{pedido_id}.",'aviso',url_for('chat_pedido',tipo='breed',pedido_id=pedido_id))
         flash('Problema registrado. Use o chat do pedido para acompanhar.','sucesso')
     except Exception as e: flash(f'Erro ao registrar problema: {e}','erro')
     return redirect(url_for('breed_meus_pedidos'))
@@ -1543,7 +1541,7 @@ def assumir_breed(pedido_id):
 
         pedidos_ativos = supabase.table('pedidos_breed').select('id').eq(
             'breeder_responsavel', email
-        ).in_('status', ['aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado']).execute()
+        ).in_('status', ['aguardando_pagamento','em_producao','cancelamento_solicitado']).execute()
 
         limite_ativos = 4
         try:
@@ -1557,7 +1555,7 @@ def assumir_breed(pedido_id):
             return redirect(url_for('breed_fila_breeders'))
 
         resultado = supabase.table('pedidos_breed').update({
-            'status': 'aguardando_confirmacao_cliente',
+            'status': 'aguardando_pagamento',
             'breeder_responsavel': email,
             'assumido_em': agora_iso(),
             'prazo_notificado': False
@@ -1570,65 +1568,24 @@ def assumir_breed(pedido_id):
         valor = filtro_preco(pedido.get('preco_total') or 0)
         criar_notificacao(
             pedido.get('usuario_email'),
-            'Breeder encontrou seu pedido',
-            f"{session.get('nick_jogo')} assumiu seu pedido de {pedido.get('pokemon')}. Valor: {valor}. Confirme o pedido em Meus Pedidos antes do pagamento.",
-            'aviso', url_for('breed_meus_pedidos')
+            'Aguardando pagamento',
+            f"Seu pedido de {pedido.get('pokemon')} foi assumido por {session.get('nick_jogo')}. Valor: {valor}. A produção só começa após o Breeder confirmar o pagamento.",
+            'aviso', url_for('breed')
         )
         criar_notificacao(
             email,
-            'Aguardando o cliente',
-            f"O pedido #{pedido_id} aguarda a confirmação do cliente. O pagamento só será liberado depois disso.",
+            'Não inicie a produção ainda',
+            f"O pedido #{pedido_id} está aguardando pagamento. Confirme o recebimento antes de começar a breedar/chocar.",
             'aviso', url_for('breed')
         )
-        registrar_historico('breed', pedido_id, 'pendente', 'aguardando_confirmacao_cliente', 'Pedido assumido; aguardando confirmação do cliente.')
-        registrar_log('assumir', 'breed', 'pedido_breed', pedido_id, {'status_novo':'aguardando_confirmacao_cliente'})
-        flash('Pedido assumido. Aguarde o cliente confirmar antes de solicitar/confirmar o pagamento.', 'sucesso')
+        registrar_historico('breed', pedido_id, 'pendente', 'aguardando_pagamento', 'Pedido assumido; aguardando confirmação do pagamento.')
+        registrar_log('assumir', 'breed', 'pedido_breed', pedido_id, {'status_novo':'aguardando_pagamento'})
+        flash('Pedido assumido. Aguarde o pagamento e confirme o recebimento antes de iniciar a produção.', 'sucesso')
     except Exception as e:
         flash(f'Erro ao assumir pedido: {e}', 'erro')
 
     return redirect(url_for('breed'))
 
-
-@app.route('/breed/confirmar-pedido/<int:pedido_id>', methods=['POST'])
-@login_required
-def confirmar_pedido_cliente(pedido_id):
-    email = session.get('usuario_email')
-    try:
-        rows = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).limit(1).execute().data or []
-        if not rows or rows[0].get('usuario_email') != email:
-            flash('Pedido não encontrado.', 'erro'); return redirect(url_for('breed_meus_pedidos'))
-        pedido = rows[0]
-        if pedido.get('status') != 'aguardando_confirmacao_cliente':
-            flash('Este pedido não está aguardando sua confirmação.', 'erro'); return redirect(url_for('breed_meus_pedidos'))
-        r = supabase.table('pedidos_breed').update({'status':'aguardando_pagamento'}).eq('id',pedido_id).eq('status','aguardando_confirmacao_cliente').execute()
-        if not r.data:
-            flash('Não foi possível confirmar o pedido.', 'erro'); return redirect(url_for('breed_meus_pedidos'))
-        registrar_historico('breed',pedido_id,'aguardando_confirmacao_cliente','aguardando_pagamento','Cliente confirmou o Breeder e o valor; pagamento liberado.')
-        if pedido.get('breeder_responsavel'):
-            criar_notificacao(pedido.get('breeder_responsavel'),'Cliente confirmou o pedido',f"O cliente confirmou o Breed #{pedido_id}. Agora o pagamento pode ser confirmado.",'sucesso',url_for('breed_fila_breeders'))
-        flash('Pedido confirmado! Agora ele está aguardando pagamento.', 'sucesso')
-    except Exception as e: flash(f'Erro ao confirmar pedido: {e}','erro')
-    return redirect(url_for('breed_meus_pedidos'))
-
-@app.route('/breed/recusar-breeder/<int:pedido_id>', methods=['POST'])
-@login_required
-def recusar_breeder_cliente(pedido_id):
-    email = session.get('usuario_email')
-    try:
-        rows=supabase.table('pedidos_breed').select('*').eq('id',pedido_id).limit(1).execute().data or []
-        if not rows or rows[0].get('usuario_email') != email:
-            flash('Pedido não encontrado.','erro'); return redirect(url_for('breed_meus_pedidos'))
-        pedido=rows[0]
-        if pedido.get('status') != 'aguardando_confirmacao_cliente':
-            flash('Este pedido não pode voltar para a fila neste momento.','erro'); return redirect(url_for('breed_meus_pedidos'))
-        antigo=pedido.get('breeder_responsavel')
-        r=supabase.table('pedidos_breed').update({'status':'pendente','breeder_responsavel':None,'assumido_em':None,'prazo_notificado':False}).eq('id',pedido_id).eq('status','aguardando_confirmacao_cliente').execute()
-        if r.data:
-            registrar_historico('breed',pedido_id,'aguardando_confirmacao_cliente','pendente','Cliente recusou o responsável; pedido devolvido à fila.')
-            if antigo: criar_notificacao(antigo,'Pedido devolvido à fila',f"O cliente não confirmou o Breed #{pedido_id}; sua vaga foi liberada.",'aviso',url_for('breed_fila_breeders'))
-            flash('O pedido voltou para a fila e sua solicitação foi preservada.','sucesso')
-    except Exception as e: flash(f'Erro ao devolver pedido à fila: {e}','erro')
-    return redirect(url_for('breed_meus_pedidos'))
 
 @app.route('/breed/confirmar-pagamento/<int:pedido_id>', methods=['POST'])
 @login_required
@@ -2424,56 +2381,15 @@ def proxima_rodada(torneio_id):
 @login_required
 def admin_precos():
     if not tem_permissao('pode_gerenciar_precos'): return redirect(url_for('painel'))
-    nomes = {
-        'comum_f5_naturado':'Comum F5 Naturado', 'comum_f5_sem_nature':'Comum F5 sem Nature',
-        'comum_f6_sem_nature':'Comum F6 sem Nature', 'comum_f6_naturado':'Comum F6 Naturado',
-        'raro_f5_naturado':'Raro F5 Naturado', 'raro_f5_sem_nature':'Raro F5 sem Nature',
-        'raro_f6_sem_nature':'Raro F6 sem Nature', 'raro_f6_naturado':'Raro F6 Naturado',
-        'ditto_f5_naturado':'Ditto F5 Naturado', 'ditto_f6_sem_nature':'Ditto F6 sem Nature',
-        'ditto_f6_naturado':'Ditto F6 Naturado',
-        'ha_com_ditto_f5':'HA com Ditto F5', 'ha_com_ditto_f5_naturado':'HA com Ditto F5 Naturado',
-        'ha_com_ditto_f5_sem_nature':'HA com Ditto F5 sem Nature',
-        'ha_com_ditto_f6_sem_nature':'HA com Ditto F6 sem Nature', 'ha_com_ditto_f6_naturado':'HA com Ditto F6 Naturado',
-        'ha_sem_ditto_f5':'HA sem Ditto F5', 'ha_sem_ditto_f5_naturado':'HA sem Ditto F5 Naturado',
-        'ha_sem_ditto_f5_sem_nature':'HA sem Ditto F5 sem Nature',
-        'ha_sem_ditto_f6_sem_nature':'HA sem Ditto F6 sem Nature', 'ha_sem_ditto_f6_naturado':'HA sem Ditto F6 Naturado',
-        'comum_genero':'Escolher gênero', 'ha_sem_ditto_genero':'Escolher gênero (HA sem Ditto)',
-        'femea_rara':'Adicional fêmea rara', 'treinado':'Serviço adicional - treinado'
-    }
     if request.method=='POST':
         codigo=request.form.get('codigo','').strip()
         try:
             valor=parse_valor_moeda(request.form.get('valor',0))
-            if codigo not in PRECO_BREED_FALLBACK or valor <= 0:
-                raise ValueError('Código ou valor inválido.')
-            supabase.table('precos_breed').upsert({'codigo':codigo,'nome':nomes.get(codigo,codigo.replace('_',' ').title()),'valor':valor,'ativo':True}, on_conflict='codigo').execute()
+            supabase.table('precos_breed').update({'valor':valor}).eq('codigo',codigo).execute()
             flash('Preço atualizado.','sucesso')
         except Exception as e: flash(f'Erro: {e}','erro')
         return redirect(url_for('admin_precos'))
-
-    banco = {x.get('codigo'):x for x in _safe_table('precos_breed','*') if x.get('codigo')}
-    codigos = [c for c in PRECO_BREED_FALLBACK if c not in ('escolher_genero',)]
-    precos=[]
-    for codigo in codigos:
-        row=dict(banco.get(codigo) or {})
-        valor=int(row.get('valor') or 0)
-        if valor <= 0: valor=int(PRECO_BREED_FALLBACK[codigo])
-        precos.append({'codigo':codigo,'nome':row.get('nome') or nomes.get(codigo,codigo.replace('_',' ').title()),'valor':valor,'fallback':codigo not in banco or int((banco.get(codigo) or {}).get('valor') or 0)<=0})
-
-    familias=[
-      ('Comum','comum',False,False),('Raro','raro',False,False),('Normal + Ditto','comum',False,True),
-      ('HA sem Ditto','comum',True,False),('HA com Ditto','comum',True,True)
-    ]
-    combinacoes=[]
-    for familia,categoria,ha,usa_ditto in familias:
-        for bt in ('F5','F6'):
-            for naturado in (True,False):
-                for genero in ('indiferente','macho','femea'):
-                    for treinado in (False,True):
-                        total,det=calcular_preco_breed(bt,ha=ha,genero=genero,categoria=categoria,usa_ditto=usa_ditto,treinado=treinado,nature='Bold' if naturado else None)
-                        combinacoes.append({'familia':familia,'breed':bt,'nature':'Com Nature' if naturado else 'Sem Nature','genero':genero.title(),'treinado':'Sim' if treinado else 'Não','total':total})
-    valores_possiveis=sorted({x['total'] for x in combinacoes if x['total']>0})
-    return render_template('admin_precos.html', precos=precos, combinacoes=combinacoes, valores_possiveis=valores_possiveis)
+    return render_template('admin_precos.html', precos=_safe_table('precos_breed','*'))
 
 @app.route('/admin/feed', methods=['GET','POST'])
 @login_required
@@ -2647,7 +2563,7 @@ def cancelar_breed(pedido_id):
             return redirect(url_for('breed'))
 
         # Após um Breeder assumir, o cliente solicita cancelamento e o Breeder decide.
-        if status_atual not in ('aguardando_confirmacao_cliente','aguardando_pagamento','em_producao'):
+        if status_atual not in ('aguardando_pagamento','em_producao'):
             flash('Este pedido não pode solicitar cancelamento neste status.', 'erro')
             return redirect(url_for('breed'))
         supabase.table('pedidos_breed').update({
@@ -2703,7 +2619,7 @@ def decidir_cancelamento_breed(pedido_id, decisao):
             msg = 'Seu pedido teve o cancelamento aprovado pelo Breeder.'
         else:
             novo_status = p.get('status_antes_cancelamento') or ('em_producao' if p.get('pagamento_confirmado_em') else 'aguardando_pagamento')
-            if novo_status not in ('aguardando_confirmacao_cliente','aguardando_pagamento','em_producao'):
+            if novo_status not in ('aguardando_pagamento','em_producao'):
                 novo_status = 'aguardando_pagamento'
             updates = {
                 'status':novo_status,
@@ -2838,6 +2754,9 @@ def chat_pedido(tipo, pedido_id):
         flash('O chat será liberado assim que um responsável assumir o pedido.','info')
         return redirect(url_for('breed_meus_pedidos') if tipo == 'breed' else url_for('painel'))
     if request.method=='POST':
+        if tipo == 'breed' and p.get('status') in ('entregue','cancelado'):
+            flash('Esta conversa foi arquivada e está disponível somente para leitura.','info')
+            return redirect(url_for('chat_pedido',tipo=tipo,pedido_id=pedido_id))
         msg=request.form.get('mensagem','').strip()[:1500]
         if msg:
             supabase.table('mensagens_pedido').insert({'tipo_pedido':tipo,'pedido_id':pedido_id,'remetente_email':email,'mensagem':msg}).execute()
@@ -2847,7 +2766,7 @@ def chat_pedido(tipo, pedido_id):
         return redirect(url_for('chat_pedido',tipo=tipo,pedido_id=pedido_id))
     msgs=supabase.table('mensagens_pedido').select('*').eq('tipo_pedido',tipo).eq('pedido_id',pedido_id).order('created_at').execute().data or []
     supabase.table('mensagens_pedido').update({'lida':True}).eq('tipo_pedido',tipo).eq('pedido_id',pedido_id).neq('remetente_email',email).execute()
-    return render_template('chat_pedido.html',tipo=tipo,pedido=p,mensagens=msgs)
+    return render_template('chat_pedido.html',tipo=tipo,pedido=p,mensagens=msgs,chat_readonly=(tipo == 'breed' and p.get('status') in ('entregue','cancelado')))
 
 @app.route('/pedido/<tipo>/<int:pedido_id>/avaliar', methods=['POST'])
 @login_required
