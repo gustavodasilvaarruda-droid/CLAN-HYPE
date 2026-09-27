@@ -532,7 +532,7 @@ def atualizar_conquistas_breeder(usuario_email):
         print(f"Falha ao atualizar conquistas do Breeder: {e}")
 
 
-def criar_notificacao(usuario_email, titulo, mensagem, tipo='info', link=None):
+def criar_notificacao(usuario_email, titulo, mensagem, tipo='info', link=None, discord_dados=None):
     try:
         supabase.table('notificacoes').insert({
             'usuario_email': usuario_email, 'titulo': titulo, 'mensagem': mensagem,
@@ -581,6 +581,59 @@ def criar_notificacao(usuario_email, titulo, mensagem, tipo='info', link=None):
                 'timestamp': datetime.now(timezone.utc).isoformat(),
             }
 
+            # Cards especiais do HYPE Breed. O Discord não aceita HTML/CSS dentro
+            # do Embed, então reproduzimos a referência com cabeçalho, campos,
+            # status, Pokémon, preço e instrução operacional organizados.
+            if isinstance(discord_dados, dict) and discord_dados.get('categoria') == 'breed':
+                status = str(discord_dados.get('status') or '').strip()
+                pedido_num = discord_dados.get('pedido_id')
+                pokemon = str(discord_dados.get('pokemon') or 'Pokémon').strip()
+                breeder = str(discord_dados.get('breeder') or '—').strip()
+                valor_breed = discord_dados.get('valor')
+                pokemon_id = discord_dados.get('pokemon_id')
+                instrucao = str(discord_dados.get('instrucao') or '').strip()
+
+                visuais = {
+                    'aguardando_pagamento': ('🟡', 'HYPE BREED • AGUARDANDO PAGAMENTO', 0xF1C40F),
+                    'em_producao': ('🥚', 'HYPE BREED • EM PRODUÇÃO', 0x3498DB),
+                    'concluido': ('✨', 'HYPE BREED • POKÉMON PRONTO', 0x57F287),
+                    'aguardando_confirmacao': ('🤝', 'HYPE BREED • AGUARDANDO CONFIRMAÇÃO', 0x5865F2),
+                    'entregue': ('✅', 'HYPE BREED • PEDIDO ENTREGUE', 0x57F287),
+                    'cancelado': ('❌', 'HYPE BREED • PEDIDO CANCELADO', 0xED4245),
+                }
+                icone_status, cabecalho, cor_status = visuais.get(status, ('🥚', 'HYPE BREED', cor))
+                embed['author'] = {'name': '🥚 HYPE BREED • Central de Breed'}
+                embed['title'] = f"{icone_status} {titulo_embed}"
+                embed['color'] = cor_status
+                embed['description'] = descricao_embed
+                campos = []
+                if pedido_num is not None:
+                    campos.append({'name': '📋 Pedido', 'value': f'`#{pedido_num}`', 'inline': True})
+                campos.append({'name': '🧬 Pokémon', 'value': f'**{pokemon}**', 'inline': True})
+                if valor_breed not in (None, ''):
+                    campos.append({'name': '🪙 Valor', 'value': f'**{filtro_preco(valor_breed)}**', 'inline': True})
+                if breeder and breeder != '—':
+                    campos.append({'name': '👤 Breeder', 'value': f'**{breeder}**', 'inline': True})
+                campos.append({'name': '📡 Status', 'value': f'**{cabecalho.replace("HYPE BREED • ", "").title()}**', 'inline': True})
+                if instrucao:
+                    campos.append({'name': '⚡ Próximo passo', 'value': instrucao[:1024], 'inline': False})
+                embed['fields'] = campos[:25]
+                embed['footer'] = {'text': 'HYPE • Central do Membro • Breed System'}
+
+                # Quando há ID da Pokédex, usa o sprite oficial como imagem do
+                # Pokémon e mantém o emblema HYPE anexado no corpo do card.
+                try:
+                    pid = int(pokemon_id or 0)
+                except (TypeError, ValueError):
+                    pid = 0
+                if pid > 0:
+                    embed['thumbnail'] = {'url': f'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{pid}.png'}
+                    embed['image'] = {'url': 'attachment://emblema_hype_novo.png'}
+
+                payload_content = f'🥚 **{cabecalho}**'
+            else:
+                payload_content = '🔔 **Nova atualização HYPE**'
+
             # Quando a notificação possui destino no site, transforma o título
             # do Embed em um atalho clicável. Links relativos usam a URL atual.
             if link:
@@ -598,7 +651,7 @@ def criar_notificacao(usuario_email, titulo, mensagem, tipo='info', link=None):
                     pass
 
             payload = {
-                'content': '🔔 **Nova atualização HYPE**',
+                'content': payload_content,
                 'embeds': [embed],
                 'allowed_mentions': {'parse': []},
             }
@@ -1871,13 +1924,21 @@ def assumir_breed(pedido_id):
             pedido.get('usuario_email'),
             'Aguardando pagamento',
             f"Seu pedido de {pedido.get('pokemon')} foi assumido por {session.get('nick_jogo')}. Valor: {valor}. A produção só começa após o Breeder confirmar o pagamento.",
-            'aviso', url_for('breed')
+            'aviso', url_for('breed'),
+            {'categoria':'breed','status':'aguardando_pagamento','pedido_id':pedido_id,
+             'pokemon':pedido.get('pokemon'),'pokemon_id':pedido.get('pokemon_id'),
+             'valor':pedido.get('preco_total'),'breeder':session.get('nick_jogo'),
+             'instrucao':'Aguarde a confirmação do pagamento para que a produção seja iniciada.'}
         )
         criar_notificacao(
             email,
             'Não inicie a produção ainda',
             f"O pedido #{pedido_id} está aguardando pagamento. Confirme o recebimento antes de começar a breedar/chocar.",
-            'aviso', url_for('breed')
+            'aviso', url_for('breed'),
+            {'categoria':'breed','status':'aguardando_pagamento','pedido_id':pedido_id,
+             'pokemon':pedido.get('pokemon'),'pokemon_id':pedido.get('pokemon_id'),
+             'valor':pedido.get('preco_total'),'breeder':session.get('nick_jogo'),
+             'instrucao':'Confirme o recebimento do pagamento antes de começar a breedar/chocar.'}
         )
         registrar_historico('breed', pedido_id, 'pendente', 'aguardando_pagamento', 'Pedido assumido; aguardando confirmação do pagamento.')
         registrar_log('assumir', 'breed', 'pedido_breed', pedido_id, {'status_novo':'aguardando_pagamento'})
@@ -1921,7 +1982,11 @@ def confirmar_pagamento_breed(pedido_id):
         criar_notificacao(
             pedido.get('usuario_email'), 'Pagamento confirmado',
             f"Pagamento do pedido de {pedido.get('pokemon')} confirmado. Seu pedido entrou em produção.",
-            'sucesso', url_for('breed')
+            'sucesso', url_for('breed'),
+            {'categoria':'breed','status':'em_producao','pedido_id':pedido_id,
+             'pokemon':pedido.get('pokemon'),'pokemon_id':pedido.get('pokemon_id'),
+             'valor':pedido.get('preco_total'),'breeder':session.get('nick_jogo'),
+             'instrucao':'Pagamento confirmado. Seu Pokémon já está em produção.'}
         )
         registrar_historico('breed', pedido_id, 'aguardando_pagamento', 'em_producao', 'Pagamento confirmado pelo Breeder; produção liberada.')
         registrar_log('confirmar_pagamento', 'breed', 'pedido_breed', pedido_id, {'valor': pedido.get('preco_total') or 0})
@@ -1981,7 +2046,7 @@ def concluir_breed(pedido_id):
             flash('Não foi possível concluir este pedido.', 'erro')
             return redirect(url_for('breed'))
 
-        criar_notificacao(pedido.get('usuario_email'), 'Pokémon pronto!', f"Seu {pedido.get('pokemon')} foi concluído e está pronto para entrega.", 'sucesso', url_for('breed'))
+        criar_notificacao(pedido.get('usuario_email'), 'Pokémon pronto!', f"Seu {pedido.get('pokemon')} foi concluído e está pronto para entrega.", 'sucesso', url_for('breed'), {'categoria':'breed','status':'concluido','pedido_id':pedido_id,'pokemon':pedido.get('pokemon'),'pokemon_id':pedido.get('pokemon_id'),'valor':pedido.get('preco_total'),'breeder':session.get('nick_jogo'),'instrucao':'Seu Pokémon está pronto. Combine a entrega com o Breeder.'})
         atualizar_conquistas_breeder(pedido.get('breeder_responsavel') or email)
         registrar_atividade_reino('breed_concluido', email, f"Breed concluído: {pedido.get('pokemon')}", 'breed', pedido_id)
         flash('Pedido marcado como concluído! O jogador foi notificado. 🎉', 'sucesso')
@@ -2022,7 +2087,7 @@ def entregar_breed(pedido_id):
             return redirect(url_for('breed'))
 
         registrar_historico('breed', pedido_id, 'concluido', 'aguardando_confirmacao', 'Breeder informou a entrega; aguardando confirmação do cliente.')
-        criar_notificacao(pedido.get('usuario_email'),'Confirme o recebimento',f"O Breeder informou a entrega do pedido #{pedido_id}. Confirme em Meus Pedidos.",'aviso',url_for('breed_meus_pedidos'))
+        criar_notificacao(pedido.get('usuario_email'),'Confirme o recebimento',f"O Breeder informou a entrega do pedido #{pedido_id}. Confirme em Meus Pedidos.",'aviso',url_for('breed_meus_pedidos'), {'categoria':'breed','status':'aguardando_confirmacao','pedido_id':pedido_id,'pokemon':pedido.get('pokemon'),'pokemon_id':pedido.get('pokemon_id'),'valor':pedido.get('preco_total'),'breeder':session.get('nick_jogo'),'instrucao':'Abra Meus Pedidos e confirme que recebeu o Pokémon.'})
         flash('Entrega informada. Agora aguardamos a confirmação do cliente.', 'sucesso')
     except Exception as e:
         flash(f'Erro ao entregar pedido: {e}', 'erro')
