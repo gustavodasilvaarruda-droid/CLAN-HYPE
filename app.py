@@ -1095,7 +1095,7 @@ def breed_meus_pedidos():
         pedido['historico_status'] = historicos.get(pedido.get('id'), [])
         base = pedido.get('entregue_em') or pedido.get('concluido_em') or pedido.get('pagamento_confirmado_em') or pedido.get('assumido_em') or pedido.get('created_at')
         pedido['atualizado_em'] = base
-    ativos = [p for p in pedidos if p.get('status') in ('pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao')]
+    ativos = [p for p in pedidos if p.get('status') in ('pendente','aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao')]
     historico = [p for p in pedidos if p.get('status') in ('entregue','cancelado')]
     return render_template('breed_meus_pedidos.html', pedidos_ativos=ativos, historico=historico, permissoes=permissoes)
 
@@ -1110,7 +1110,7 @@ def breed_fila_breeders():
         return redirect(url_for('breed_meus_pedidos'))
     try:
         pedidos = supabase.table('pedidos_breed').select('*').in_('status', [
-            'pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao'
+            'pendente','aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao'
         ]).order('created_at', desc=False).execute().data or []
     except Exception as e:
         print(f'Erro ao buscar fila dos Breeders: {e}')
@@ -1130,7 +1130,7 @@ def breed_fila_breeders():
         p['mensagens_nao_lidas']=nao_lidas.get(p.get('id'),0)
         inicio=parse_data_supabase(p.get('assumido_em'))
         p['atrasado']=bool(inicio and p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado') and (datetime.now(timezone.utc)-inicio).total_seconds()>3*86400)
-    meus_ativos = len([p for p in pedidos if p.get('breeder_responsavel') == email and p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao')])
+    meus_ativos = len([p for p in pedidos if p.get('breeder_responsavel') == email and p.get('status') in ('aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado')])
     max_ativos = 4
     try:
         perfil = supabase.table('breeders_perfil').select('max_ativos').eq('usuario_email', email).limit(1).execute().data or []
@@ -1147,6 +1147,20 @@ def breed_fila_breeders():
     historico_cancelados = enriquecer_pedidos_com_nicks(historico_cancelados)
     return render_template('breed_fila.html', fila_ativa=pedidos, historico_cancelados=historico_cancelados, permissoes=permissoes, breeder_email=email, meus_ativos=meus_ativos, max_ativos=max_ativos)
 
+
+
+@app.route('/breed/historico')
+@login_required
+def breed_historico_geral():
+    """Histórico geral: todos os Breeds efetivamente entregues pelo sistema."""
+    email=session.get('usuario_email')
+    permissoes=obter_permissoes_usuario(email)
+    try:
+        pedidos=supabase.table('pedidos_breed').select('*').eq('status','entregue').order('entregue_em',desc=True).limit(500).execute().data or []
+    except Exception as e:
+        print(f'Erro ao buscar histórico geral de Breed: {e}'); pedidos=[]
+    pedidos=enriquecer_pedidos_com_nicks(pedidos)
+    return render_template('breed_historico.html', pedidos=pedidos, permissoes=permissoes)
 
 
 def _breed_payload(pedidos, email):
@@ -1177,7 +1191,7 @@ def api_breed_fila_status():
     email=session.get('usuario_email'); perm=obter_permissoes_usuario(email)
     if not perm.get('pode_ver_fila_breed'): return jsonify({'ok':False}),403
     try:
-        pedidos=supabase.table('pedidos_breed').select('*').in_('status',['pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao']).order('created_at',desc=False).execute().data or []
+        pedidos=supabase.table('pedidos_breed').select('*').in_('status',['pendente','aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao']).order('created_at',desc=False).execute().data or []
         return jsonify({'ok':True,'pedidos':_breed_payload(pedidos,email),'server_time':agora_iso()})
     except Exception as e: return jsonify({'ok':False,'error':str(e)}),500
 
@@ -1190,9 +1204,9 @@ def confirmar_recebimento_breed(pedido_id):
         if not rows or rows[0].get('usuario_email')!=email:
             flash('Pedido não encontrado.','erro'); return redirect(url_for('breed_meus_pedidos'))
         p=rows[0]
-        if p.get('status') not in ('concluido','aguardando_confirmacao'):
+        if p.get('status') != 'aguardando_confirmacao':
             flash('Este pedido ainda não está pronto para confirmar recebimento.','erro'); return redirect(url_for('breed_meus_pedidos'))
-        supabase.table('pedidos_breed').update({'status':'entregue','entregue_em':agora_iso(),'recebimento_confirmado_em':agora_iso(),'recebimento_confirmado_por':email}).eq('id',pedido_id).in_('status',['concluido','aguardando_confirmacao']).execute()
+        supabase.table('pedidos_breed').update({'status':'entregue','entregue_em':agora_iso(),'recebimento_confirmado_em':agora_iso(),'recebimento_confirmado_por':email}).eq('id',pedido_id).eq('status','aguardando_confirmacao').execute()
         registrar_historico('breed',pedido_id,p.get('status'),'entregue','Recebimento confirmado pelo cliente.')
         if p.get('breeder_responsavel'): criar_notificacao(p.get('breeder_responsavel'),'Entrega confirmada',f"O cliente confirmou o recebimento do Breed #{pedido_id}.",'sucesso',url_for('breed_fila_breeders'))
         flash('Recebimento confirmado. Obrigado!','sucesso')
@@ -1529,7 +1543,7 @@ def assumir_breed(pedido_id):
 
         pedidos_ativos = supabase.table('pedidos_breed').select('id').eq(
             'breeder_responsavel', email
-        ).in_('status', ['aguardando_pagamento','em_producao','cancelamento_solicitado']).execute()
+        ).in_('status', ['aguardando_confirmacao_cliente','aguardando_pagamento','em_producao','cancelamento_solicitado']).execute()
 
         limite_ativos = 4
         try:
@@ -1543,7 +1557,7 @@ def assumir_breed(pedido_id):
             return redirect(url_for('breed_fila_breeders'))
 
         resultado = supabase.table('pedidos_breed').update({
-            'status': 'aguardando_pagamento',
+            'status': 'aguardando_confirmacao_cliente',
             'breeder_responsavel': email,
             'assumido_em': agora_iso(),
             'prazo_notificado': False
@@ -1556,24 +1570,65 @@ def assumir_breed(pedido_id):
         valor = filtro_preco(pedido.get('preco_total') or 0)
         criar_notificacao(
             pedido.get('usuario_email'),
-            'Aguardando pagamento',
-            f"Seu pedido de {pedido.get('pokemon')} foi assumido por {session.get('nick_jogo')}. Valor: {valor}. A produção só começa após o Breeder confirmar o pagamento.",
-            'aviso', url_for('breed')
+            'Breeder encontrou seu pedido',
+            f"{session.get('nick_jogo')} assumiu seu pedido de {pedido.get('pokemon')}. Valor: {valor}. Confirme o pedido em Meus Pedidos antes do pagamento.",
+            'aviso', url_for('breed_meus_pedidos')
         )
         criar_notificacao(
             email,
-            'Não inicie a produção ainda',
-            f"O pedido #{pedido_id} está aguardando pagamento. Confirme o recebimento antes de começar a breedar/chocar.",
+            'Aguardando o cliente',
+            f"O pedido #{pedido_id} aguarda a confirmação do cliente. O pagamento só será liberado depois disso.",
             'aviso', url_for('breed')
         )
-        registrar_historico('breed', pedido_id, 'pendente', 'aguardando_pagamento', 'Pedido assumido; aguardando confirmação do pagamento.')
-        registrar_log('assumir', 'breed', 'pedido_breed', pedido_id, {'status_novo':'aguardando_pagamento'})
-        flash('Pedido assumido. Aguarde o pagamento e confirme o recebimento antes de iniciar a produção.', 'sucesso')
+        registrar_historico('breed', pedido_id, 'pendente', 'aguardando_confirmacao_cliente', 'Pedido assumido; aguardando confirmação do cliente.')
+        registrar_log('assumir', 'breed', 'pedido_breed', pedido_id, {'status_novo':'aguardando_confirmacao_cliente'})
+        flash('Pedido assumido. Aguarde o cliente confirmar antes de solicitar/confirmar o pagamento.', 'sucesso')
     except Exception as e:
         flash(f'Erro ao assumir pedido: {e}', 'erro')
 
     return redirect(url_for('breed'))
 
+
+@app.route('/breed/confirmar-pedido/<int:pedido_id>', methods=['POST'])
+@login_required
+def confirmar_pedido_cliente(pedido_id):
+    email = session.get('usuario_email')
+    try:
+        rows = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).limit(1).execute().data or []
+        if not rows or rows[0].get('usuario_email') != email:
+            flash('Pedido não encontrado.', 'erro'); return redirect(url_for('breed_meus_pedidos'))
+        pedido = rows[0]
+        if pedido.get('status') != 'aguardando_confirmacao_cliente':
+            flash('Este pedido não está aguardando sua confirmação.', 'erro'); return redirect(url_for('breed_meus_pedidos'))
+        r = supabase.table('pedidos_breed').update({'status':'aguardando_pagamento'}).eq('id',pedido_id).eq('status','aguardando_confirmacao_cliente').execute()
+        if not r.data:
+            flash('Não foi possível confirmar o pedido.', 'erro'); return redirect(url_for('breed_meus_pedidos'))
+        registrar_historico('breed',pedido_id,'aguardando_confirmacao_cliente','aguardando_pagamento','Cliente confirmou o Breeder e o valor; pagamento liberado.')
+        if pedido.get('breeder_responsavel'):
+            criar_notificacao(pedido.get('breeder_responsavel'),'Cliente confirmou o pedido',f"O cliente confirmou o Breed #{pedido_id}. Agora o pagamento pode ser confirmado.",'sucesso',url_for('breed_fila_breeders'))
+        flash('Pedido confirmado! Agora ele está aguardando pagamento.', 'sucesso')
+    except Exception as e: flash(f'Erro ao confirmar pedido: {e}','erro')
+    return redirect(url_for('breed_meus_pedidos'))
+
+@app.route('/breed/recusar-breeder/<int:pedido_id>', methods=['POST'])
+@login_required
+def recusar_breeder_cliente(pedido_id):
+    email = session.get('usuario_email')
+    try:
+        rows=supabase.table('pedidos_breed').select('*').eq('id',pedido_id).limit(1).execute().data or []
+        if not rows or rows[0].get('usuario_email') != email:
+            flash('Pedido não encontrado.','erro'); return redirect(url_for('breed_meus_pedidos'))
+        pedido=rows[0]
+        if pedido.get('status') != 'aguardando_confirmacao_cliente':
+            flash('Este pedido não pode voltar para a fila neste momento.','erro'); return redirect(url_for('breed_meus_pedidos'))
+        antigo=pedido.get('breeder_responsavel')
+        r=supabase.table('pedidos_breed').update({'status':'pendente','breeder_responsavel':None,'assumido_em':None,'prazo_notificado':False}).eq('id',pedido_id).eq('status','aguardando_confirmacao_cliente').execute()
+        if r.data:
+            registrar_historico('breed',pedido_id,'aguardando_confirmacao_cliente','pendente','Cliente recusou o responsável; pedido devolvido à fila.')
+            if antigo: criar_notificacao(antigo,'Pedido devolvido à fila',f"O cliente não confirmou o Breed #{pedido_id}; sua vaga foi liberada.",'aviso',url_for('breed_fila_breeders'))
+            flash('O pedido voltou para a fila e sua solicitação foi preservada.','sucesso')
+    except Exception as e: flash(f'Erro ao devolver pedido à fila: {e}','erro')
+    return redirect(url_for('breed_meus_pedidos'))
 
 @app.route('/breed/confirmar-pagamento/<int:pedido_id>', methods=['POST'])
 @login_required
@@ -2592,7 +2647,7 @@ def cancelar_breed(pedido_id):
             return redirect(url_for('breed'))
 
         # Após um Breeder assumir, o cliente solicita cancelamento e o Breeder decide.
-        if status_atual not in ('aguardando_pagamento','em_producao'):
+        if status_atual not in ('aguardando_confirmacao_cliente','aguardando_pagamento','em_producao'):
             flash('Este pedido não pode solicitar cancelamento neste status.', 'erro')
             return redirect(url_for('breed'))
         supabase.table('pedidos_breed').update({
@@ -2648,7 +2703,7 @@ def decidir_cancelamento_breed(pedido_id, decisao):
             msg = 'Seu pedido teve o cancelamento aprovado pelo Breeder.'
         else:
             novo_status = p.get('status_antes_cancelamento') or ('em_producao' if p.get('pagamento_confirmado_em') else 'aguardando_pagamento')
-            if novo_status not in ('aguardando_pagamento','em_producao'):
+            if novo_status not in ('aguardando_confirmacao_cliente','aguardando_pagamento','em_producao'):
                 novo_status = 'aguardando_pagamento'
             updates = {
                 'status':novo_status,
