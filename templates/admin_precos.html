@@ -1,18 +1,21 @@
 {% extends "hype_app_base.html" %}
-{% block title %}Preços do Breed · HYPE Admin{% endblock %}
+{% block title %}Preços e Promoções · HYPE Admin{% endblock %}
 {% block content %}
 <div class="admin-price-shell">
-  <div class="admin-price-head"><div><span>ADMIN · HYPE BREED</span><h1>Preços do Breed</h1><p>Fonte oficial dos valores usados em novos pedidos. Pedidos já criados preservam o valor histórico.</p></div><a class="btn-ranking-outline" href="{{url_for('expansion.admin_dashboard')}}">← Central Administrativa</a></div>
-  <div class="admin-price-grid">
-  {% for p in precos %}
-    <form method="post" class="admin-price-card">
-      <input type="hidden" name="codigo" value="{{p.codigo}}">
-      <div><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3></div>
-      <label>Valor HYPE<input name="valor" value="{{p.valor}}" inputmode="numeric" required></label>
-      <div class="admin-price-current">Atual: <b>{{p.valor|preco}}</b></div>
-      <button class="cta-gold">Salvar valor</button>
+  <div class="admin-price-head"><div><span>ADMIN · HYPE BREED</span><h1>Preços e Promoções</h1><p>Os preços oficiais continuam intactos. As promoções aplicam descontos automaticamente e pedidos já criados preservam o valor fechado.</p></div><a class="btn-ranking-outline" href="{{url_for('expansion.admin_dashboard')}}">← Central Administrativa</a></div>
+  <section class="promo-admin-panel">
+    <div class="promo-admin-title"><div><span>🔥 HYPE PROMO</span><h2>Criar promoção</h2><p>Escolha qualquer percentual e aplique em todos os preços ou somente nos itens selecionados.</p></div></div>
+    <form method="post" class="promo-create-form"><input type="hidden" name="acao" value="criar_promocao">
+      <label>Nome da promoção<input name="nome" placeholder="Ex.: Semana HYPE" required></label>
+      <label>Desconto (%)<input name="percentual" type="number" min="0.01" max="100" step="0.01" placeholder="30" required></label>
+      <label>Início<input name="inicio_em" type="datetime-local"></label><label>Término<input name="fim_em" type="datetime-local"></label>
+      <label class="promo-all"><input type="checkbox" name="aplicar_todos" value="1" id="promoAll"> Aplicar em TODOS os preços</label>
+      <div class="promo-price-options" id="promoPriceOptions">{% for p in precos %}<label><input type="checkbox" name="codigos_preco" value="{{p.codigo}}"><span><b>{{p.nome}}</b><small>{{p.codigo|replace('_',' ')}} · {{p.valor|preco}}</small></span></label>{% endfor %}</div>
+      <button class="cta-gold">🔥 Criar promoção</button>
     </form>
-  {% else %}<div class="dash-card">Nenhum preço cadastrado.</div>{% endfor %}
-  </div>
+  </section>
+  {% if promocoes %}<section class="promo-list"><h2>Promoções cadastradas</h2><div class="promo-list-grid">{% for p in promocoes %}<article class="promo-admin-card {{'active' if p.ativo else 'paused'}}"><div><span class="promo-badge">-{{p.percentual}}%</span><h3>{{p.nome}}</h3><small>{% if p.aplicar_todos %}Todos os preços{% else %}{{(p.codigos_preco or [])|length}} preço(s) selecionado(s){% endif %}</small><p>{{p.inicio_em or 'Início imediato'}} → {{p.fim_em or 'Sem término automático'}}</p></div><div class="promo-admin-actions"><form method="post"><input type="hidden" name="acao" value="toggle_promocao"><input type="hidden" name="promocao_id" value="{{p.id}}"><input type="hidden" name="ativo" value="{{'0' if p.ativo else '1'}}"><button class="btn-ranking-outline">{{'Pausar' if p.ativo else 'Ativar'}}</button></form><form method="post" onsubmit="return confirm('Remover esta promoção? Pedidos já feitos não serão alterados.')"><input type="hidden" name="acao" value="excluir_promocao"><input type="hidden" name="promocao_id" value="{{p.id}}"><button class="btn-muted-hype">Excluir</button></form></div></article>{% endfor %}</div></section>{% endif %}
+  <h2 class="admin-price-section-title">Tabela oficial de preços</h2><div class="admin-price-grid">{% for p in precos %}<form method="post" class="admin-price-card"><input type="hidden" name="acao" value="preco"><input type="hidden" name="codigo" value="{{p.codigo}}"><div><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3></div><label>Valor HYPE<input name="valor" value="{{p.valor}}" inputmode="numeric" required></label><div class="admin-price-current">Atual: <b>{{p.valor|preco}}</b></div><button class="cta-gold">Salvar valor</button></form>{% else %}<div class="dash-card">Nenhum preço cadastrado.</div>{% endfor %}</div>
 </div>
+<script>const all=document.getElementById('promoAll'), box=document.getElementById('promoPriceOptions');if(all&&box)all.addEventListener('change',()=>{box.classList.toggle('promo-disabled',all.checked);box.querySelectorAll('input').forEach(x=>x.disabled=all.checked)});</script>
 {% endblock %}

@@ -11,6 +11,7 @@
     </div>
     <div class="breed-ref-hero-mark">HYPE</div>
   </section>
+  <div class="breed-promo-banner" id="breedPromoBanner" hidden><span>🔥</span><div><b id="breedPromoTitle">PROMOÇÃO HYPE</b><small id="breedPromoText">Desconto aplicado automaticamente.</small></div><strong id="breedPromoPct"></strong></div>
 
   <div class="breed-ref-titlebar">
     <div><span class="breed-ref-kicker">HYPE BREED</span><h2 id="wizardTitle">ESCOLHA O POKÉMON</h2></div>
@@ -389,9 +390,14 @@ async function refreshPrice(){
     if(!r.ok||!d.ok)throw new Error(d.error||'Preço indisponível');
     const total=Number(d.preco_total ?? d.total ?? 0);
     if(!Number.isFinite(total)||total<=0)throw new Error('Preço não configurado para esta combinação.');
-    lastPrice={...d,total}; const shown=formatHypePrice(total);
-    if(value)value.textContent=shown; if(send){send.textContent='Valor do Breed: '+shown;send.dataset.priceReady='1';}
-    if(detail)detail.textContent='Preço calculado pela tabela oficial HYPE.';
+    lastPrice={...d,total}; const shown=formatHypePrice(total), original=Number(d.preco_original||total), discount=Number(d.desconto_valor||0);
+    const banner=$('#breedPromoBanner');
+    if(d.promocao_ativa&&discount>0){
+      if(value)value.innerHTML=`<del>${formatHypePrice(original)}</del> <strong>${shown}</strong>`;
+      if(detail)detail.textContent=`🔥 ${d.promocao_nome||'Promoção HYPE'} · você economiza ${formatHypePrice(discount)}.`;
+      if(banner){banner.hidden=false;$('#breedPromoTitle').textContent=d.promocao_nome||'PROMOÇÃO HYPE';$('#breedPromoText').textContent=`Desconto aplicado automaticamente neste Breed · economia ${formatHypePrice(discount)}`;$('#breedPromoPct').textContent='-'+Number(d.promocao_percentual||0).toLocaleString('pt-BR')+'%';}
+    }else{if(value)value.textContent=shown;if(detail)detail.textContent='Preço calculado pela tabela oficial HYPE.';if(banner)banner.hidden=true;}
+    if(send){send.textContent=(d.promocao_ativa?'🔥 Preço promocional: ':'Valor do Breed: ')+shown;send.dataset.priceReady='1';}
   }catch(e){lastPrice=null;if(value)value.textContent='Valor indisponível';if(send){send.textContent='Valor indisponível — revise antes de enviar';send.dataset.priceReady='0';}if(detail)detail.textContent=(e&&e.message&&String(e.message).indexOf('Unexpected token')<0)?e.message:'Não foi possível consultar o valor agora. Atualize a página e tente novamente.'}
 }
 function schedulePrice(){clearTimeout(priceTimer);priceTimer=setTimeout(refreshPrice,120)}
