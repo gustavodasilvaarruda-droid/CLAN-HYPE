@@ -2,17 +2,32 @@
 {% block title %}Preços do Breed · HYPE Admin{% endblock %}
 {% block content %}
 <div class="admin-price-shell">
-  <div class="admin-price-head"><div><span>ADMIN · HYPE BREED</span><h1>Preços do Breed</h1><p>Fonte oficial dos valores usados em novos pedidos. Pedidos já criados preservam o valor histórico.</p></div><a class="btn-ranking-outline" href="{{url_for('expansion.admin_dashboard')}}">← Central Administrativa</a></div>
+  <div class="admin-price-head"><div><span>ADMIN · HYPE BREED</span><h1>Preços do Breed</h1><p>Fonte oficial dos valores usados em novos pedidos. Abaixo você também vê todas as combinações calculadas pelo mesmo motor do pedido.</p></div><a class="btn-ranking-outline" href="{{url_for('expansion.admin_dashboard')}}">← Central Administrativa</a></div>
+
+  <section class="admin-price-summary">
+    <div><small>COMBINAÇÕES CALCULADAS</small><b>{{combinacoes|length}}</b></div>
+    <div><small>VALORES FINAIS DIFERENTES</small><b>{{valores_possiveis|length}}</b></div>
+    <div class="wide"><small>FAIXA ATUAL</small><b>{{valores_possiveis[0]|preco if valores_possiveis else '$0'}} → {{valores_possiveis[-1]|preco if valores_possiveis else '$0'}}</b></div>
+  </section>
+
+  <h2 class="admin-price-section-title">Tabela base editável</h2>
   <div class="admin-price-grid">
   {% for p in precos %}
     <form method="post" class="admin-price-card">
       <input type="hidden" name="codigo" value="{{p.codigo}}">
-      <div><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3></div>
+      <div><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3>{% if p.fallback %}<span class="price-fallback-badge">VALOR PADRÃO ATIVO</span>{% endif %}</div>
       <label>Valor HYPE<input name="valor" value="{{p.valor}}" inputmode="numeric" required></label>
       <div class="admin-price-current">Atual: <b>{{p.valor|preco}}</b></div>
       <button class="cta-gold">Salvar valor</button>
     </form>
-  {% else %}<div class="dash-card">Nenhum preço cadastrado.</div>{% endfor %}
+  {% endfor %}
   </div>
+
+  <section class="admin-price-all">
+    <div class="admin-price-all-head"><div><small>SIMULADOR OFICIAL</small><h2>Todas as combinações possíveis</h2><p>Estes valores são calculados automaticamente com a tabela acima. Ao alterar um preço base, a combinação correspondente muda junto.</p></div><input id="priceSearch" type="search" placeholder="Filtrar: HA, F5, fêmea, treinado..." aria-label="Filtrar combinações"></div>
+    <div class="admin-price-unique"><b>Valores finais possíveis:</b>{% for v in valores_possiveis %}<span>{{v|preco}}</span>{% endfor %}</div>
+    <div class="admin-price-table-wrap"><table class="admin-price-table"><thead><tr><th>Categoria</th><th>Breed</th><th>Nature</th><th>Gênero</th><th>Treinado</th><th>Valor final</th></tr></thead><tbody id="priceRows">{% for c in combinacoes %}<tr data-price-row><td>{{c.familia}}</td><td><b>{{c.breed}}</b></td><td>{{c.nature}}</td><td>{{c.genero}}</td><td>{{c.treinado}}</td><td><strong>{{c.total|preco}}</strong></td></tr>{% endfor %}</tbody></table></div>
+  </section>
 </div>
+<script>const ps=document.getElementById('priceSearch');if(ps)ps.addEventListener('input',()=>{const q=ps.value.toLowerCase().trim();document.querySelectorAll('[data-price-row]').forEach(r=>r.hidden=q&&!r.textContent.toLowerCase().includes(q));});</script>
 {% endblock %}
