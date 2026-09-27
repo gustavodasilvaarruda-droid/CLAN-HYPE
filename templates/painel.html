@@ -34,7 +34,11 @@
     </div>
   </section>
 
-  <section class="member2-progress"><article><div class="member2-level"><span>NÍVEL {{nivel}}</span><b>{{xp}} XP</b></div><div class="hype-xp-track"><i style="width:{{progresso_xp}}%"></i></div><small>{{1000 - (xp % 1000)}} XP para a próxima faixa</small></article><article><b>{{conquistas|length}}</b><span>Conquistas recentes</span></article><article><b>{{notificacoes_nao_lidas}}</b><span>Avisos não lidos</span></article><article><b>{{resumo.andamento + resumo.prontos}}</b><span>Breeds ativos/prontos</span></article></section>
+  <section class="member2-progress"><a href="{{url_for('conta_hype')}}#perfil"><div class="member2-level"><span>NÍVEL {{nivel}}</span><b>{{xp}} XP</b></div><div class="hype-xp-track"><i style="width:{{progresso_xp}}%"></i></div><small>{{1000 - (xp % 1000)}} XP para a próxima faixa</small></a><a href="{{url_for('perfil_publico',nick=nick_jogo)}}"><b>{{conquistas|length}}</b><span>Conquistas recentes</span></a><a href="{{url_for('central_notificacoes')}}"><b>{{notificacoes_nao_lidas}}</b><span>Avisos não lidos</span></a><a href="{{url_for('breed_meus_pedidos')}}"><b>{{resumo.andamento + resumo.prontos}}</b><span>Breeds ativos/prontos</span></a></section>
+
+  {% if resumo.prontos or resumo.aguardando_pagamento or notificacoes_nao_lidas %}
+  <section class="hype-member-attention"><div><span>✦</span><div><b>Precisa da sua atenção</b><p>{% if resumo.prontos %}Você tem {{resumo.prontos}} Breed{{'' if resumo.prontos == 1 else 's'}} pronto{{'' if resumo.prontos == 1 else 's'}}. {% endif %}{% if resumo.aguardando_pagamento %}{{resumo.aguardando_pagamento}} aguardando pagamento. {% endif %}{% if notificacoes_nao_lidas %}{{notificacoes_nao_lidas}} aviso{{'' if notificacoes_nao_lidas == 1 else 's'}} não lido{{'' if notificacoes_nao_lidas == 1 else 's'}}.{% endif %}</p></div></div><a href="{{url_for('breed_meus_pedidos') if (resumo.prontos or resumo.aguardando_pagamento) else url_for('central_notificacoes')}}">Ver agora →</a></section>
+  {% endif %}
 
   <section class="hype-v6-action-grid">
     <a class="hype-v6-action-card gold" href="{{url_for('breed')}}#escolher-pokemon"><span>◈</span><div><b>Fazer Pedido de Breed</b><small>Peça Pokémon com configuração completa.</small></div></a>
@@ -80,18 +84,7 @@
   </div>
 
   <section class="hype-v6-panel" id="configuracoes">
-    <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">PERFIL</span><h2>Editar meu perfil</h2></div></div>
-    <form class="hype-v6-profile-form" method="post" action="{{url_for('editar_perfil')}}">
-      <label>Nome de exibição<input name="nome_exibicao" value="{{usuario.nome_exibicao or ''}}" placeholder="Como quer aparecer"></label>
-      <label>Pokémon favorito<input name="pokemon_favorito" value="{{usuario.pokemon_favorito or ''}}" placeholder="Ex.: Rayquaza"></label>
-      <label>URL do avatar<input name="avatar_url" value="{{usuario.avatar_url or ''}}" placeholder="https://..."></label>
-      <label>URL do banner<input name="banner_url" value="{{usuario.banner_url or ''}}" placeholder="https://..."></label>
-      <label>Discord<input name="discord" value="{{(usuario.links_perfil or {}).get('discord','')}}" placeholder="Seu usuário ou convite"></label>
-      <label>YouTube<input name="youtube" value="{{(usuario.links_perfil or {}).get('youtube','')}}" placeholder="Link do canal"></label>
-      <label class="wide">Bio<textarea name="bio" placeholder="Conte um pouco sobre você">{{usuario.bio or ''}}</textarea></label>
-      <div class="wide"><span class="hype-v6-kicker">TIME EM DESTAQUE</span><div class="hype-profile-team-inputs">{% for i in range(6) %}<input name="pokemon_time" value="{{ (usuario.pokemon_time[i] if usuario.pokemon_time and usuario.pokemon_time|length > i else '') }}" placeholder="Pokémon {{i+1}}">{% endfor %}</div></div>
-      <div class="wide"><button class="hype-v6-btn gold" type="submit">Salvar perfil</button></div>
-    </form>
+    <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">CONTA</span><h2>Perfil, Discord e Segurança</h2><p>Suas configurações agora ficam organizadas na Central da Conta HYPE.</p></div><a class="hype-v6-btn gold" href="{{url_for('conta_hype')}}">Abrir Minha Conta</a></div>
   </section>
 
   {% if pode_gerenciar %}

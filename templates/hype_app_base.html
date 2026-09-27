@@ -30,12 +30,23 @@
       <span>⌕</span><input name="q" placeholder="Buscar Pokémon..." aria-label="Buscar Pokémon">
     </form>
     {% if session.get('usuario_email') %}
-      <a class="hgb-notify" href="{{url_for('painel')}}" title="Painel"><span>♢</span></a>
-      <a class="hgb-user" href="{{url_for('painel')}}">
-        <span class="hgb-avatar">{{(session.get('nick_jogo') or 'H')[:1]|upper}}</span>
-        <span class="hgb-user-name">{{session.get('nick_jogo') or 'Membro HYPE'}}</span>
-        <span class="hgb-chevron">⌄</span>
-      </a>
+      <a class="hgb-notify" href="{{url_for('central_notificacoes')}}" title="Notificações" aria-label="Notificações"><span>♢</span>{% if hype_notificacoes_nao_lidas %}<b>{{hype_notificacoes_nao_lidas if hype_notificacoes_nao_lidas < 100 else '99+'}}</b>{% endif %}</a>
+      <div class="hgb-account" id="hgbAccount">
+        <button class="hgb-user" id="hgbAccountButton" type="button" aria-expanded="false" aria-haspopup="menu">
+          <span class="hgb-avatar">{% if hype_header_user.avatar_url %}<img src="{{hype_header_user.avatar_url}}" alt="">{% else %}{{(session.get('nick_jogo') or 'H')[:1]|upper}}{% endif %}</span>
+          <span class="hgb-user-name">{{hype_header_user.nome_exibicao or session.get('nick_jogo') or 'Membro HYPE'}}</span>
+          <span class="hgb-chevron">⌄</span>
+        </button>
+        <div class="hgb-account-menu" id="hgbAccountMenu" role="menu">
+          <div class="hgb-account-head"><b>{{session.get('nick_jogo') or 'Membro HYPE'}}</b><small>{{(hype_header_user.cargo or session.get('cargo') or 'membro')|replace('_',' ')|title}}</small></div>
+          <a href="{{url_for('perfil_publico',nick=session.get('nick_jogo'))}}"><span>♙</span>Meu Perfil</a>
+          <a href="{{url_for('central_notificacoes')}}"><span>♢</span>Notificações{% if hype_notificacoes_nao_lidas %}<em>{{hype_notificacoes_nao_lidas}}</em>{% endif %}</a>
+          <a href="{{url_for('conta_hype')}}"><span>⚙</span>Configurações</a>
+          <a href="{{url_for('conta_hype')}}#discord"><span>◉</span>Discord</a>
+          <div class="hgb-account-sep"></div>
+          <button class="hgb-account-logout" type="button" data-open-logout><span>↪</span>Sair da conta</button>
+        </div>
+      </div>
     {% else %}
       <a class="hgb-user" href="{{url_for('pagina_inicial')}}#entrar"><span class="hgb-avatar">H</span><span class="hgb-user-name">Entrar</span></a>
     {% endif %}
@@ -76,8 +87,7 @@
     <div class="hgb-side-divider"></div>
     {% if session.get('usuario_email') %}
     <nav class="hgb-side-nav">
-      <a href="{{url_for('painel')}}#configuracoes"><span>⚙</span>Configurações</a>
-      <a href="{{url_for('logout')}}"><span>↪</span>Sair</a>
+      <a class="{{'active' if request.endpoint=='conta_hype' else ''}}" href="{{url_for('conta_hype')}}"><span>⚙</span>Configurações</a>
     </nav>
     {% endif %}
     <div class="hgb-sidebar-art" aria-hidden="true"></div>
@@ -91,11 +101,31 @@
   </main>
 </div>
 
+{% if session.get('usuario_email') %}
+<div class="hgb-logout-modal" id="hgbLogoutModal" hidden>
+  <div class="hgb-logout-dialog" role="dialog" aria-modal="true" aria-labelledby="logoutTitle">
+    <span class="hgb-logout-icon">↪</span><h2 id="logoutTitle">Sair da conta HYPE?</h2>
+    <p>Sua sessão neste dispositivo será encerrada. Sua conta e o Discord vinculado continuarão intactos.</p>
+    <div><button type="button" class="hgb-dialog-cancel" data-close-logout>Cancelar</button><a class="hgb-dialog-exit" href="{{url_for('logout')}}">Sair da conta</a></div>
+  </div>
+</div>
+{% endif %}
+
 <script>
 (() => {
   const btn = document.getElementById('hgbMobileMenu');
   const sidebar = document.getElementById('hgbSidebar');
   if(btn && sidebar){ btn.addEventListener('click', () => sidebar.classList.toggle('open')); }
+  const account = document.getElementById('hgbAccount'), accountBtn = document.getElementById('hgbAccountButton');
+  if(account && accountBtn){
+    accountBtn.addEventListener('click', (e) => { e.stopPropagation(); const open=account.classList.toggle('open'); accountBtn.setAttribute('aria-expanded', open ? 'true':'false'); });
+    document.addEventListener('click', (e) => { if(!account.contains(e.target)){ account.classList.remove('open'); accountBtn.setAttribute('aria-expanded','false'); } });
+  }
+  const logoutModal=document.getElementById('hgbLogoutModal');
+  document.querySelectorAll('[data-open-logout]').forEach(el=>el.addEventListener('click',()=>{ if(logoutModal){ logoutModal.hidden=false; account?.classList.remove('open'); } }));
+  document.querySelectorAll('[data-close-logout]').forEach(el=>el.addEventListener('click',()=>{ if(logoutModal) logoutModal.hidden=true; }));
+  if(logoutModal) logoutModal.addEventListener('click',e=>{ if(e.target===logoutModal) logoutModal.hidden=true; });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape' && logoutModal) logoutModal.hidden=true; });
 })();
 </script>
 {% block extra_scripts %}{% endblock %}

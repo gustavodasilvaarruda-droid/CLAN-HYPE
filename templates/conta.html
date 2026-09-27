@@ -1,0 +1,43 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Minha Conta - Clã HYPE{% endblock %}
+{% block body_class %}hype-account-page{% endblock %}
+{% block content %}
+<div class="hype-account-page-wrap">
+  <header class="hype-account-title"><span class="hype-v6-kicker">CENTRAL DO MEMBRO</span><h1>MINHA CONTA <em>HYPE</em></h1><p>Gerencie seu perfil, integrações e segurança em um só lugar.</p></header>
+  <div class="hype-account-layout">
+    <aside class="hype-account-nav"><a href="#perfil">♙ <span>Perfil</span></a><a href="#discord">◉ <span>Discord</span></a><a href="#seguranca">⌾ <span>Conta e Segurança</span></a></aside>
+    <div class="hype-account-content">
+      <section class="hype-account-card hype-account-hero" id="perfil">
+        <div class="hype-account-avatar">{% if usuario.avatar_url %}<img src="{{usuario.avatar_url}}" alt="Avatar">{% else %}<span>{{(usuario.nick_jogo or 'H')[:1]|upper}}</span>{% endif %}</div>
+        <div><span class="hype-v6-kicker">IDENTIDADE HYPE</span><h2>{{usuario.nome_exibicao or usuario.nick_jogo}} {% if membro_hype %}<em>[HYPE]</em>{% endif %}</h2><p>{{usuario.bio or 'Guerreiro do Clã HYPE'}}</p><div class="hype-account-tags"><span>{{(usuario.cargo or 'membro')|replace('_',' ')|title}}</span><span>Nível {{usuario.nivel or 1}}</span>{% if membro_hype %}<span>Membro desde {{membro_hype.entrou_em}}</span>{% endif %}</div></div>
+        <a class="hype-v6-btn secondary" href="{{url_for('perfil_publico',nick=usuario.nick_jogo)}}">Ver perfil público</a>
+      </section>
+
+      <section class="hype-account-card"><div class="hype-account-card-head"><div><span class="hype-v6-kicker">PERFIL</span><h2>Editar informações</h2></div></div>
+        <form class="hype-v6-profile-form" method="post" action="{{url_for('editar_perfil')}}">
+          <label>Nome de exibição<input name="nome_exibicao" value="{{usuario.nome_exibicao or ''}}" placeholder="Como quer aparecer"></label>
+          <label>Pokémon favorito<input name="pokemon_favorito" value="{{usuario.pokemon_favorito or ''}}" placeholder="Ex.: Rayquaza"></label>
+          <label>URL do avatar<input name="avatar_url" value="{{usuario.avatar_url or ''}}" placeholder="https://..."></label>
+          <label>URL do banner<input name="banner_url" value="{{usuario.banner_url or ''}}" placeholder="https://..."></label>
+          <label>Discord público<input name="discord" value="{{(usuario.links_perfil or {}).get('discord','')}}" placeholder="Nome exibido no perfil"></label>
+          <label>YouTube<input name="youtube" value="{{(usuario.links_perfil or {}).get('youtube','')}}" placeholder="Link do canal"></label>
+          <label class="wide">Bio<textarea name="bio" placeholder="Conte um pouco sobre você">{{usuario.bio or ''}}</textarea></label>
+          <div class="wide"><span class="hype-v6-kicker">TIME EM DESTAQUE</span><div class="hype-profile-team-inputs">{% for i in range(6) %}<input name="pokemon_time" value="{{ (usuario.pokemon_time[i] if usuario.pokemon_time and usuario.pokemon_time|length > i else '') }}" placeholder="Pokémon {{i+1}}">{% endfor %}</div></div>
+          <div class="wide"><button class="hype-v6-btn gold" type="submit">Salvar alterações</button></div>
+        </form>
+      </section>
+
+      <section class="hype-account-card" id="discord"><div class="hype-account-card-head"><div><span class="hype-v6-kicker">INTEGRAÇÃO</span><h2>Discord</h2><p>Vincule sua identidade do Discord à sua conta HYPE.</p></div><span class="hype-discord-logo">◉</span></div>
+        {% if usuario.discord_id %}
+        <div class="hype-discord-connected"><div class="hype-discord-avatar">{% if usuario.discord_avatar_url %}<img src="{{usuario.discord_avatar_url}}" alt="Discord">{% else %}D{% endif %}</div><div><b>{{usuario.discord_username or 'Discord conectado'}}</b><small>Conta vinculada com sucesso</small></div><span class="hype-connected-badge">● CONECTADO</span></div>
+        <div class="hype-discord-actions"><form method="post" action="{{url_for('discord_notificacoes')}}"><input type="hidden" name="ativo" value="{{'0' if usuario.discord_notificacoes else '1'}}"><button class="hype-v6-btn secondary" type="submit">{{'Desativar' if usuario.discord_notificacoes else 'Ativar'}} avisos pelo Discord</button></form><form method="post" action="{{url_for('discord_desconectar')}}" onsubmit="return confirm('Desconectar sua conta Discord da HYPE?')"><button class="hype-danger-btn" type="submit">Desconectar Discord</button></form></div>
+        {% else %}
+        <div class="hype-discord-empty"><div><b>Discord ainda não conectado</b><p>Conecte sua conta para preparar avisos de Breed, eventos e outras atividades HYPE.</p></div><a class="hype-discord-button" href="{{url_for('discord_conectar')}}">Conectar Discord</a></div>
+        {% endif %}
+      </section>
+
+      <section class="hype-account-card" id="seguranca"><div class="hype-account-card-head"><div><span class="hype-v6-kicker">CONTA E SEGURANÇA</span><h2>Sessão atual</h2></div></div><div class="hype-security-row"><div><b>{{usuario.email}}</b><small>Você está conectado como {{usuario.nick_jogo}}.</small></div><button class="hype-danger-btn" type="button" data-open-logout>Sair da conta</button></div><p class="hype-account-note">Sair do Site HYPE não desconecta sua conta Discord. A vinculação só é removida pelo botão “Desconectar Discord”.</p></section>
+    </div>
+  </div>
+</div>
+{% endblock %}

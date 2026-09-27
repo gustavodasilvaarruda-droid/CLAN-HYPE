@@ -1,0 +1,11 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Notificações - Clã HYPE{% endblock %}
+{% block content %}
+<div class="hype-notify-page">
+  <header class="hype-account-title"><span class="hype-v6-kicker">CENTRAL HYPE</span><h1>NOTIFICAÇÕES</h1><p>Avisos de Breed, eventos, torneios, Reino HYPE e administração.</p></header>
+  <section class="hype-account-card">
+    <div class="hype-account-card-head"><div><h2>Central de avisos</h2><p>{{hype_notificacoes_nao_lidas}} não lida{{'' if hype_notificacoes_nao_lidas == 1 else 's'}}</p></div>{% if notificacoes %}<form method="post" action="{{url_for('ler_notificacoes')}}"><button class="hype-v6-btn secondary" type="submit">Marcar todas como lidas</button></form>{% endif %}</div>
+    <div class="hype-notify-list">{% for n in notificacoes %}<article class="{{'' if n.lida else 'unread'}}"><span class="hype-notify-kind">{{'◈' if 'breed' in (n.tipo or '')|lower else '♢'}}</span><div><div class="hype-notify-line"><b>{{n.titulo}}</b>{% if not n.lida %}<em>NOVO</em>{% endif %}</div><p>{{n.mensagem}}</p><small>{{(n.created_at or '')|replace('T',' ')}}</small></div><div class="hype-notify-actions">{% if n.link %}<a href="{{n.link}}">Abrir</a>{% endif %}{% if not n.lida %}<form method="post" action="{{url_for('ler_notificacao',notificacao_id=n.id)}}"><button type="submit">Marcar lida</button></form>{% endif %}</div></article>{% else %}<div class="hype-empty-center">Você não possui notificações no momento.</div>{% endfor %}</div>
+  </section>
+</div>
+{% endblock %}
