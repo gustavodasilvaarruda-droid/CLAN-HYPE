@@ -4,6 +4,7 @@ import csv
 import io
 from functools import wraps, lru_cache
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -218,6 +219,26 @@ PRECO_BREED_FALLBACK = {
     'ha_sem_ditto_genero': 200000, 'femea_rara': 200000,
     'treinado': 200000,
 }
+
+HYPE_TZ = ZoneInfo('America/Sao_Paulo')
+
+def _promo_local_para_utc(valor):
+    """Converte o datetime-local do painel (horário de Brasília) para UTC antes de salvar no TIMESTAMPTZ."""
+    if not valor:
+        return None
+    dt = datetime.fromisoformat(str(valor).strip())
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=HYPE_TZ)
+    return dt.astimezone(timezone.utc).isoformat()
+
+@app.template_filter('data_hype')
+def filtro_data_hype(valor):
+    """Exibe TIMESTAMPTZ no horário oficial usado pelo painel HYPE (America/Sao_Paulo)."""
+    dt = _parse_promo_datetime(valor)
+    if not dt:
+        return ''
+    return dt.astimezone(HYPE_TZ).strftime('%d/%m/%Y %H:%M')
+
 
 def _parse_promo_datetime(valor):
     if not valor:
@@ -2614,8 +2635,10 @@ def admin_precos():
                 if percentual <= 0 or percentual > 100: raise ValueError('O desconto deve ficar entre 0,01% e 100%.')
                 todos=request.form.get('aplicar_todos')=='1'; codigos=request.form.getlist('codigos_preco')
                 if not todos and not codigos: raise ValueError('Selecione pelo menos um preço ou marque Aplicar em todos.')
-                inicio=request.form.get('inicio_em') or None; fim=request.form.get('fim_em') or None
-                if inicio and fim and inicio >= fim: raise ValueError('O término precisa ser posterior ao início.')
+                inicio_local=request.form.get('inicio_em') or None; fim_local=request.form.get('fim_em') or None
+                inicio=_promo_local_para_utc(inicio_local); fim=_promo_local_para_utc(fim_local)
+                if inicio and fim and _parse_promo_datetime(inicio) >= _parse_promo_datetime(fim):
+                    raise ValueError('O término precisa ser posterior ao início.')
                 supabase.table('promocoes_breed').insert({'nome':nome,'percentual':percentual,'aplicar_todos':todos,'codigos_preco':codigos,'inicio_em':inicio,'fim_em':fim,'ativo':True,'criado_por':session.get('usuario_email')}).execute()
                 flash('Promoção criada. O desconto será aplicado automaticamente no período configurado.','sucesso')
             elif acao == 'toggle_promocao':
