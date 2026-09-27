@@ -219,6 +219,66 @@ PRECO_BREED_FALLBACK = {
     'treinado': 200000,
 }
 
+def _parse_promo_datetime(valor):
+    if not valor:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(valor).replace('Z', '+00:00'))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def promocoes_breed_ativas():
+    """Promoções válidas agora. Falha fechada: sem tabela/migração = sem desconto."""
+    agora = datetime.now(timezone.utc)
+    rows = _safe_table('promocoes_breed', '*')
+    validas = []
+    for p in rows:
+        if p.get('ativo') is False:
+            continue
+        inicio = _parse_promo_datetime(p.get('inicio_em'))
+        fim = _parse_promo_datetime(p.get('fim_em'))
+        if inicio and agora < inicio:
+            continue
+        if fim and agora > fim:
+            continue
+        try:
+            pct = float(p.get('percentual') or 0)
+        except (TypeError, ValueError):
+            continue
+        if pct <= 0 or pct > 100:
+            continue
+        p = dict(p); p['percentual'] = pct
+        validas.append(p)
+    validas.sort(key=lambda x: float(x.get('percentual') or 0), reverse=True)
+    return validas
+
+
+def _promocao_para_codigo(codigo, promocoes=None):
+    """Retorna a melhor promoção aplicável ao código de preço."""
+    for p in (promocoes if promocoes is not None else promocoes_breed_ativas()):
+        codigos = p.get('codigos_preco') or []
+        if isinstance(codigos, str):
+            try: codigos = json.loads(codigos)
+            except Exception: codigos = [x.strip() for x in codigos.split(',') if x.strip()]
+        if p.get('aplicar_todos') or codigo in codigos:
+            return p
+    return None
+
+
+def _aplicar_promocao_componente(codigo, valor, promocoes):
+    promo = _promocao_para_codigo(codigo, promocoes)
+    valor = int(valor or 0)
+    if not promo:
+        return valor, None
+    pct = float(promo.get('percentual') or 0)
+    final = max(0, int(round(valor * (100.0 - pct) / 100.0)))
+    return final, promo
+
+
 def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='comum',
                          usa_ditto=False, treinado=False, nature=None):
     """Calcula o preço no servidor. Ditto é automático; HPWR foi removido do formulário."""
@@ -266,35 +326,50 @@ def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='
             candidatos.append("comum_f5_naturado")
 
     codigo = next((c for c in candidatos if c in precos), candidatos[0] if candidatos else '')
-    base = int(precos.get(codigo, 0) or 0)
+    promocoes = promocoes_breed_ativas()
+    base_original = int(precos.get(codigo, 0) or 0)
+    base, promo_base = _aplicar_promocao_componente(codigo, base_original, promocoes)
+    total_original = base_original
     total = base
     extras = []
+    promos_usadas = []
+    if promo_base: promos_usadas.append(promo_base)
 
     if genero in ('macho', 'femea'):
         if ha and not usa_ditto:
             extra_key = 'ha_sem_ditto_genero'
         else:
             extra_key = 'comum_genero'
-        v = int(precos.get(extra_key, precos.get('escolher_genero', 0)) or 0)
-        total += v
-        extras.append({'codigo': extra_key, 'valor': v})
+        original = int(precos.get(extra_key, precos.get('escolher_genero', 0)) or 0)
+        v, promo = _aplicar_promocao_componente(extra_key, original, promocoes)
+        total_original += original; total += v
+        extras.append({'codigo': extra_key, 'valor_original': original, 'valor': v, 'promocao': promo.get('nome') if promo else None})
+        if promo: promos_usadas.append(promo)
 
         if categoria == 'raro' and genero == 'femea':
-            v = int(precos.get('femea_rara', 0) or 0)
-            total += v
-            extras.append({'codigo': 'femea_rara', 'valor': v})
+            original = int(precos.get('femea_rara', 0) or 0)
+            v, promo = _aplicar_promocao_componente('femea_rara', original, promocoes)
+            total_original += original; total += v
+            extras.append({'codigo': 'femea_rara', 'valor_original': original, 'valor': v, 'promocao': promo.get('nome') if promo else None})
+            if promo: promos_usadas.append(promo)
 
     if treinado:
-        v = int(precos.get('treinado', 0) or 0)
-        total += v
-        extras.append({'codigo': 'treinado', 'valor': v})
+        original = int(precos.get('treinado', 0) or 0)
+        v, promo = _aplicar_promocao_componente('treinado', original, promocoes)
+        total_original += original; total += v
+        extras.append({'codigo': 'treinado', 'valor_original': original, 'valor': v, 'promocao': promo.get('nome') if promo else None})
+        if promo: promos_usadas.append(promo)
 
+    promo_principal = max(promos_usadas, key=lambda x: float(x.get('percentual') or 0), default=None)
+    desconto = max(0, total_original - total)
     return total, {
-        'base_codigo': codigo,
-        'base_valor': base,
-        'breed_especial_ditto': bool(usa_ditto),
-        'extras': extras,
-        'total': total
+        'base_codigo': codigo, 'base_valor_original': base_original, 'base_valor': base,
+        'breed_especial_ditto': bool(usa_ditto), 'extras': extras,
+        'preco_original': total_original, 'desconto_valor': desconto, 'total': total,
+        'promocao_ativa': bool(desconto),
+        'promocao_id': promo_principal.get('id') if promo_principal else None,
+        'promocao_nome': promo_principal.get('nome') if promo_principal else None,
+        'promocao_percentual': float(promo_principal.get('percentual') or 0) if promo_principal else 0,
     }
 
 
@@ -977,6 +1052,10 @@ def breed():
                 'treinado': treinado,
                 'evs_treinamento': evs_treinamento if treinado else {},
                 'preco_total': preco_total,
+                'preco_original': int(preco_detalhes.get('preco_original') or preco_total),
+                'promocao_id': preco_detalhes.get('promocao_id'),
+                'promocao_nome': preco_detalhes.get('promocao_nome'),
+                'promocao_percentual': preco_detalhes.get('promocao_percentual') or 0,
                 'preco_detalhes': preco_detalhes,
                 # Mantidos por compatibilidade com pedidos/estrutura antigos.
                 'ability': 'HA' if ha == 'sim' else 'Sem HA',
@@ -2382,14 +2461,31 @@ def proxima_rodada(torneio_id):
 def admin_precos():
     if not tem_permissao('pode_gerenciar_precos'): return redirect(url_for('painel'))
     if request.method=='POST':
-        codigo=request.form.get('codigo','').strip()
+        acao=request.form.get('acao','preco').strip()
         try:
-            valor=parse_valor_moeda(request.form.get('valor',0))
-            supabase.table('precos_breed').update({'valor':valor}).eq('codigo',codigo).execute()
-            flash('Preço atualizado.','sucesso')
+            if acao == 'preco':
+                codigo=request.form.get('codigo','').strip(); valor=parse_valor_moeda(request.form.get('valor',0))
+                supabase.table('precos_breed').update({'valor':valor}).eq('codigo',codigo).execute(); flash('Preço atualizado.','sucesso')
+            elif acao == 'criar_promocao':
+                nome=request.form.get('nome','').strip() or 'Promoção HYPE'
+                percentual=float((request.form.get('percentual') or '0').replace(',','.'))
+                if percentual <= 0 or percentual > 100: raise ValueError('O desconto deve ficar entre 0,01% e 100%.')
+                todos=request.form.get('aplicar_todos')=='1'; codigos=request.form.getlist('codigos_preco')
+                if not todos and not codigos: raise ValueError('Selecione pelo menos um preço ou marque Aplicar em todos.')
+                inicio=request.form.get('inicio_em') or None; fim=request.form.get('fim_em') or None
+                if inicio and fim and inicio >= fim: raise ValueError('O término precisa ser posterior ao início.')
+                supabase.table('promocoes_breed').insert({'nome':nome,'percentual':percentual,'aplicar_todos':todos,'codigos_preco':codigos,'inicio_em':inicio,'fim_em':fim,'ativo':True,'criado_por':session.get('usuario_email')}).execute()
+                flash('Promoção criada. O desconto será aplicado automaticamente no período configurado.','sucesso')
+            elif acao == 'toggle_promocao':
+                pid=int(request.form.get('promocao_id')); ativo=request.form.get('ativo')=='1'
+                supabase.table('promocoes_breed').update({'ativo':ativo,'updated_at':agora_iso()}).eq('id',pid).execute(); flash('Promoção atualizada.','sucesso')
+            elif acao == 'excluir_promocao':
+                pid=int(request.form.get('promocao_id')); supabase.table('promocoes_breed').delete().eq('id',pid).execute(); flash('Promoção removida. Pedidos antigos mantêm o preço já fechado.','sucesso')
         except Exception as e: flash(f'Erro: {e}','erro')
         return redirect(url_for('admin_precos'))
-    return render_template('admin_precos.html', precos=_safe_table('precos_breed','*'))
+    precos=_safe_table('precos_breed','*'); promos=_safe_table('promocoes_breed','*')
+    promos.sort(key=lambda x: str(x.get('created_at') or ''), reverse=True)
+    return render_template('admin_precos.html', precos=precos, promocoes=promos)
 
 @app.route('/admin/feed', methods=['GET','POST'])
 @login_required
