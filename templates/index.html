@@ -68,30 +68,43 @@
     <a href="{{url_for('expansion.hype_live')}}"><span>●</span><div><b>HYPE Live</b><small>Acompanhe as lives</small></div></a>
   </section>
 
-  <section class="hype-v6-home-section">
-    <div class="hype-v6-section-head"><div><span class="hype-v6-kicker">DESTAQUES</span><h2>O que está acontecendo na HYPE</h2></div><a href="{{url_for('painel_reino')}}">Abrir Reino →</a></div>
-    <div class="hype-v6-home-columns">
-      <section class="hype-v6-panel"><div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">BREED</span><h2>Pokémon mais pedidos</h2></div><a href="{{url_for('ranking_breed')}}">Ranking →</a></div>{% for nome,total in destaques %}<div class="hype-v6-ranking-row"><span>#{{loop.index}}</span><b>{{nome}}</b><em>{{total}} breeds</em></div>{% else %}<p class="hype-v6-empty">O ranking aparecerá conforme os pedidos forem concluídos.</p>{% endfor %}</section>
-      <section class="hype-v6-panel"><div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">BREEDERS</span><h2>Destaques do Berçário</h2></div><a href="{{url_for('ranking_breeders')}}">Ver ranking →</a></div>{% for nick,total in top_breeders %}<div class="hype-v6-ranking-row"><span>#{{loop.index}}</span><b>{{nick}}</b><em>{{total}} concluídos</em></div>{% else %}<p class="hype-v6-empty">O ranking aparecerá conforme os Breeders concluírem pedidos.</p>{% endfor %}</section>
-    </div>
-  </section>
+  <section class="hype-v18-showcase" id="destaques-hype">
+    <div class="hype-v18-showcase-title"><div><span class="hype-v6-kicker">ACONTECENDO NA HYPE</span><h2>Destaques do Clã</h2><p>Rankings, competições, eventos e conteúdo da comunidade em um só lugar.</p></div></div>
 
-  <section class="hype-v6-home-section">
-    <div class="hype-v6-section-head"><div><span class="hype-v6-kicker">AGENDA</span><h2>Próximos eventos e torneios</h2></div><a href="{{url_for('eventos')}}">Ver agenda →</a></div>
-    <div class="hype-v6-event-grid compact-home">
-      {% for e in eventos_home %}<a class="hype-v6-event-card" href="{{url_for('eventos')}}"><div class="hype-v6-event-cover"><img src="{{e.imagem_url or url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt=""><span class="hype-v6-card-badge">EVENTO</span></div><div class="hype-v6-event-body"><span class="hype-v6-date">{{e.data_evento|replace('T',' ') if e.data_evento else 'Data a definir'}}</span><h2>{{e.titulo}}</h2><p>{{e.descricao}}</p></div></a>{% endfor %}
-      {% for t in torneios_home %}<a class="hype-v6-event-card tournament" href="{{url_for('torneios')}}"><div class="hype-v6-event-cover"><img src="{{t.imagem_url or url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt=""><span class="hype-v6-card-badge">TORNEIO</span></div><div class="hype-v6-event-body"><span class="hype-v6-date">{{t.data_torneio|replace('T',' ') if t.data_torneio else 'Data a definir'}}</span><h2>{{t.titulo}}</h2><p>{{t.descricao}}</p></div></a>{% endfor %}
-      {% if not eventos_home and not torneios_home %}<div class="hype-v6-panel"><p class="hype-v6-empty">Ainda não há eventos publicados.</p></div>{% endif %}
-    </div>
-  </section>
+    <section class="hype-v18-slider-section">
+      <div class="hype-v18-slider-head"><div><span class="hype-v18-icon">🥚</span><div><b>HYPE BREED</b><small>Destaques do Berçário</small></div></div><a href="{{url_for('ranking_breeders')}}">Ver ranking completo →</a></div>
+      <div class="hype-v18-slider-shell"><button class="hype-v18-arrow prev" type="button" aria-label="Anterior">‹</button><div class="hype-v18-slider" data-hype-slider>
+        {% for nick,total in top_breeders %}<article class="hype-v18-rank-card"><span class="hype-v18-rank">#{{loop.index}}</span><div class="hype-v18-medal">{{'👑' if loop.index==1 else '🏅'}}</div><small>TOP BREEDER</small><h3>{{nick}}</h3><strong>{{total}}</strong><p>breeds concluídos</p></article>{% endfor %}
+        {% for nome,total in destaques %}<article class="hype-v18-rank-card pokemon"><span class="hype-v18-rank">#{{loop.index}}</span><div class="hype-v18-poke-orb">◉</div><small>POKÉMON EM ALTA</small><h3>{{nome}}</h3><strong>{{total}}</strong><p>pedidos concluídos</p></article>{% endfor %}
+        {% if not top_breeders and not destaques %}<article class="hype-v18-empty-card"><b>O Berçário está começando</b><p>Os destaques aparecem automaticamente conforme os pedidos forem entregues.</p></article>{% endif %}
+      </div><button class="hype-v18-arrow next" type="button" aria-label="Próximo">›</button></div>
+    </section>
 
-  <section class="hype-v6-home-section">
-    <div class="hype-v6-section-head"><div><span class="hype-v6-kicker">COMUNIDADE</span><h2>Conteúdo do Clã</h2></div></div>
-    <div class="hype-v6-media-grid">
-      <article><span>✦</span><h3>Notícias</h3>{% for n in noticias_home %}<p><b>{{n.titulo}}</b><br>{{n.descricao}}</p>{% else %}<p>Nenhuma notícia publicada.</p>{% endfor %}</article>
-      <article><span>▶</span><h3>Vídeos</h3>{% for v in videos_home %}<p><b>{{v.titulo}}</b><br>{{v.descricao}}</p>{% if v.url %}<a href="{{v.url}}" target="_blank" rel="noopener">Assistir →</a>{% endif %}{% else %}<p>Nenhum vídeo publicado.</p>{% endfor %}</article>
-      <article><span>▦</span><h3>Galeria</h3><div class="hype-v6-gallery-mini">{% for g in galeria_home %}{% if g.url %}<img src="{{g.url}}" alt="{{g.titulo}}">{% endif %}{% else %}<p>Galeria vazia.</p>{% endfor %}</div></article>
-    </div>
+    <section class="hype-v18-slider-section">
+      <div class="hype-v18-slider-head"><div><span class="hype-v18-icon">🏆</span><div><b>TORNEIOS HYPE</b><small>Ranking competitivo e arena</small></div></div><a href="{{url_for('torneios')}}">Abrir torneios →</a></div>
+      <div class="hype-v18-slider-shell"><button class="hype-v18-arrow prev" type="button">‹</button><div class="hype-v18-slider" data-hype-slider>
+        {% for r in ranking_competitivo_home %}<article class="hype-v18-rank-card"><span class="hype-v18-rank">#{{loop.index}}</span><div class="hype-v18-avatar">{% if r.avatar_url %}<img src="{{r.avatar_url}}" alt="">{% else %}{{r.nick[:1]|upper}}{% endif %}</div><small>{{r.temporada}}</small><h3>{{r.nick}}</h3><strong>{{r.pontos}} pts</strong><p>{{r.vitorias}} vitórias · {{r.podios}} pódios</p></article>{% endfor %}
+        {% for t in torneios_destaques_home %}<article class="hype-v18-rank-card event"><span class="hype-v18-tag">TORNEIO</span><small>{{t.data_torneio|replace('T',' ') if t.data_torneio else 'Data a definir'}}</small><h3>{{t.titulo}}</h3><strong>{{t.total_inscritos}}</strong><p>participantes{% if t.premio %} · Prêmio: {{t.premio}}{% endif %}</p></article>{% endfor %}
+        {% if not ranking_competitivo_home and not torneios_destaques_home %}<article class="hype-v18-empty-card"><b>Arena aguardando competidores</b><p>Rankings e torneios publicados aparecerão aqui.</p></article>{% endif %}
+      </div><button class="hype-v18-arrow next" type="button">›</button></div>
+    </section>
+
+    <section class="hype-v18-slider-section">
+      <div class="hype-v18-slider-head"><div><span class="hype-v18-icon">🎉</span><div><b>EVENTOS HYPE</b><small>Os eventos que estão movimentando o Clã</small></div></div><a href="{{url_for('eventos')}}">Ver todos →</a></div>
+      <div class="hype-v18-slider-shell"><button class="hype-v18-arrow prev" type="button">‹</button><div class="hype-v18-slider" data-hype-slider>
+        {% for e in eventos_populares_home %}<article class="hype-v18-event-slide">{% if e.imagem_url %}<img src="{{e.imagem_url}}" alt="">{% endif %}<div><span class="hype-v18-tag">EVENTO #{{loop.index}}</span><small>{{e.data_evento|replace('T',' ') if e.data_evento else 'Data a definir'}}</small><h3>{{e.titulo}}</h3><p>{{e.descricao}}</p><strong>♙ {{e.total_inscritos}} participantes</strong></div></article>{% else %}<article class="hype-v18-empty-card"><b>Nenhum evento publicado</b><p>Quando um novo evento entrar no calendário, ele aparecerá automaticamente aqui.</p></article>{% endfor %}
+      </div><button class="hype-v18-arrow next" type="button">›</button></div>
+    </section>
+
+    <section class="hype-v18-slider-section">
+      <div class="hype-v18-slider-head"><div><span class="hype-v18-icon">✨</span><div><b>COMUNIDADE HYPE</b><small>Notícias, vídeos e momentos do Clã</small></div></div></div>
+      <div class="hype-v18-slider-shell"><button class="hype-v18-arrow prev" type="button">‹</button><div class="hype-v18-slider" data-hype-slider>
+        {% for n in noticias_home %}<article class="hype-v18-content-card"><span>NOTÍCIA</span><h3>{{n.titulo}}</h3><p>{{n.descricao}}</p></article>{% endfor %}
+        {% for v in videos_home %}<article class="hype-v18-content-card"><span>▶ VÍDEO</span><h3>{{v.titulo}}</h3><p>{{v.descricao}}</p>{% if v.url %}<a href="{{v.url}}" target="_blank" rel="noopener">Assistir →</a>{% endif %}</article>{% endfor %}
+        {% for g in galeria_home %}{% if g.url %}<article class="hype-v18-gallery-card"><img src="{{g.url}}" alt="{{g.titulo}}"><span>{{g.titulo or 'Galeria HYPE'}}</span></article>{% endif %}{% endfor %}
+        {% if not noticias_home and not videos_home and not galeria_home %}<article class="hype-v18-empty-card"><b>Comunidade HYPE</b><p>Notícias, vídeos e galeria aparecerão aqui conforme forem publicados.</p></article>{% endif %}
+      </div><button class="hype-v18-arrow next" type="button">›</button></div>
+    </section>
   </section>
 </main>
 </div>
@@ -113,5 +126,6 @@ function fecharModal(){document.getElementById('modalLogin').style.display='none
 function alternarModoModal(){const titulo=document.getElementById('tituloModal'),grupoNick=document.getElementById('grupoNick'),inputNick=document.getElementById('nick_jogo'),btn=document.getElementById('btnSubmitModal'),acao=document.getElementById('campoAcao'),texto=document.getElementById('textoAlternar'),link=document.getElementById('linkAlternar');if(modoAtual==='login'){modoAtual='cadastro';titulo.innerText='Criar Conta no Clã';grupoNick.style.display='block';inputNick.required=true;btn.innerText='Cadastrar Guerreiro';acao.value='cadastro';texto.innerText='Já possui uma conta?';link.innerText='Fazer Login';}else{modoAtual='login';titulo.innerText='Acesso ao Clã';grupoNick.style.display='none';inputNick.required=false;btn.innerText='Entrar';acao.value='login';texto.innerText='Não tem conta ainda?';link.innerText='Cadastre-se';}}
 window.onclick=function(event){const modal=document.getElementById('modalLogin');if(event.target===modal)fecharModal();}
 (function(){const box=document.getElementById('guestOnboarding');if(box&&!localStorage.getItem('hype_guest_onboarding_v1'))box.style.display='flex';const close=()=>{if(box)box.style.display='none';localStorage.setItem('hype_guest_onboarding_v1','1');};const create=document.getElementById('guestCreate'),login=document.getElementById('guestLogin'),explore=document.getElementById('guestExplore');if(create)create.addEventListener('click',()=>{close();abrirModal('cadastro');});if(login)login.addEventListener('click',()=>{close();abrirModal('login');});if(explore)explore.addEventListener('click',close);if('serviceWorker' in navigator){navigator.serviceWorker.register('{{url_for('expansion.service_worker')}}').catch(()=>{});}})();
+document.querySelectorAll('.hype-v18-slider-shell').forEach((shell)=>{const track=shell.querySelector('[data-hype-slider]');const move=(dir)=>track.scrollBy({left:dir*Math.max(280,track.clientWidth*.78),behavior:'smooth'});shell.querySelector('.prev')?.addEventListener('click',()=>move(-1));shell.querySelector('.next')?.addEventListener('click',()=>move(1));});
 </script>
 </body></html>

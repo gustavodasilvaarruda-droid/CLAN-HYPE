@@ -35,6 +35,15 @@
       <article><i>☷</i><div><b>{{stats.breed_total}}</b><span>Pedidos de Breed</span><small>{{stats.breed_pendentes}} pendentes</small></div></article>
     </section>
 
+    <section class="admin2-quick" aria-label="Atalhos administrativos">
+      <a href="{{url_for('admin_membros_hype')}}"><b>♙ MEMBROS</b><span>Gerenciar membros HYPE</span></a>
+      <a href="{{url_for('gestao_breeders')}}"><b>☷ BREED</b><span>Acompanhar pedidos e breeders</span></a>
+      <a href="{{url_for('admin_conteudo')}}"><b>♛ EVENTOS</b><span>Torneios e eventos do clã</span></a>
+      <a href="{{url_for('admin_reino')}}"><b>⌂ REINO</b><span>Casas e lojas HYPE</span></a>
+      <a href="{{url_for('admin_precos')}}"><b>＄ PREÇOS</b><span>Economia e preços de Breed</span></a>
+      <a href="{{url_for('admin_logs')}}"><b>▤ LOGS</b><span>Atividade administrativa</span></a>
+    </section>
+
     <section class="admin2-grid admin2-grid-top">
       <article class="admin2-card admin2-activity"><header><b>▣ ATIVIDADE RECENTE</b><a href="{{url_for('admin_logs')}}">Ver todos →</a></header>
         {% for l in logs %}<div class="admin2-row"><span class="admin2-dot"></span><div><b>{{l.modulo or 'Sistema'}} · {{l.acao or 'atividade'}}</b><small>{{l.alvo_tipo or ''}} {{l.alvo_id or ''}}</small></div><time>{{(l.created_at or '')[:16]|replace('T',' ')}}</time></div>{% else %}<p class="admin2-empty">Nenhuma atividade administrativa registrada ainda.</p>{% endfor %}
