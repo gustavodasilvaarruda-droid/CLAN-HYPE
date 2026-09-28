@@ -797,17 +797,59 @@ def pagina_inicial():
     except Exception as e:
         print(f'Erro ao carregar torneios da Home: {e}')
 
-    noticias_home = [x for x in _safe_table('noticias') if x.get('publicado', True)][:3]
-    videos_home = [x for x in _safe_table('videos') if x.get('publicado', True)][:3]
-    galeria_home = [x for x in _safe_table('galeria') if x.get('publicado', True)][:6]
+    # V18: vitrine dinâmica da Home. Todos os blocos usam dados reais do banco.
+    # Se uma área ainda não tiver dados, o template mostra um estado vazio elegante.
+    ranking_competitivo_home = []
+    try:
+        temporadas = _safe_table('temporadas')
+        temporada_ativa = next((t for t in temporadas if t.get('ativa')), None)
+        if temporada_ativa:
+            rows = _safe_table('ranking_temporada', '*', temporada_id=temporada_ativa.get('id'))
+            usuarios_rank = {u.get('email'): u for u in _safe_table('usuarios_clan', 'email,nick_jogo,avatar_url')}
+            rows = sorted(rows, key=lambda r: (-int(r.get('pontos') or 0), -int(r.get('vitorias') or 0), -int(r.get('podios') or 0)))[:5]
+            for r in rows:
+                u = usuarios_rank.get(r.get('usuario_email'), {})
+                ranking_competitivo_home.append({
+                    'nick': u.get('nick_jogo') or r.get('usuario_email'),
+                    'avatar_url': u.get('avatar_url'),
+                    'pontos': int(r.get('pontos') or 0),
+                    'vitorias': int(r.get('vitorias') or 0),
+                    'podios': int(r.get('podios') or 0),
+                    'temporada': temporada_ativa.get('nome') or 'Temporada atual'
+                })
+    except Exception as e:
+        print(f'Erro ao carregar ranking competitivo da Home: {e}')
+
+    eventos_populares_home = []
+    try:
+        for evento in eventos_home:
+            total = len(_safe_table('inscricoes_evento', 'id', evento_id=evento.get('id')))
+            item = dict(evento); item['total_inscritos'] = total
+            eventos_populares_home.append(item)
+        eventos_populares_home.sort(key=lambda x: -int(x.get('total_inscritos') or 0))
+    except Exception as e:
+        print(f'Erro ao montar ranking de eventos da Home: {e}')
+
+    torneios_destaques_home = []
+    try:
+        for torneio in torneios_home:
+            item = dict(torneio)
+            item['total_inscritos'] = len(_safe_table('inscricoes_torneio', 'id', torneio_id=torneio.get('id')))
+            torneios_destaques_home.append(item)
+    except Exception as e:
+        print(f'Erro ao montar destaques de torneios da Home: {e}')
+
+    noticias_home = [x for x in _safe_table('noticias') if x.get('publicado', True)][:6]
+    videos_home = [x for x in _safe_table('videos') if x.get('publicado', True)][:6]
+    galeria_home = [x for x in _safe_table('galeria') if x.get('publicado', True)][:8]
 
     return render_template(
         'index.html',
-        resumo=resumo,
-        destaques=destaques,
-        top_breeders=top_breeders,
-        eventos_home=eventos_home,
-        torneios_home=torneios_home,
+        resumo=resumo, destaques=destaques, top_breeders=top_breeders,
+        eventos_home=eventos_home, torneios_home=torneios_home,
+        eventos_populares_home=eventos_populares_home,
+        torneios_destaques_home=torneios_destaques_home,
+        ranking_competitivo_home=ranking_competitivo_home,
         noticias_home=noticias_home, videos_home=videos_home, galeria_home=galeria_home
     )
 
