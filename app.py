@@ -1603,9 +1603,11 @@ def confirmar_recebimento_breed(pedido_id):
         supabase.table('pedidos_breed').update({'status':'entregue','entregue_em':agora_iso(),'recebimento_confirmado_em':agora_iso(),'recebimento_confirmado_por':email}).eq('id',pedido_id).eq('status','aguardando_confirmacao').execute()
         registrar_historico('breed',pedido_id,p.get('status'),'entregue','Recebimento confirmado pelo cliente.')
         if p.get('breeder_responsavel'): criar_notificacao(p.get('breeder_responsavel'),'Entrega confirmada',f"O cliente confirmou o recebimento do Breed #{pedido_id}.",'sucesso',url_for('breed_fila_breeders'))
-        flash('Recebimento confirmado. Obrigado!','sucesso')
-    except Exception as e: flash(f'Erro ao confirmar recebimento: {e}','erro')
-    return redirect(url_for('breed_meus_pedidos'))
+        flash('Recebimento confirmado. Agora você pode avaliar o Breeder.','sucesso')
+        return redirect(url_for('breed_meus_pedidos', avaliar=pedido_id))
+    except Exception as e:
+        flash(f'Erro ao confirmar recebimento: {e}','erro')
+        return redirect(url_for('breed_meus_pedidos'))
 
 @app.route('/breed/problema/<int:pedido_id>',methods=['POST'])
 @login_required
@@ -2167,7 +2169,7 @@ def team_breeders():
         cards.append({'email':email,'nick':u.get('nome_exibicao') or u.get('nick_jogo') or email,'nick_url':u.get('nick_jogo') or email,
           'avatar_url':u.get('avatar_url'),'cargo':u.get('cargo'),'status':status,'ativos':len(ativos),'concluidos':len(concluidos),
           'avaliacao':round(sum(notas)/len(notas),1) if notas else None,'max_ativos':int(perfil.get('max_ativos') or 4),
-          'especialidades':perfil.get('especialidades') or [],'bio':perfil.get('bio_breeder')})
+          'especialidades':perfil.get('especialidades') or [],'bio':perfil.get('bio_breeder'), **_hype_breeder_metricas(email,pedidos,avaliacoes)})
     ordem={'disponivel':0,'ocupado':1,'ausente':2}
     cards.sort(key=lambda x:(ordem.get(x['status'],9),x['ativos'],x['nick'].casefold()))
     return render_template('team_breeders.html', breeders=cards, permissoes=obter_permissoes_usuario(session.get('usuario_email')))
@@ -3207,7 +3209,8 @@ def avaliar_pedido(tipo,pedido_id):
     avaliado=p.get('breeder_responsavel') if tipo=='breed' else p.get('builder_responsavel')
     try:
         supabase.table('avaliacoes').insert({'tipo_pedido':tipo,'pedido_id':pedido_id,'avaliador_email':email,'avaliado_email':avaliado,'nota':nota,'comentario':comentario or None}).execute()
-        criar_notificacao(avaliado,'Nova avaliação',f'Você recebeu uma avaliação de {nota}/5.','sucesso',url_for('perfil_publico',nick=session.get('nick_jogo')))
+        destino_avaliacao = url_for('perfil_breeder', nick=(mapa_nicks_por_email().get(avaliado, {}).get('nick') or session.get('nick_jogo'))) if tipo == 'breed' else url_for('painel')
+        criar_notificacao(avaliado,'Nova avaliação',f'Você recebeu uma avaliação de {nota}/5.','sucesso',destino_avaliacao)
         flash('Avaliação enviada. Obrigado!','sucesso')
     except Exception: flash('Este pedido já foi avaliado ou ocorreu um erro.','erro')
     return redirect(url_for('breed_meus_pedidos') if tipo == 'breed' else url_for('painel'))
@@ -3285,6 +3288,97 @@ def ranking_breeders():
         notas=[int(a.get('nota') or 0) for a in avals if a.get('avaliado_email')==e and a.get('tipo_pedido')=='breed']; d['media']=round(sum(notas)/len(notas),1) if notas else None
     ranking=sorted(dados.values(),key=lambda x:(-x['total'],-x['valor']))
     return render_template('ranking_breeders.html',ranking=ranking,mes=mes)
+
+
+# ============================================================================
+# GRANDE ATUALIZACAO HYPE 2026-09-28
+# Central dos Breeders + Hall da Fama + carreira detalhada
+# ============================================================================
+def _hype_dt(valor):
+    if not valor: return None
+    try:
+        d=datetime.fromisoformat(str(valor).replace('Z','+00:00'))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except Exception: return None
+
+def _hype_breeder_metricas(email, pedidos=None, avaliacoes=None):
+    pedidos=pedidos if pedidos is not None else _safe_table('pedidos_breed','*')
+    avaliacoes=avaliacoes if avaliacoes is not None else _safe_table('avaliacoes','*')
+    meus=[p for p in pedidos if p.get('breeder_responsavel')==email]
+    entregues=[p for p in meus if p.get('status')=='entregue']
+    ativos=[p for p in meus if p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado')]
+    notas=[int(a.get('nota') or 0) for a in avaliacoes if a.get('avaliado_email')==email and a.get('tipo_pedido')=='breed' and a.get('nota')]
+    tempos=[]
+    for p in entregues:
+        ini=_hype_dt(p.get('pagamento_confirmado_em') or p.get('assumido_em')); fim=_hype_dt(p.get('concluido_em'))
+        if ini and fim and fim>=ini: tempos.append((fim-ini).total_seconds()/3600)
+    finalizados=[p for p in meus if p.get('status') in ('entregue','cancelado')]
+    taxa=(len(entregues)/len(finalizados)*100) if finalizados else None
+    pok={}
+    for p in entregues:
+        n=p.get('pokemon') or 'Pokémon'; pok[n]=pok.get(n,0)+1
+    return {'entregues':len(entregues),'ativos':len(ativos),'avaliacoes':len(notas),
+      'media':round(sum(notas)/len(notas),1) if notas else None,
+      'tempo_medio_h':round(sum(tempos)/len(tempos),1) if tempos else None,
+      'taxa_conclusao':round(taxa,1) if taxa is not None else None,
+      'top_pokemon':sorted(pok.items(),key=lambda x:(-x[1],x[0].casefold()))[:8]}
+
+@app.route('/breeders/<nick>')
+def perfil_breeder(nick):
+    u=next((x for x in _safe_table('usuarios_clan','*') if str(x.get('nick_jogo') or '').casefold()==str(nick).casefold()),None)
+    if not u: return redirect(url_for('team_breeders'))
+    email=u.get('email'); pedidos=_safe_table('pedidos_breed','*'); avals=_safe_table('avaliacoes','*')
+    metricas=_hype_breeder_metricas(email,pedidos,avals)
+    perfil=next(iter(_safe_table('breeders_perfil','*',usuario_email=email)),{})
+    disp=next((d for d in _safe_table('disponibilidade_funcoes','*',usuario_email=email) if d.get('funcao')=='breeder'),{})
+    cons=_safe_table('conquistas_usuario','*',usuario_email=email)
+    reviews=[a for a in avals if a.get('avaliado_email')==email and a.get('tipo_pedido')=='breed']
+    reviews.sort(key=lambda x:str(x.get('created_at') or ''),reverse=True)
+    mapa=mapa_nicks_por_email()
+    for a in reviews: a['avaliador_nick']=mapa.get(a.get('avaliador_email'),{}).get('nick') or 'Membro HYPE'
+    return render_template('perfil_breeder.html',usuario=u,perfil=perfil,disponibilidade=disp,metricas=metricas,conquistas=cons,avaliacoes=reviews[:30])
+
+@app.route('/breed/hall-da-fama')
+def breed_hall_fama():
+    hall=_safe_table('hype_breed_hall_fama','*')
+    meses=sorted({str(x.get('mes'))[:7] for x in hall if x.get('mes')},reverse=True)
+    mes=request.args.get('mes') or (meses[0] if meses else datetime.now(timezone.utc).strftime('%Y-%m'))
+    itens=[x for x in hall if str(x.get('mes') or '')[:7]==mes]; mapa=mapa_nicks_por_email()
+    for x in itens: x['nick']=mapa.get(x.get('usuario_email'),{}).get('nick') or x.get('usuario_email')
+    return render_template('breed_hall_fama.html',itens=itens,meses=meses,mes=mes)
+
+@app.route('/admin/breed/hall-da-fama/fechar-mes',methods=['POST'])
+@login_required
+def admin_fechar_mes_breed():
+    if not _is_admin(): return redirect(url_for('painel'))
+    mes=(request.form.get('mes') or '').strip()
+    try: inicio=datetime.strptime(mes+'-01','%Y-%m-%d').replace(tzinfo=timezone.utc)
+    except Exception:
+        flash('Mês inválido.','erro'); return redirect(url_for('ranking_breeders'))
+    fim=(inicio.replace(day=28)+timedelta(days=4)).replace(day=1)
+    entregues=[]
+    for p in _safe_table('pedidos_breed','*'):
+        d=_hype_dt(p.get('entregue_em') or p.get('recebimento_confirmado_em') or p.get('concluido_em'))
+        if p.get('status')=='entregue' and d and inicio<=d<fim: entregues.append(p)
+    mapa=mapa_nicks_por_email(); pb={}; pp={}; pc={}
+    for p in entregues:
+        b=p.get('breeder_responsavel'); c=p.get('usuario_email'); pk=p.get('pokemon') or 'Pokémon'
+        if b: pb[b]=pb.get(b,0)+1
+        if c: pc[c]=pc.get(c,0)+1
+        pp[pk]=pp.get(pk,0)+1
+    linhas=[]
+    for pos,(e,total) in enumerate(sorted(pb.items(),key=lambda x:-x[1])[:3],1):
+        linhas.append({'mes':inicio.date().isoformat(),'categoria':'breeder_entregas','usuario_email':e,'posicao':pos,'valor_numerico':total,'valor_texto':mapa.get(e,{}).get('nick') or e})
+    for pos,(pk,total) in enumerate(sorted(pp.items(),key=lambda x:-x[1])[:3],1):
+        linhas.append({'mes':inicio.date().isoformat(),'categoria':'pokemon_mais_breedado','pokemon':pk,'posicao':pos,'valor_numerico':total,'valor_texto':pk})
+    for pos,(e,total) in enumerate(sorted(pc.items(),key=lambda x:-x[1])[:3],1):
+        linhas.append({'mes':inicio.date().isoformat(),'categoria':'cliente_mais_pedidos','usuario_email':e,'posicao':pos,'valor_numerico':total,'valor_texto':mapa.get(e,{}).get('nick') or e})
+    for row in linhas:
+        try: supabase.table('hype_breed_hall_fama').insert(row).execute()
+        except Exception as e: print('Hall HYPE:',e)
+    registrar_log('fechar_mes','hype_breed_hall_fama','mes',mes,{'registros':len(linhas)})
+    flash(f'Temporada Breed {mes} registrada no Hall da Fama.','sucesso')
+    return redirect(url_for('breed_hall_fama',mes=mes))
 
 @app.route('/admin/logs')
 @login_required
