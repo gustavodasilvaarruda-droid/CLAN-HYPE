@@ -1501,3 +1501,50 @@ body.hype-home :is(input,select,textarea):focus{outline:none;border-color:rgba(2
 .admin2-member-return:hover{color:#f4ca49;border-color:rgba(244,196,61,.35)}
 @media(max-width:1100px){.admin2-quick{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:680px){.admin2-quick{grid-template-columns:1fr 1fr}.admin2-quick a{min-height:68px}}
+
+/* HYPE GRANDE ATUALIZACAO - Hall */
+.hall-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.hall-panel{padding:18px;border:1px solid rgba(244,196,61,.24);border-radius:14px;background:linear-gradient(145deg,#0d1015,#07090c)}.hall-row{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}.hall-row b,.hall-row strong{color:#f4c43d}.hall-close{margin-top:18px}.hype-career-extra{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.hype-career-extra span{padding:5px 8px;border:1px solid rgba(244,196,61,.2);border-radius:999px;font-size:11px;color:#c8cbd1}@media(max-width:900px){.hall-grid{grid-template-columns:1fr}}
+
+/* HYPE HOTFIX - Perfil do Breeder */
+.breeder-career-hero{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.breeder-career-avatar{width:118px;height:118px;flex:0 0 118px;border-radius:26px;overflow:hidden;display:grid;place-items:center;background:linear-gradient(145deg,#18130a,#08090b);border:1px solid rgba(244,196,61,.5);box-shadow:0 0 34px rgba(244,177,0,.1);font-size:42px;font-weight:900;color:#f4c43d}
+.breeder-career-avatar img{width:100%;height:100%;object-fit:cover}
+.breeder-career-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.breeder-career-tags>span:not(.breeder-status){padding:5px 9px;border:1px solid rgba(244,196,61,.24);border-radius:999px;color:#d4c38f;font-size:11px}
+.breeder-career-stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:20px 0}
+.breeder-career-stats .dash-card{padding:16px;text-align:center}
+.breeder-career-stats span,.breeder-career-stats small{display:block;color:#8d9199;font-size:11px}
+.breeder-career-stats strong{display:block;color:#f4c43d;font-size:24px;margin:4px 0}
+.breeder-career-columns{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.career-section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.career-section-head h2{margin:4px 0 0}
+.career-pokemon-row{display:grid;grid-template-columns:42px 1fr auto;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.career-pokemon-row .career-rank,.career-pokemon-row b{color:#f4c43d}
+.career-achievement{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.career-achievement>span{font-size:24px}.career-achievement p{margin:4px 0 0;color:#959aa3}
+.breeder-reviews{margin-top:16px}.career-rating-big{font-size:20px;font-weight:900;color:#f4c43d}
+.career-review{padding:14px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.career-review-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.career-review-top span{color:#f4c43d}
+.career-review p{margin:7px 0;color:#c5c8ce}.career-review small{color:#737880}
+@media(max-width:1100px){.breeder-career-stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:720px){.breeder-career-hero{align-items:flex-start}.breeder-career-avatar{width:82px;height:82px;flex-basis:82px;border-radius:20px}.breeder-career-stats{grid-template-columns:repeat(2,1fr)}.breeder-career-columns{grid-template-columns:1fr}.career-section-head{align-items:flex-start;flex-direction:column}}
+
+/* HYPE HOTFIX - Avaliação Breed em estrelas */
+.breed-rating-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:18px}
+.breed-rating-modal.open{display:flex}
+.breed-rating-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(6px)}
+.breed-rating-dialog{position:relative;width:min(520px,100%);padding:28px;border-radius:20px;border:1px solid rgba(244,196,61,.38);background:linear-gradient(160deg,#111318 0%,#08090c 70%);box-shadow:0 30px 100px rgba(0,0,0,.65),0 0 45px rgba(244,196,61,.08);animation:breedRatingIn .2s ease-out}
+.breed-rating-dialog h2{margin:6px 0 8px;font-size:26px}.breed-rating-dialog>p{margin:0 0 22px;color:#9ca1aa;line-height:1.5}
+.breed-rating-close{position:absolute;right:14px;top:12px;width:34px;height:34px;border:0;border-radius:50%;background:rgba(255,255,255,.05);color:#b7bbc3;font-size:24px;cursor:pointer}
+.breed-star-picker{display:flex;justify-content:center;gap:7px;margin:8px 0 5px}
+.breed-star{border:0;background:transparent;color:#4c4e53;font-size:40px;line-height:1;padding:3px;cursor:pointer;transition:transform .12s ease,color .12s ease,filter .12s ease}
+.breed-star:hover{transform:scale(1.12)}.breed-star.active{color:#f4c43d;filter:drop-shadow(0 0 7px rgba(244,196,61,.27))}
+.breed-rating-label{text-align:center;color:#f4c43d;font-weight:800;margin:8px 0 20px}
+.breed-rating-comment{display:block}.breed-rating-comment>span{display:block;font-weight:700;margin-bottom:8px}.breed-rating-comment>span small{color:#7d828a;font-weight:500}
+.breed-rating-comment textarea{width:100%;resize:vertical;min-height:105px;border:1px solid rgba(244,196,61,.18);border-radius:12px;background:#090b0e;color:#eef0f3;padding:12px 13px;outline:none}
+.breed-rating-comment textarea:focus{border-color:rgba(244,196,61,.65);box-shadow:0 0 0 3px rgba(244,196,61,.08)}
+.breed-rating-comment>small{display:block;text-align:right;color:#70757d;margin-top:5px}
+.breed-rating-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}.breed-rating-actions button{min-height:42px}
+body.breed-rating-open{overflow:hidden}
+@keyframes breedRatingIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+@media(max-width:600px){.breed-rating-dialog{padding:24px 18px 20px}.breed-star{font-size:34px}.breed-rating-actions{display:grid;grid-template-columns:1fr 1fr}.breed-rating-dialog h2{font-size:22px}}
