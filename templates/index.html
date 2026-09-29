@@ -38,7 +38,7 @@
       <a href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a>
       <a href="{{url_for('competitive.pokedex_competitiva')}}"><span>◉</span>Pokédex</a>
       <a href="{{url_for('buildershub.hub')}}"><span>✦</span>Guias e Builds</a>
-      <a href="{{url_for('ranking_breed')}}"><span>▥</span>Ranking</a>
+      <a href="{{url_for('central_rankings')}}"><span>▥</span>Ranking</a>
     </nav>
     <div class="hype-v7-home-side-art"></div>
   </aside>
@@ -72,7 +72,7 @@
     <div class="hype-v18-showcase-title"><div><span class="hype-v6-kicker">ACONTECENDO NA HYPE</span><h2>Destaques do Clã</h2><p>Rankings, competições, eventos e conteúdo da comunidade em um só lugar.</p></div></div>
 
     <section class="hype-v18-slider-section">
-      <div class="hype-v18-slider-head"><div><span class="hype-v18-icon">🥚</span><div><b>HYPE BREED</b><small>Destaques do Berçário</small></div></div><a href="{{url_for('ranking_breeders')}}">Ver ranking completo →</a></div>
+      <div class="hype-v18-slider-head"><div><span class="hype-v18-icon">🥚</span><div><b>HYPE BREED</b><small>Destaques do Berçário</small></div></div><a href="{{url_for('ranking_detalhe',tipo='breeders')}}">Ver ranking completo →</a></div>
       <div class="hype-v18-slider-shell"><button class="hype-v18-arrow prev" type="button" aria-label="Anterior">‹</button><div class="hype-v18-slider" data-hype-slider>
         {% for nick,total in top_breeders %}<article class="hype-v18-rank-card"><span class="hype-v18-rank">#{{loop.index}}</span><div class="hype-v18-medal">{{'👑' if loop.index==1 else '🏅'}}</div><small>TOP BREEDER</small><h3>{{nick}}</h3><strong>{{total}}</strong><p>breeds concluídos</p></article>{% endfor %}
         {% for nome,total in destaques %}<article class="hype-v18-rank-card pokemon"><span class="hype-v18-rank">#{{loop.index}}</span><div class="hype-v18-poke-orb">◉</div><small>POKÉMON EM ALTA</small><h3>{{nome}}</h3><strong>{{total}}</strong><p>pedidos concluídos</p></article>{% endfor %}
