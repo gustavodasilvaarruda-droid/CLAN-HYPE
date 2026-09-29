@@ -1,0 +1,124 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Carreira de {{ usuario.nome_exibicao or usuario.nick_jogo }} — HYPE{% endblock %}
+{% block body_class %}hype-breeder-career-page{% endblock %}
+
+{% block content %}
+<div class="hype-v6-page hype-v7-page breeder-career-page">
+
+  <section class="hype-v6-banner hype-v7-cinematic-banner breeder-career-hero">
+    <div class="hype-v6-banner-copy">
+      <span class="hype-v6-kicker">CENTRAL DOS BREEDERS</span>
+      <h1>{{ usuario.nome_exibicao or usuario.nick_jogo }}</h1>
+      <p>{{ perfil.bio_breeder or 'Breeder oficial da equipe HYPE.' }}</p>
+
+      <div class="breeder-career-tags">
+        <span class="breeder-status {{ (disponibilidade.status if disponibilidade else perfil.status or 'disponivel') }}">
+          {{ (disponibilidade.status if disponibilidade else perfil.status or 'disponivel')|replace('_',' ')|title }}
+        </span>
+        {% for item in perfil.especialidades or [] %}
+          <span>{{ item }}</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="breeder-career-avatar">
+      {% if usuario.avatar_url %}
+        <img src="{{ usuario.avatar_url }}" alt="{{ usuario.nome_exibicao or usuario.nick_jogo }}">
+      {% else %}
+        <span>{{ (usuario.nome_exibicao or usuario.nick_jogo or 'H')[0]|upper }}</span>
+      {% endif %}
+    </div>
+  </section>
+
+  <nav class="hype-breed-subnav">
+    <a href="{{ url_for('breed') }}">Fazer Pedido</a>
+    <a href="{{ url_for('breed_meus_pedidos') }}">Meus Pedidos</a>
+    <a href="{{ url_for('team_breeders') }}">Team Breeders</a>
+    <a href="{{ url_for('ranking_breeders') }}">Ranking</a>
+    <a href="{{ url_for('breed_hall_fama') }}">Hall da Fama</a>
+  </nav>
+
+  <section class="breeder-career-stats">
+    <article class="dash-card"><span>Pokémon entregues</span><strong>{{ metricas.entregues }}</strong></article>
+    <article class="dash-card"><span>Avaliação média</span><strong>{{ metricas.media if metricas.media is not none else '—' }}</strong><small>{{ metricas.avaliacoes }} avaliação(ões)</small></article>
+    <article class="dash-card"><span>Tempo médio</span><strong>{{ metricas.tempo_medio_h ~ 'h' if metricas.tempo_medio_h is not none else '—' }}</strong><small>produção</small></article>
+    <article class="dash-card"><span>Taxa de conclusão</span><strong>{{ metricas.taxa_conclusao ~ '%' if metricas.taxa_conclusao is not none else '—' }}</strong></article>
+    <article class="dash-card"><span>Pedidos ativos</span><strong>{{ metricas.ativos }}</strong></article>
+    <article class="dash-card"><span>Conquistas</span><strong>{{ conquistas|length }}</strong></article>
+  </section>
+
+  <div class="breeder-career-columns">
+    <section class="dash-card">
+      <div class="career-section-head">
+        <div>
+          <span class="breed-kicker">DESTAQUES</span>
+          <h2>Pokémon mais breedados</h2>
+        </div>
+      </div>
+
+      <div class="career-pokemon-list">
+        {% for nome, total in metricas.top_pokemon %}
+          <div class="career-pokemon-row">
+            <span class="career-rank">#{{ loop.index }}</span>
+            <strong>{{ nome }}</strong>
+            <b>{{ total }}</b>
+          </div>
+        {% else %}
+          <p class="muted">Este Breeder ainda não possui entregas registradas.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="dash-card">
+      <div class="career-section-head">
+        <div>
+          <span class="breed-kicker">HISTÓRICO</span>
+          <h2>Conquistas HYPE</h2>
+        </div>
+      </div>
+
+      <div class="career-achievements">
+        {% for c in conquistas %}
+          <article class="career-achievement">
+            <span>{{ c.icone or '🏅' }}</span>
+            <div>
+              <strong>{{ c.titulo }}</strong>
+              {% if c.descricao %}<p>{{ c.descricao }}</p>{% endif %}
+            </div>
+          </article>
+        {% else %}
+          <p class="muted">Nenhuma conquista registrada ainda.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <section class="dash-card breeder-reviews">
+    <div class="career-section-head">
+      <div>
+        <span class="breed-kicker">COMUNIDADE HYPE</span>
+        <h2>Avaliações dos clientes</h2>
+      </div>
+      {% if metricas.media is not none %}
+        <div class="career-rating-big">⭐ {{ metricas.media }}/5</div>
+      {% endif %}
+    </div>
+
+    <div class="career-review-list">
+      {% for a in avaliacoes %}
+        <article class="career-review">
+          <div class="career-review-top">
+            <strong>{{ a.avaliador_nick }}</strong>
+            <span>{% for _ in range(a.nota|int) %}★{% endfor %}{% for _ in range(5-(a.nota|int)) %}☆{% endfor %}</span>
+          </div>
+          {% if a.comentario %}<p>{{ a.comentario }}</p>{% else %}<p class="muted">Avaliação sem comentário.</p>{% endif %}
+          {% if a.created_at %}<small>{{ a.created_at|data_br }}</small>{% endif %}
+        </article>
+      {% else %}
+        <p class="muted">Este Breeder ainda não recebeu avaliações.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+</div>
+{% endblock %}

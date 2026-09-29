@@ -16,7 +16,7 @@
       <div class="team-breeder-stats"><div><b>{{b.ativos}}/{{b.max_ativos}}</b><span>Ativos</span></div><div><b>{{b.concluidos}}</b><span>Concluídos</span></div><div><b>{{b.avaliacao or '—'}}</b><span>Avaliação</span></div></div>
       {% if b.especialidades %}<div class="breeder-specialties">{% for e in b.especialidades %}<span>{{e}}</span>{% endfor %}</div>{% endif %}
       <a class="cta-dark full-btn" href="{{url_for('perfil_publico',nick=b.nick_url)}}">Ver perfil</a>
-    </article>
+    <div class="hype-career-extra"><span>⏱ {{ b.tempo_medio_h ~ 'h' if b.tempo_medio_h is not none else '—' }}</span><span>✓ {{ b.taxa_conclusao ~ '%' if b.taxa_conclusao is not none else '—' }}</span></div><a class="cta-dark full-btn" href="{{url_for('perfil_breeder',nick=b.nick_url)}}">Ver carreira completa</a></article>
   {% else %}<section class="dash-card"><p class="muted">Nenhum Breeder foi configurado ainda.</p></section>{% endfor %}
   </section>
 </div>

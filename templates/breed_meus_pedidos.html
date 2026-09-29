@@ -13,6 +13,106 @@
 <div class="breed-v15-details"><div class="breed-order-summary"><strong>Requisitos do Pedido #{{p.id}}</strong><small>Confira exatamente o que foi solicitado para este Breed.</small></div><div class="breed-req-grid"><span><b>Pokémon</b>{{p.pokemon or '—'}}</span><span><b>Tipo do Breed</b>{{p.breed_tipo or '—'}}</span><span><b>Nature</b>{{p.nature or 'Sem Nature'}}</span><span><b>Ability</b>{{'HA' if p.ha else (p.ability or 'Sem HA')}}</span><span><b>Gênero</b>{{p.genero or 'Indiferente'}}</span><span><b>IV descartado</b>{{p.iv_descartado or 'Nenhum'}}</span><span><b>0 Speed</b>{{'Sim' if p.zero_speed else 'Não'}}</span><span><b>Treinado</b>{{'Sim' if p.treinado else 'Não'}}</span><span><b>EVs</b>{{p.evs_treinamento or '—'}}</span></div>
 <div class="breed-v15-actions">{% if p.status not in ('entregue','cancelado','concluido','aguardando_confirmacao','cancelamento_solicitado') %}<form method="post" action="{{url_for('cancelar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Solicitar/cancelar este pedido?')"><input name="motivo" placeholder="Motivo (opcional)"><button class="btn-danger-hype btn-sm" data-once>Cancelar</button></form>{% endif %}{% if p.status in ('concluido','aguardando_confirmacao','entregue') and p.problema_status!='aberto' %}<form method="post" action="{{url_for('relatar_problema_breed',pedido_id=p.id)}}"><input name="motivo" required maxlength="800" placeholder="Descreva o problema"><button class="btn-muted-hype btn-sm" data-once>⚠ Relatar problema</button></form>{% elif p.problema_status=='aberto' %}<span class="breed-problem">⚠ Problema em acompanhamento</span>{% endif %}</div>
 {% if p.historico_status %}<div class="breed-history"><b>Histórico do pedido</b>{% for h in p.historico_status %}<span><time>{{h.created_at}}</time> {{h.status_anterior or 'início'}} → <strong>{{h.status_novo}}</strong>{% if h.observacao %} · {{h.observacao}}{% endif %}</span>{% endfor %}</div>{% endif %}
-{% if p.status=='entregue' and p.breeder_responsavel and not p.ja_avaliado %}<form class="breed-rating-inline" method="post" action="{{url_for('avaliar_pedido',tipo='breed',pedido_id=p.id)}}"><select name="nota"><option value="5">5 ⭐</option><option value="4">4 ⭐</option><option value="3">3 ⭐</option><option value="2">2 ⭐</option><option value="1">1 ⭐</option></select><input name="comentario" maxlength="700" placeholder="Como foi o Breed?"><button class="btn-dourado btn-sm" data-once>Avaliar</button></form>{% elif p.ja_avaliado %}<small class="breed-rated">✓ Avaliação enviada</small>{% endif %}</div></article>{% else %}<div class="tabela-vazia">Você ainda não possui pedidos.</div>{% endfor %}
+{% if p.status=='entregue' and p.breeder_responsavel and not p.ja_avaliado %}<button type="button" class="btn-dourado btn-sm breed-open-rating" data-rating-id="{{p.id}}" data-rating-pokemon="{{p.pokemon|e}}" data-rating-breeder="{{(p.breeder_nick or 'Breeder HYPE')|e}}" data-rating-action="{{url_for('avaliar_pedido',tipo='breed',pedido_id=p.id)}}">⭐ Avaliar Breeder</button>{% elif p.ja_avaliado %}<small class="breed-rated">✓ Avaliação enviada</small>{% endif %}</div></article>{% else %}<div class="tabela-vazia">Você ainda não possui pedidos.</div>{% endfor %}
 </section></div>
+
+<div class="breed-rating-modal" id="breedRatingModal" aria-hidden="true">
+  <div class="breed-rating-backdrop" data-rating-close></div>
+  <section class="breed-rating-dialog" role="dialog" aria-modal="true" aria-labelledby="breedRatingTitle">
+    <button type="button" class="breed-rating-close" data-rating-close aria-label="Fechar">×</button>
+    <span class="breed-kicker">AVALIAÇÃO HYPE BREED</span>
+    <h2 id="breedRatingTitle">Como foi seu Breed?</h2>
+    <p id="breedRatingSubtitle">Sua avaliação ajuda a reconhecer o trabalho dos Breeders HYPE.</p>
+
+    <form id="breedRatingForm" method="post">
+      <input type="hidden" name="nota" id="breedRatingValue" value="5">
+
+      <div class="breed-star-picker" role="radiogroup" aria-label="Nota de 1 a 5 estrelas">
+        {% for n in range(1,6) %}
+          <button type="button" class="breed-star active" data-star="{{n}}" aria-label="{{n}} estrela{{'s' if n>1 else ''}}" aria-pressed="true">★</button>
+        {% endfor %}
+      </div>
+      <div class="breed-rating-label" id="breedRatingLabel">Excelente · 5/5</div>
+
+      <label class="breed-rating-comment">
+        <span>Comentário <small>(opcional)</small></span>
+        <textarea name="comentario" maxlength="700" rows="4" placeholder="Conte como foi o atendimento, prazo e qualidade do Breed..."></textarea>
+        <small><b id="breedRatingCount">0</b>/700</small>
+      </label>
+
+      <div class="breed-rating-actions">
+        <button type="button" class="btn-ranking-outline" data-rating-close>Agora não</button>
+        <button type="submit" class="btn-dourado" data-once>Enviar avaliação</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script>
+(function(){
+  const modal = document.getElementById('breedRatingModal');
+  const form = document.getElementById('breedRatingForm');
+  const value = document.getElementById('breedRatingValue');
+  const label = document.getElementById('breedRatingLabel');
+  const subtitle = document.getElementById('breedRatingSubtitle');
+  const stars = [...document.querySelectorAll('.breed-star')];
+  const textarea = form ? form.querySelector('textarea[name="comentario"]') : null;
+  const counter = document.getElementById('breedRatingCount');
+  const labels = {1:'Pode melhorar',2:'Regular',3:'Bom',4:'Muito bom',5:'Excelente'};
+
+  function setStars(n){
+    n = Number(n || 5);
+    value.value = n;
+    stars.forEach((star, i) => {
+      const active = i < n;
+      star.classList.toggle('active', active);
+      star.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    label.textContent = (labels[n] || '') + ' · ' + n + '/5';
+  }
+
+  function openRating(btn){
+    if(!modal || !form || !btn) return;
+    form.action = btn.dataset.ratingAction || '';
+    subtitle.textContent = 'Avalie ' + (btn.dataset.ratingBreeder || 'o Breeder HYPE') +
+      ' pelo pedido de ' + (btn.dataset.ratingPokemon || 'Pokémon') + '.';
+    setStars(5);
+    if(textarea){ textarea.value=''; counter.textContent='0'; }
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.classList.add('breed-rating-open');
+  }
+
+  function closeRating(){
+    if(!modal) return;
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden','true');
+    document.body.classList.remove('breed-rating-open');
+  }
+
+  document.addEventListener('click', function(e){
+    const open = e.target.closest('.breed-open-rating');
+    if(open){ openRating(open); return; }
+    if(e.target.closest('[data-rating-close]')) closeRating();
+    const star = e.target.closest('.breed-star');
+    if(star) setStars(star.dataset.star);
+  });
+
+  if(textarea){
+    textarea.addEventListener('input', () => counter.textContent = textarea.value.length);
+  }
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') closeRating(); });
+
+  const params = new URLSearchParams(window.location.search);
+  const autoId = params.get('avaliar');
+  if(autoId){
+    const btn = document.querySelector('.breed-open-rating[data-rating-id="' + CSS.escape(autoId) + '"]');
+    if(btn){
+      setTimeout(() => openRating(btn), 250);
+      history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
+})();
+</script>
+
 <script src="{{url_for('static',filename='breed_v15.js')}}"></script>{% endblock %}
