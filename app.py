@@ -4,6 +4,7 @@ import csv
 import io
 from functools import wraps, lru_cache
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -18,6 +19,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+try:
+    HYPE_TZ = ZoneInfo('America/Sao_Paulo')
+except Exception:
+    HYPE_TZ = timezone(timedelta(hours=-3))
 
 
 @app.template_filter('preco')
@@ -973,8 +978,6 @@ def painel():
 def editar_perfil():
     time_pokemon = [x.strip()[:80] for x in request.form.getlist('pokemon_time') if x.strip()][:6]
     dados = {
-        'avatar_url': request.form.get('avatar_url','').strip() or None,
-        'banner_url': request.form.get('banner_url','').strip() or None,
         'nome_exibicao': request.form.get('nome_exibicao','').strip()[:80] or None,
         'bio': request.form.get('bio','').strip()[:500] or None,
         'pokemon_favorito': request.form.get('pokemon_favorito','').strip()[:80] or None,
@@ -982,6 +985,10 @@ def editar_perfil():
         'links_perfil': {
             'discord': request.form.get('discord','').strip()[:120],
             'youtube': request.form.get('youtube','').strip()[:250]
+        },
+        'privacidade_perfil': {
+            'mostrar_atividade': request.form.get('mostrar_atividade') == '1',
+            'mostrar_times': request.form.get('mostrar_times') == '1'
         }
     }
     try:
@@ -4108,6 +4115,283 @@ def admin_loja_nova():
     except Exception as e:
         flash(f'Erro ao criar loja: {e}', 'erro')
     return redirect(url_for('admin_reino'))
+
+
+
+# ============================================================================
+# HYPE V19 - GRANDE ATUALIZACAO INTEGRADA 2026-09-29
+# Rankings centralizados + Perfil 2.0 visual + XP/Conquistas automáticos
+# + temporadas mensais automáticas + ajustes administrativos
+# ============================================================================
+
+def _hype_media_upload(arquivo, pasta, email):
+    """Upload seguro de imagem para o bucket já existente hype-media."""
+    if not arquivo or not getattr(arquivo, 'filename', None):
+        return None
+    nome = secure_filename(arquivo.filename or '')
+    ext = os.path.splitext(nome)[1].lower()
+    if ext not in ('.png','.jpg','.jpeg','.webp','.gif'):
+        raise ValueError('Formato de imagem não permitido. Use PNG, JPG, WEBP ou GIF.')
+    if getattr(arquivo, 'content_length', None) and arquivo.content_length > 8 * 1024 * 1024:
+        raise ValueError('A imagem deve ter no máximo 8 MB.')
+    caminho = f"perfis/{email.replace('@','_').replace('.','_')}/{pasta}/{uuid4().hex}{ext}"
+    conteudo = arquivo.read()
+    if len(conteudo) > 8 * 1024 * 1024:
+        raise ValueError('A imagem deve ter no máximo 8 MB.')
+    supabase.storage.from_('hype-media').upload(caminho, conteudo, {'content-type': arquivo.mimetype or 'application/octet-stream'})
+    pub = supabase.storage.from_('hype-media').get_public_url(caminho)
+    return pub if isinstance(pub, str) else getattr(pub, 'public_url', None) or str(pub)
+
+
+def _hype_auto_conquista(email, titulo, descricao, icone='🏅'):
+    try:
+        existentes = supabase.table('conquistas_usuario').select('id').eq('usuario_email',email).eq('titulo',titulo).limit(1).execute().data or []
+        if existentes:
+            return False
+        supabase.table('conquistas_usuario').insert({'usuario_email':email,'titulo':titulo,'descricao':descricao,'icone':icone}).execute()
+        criar_notificacao(email, 'Nova conquista!', f'Você desbloqueou: {titulo}.', 'sucesso', url_for('perfil_publico',nick=(mapa_nicks_por_email().get(email,{}).get('nick') or session.get('nick_jogo') or '')))
+        return True
+    except Exception as e:
+        print(f'[conquista auto] {e}')
+        return False
+
+
+def _hype_recalcular_progressao(email):
+    """XP é derivado das ações reais + ajustes do Admin; pode ser recalculado sem duplicar pontos."""
+    if not email:
+        return {'xp':0,'nivel':1,'progresso':0}
+    pedidos = _safe_table('pedidos_breed','*')
+    compras = _safe_table('pedidos_loja','*')
+    inscr_t = _safe_table('inscricoes_torneio','*',usuario_email=email)
+    inscr_e = _safe_table('inscricoes_evento','*',usuario_email=email)
+    resultados = _safe_table('resultados_evento','*',usuario_email=email)
+    builds = _safe_table('builds_pokemon','*',autor_email=email)
+    meus_pedidos = [p for p in pedidos if p.get('usuario_email')==email]
+    entregues_cliente = [p for p in meus_pedidos if p.get('status')=='entregue']
+    entregues_breeder = [p for p in pedidos if p.get('breeder_responsavel')==email and p.get('status')=='entregue']
+    compras_entregues = [p for p in compras if p.get('comprador_email')==email and p.get('status')=='entregue']
+    vitorias_evento = [r for r in resultados if int(r.get('colocacao') or 999)==1]
+    podios_evento = [r for r in resultados if int(r.get('colocacao') or 999)<=3]
+    base = (
+        len(entregues_cliente)*60 + len(entregues_breeder)*90 + len(inscr_t)*40 + len(inscr_e)*30 +
+        len(resultados)*80 + len(vitorias_evento)*180 + len(podios_evento)*70 + len(builds)*45 + len(compras_entregues)*25
+    )
+    ajustes = 0
+    try:
+        for a in _safe_table('hype_xp_ajustes','*',usuario_email=email):
+            ajustes += int(a.get('delta') or 0)
+    except Exception:
+        pass
+    xp=max(0,base+ajustes)
+    nivel=max(1,(xp//1000)+1)
+    try:
+        supabase.table('usuarios_clan').update({'xp':xp,'nivel':nivel}).eq('email',email).execute()
+    except Exception as e:
+        print(f'[xp sync] {e}')
+    # conquistas de progressão e participação
+    if entregues_cliente: _hype_auto_conquista(email,'Primeiro Breed','Recebeu seu primeiro Pokémon pelo HYPE Breed.','🥚')
+    if len(entregues_cliente)>=10: _hype_auto_conquista(email,'Cliente Fiel','Concluiu 10 pedidos de Breed.','⭐')
+    if len(entregues_breeder)>=10: _hype_auto_conquista(email,'Breeder em Ascensão','Entregou 10 pedidos de Breed.','⚡')
+    if len(entregues_breeder)>=100: _hype_auto_conquista(email,'100 Breeds','Entregou 100 pedidos de Breed.','🥚')
+    if vitorias_evento: _hype_auto_conquista(email,'Campeão HYPE','Conquistou uma vitória registrada em evento.','🏆')
+    if nivel>=5: _hype_auto_conquista(email,'Veterano HYPE','Alcançou o nível 5 no site.','👑')
+    return {'xp':xp,'nivel':nivel,'progresso':round((xp%1000)/10,1),'base':base,'ajustes':ajustes}
+
+
+def _hype_temporada_mensal_auto():
+    """Garante temporada do mês e arquiva o mês anterior no primeiro acesso após a virada."""
+    hoje=datetime.now(HYPE_TZ).date() if 'HYPE_TZ' in globals() else datetime.now(timezone.utc).date()
+    mes=hoje.replace(day=1)
+    chave=mes.isoformat()
+    try:
+        atual=_safe_table('hype_temporadas_mensais','*',mes=chave)
+        if not atual:
+            supabase.table('hype_temporadas_mensais').insert({'mes':chave,'nome':f'Temporada {mes.strftime("%m/%Y")}','status':'ativa'}).execute()
+        # fecha qualquer temporada anterior ainda ativa
+        antigas=[x for x in _safe_table('hype_temporadas_mensais','*') if x.get('status')=='ativa' and str(x.get('mes') or '')[:10] < chave]
+        for t in antigas:
+            m=str(t.get('mes'))[:7]
+            if not _safe_table('hype_rank_snapshots','id',mes=m):
+                dados=_hype_montar_rankings(m)
+                linhas=[]
+                for tipo, itens in dados.items():
+                    if tipo.startswith('_'): continue
+                    for pos,item in enumerate(itens[:10],1):
+                        linhas.append({'mes':m,'tipo':tipo,'posicao':pos,'usuario_email':item.get('email'),'nome':item.get('nome'),'valor':float(item.get('valor') or 0),'metadata':item})
+                if linhas: supabase.table('hype_rank_snapshots').insert(linhas).execute()
+            supabase.table('hype_temporadas_mensais').update({'status':'encerrada','encerrada_em':agora_iso()}).eq('id',t.get('id')).execute()
+    except Exception as e:
+        print(f'[temporada mensal auto] {e}')
+    return chave[:7]
+
+
+def _hype_rank_avatar(email):
+    u=next((x for x in _safe_table('usuarios_clan','email,nick_jogo,nome_exibicao,avatar_url,xp,nivel') if x.get('email')==email),{})
+    return {'email':email,'nome':u.get('nome_exibicao') or u.get('nick_jogo') or email or '—','avatar_url':u.get('avatar_url'),'xp':int(u.get('xp') or 0),'nivel':int(u.get('nivel') or 1)}
+
+
+def _hype_montar_rankings(mes=None):
+    """Monta todos os rankings centrais usando dados reais do banco."""
+    pedidos=_safe_table('pedidos_breed','*')
+    usuarios=_safe_table('usuarios_clan','email,nick_jogo,nome_exibicao,avatar_url,xp,nivel')
+    umap={u.get('email'):u for u in usuarios}
+    def dt_mes(v): return str(v or '')[:7]
+    entregues=[p for p in pedidos if p.get('status')=='entregue' and (not mes or dt_mes(p.get('entregue_em') or p.get('concluido_em') or p.get('created_at'))==mes)]
+    avals=[a for a in _safe_table('avaliacoes','*') if a.get('tipo_pedido')=='breed' and (not mes or dt_mes(a.get('created_at'))==mes)]
+    pb={}; pc={}; pp={}
+    for p in entregues:
+        b=p.get('breeder_responsavel'); c=p.get('usuario_email'); pk=(p.get('pokemon') or 'Pokémon').strip(); pid=p.get('pokemon_id')
+        if b:
+            d=pb.setdefault(b,{'total':0,'valor':0}); d['total']+=1; d['valor']+=int(p.get('preco_total') or 0)
+        if c:
+            d=pc.setdefault(c,{'total':0,'valor':0}); d['total']+=1; d['valor']+=int(p.get('preco_total') or 0)
+        key=pk.casefold(); d=pp.setdefault(key,{'nome':pk,'pokemon_id':pid,'total':0,'valor':0}); d['total']+=1; d['valor']+=int(p.get('preco_total') or 0)
+    breeders=[]
+    for e,d in pb.items():
+        u=umap.get(e,{})
+        notas=[int(a.get('nota') or 0) for a in avals if a.get('avaliado_email')==e]
+        media=round(sum(notas)/len(notas),1) if notas else None
+        # score equilibrado: produção + reputação, sem transformar ranking principal em mera quantidade
+        score=round(d['total']*10 + (media or 0)*12 + min(len(notas),20)*2,1)
+        breeders.append({'email':e,'nome':u.get('nome_exibicao') or u.get('nick_jogo') or e,'nick':u.get('nick_jogo') or e,'avatar_url':u.get('avatar_url'),'valor':score,'total':d['total'],'valor_gerado':d['valor'],'media':media,'avaliacoes':len(notas)})
+    breeders.sort(key=lambda x:(-x['valor'],-x['total'],x['nome'].casefold()))
+    clientes=[]
+    for e,d in pc.items():
+        u=umap.get(e,{})
+        clientes.append({'email':e,'nome':u.get('nome_exibicao') or u.get('nick_jogo') or e,'nick':u.get('nick_jogo') or e,'avatar_url':u.get('avatar_url'),'valor':d['total'],'total':d['total'],'valor_gasto':d['valor']})
+    clientes.sort(key=lambda x:(-x['valor'],-x.get('valor_gasto',0),x['nome'].casefold()))
+    pokemons=[{'nome':d['nome'],'pokemon_id':d['pokemon_id'],'valor':d['total'],'total':d['total'],'valor_gerado':d['valor']} for d in pp.values()]
+    pokemons.sort(key=lambda x:(-x['valor'],x['nome'].casefold()))
+    # competitivo
+    comp=[]
+    temporadas=_safe_table('temporadas','*'); ativa=next((t for t in temporadas if t.get('ativa')),None)
+    if ativa:
+        for r in _safe_table('ranking_temporada','*',temporada_id=ativa.get('id')):
+            u=umap.get(r.get('usuario_email'),{})
+            comp.append({'email':r.get('usuario_email'),'nome':u.get('nome_exibicao') or u.get('nick_jogo') or r.get('usuario_email'),'nick':u.get('nick_jogo') or r.get('usuario_email'),'avatar_url':u.get('avatar_url'),'valor':int(r.get('pontos') or 0),'vitorias':int(r.get('vitorias') or 0),'podios':int(r.get('podios') or 0)})
+    comp.sort(key=lambda x:(-x['valor'],-x['vitorias'],-x['podios']))
+    # eventos
+    er={}
+    for r in _safe_table('resultados_evento','*'):
+        if mes and dt_mes(r.get('created_at'))!=mes: continue
+        e=r.get('usuario_email'); pos=int(r.get('colocacao') or 999); d=er.setdefault(e,{'pontos':0,'vitorias':0,'podios':0}); d['pontos']+=max(1,11-min(pos,10)); d['vitorias']+=1 if pos==1 else 0; d['podios']+=1 if pos<=3 else 0
+    eventos=[]
+    for e,d in er.items():
+        u=umap.get(e,{})
+        eventos.append({'email':e,'nome':u.get('nome_exibicao') or u.get('nick_jogo') or e,'nick':u.get('nick_jogo') or e,'avatar_url':u.get('avatar_url'),'valor':d['pontos'],**d})
+    eventos.sort(key=lambda x:(-x['valor'],-x['vitorias'],-x['podios']))
+    # XP global
+    xp=[]
+    for u in usuarios:
+        xp.append({'email':u.get('email'),'nome':u.get('nome_exibicao') or u.get('nick_jogo') or u.get('email'),'nick':u.get('nick_jogo') or u.get('email'),'avatar_url':u.get('avatar_url'),'valor':int(u.get('xp') or 0),'nivel':int(u.get('nivel') or 1)})
+    xp.sort(key=lambda x:(-x['valor'],x['nome'].casefold()))
+    # compras no reino
+    cr={}
+    for p in _safe_table('pedidos_loja','*'):
+        if p.get('status')!='entregue' or (mes and dt_mes(p.get('created_at'))!=mes): continue
+        e=p.get('comprador_email'); d=cr.setdefault(e,{'total':0,'valor':0}); d['total']+=int(p.get('quantidade') or 1); d['valor']+=int(p.get('total') or 0)
+    compras=[]
+    for e,d in cr.items():
+        u=umap.get(e,{})
+        compras.append({'email':e,'nome':u.get('nome_exibicao') or u.get('nick_jogo') or e,'nick':u.get('nick_jogo') or e,'avatar_url':u.get('avatar_url'),'valor':d['total'],'total':d['total'],'valor_gasto':d['valor']})
+    compras.sort(key=lambda x:(-x['valor'],-x['valor_gasto']))
+    # ajustes manuais (somente acréscimo/subtração transparente, nunca apaga o cálculo real)
+    try:
+        ajustes=_safe_table('hype_ranking_ajustes','*')
+        for tipo,lista in [('breeders',breeders),('clientes',clientes),('competitivo',comp),('eventos',eventos),('xp',xp),('compras',compras)]:
+            for a in ajustes:
+                if a.get('tipo')!=tipo or (a.get('mes') and mes and str(a.get('mes'))[:7]!=mes): continue
+                alvo=next((x for x in lista if x.get('email')==a.get('usuario_email')),None)
+                if alvo:
+                    alvo['valor']=float(alvo.get('valor') or 0)+float(a.get('delta') or 0)
+                    alvo['ajuste_admin']=float(alvo.get('ajuste_admin') or 0)+float(a.get('delta') or 0)
+            lista.sort(key=lambda x:-float(x.get('valor') or 0))
+    except Exception: pass
+    return {'breeders':breeders,'pokemons':pokemons,'clientes':clientes,'competitivo':comp,'eventos':eventos,'xp':xp,'compras':compras,'_mes':mes}
+
+
+@app.route('/rankings')
+def central_rankings():
+    mes=_hype_temporada_mensal_auto()
+    escopo=request.args.get('escopo','mensal')
+    dados=_hype_montar_rankings(mes if escopo=='mensal' else None)
+    return render_template('rankings.html',dados=dados,mes=mes,escopo=escopo)
+
+
+@app.route('/rankings/<tipo>')
+def ranking_detalhe(tipo):
+    tipos={'breeders':'Breeders','pokemons':'Pokémon mais breedados','clientes':'Clientes do Breed','competitivo':'Competitivo','eventos':'Eventos','xp':'XP & Nível','compras':'Compras no Reino'}
+    if tipo not in tipos: return redirect(url_for('central_rankings'))
+    mes=_hype_temporada_mensal_auto(); escopo=request.args.get('escopo','mensal')
+    dados=_hype_montar_rankings(mes if escopo=='mensal' else None)
+    return render_template('ranking_detalhe.html',tipo=tipo,titulo=tipos[tipo],itens=dados.get(tipo,[])[:100],mes=mes,escopo=escopo)
+
+
+@app.route('/rankings/pokemon/<nome>')
+def ranking_pokemon_detalhe(nome):
+    pedidos=[p for p in _safe_table('pedidos_breed','*') if p.get('status')=='entregue' and str(p.get('pokemon') or '').casefold()==str(nome).casefold()]
+    pedidos.sort(key=lambda p:str(p.get('entregue_em') or p.get('concluido_em') or p.get('created_at') or ''),reverse=True)
+    mapa=mapa_nicks_por_email()
+    for p in pedidos:
+        p['cliente_nick']=mapa.get(p.get('usuario_email'),{}).get('nick') or p.get('player') or 'Membro HYPE'
+        p['breeder_nick']=mapa.get(p.get('breeder_responsavel'),{}).get('nick') or '—'
+    return render_template('ranking_pokemon_detalhe.html',nome=nome,pedidos=pedidos)
+
+
+@app.route('/admin/rankings/ajustar',methods=['POST'])
+@login_required
+def admin_ranking_ajustar():
+    if not _is_admin(): return redirect(url_for('central_rankings'))
+    tipo=(request.form.get('tipo') or '').strip(); email=(request.form.get('usuario_email') or '').strip(); motivo=(request.form.get('motivo') or '').strip()[:300]
+    try: delta=float(request.form.get('delta') or 0)
+    except: delta=0
+    if tipo not in ('breeders','clientes','competitivo','eventos','xp','compras') or not email or not delta:
+        flash('Ajuste de ranking inválido.','erro'); return redirect(request.referrer or url_for('central_rankings'))
+    try:
+        supabase.table('hype_ranking_ajustes').insert({'tipo':tipo,'usuario_email':email,'mes':request.form.get('mes') or None,'delta':delta,'motivo':motivo or None,'criado_por':session.get('usuario_email')}).execute()
+        registrar_log('ajustar_ranking','rankings','usuario',email,{'tipo':tipo,'delta':delta,'motivo':motivo})
+        flash('Ajuste aplicado ao ranking.','sucesso')
+    except Exception as e: flash(f'Erro ao ajustar ranking: {e}','erro')
+    return redirect(request.referrer or url_for('central_rankings'))
+
+
+@app.route('/admin/xp/ajustar',methods=['POST'])
+@login_required
+def admin_xp_ajustar():
+    if not _is_admin(): return redirect(url_for('painel'))
+    email=(request.form.get('usuario_email') or '').strip(); motivo=(request.form.get('motivo') or '').strip()[:300]
+    try: delta=int(request.form.get('delta') or 0)
+    except: delta=0
+    if not email or not delta:
+        flash('Ajuste de XP inválido.','erro'); return redirect(request.referrer or url_for('painel'))
+    try:
+        supabase.table('hype_xp_ajustes').insert({'usuario_email':email,'delta':delta,'motivo':motivo or None,'criado_por':session.get('usuario_email')}).execute()
+        _hype_recalcular_progressao(email); registrar_log('ajustar_xp','xp','usuario',email,{'delta':delta,'motivo':motivo}); flash('XP ajustado.','sucesso')
+    except Exception as e: flash(f'Erro ao ajustar XP: {e}','erro')
+    return redirect(request.referrer or url_for('painel'))
+
+
+@app.route('/perfil/midia',methods=['POST'])
+@login_required
+def perfil_upload_midia():
+    email=session.get('usuario_email'); tipo=(request.form.get('tipo') or '').strip()
+    if tipo not in ('avatar','banner'): return redirect(url_for('conta_hype'))
+    try:
+        url=_hype_media_upload(request.files.get('imagem'),tipo,email)
+        if not url: raise ValueError('Selecione uma imagem.')
+        campo='avatar_url' if tipo=='avatar' else 'banner_url'
+        supabase.table('usuarios_clan').update({campo:url}).eq('email',email).execute()
+        flash(('Foto de perfil' if tipo=='avatar' else 'Capa')+' atualizada!','sucesso')
+    except Exception as e: flash(str(e),'erro')
+    return redirect(url_for('conta_hype')+'#perfil')
+
+
+@app.before_request
+def hype_v19_progressao_automatica():
+    # Atualização leve e idempotente para o membro autenticado em páginas centrais.
+    if session.get('usuario_email') and request.endpoint in ('painel','conta_hype','central_rankings','perfil_publico'):
+        try: _hype_recalcular_progressao(session.get('usuario_email'))
+        except Exception as e: print(f'[progressao auto] {e}')
 
 
 # ============================================================================
