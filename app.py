@@ -103,6 +103,33 @@ def login_required(f):
     return decorated_function
 
 
+def membro_hype_ativo(email=None):
+    """Retorna True somente para usuário confirmado e ativo no Clã HYPE."""
+    email = email or session.get('usuario_email')
+    if not email:
+        return False
+    try:
+        rows = supabase.table('membros_hype').select('ativo').eq('usuario_email', email).limit(1).execute().data or []
+        return bool(rows and rows[0].get('ativo'))
+    except Exception as e:
+        print(f'[membros_hype] {e}')
+        return False
+
+
+def membro_hype_required(f):
+    """Protege áreas internas exclusivas dos membros ativos do Clã HYPE."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario_email' not in session:
+            flash('Faça login para acessar esta área.', 'erro')
+            return redirect(url_for('pagina_inicial'))
+        if not membro_hype_ativo(session.get('usuario_email')):
+            flash('O Tesouro do Clã é exclusivo para membros ativos da HYPE.', 'erro')
+            return redirect(url_for('painel'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 
 def parse_valor_moeda(valor):
     """Aceita 500k, 1.5m, 1,5m, 1.5kk, 1,5kk ou números inteiros."""
@@ -161,13 +188,40 @@ def parse_data_supabase(valor):
         return None
 
 
-def mapa_nicks_por_email():
-    """Mapa usado para nunca precisar exibir e-mail do Breeder na interface."""
+@app.template_filter('data_br')
+def filtro_data_br(valor, formato='%d/%m/%Y %H:%M'):
+    """Formata datas do Supabase no horário do HYPE (Brasília).
+
+    Aceita datetime ou string ISO/TIMESTAMPTZ. Se o valor não puder ser
+    interpretado, devolve o texto original para a página nunca quebrar.
+    """
+    if not valor:
+        return ''
     try:
-        res = supabase.table('usuarios_clan').select('email,nick_jogo,cargo').execute()
+        if isinstance(valor, datetime):
+            data = valor
+            if data.tzinfo is None:
+                data = data.replace(tzinfo=timezone.utc)
+        else:
+            data = parse_data_supabase(valor)
+            if data is None:
+                return str(valor)
+        return data.astimezone(HYPE_TZ).strftime(formato)
+    except Exception:
+        return str(valor)
+
+
+def mapa_nicks_por_email():
+    """Mapa leve de perfis usado nas telas do Breed sem expor e-mail na interface."""
+    try:
+        res = supabase.table('usuarios_clan').select(
+            'email,nick_jogo,nome_exibicao,avatar_url,discord_avatar_url,cargo'
+        ).execute()
         return {
             u.get('email'): {
                 'nick': u.get('nick_jogo') or u.get('email'),
+                'nome': u.get('nome_exibicao') or u.get('nick_jogo') or u.get('email'),
+                'avatar_url': u.get('avatar_url') or u.get('discord_avatar_url'),
                 'cargo': u.get('cargo') or 'membro'
             }
             for u in (res.data or [])
@@ -182,7 +236,13 @@ def enriquecer_pedidos_com_nicks(pedidos):
     mapa = mapa_nicks_por_email()
     for p in pedidos:
         email_breeder = p.get('breeder_responsavel')
-        p['breeder_nick'] = mapa.get(email_breeder, {}).get('nick') if email_breeder else None
+        breeder = mapa.get(email_breeder, {}) if email_breeder else {}
+        cliente = mapa.get(p.get('usuario_email'), {})
+        p['breeder_nick'] = breeder.get('nick') if email_breeder else None
+        p['breeder_avatar_url'] = breeder.get('avatar_url') if email_breeder else None
+        p['player_nick'] = cliente.get('nick') or p.get('player') or 'Jogador'
+        p['player_nome'] = cliente.get('nome') or p.get('player') or 'Jogador'
+        p['player_avatar_url'] = cliente.get('avatar_url')
     return pedidos
 
 
@@ -221,19 +281,74 @@ PRECO_BREED_FALLBACK = {
     'ha_sem_ditto_f6_sem_nature': 1500000, 'ha_sem_ditto_f6_naturado': 1800000,
     'comum_genero': 100000, 'escolher_genero': 100000,
     'ha_sem_ditto_genero': 200000, 'femea_rara': 200000,
+    'zero_speed': 200000,
     'treinado': 200000,
 }
 
+# Códigos legados que representam o mesmo componente de preço.
+# Mantemos compatibilidade porque versões anteriores do HYPE gravaram nomes
+# diferentes para o mesmo item na tabela de preços e nas promoções.
+PROMO_CODIGO_EQUIVALENCIAS = {
+    'comum_genero': {'comum_genero', 'escolher_genero'},
+    'escolher_genero': {'comum_genero', 'escolher_genero'},
+    'ha_sem_ditto_genero': {'ha_sem_ditto_genero', 'escolher_genero_raro'},
+    'escolher_genero_raro': {'ha_sem_ditto_genero', 'escolher_genero_raro'},
+    'ha_com_ditto_f5': {'ha_com_ditto_f5', 'ha_com_ditto_f5_naturado', 'ha_com_ditto_f5_sem_nature'},
+    'ha_com_ditto_f5_naturado': {'ha_com_ditto_f5', 'ha_com_ditto_f5_naturado'},
+    'ha_com_ditto_f5_sem_nature': {'ha_com_ditto_f5', 'ha_com_ditto_f5_sem_nature'},
+    'ha_sem_ditto_f5': {'ha_sem_ditto_f5', 'ha_sem_ditto_f5_naturado', 'ha_sem_ditto_f5_sem_nature'},
+    'ha_sem_ditto_f5_naturado': {'ha_sem_ditto_f5', 'ha_sem_ditto_f5_naturado'},
+    'ha_sem_ditto_f5_sem_nature': {'ha_sem_ditto_f5', 'ha_sem_ditto_f5_sem_nature'},
+}
+
+
+def _promo_codigos_equivalentes(codigo):
+    codigo = str(codigo or '').strip()
+    return PROMO_CODIGO_EQUIVALENCIAS.get(codigo, {codigo})
+
+
 def _parse_promo_datetime(valor):
+    """Normaliza TIMESTAMPTZ do Supabase para UTC.
+
+    Datetimes sem fuso vindos de dados antigos são interpretados no fuso HYPE
+    (America/Sao_Paulo), e não em UTC. Isso evita promoções começarem/terminarem
+    três horas fora do horário escolhido no painel.
+    """
     if not valor:
         return None
     try:
         dt = datetime.fromisoformat(str(valor).replace('Z', '+00:00'))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=HYPE_TZ)
         return dt.astimezone(timezone.utc)
     except Exception:
         return None
+
+
+def _promo_datetime_form_para_utc(valor):
+    """Converte o datetime-local do navegador (horário de Brasília) para UTC."""
+    if not valor:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(valor))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=HYPE_TZ)
+        return dt.astimezone(timezone.utc).isoformat()
+    except Exception as exc:
+        raise ValueError('Data/horário da promoção inválido.') from exc
+
+
+def _status_promocao(p, agora=None):
+    agora = agora or datetime.now(timezone.utc)
+    if p.get('ativo') is False:
+        return 'pausada'
+    inicio = _parse_promo_datetime(p.get('inicio_em'))
+    fim = _parse_promo_datetime(p.get('fim_em'))
+    if inicio and agora < inicio:
+        return 'agendada'
+    if fim and agora > fim:
+        return 'expirada'
+    return 'ativa'
 
 
 def promocoes_breed_ativas():
@@ -263,14 +378,30 @@ def promocoes_breed_ativas():
 
 
 def _promocao_para_codigo(codigo, promocoes=None):
-    """Retorna a melhor promoção aplicável ao código de preço."""
+    """Retorna a melhor promoção aplicável ao código de preço.
+
+    Além do match exato, entende aliases das versões antigas do HYPE. Assim uma
+    promoção criada para `ha_com_ditto_f5` também alcança a variante naturada
+    usada pelo cálculo atual, sem precisar recriar a promoção.
+    """
+    alvo_equivalentes = _promo_codigos_equivalentes(codigo)
     for p in (promocoes if promocoes is not None else promocoes_breed_ativas()):
         codigos = p.get('codigos_preco') or []
         if isinstance(codigos, str):
-            try: codigos = json.loads(codigos)
-            except Exception: codigos = [x.strip() for x in codigos.split(',') if x.strip()]
-        if p.get('aplicar_todos') or codigo in codigos:
+            try:
+                codigos = json.loads(codigos)
+            except Exception:
+                # Postgres pode devolver arrays em forma textual em integrações antigas.
+                texto = codigos.strip().strip('{}[]')
+                codigos = [x.strip().strip('\"\'') for x in texto.split(',') if x.strip()]
+        codigos = {str(x).strip() for x in (codigos or []) if str(x).strip()}
+        if p.get('aplicar_todos'):
             return p
+        if codigo in codigos:
+            return p
+        for selecionado in codigos:
+            if alvo_equivalentes & _promo_codigos_equivalentes(selecionado):
+                return p
     return None
 
 
@@ -285,7 +416,7 @@ def _aplicar_promocao_componente(codigo, valor, promocoes):
 
 
 def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='comum',
-                         usa_ditto=False, treinado=False, nature=None):
+                         usa_ditto=False, treinado=False, nature=None, zero_speed=False):
     """Calcula o preço no servidor. Ditto é automático; HPWR foi removido do formulário."""
     # Compatibilidade com bancos HYPE antigos e novos: versões anteriores de
     # precos_breed podem não ter a coluna `ativo`. Primeiro usamos apenas preços
@@ -358,6 +489,13 @@ def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='
             extras.append({'codigo': 'femea_rara', 'valor_original': original, 'valor': v, 'promocao': promo.get('nome') if promo else None})
             if promo: promos_usadas.append(promo)
 
+    if zero_speed:
+        original = int(precos.get('zero_speed', 0) or 0)
+        v, promo = _aplicar_promocao_componente('zero_speed', original, promocoes)
+        total_original += original; total += v
+        extras.append({'codigo': 'zero_speed', 'valor_original': original, 'valor': v, 'promocao': promo.get('nome') if promo else None})
+        if promo: promos_usadas.append(promo)
+
     if treinado:
         original = int(precos.get('treinado', 0) or 0)
         v, promo = _aplicar_promocao_componente('treinado', original, promocoes)
@@ -376,6 +514,62 @@ def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='
         'promocao_nome': promo_principal.get('nome') if promo_principal else None,
         'promocao_percentual': float(promo_principal.get('percentual') or 0) if promo_principal else 0,
     }
+
+
+def precos_breed_interface():
+    """Valores dos adicionais enviados junto com o HTML; não dependem de API no navegador."""
+    linhas = _safe_table('precos_breed', '*')
+    ativos = [x for x in linhas if x.get('ativo', True) is not False]
+    precos = dict(PRECO_BREED_FALLBACK)
+    precos.update({x.get('codigo'): int(x.get('valor') or 0) for x in ativos if x.get('codigo')})
+    promocoes = promocoes_breed_ativas()
+    codigos = ('zero_speed', 'comum_genero', 'escolher_genero', 'ha_sem_ditto_genero', 'femea_rara', 'treinado')
+    saida = {}
+    for codigo in codigos:
+        original = int(precos.get(codigo, 0) or 0)
+        valor, promo = _aplicar_promocao_componente(codigo, original, promocoes)
+        saida[codigo] = {
+            'valor_original': original,
+            'valor': int(valor or 0),
+            'promocao_nome': promo.get('nome') if promo else None,
+            'promocao_percentual': float(promo.get('percentual') or 0) if promo else 0,
+        }
+    return saida
+
+
+def obter_taxa_clan_breed():
+    """Percentual de comissão do clã configurado no banco (padrão 30%)."""
+    try:
+        rows = _safe_table('configuracoes_site', '*', chave='breed_taxa_clan_percentual')
+        valor = rows[0].get('valor') if rows else 30
+        taxa = float(str(valor).replace(',', '.'))
+    except Exception:
+        taxa = 30.0
+    return max(0.0, min(100.0, taxa))
+
+
+def calcular_divisao_breed(valor_total, percentual=None):
+    total = max(0, int(valor_total or 0))
+    pct = obter_taxa_clan_breed() if percentual is None else max(0.0, min(100.0, float(percentual)))
+    taxa = max(0, min(total, int(round(total * pct / 100.0))))
+    return pct, taxa, total - taxa
+
+
+def registrar_caixa_clan(tipo, categoria, descricao, valor, origem_tipo=None, origem_id=None, chave_unica=None):
+    if tipo not in ('entrada', 'saida'):
+        return False
+    try:
+        supabase.table('hype_caixa_clan').insert({
+            'tipo': tipo, 'categoria': categoria or 'geral', 'descricao': descricao or 'Movimentação do Clã HYPE',
+            'valor': max(0, int(valor or 0)), 'origem_tipo': origem_tipo, 'origem_id': origem_id,
+            'criado_por': session.get('usuario_email'), 'chave_unica': chave_unica
+        }).execute()
+        return True
+    except Exception as e:
+        if chave_unica and ('duplicate' in str(e).lower() or 'unique' in str(e).lower()):
+            return False
+        print(f"Movimentação do caixa HYPE não registrada: {e}")
+        return False
 
 
 def classificar_pokemon_preco(pokemon_id):
@@ -1016,6 +1210,11 @@ def perfil_publico(nick):
             return redirect(url_for('pagina_inicial'))
         u = dados[0]
         email = u.get('email')
+        # Mantém XP/nível do perfil visitado atualizado, não apenas do usuário logado.
+        progressao = _hype_recalcular_progressao(email) if '_hype_recalcular_progressao' in globals() else None
+        if progressao:
+            u['xp'] = progressao.get('xp', u.get('xp') or 0)
+            u['nivel'] = progressao.get('nivel', u.get('nivel') or 1)
         pedidos = _safe_table('pedidos_breed', '*')
         membro = dict(u)
         membro['pedidos_feitos'] = sum(p.get('usuario_email') == email for p in pedidos)
@@ -1028,7 +1227,22 @@ def perfil_publico(nick):
         membro['mostrar_atividade'] = bool(priv.get('mostrar_atividade', True))
         membro['mostrar_times'] = bool(priv.get('mostrar_times', True))
         membro['atividades'] = sorted(_safe_table('atividades_perfil', '*', usuario_email=email), key=lambda x: x.get('created_at') or '', reverse=True)[:20] if membro['mostrar_atividade'] else []
-        membro['times_salvos'] = sorted(_safe_table('times_pokemon', '*', usuario_email=email), key=lambda x: x.get('updated_at') or x.get('created_at') or '', reverse=True)[:6] if membro['mostrar_times'] else []
+        viewer_is_owner = session.get('usuario_email') == email
+        times_perfil = _safe_table('times_pokemon', '*', usuario_email=email) if membro['mostrar_times'] else []
+        # Em perfil público, só times marcados como públicos são expostos. O dono
+        # continua vendo os próprios times para conferir como o perfil está montado.
+        if not viewer_is_owner:
+            times_perfil = [t for t in times_perfil if bool(t.get('publico'))]
+        membro['times_salvos'] = sorted(times_perfil, key=lambda x: x.get('updated_at') or x.get('created_at') or '', reverse=True)[:6]
+        membro['viewer_is_owner'] = viewer_is_owner
+        xp_atual = int(membro.get('xp') or 0)
+        membro['xp_progresso'] = min(100, round((xp_atual % 1000) / 10, 1))
+        membro['xp_para_proximo'] = 1000 - (xp_atual % 1000) if xp_atual % 1000 else 1000
+        links = membro.get('links_perfil') or {}
+        youtube = str(links.get('youtube') or '').strip()
+        if youtube and not youtube.lower().startswith(('http://','https://')):
+            links['youtube'] = ''
+        membro['links_perfil'] = links
         mh = _safe_table('membros_hype', '*', usuario_email=email)
         membro['membro_hype'] = bool(mh and mh[0].get('ativo'))
         membro['membro_hype_desde'] = mh[0].get('entrou_em') if membro['membro_hype'] else None
@@ -1044,7 +1258,7 @@ def perfil_publico(nick):
 def hype_account_context():
     """Dados leves da conta usados no cabeçalho HYPE."""
     if not session.get('usuario_email'):
-        return {'hype_header_user': {}, 'hype_notificacoes_nao_lidas': 0}
+        return {'hype_header_user': {}, 'hype_notificacoes_nao_lidas': 0, 'hype_permissoes': {}, 'hype_membro_hype': False}
     email = session.get('usuario_email')
     usuario = {}
     try:
@@ -1057,7 +1271,20 @@ def hype_account_context():
         unread = len(rows)
     except Exception:
         unread = 0
-    return {'hype_header_user': usuario, 'hype_notificacoes_nao_lidas': unread}
+    try:
+        hype_permissoes = obter_permissoes_usuario(email)
+    except Exception:
+        hype_permissoes = {}
+    try:
+        hype_membro_hype = membro_hype_ativo(email)
+    except Exception:
+        hype_membro_hype = False
+    return {
+        'hype_header_user': usuario,
+        'hype_notificacoes_nao_lidas': unread,
+        'hype_permissoes': hype_permissoes,
+        'hype_membro_hype': hype_membro_hype
+    }
 
 
 @app.route('/conta')
@@ -1292,6 +1519,9 @@ def breed():
             if iv_descartado not in IVS_F5_VALIDOS:
                 flash('No F5, escolha qual IV não precisa.', 'erro')
                 return redirect(url_for('breed'))
+            if zero_speed and iv_descartado == 'velocidade':
+                flash('Com Zero Speed, a Velocidade já ficará em 0 IV. Escolha outro IV que pode ficar menor.', 'erro')
+                return redirect(url_for('breed'))
         else:
             iv_descartado = None
             zero_speed = False
@@ -1351,13 +1581,15 @@ def breed():
             categoria=categoria,
             usa_ditto=usa_ditto,
             treinado=treinado,
-            nature=nature or None
+            nature=nature or None,
+            zero_speed=zero_speed
         )
         if preco_total <= 0:
             flash('Não foi possível calcular o preço. Verifique a tabela de preços no painel administrativo.', 'erro')
             return redirect(url_for('breed'))
 
         try:
+            taxa_pct, taxa_valor, valor_breeder = calcular_divisao_breed(preco_total)
             dados_pedido = {
                 'usuario_email': email,
                 'player': session.get('nick_jogo'),
@@ -1376,6 +1608,9 @@ def breed():
                 'treinado': treinado,
                 'evs_treinamento': evs_treinamento if treinado else {},
                 'preco_total': preco_total,
+                'taxa_clan_percentual': taxa_pct,
+                'taxa_clan_valor': taxa_valor,
+                'valor_breeder': valor_breeder,
                 'preco_original': int(preco_detalhes.get('preco_original') or preco_total),
                 'promocao_id': preco_detalhes.get('promocao_id'),
                 'promocao_nome': preco_detalhes.get('promocao_nome'),
@@ -1404,52 +1639,47 @@ def breed():
 
             registrar_atividade_reino('breed_criado', email, f"Pedido de Breed: {pokemon}", 'breed')
             especial_txt = ' • BREED ESPECIAL COM DITTO' if usa_ditto else ''
-            flash((f'Pedido enviado! Valor calculado: ${preco_total:,}{especial_txt}. Acompanhe o progresso na fila. ⏳').replace(',', '.'), 'sucesso')
+            flash((f'Pedido enviado! Valor calculado: ${preco_total:,}{especial_txt}. Acompanhe o progresso em Meus Pedidos. ⏳').replace(',', '.'), 'sucesso')
         except Exception as e:
             flash(f'Erro ao registrar pedido: {e}', 'erro')
 
         return redirect(url_for('breed'))
 
-    pode_ver_fila = permissoes.get('pode_ver_fila_breed', False) if permissoes else False
-
+    # V21: Fazer Pedido é uma experiência independente. Nesta rota não carregamos
+    # mais a fila geral nem o histórico; isso reduz consultas e evita misturar as
+    # três áreas oficiais do Breed: Fazer Pedido / Meus Pedidos / Fila dos Breeders.
     try:
-        # Mantém a lógica existente de devolver pedidos antigos à fila.
+        # Mantém somente a verificação operacional de prazo. O pedido permanece com
+        # o mesmo Breeder e recebe sinalização de atraso depois de 3 dias em produção.
         res_verificacao = supabase.table('pedidos_breed').select('*').eq('status', 'em_producao').execute()
         if res_verificacao and res_verificacao.data:
             agora = datetime.now(timezone.utc)
             for pedido in res_verificacao.data:
-                data_referencia = parse_data_supabase(pedido.get('pagamento_confirmado_em') or pedido.get('assumido_em') or pedido.get('created_at'))
+                data_referencia = parse_data_supabase(
+                    pedido.get('pagamento_confirmado_em') or pedido.get('assumido_em') or pedido.get('created_at')
+                )
                 try:
                     if data_referencia and agora - data_referencia > timedelta(days=3) and not pedido.get('prazo_notificado'):
-                        # O prazo nasce quando o pagamento é confirmado. Não apagamos o responsável:
-                        # o pedido fica atrasado e todos recebem aviso, preservando o histórico.
                         supabase.table('pedidos_breed').update({'prazo_notificado': True}).eq('id', pedido['id']).execute()
-                        criar_notificacao(pedido.get('breeder_responsavel'), 'Prazo do Breed excedido', f"O pedido #{pedido.get('id')} de {pedido.get('pokemon')} passou de 3 dias.", 'aviso', url_for('breed'))
-                        criar_notificacao(pedido.get('usuario_email'), 'Atualização do seu Breed', f"Seu pedido #{pedido.get('id')} passou do prazo de 3 dias e a equipe foi avisada.", 'aviso', url_for('breed'))
+                        criar_notificacao(
+                            pedido.get('breeder_responsavel'), 'Prazo do Breed excedido',
+                            f"O pedido #{pedido.get('id')} de {pedido.get('pokemon')} passou de 3 dias.",
+                            'aviso', url_for('breed_fila_breeders')
+                        )
+                        criar_notificacao(
+                            pedido.get('usuario_email'), 'Atualização do seu Breed',
+                            f"Seu pedido #{pedido.get('id')} passou do prazo de 3 dias e a equipe foi avisada.",
+                            'aviso', url_for('breed_meus_pedidos')
+                        )
                 except Exception as err_date:
                     print(f"Erro ao processar data do pedido {pedido.get('id')}: {err_date}")
-
-        if pode_ver_fila:
-            pedidos_query = supabase.table('pedidos_breed').select('*').order('created_at', desc=True).execute()
-        else:
-            pedidos_query = supabase.table('pedidos_breed').select('*').eq('usuario_email', email).order('created_at', desc=True).execute()
-
-        todos_pedidos = pedidos_query.data if (pedidos_query and pedidos_query.data) else []
     except Exception as e:
-        print(f"Erro ao buscar pedidos: {e}")
-        todos_pedidos = []
-
-    todos_pedidos = enriquecer_pedidos_com_nicks(todos_pedidos)
-    fila_ativa = [p for p in todos_pedidos if p.get('status') in [
-        'pendente', 'aguardando_pagamento', 'em_producao', 'cancelamento_solicitado'
-    ]]
-    historico_concluido = [p for p in todos_pedidos if p.get('status') in ['concluido', 'entregue', 'cancelado']]
+        print(f"Erro ao verificar prazos do Breed: {e}")
 
     return render_template(
         'breed.html',
-        fila_ativa=fila_ativa,
-        historico_concluido=historico_concluido,
-        permissoes=permissoes
+        permissoes=permissoes,
+        precos_ui=precos_breed_interface()
     )
 
 
@@ -1498,7 +1728,15 @@ def breed_meus_pedidos():
         pedido['atualizado_em'] = base
     ativos = [p for p in pedidos if p.get('status') in ('pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao')]
     historico = [p for p in pedidos if p.get('status') in ('entregue','cancelado')]
-    return render_template('breed_meus_pedidos.html', pedidos_ativos=ativos, historico=historico, permissoes=permissoes)
+    resumo = {
+        'ativos': len(ativos),
+        'pagamento': sum(1 for p in ativos if p.get('status') == 'aguardando_pagamento'),
+        'producao': sum(1 for p in ativos if p.get('status') in ('em_producao','cancelamento_solicitado')),
+        'prontos': sum(1 for p in ativos if p.get('status') in ('concluido','aguardando_confirmacao')),
+        'historico': len(historico),
+        'total': len(pedidos),
+    }
+    return render_template('breed_meus_pedidos.html', pedidos_ativos=ativos, historico=historico, permissoes=permissoes, resumo=resumo)
 
 
 @app.route('/breed/historico')
@@ -1515,6 +1753,28 @@ def breed_historico_geral():
     return render_template('breed_historico.html', pedidos=pedidos, permissoes=permissoes, usuario_email=email)
 
 
+def listar_breeders_transferencia():
+    """Usuários que podem receber transferência administrativa de pedidos Breed."""
+    usuarios = _safe_table('usuarios_clan', 'email,nick_jogo,cargo')
+    funcoes = _safe_table('usuarios_funcoes', 'usuario_email,funcao')
+    extras = {x.get('usuario_email') for x in funcoes if x.get('funcao') == 'breeder'}
+    perfis = {x.get('usuario_email'): x for x in _safe_table('breeders_perfil', '*')}
+    saida = []
+    for u in usuarios:
+        email = u.get('email')
+        if not email:
+            continue
+        if u.get('cargo') not in ('breeder','sub_lider','lider') and email not in extras:
+            continue
+        perfil = perfis.get(email) or {}
+        saida.append({
+            'email': email, 'nick': u.get('nick_jogo') or email, 'cargo': u.get('cargo') or 'membro',
+            'status': perfil.get('status') or 'disponivel', 'max_ativos': int(perfil.get('max_ativos') or 4)
+        })
+    saida.sort(key=lambda x: (x.get('nick') or '').lower())
+    return saida
+
+
 @app.route('/breed/fila')
 @login_required
 def breed_fila_breeders():
@@ -1523,44 +1783,132 @@ def breed_fila_breeders():
     if not permissoes.get('pode_ver_fila_breed', False):
         flash('A Fila dos Breeders é exclusiva para usuários autorizados.', 'erro')
         return redirect(url_for('breed_meus_pedidos'))
+
+    # Estados exibidos na fila. Mantemos os dois nomes legados para que
+    # instalações antigas continuem filtrando corretamente.
+    status_fila = [
+        'pendente','em_andamento','aguardando_pagamento','em_producao',
+        'cancelamento_solicitado','concluido','aguardando_confirmacao',
+        'aguardando_confirmacao_cliente'
+    ]
     try:
-        pedidos = supabase.table('pedidos_breed').select('*').in_('status', [
-            'pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao'
-        ]).order('created_at', desc=False).execute().data or []
+        pedidos = supabase.table('pedidos_breed').select('*').in_(
+            'status', status_fila
+        ).order('created_at', desc=False).execute().data or []
     except Exception as e:
         print(f'Erro ao buscar fila dos Breeders: {e}')
         pedidos = []
     pedidos = enriquecer_pedidos_com_nicks(pedidos)
-    # V15: mensagens não lidas e sinalização de atraso também na fila operacional.
+
+    # Indicadores usados pelo layout oficial da Fila dos Breeders.
+    contagens_fila = {s: 0 for s in status_fila}
+    for p in pedidos:
+        st = p.get('status')
+        if st in contagens_fila:
+            contagens_fila[st] += 1
+    contagens_fila['todos'] = len(pedidos)
+    contagens_fila['meus'] = sum(1 for p in pedidos if p.get('breeder_responsavel') == email)
+
+    resumo_fila = {
+        'total': len(pedidos),
+        'pendentes': contagens_fila.get('pendente', 0),
+        'em_andamento': sum(contagens_fila.get(x, 0) for x in (
+            'em_andamento','aguardando_pagamento','em_producao','cancelamento_solicitado'
+        )),
+        'concluidos': sum(contagens_fila.get(x, 0) for x in (
+            'concluido','aguardando_confirmacao','aguardando_confirmacao_cliente'
+        )),
+        'entregues': 0,
+    }
+    try:
+        status_rows = supabase.table('pedidos_breed').select('status').execute().data or []
+        resumo_fila['entregues'] = sum(1 for x in status_rows if x.get('status') == 'entregue')
+    except Exception as e:
+        print(f'Erro ao montar resumo geral da fila: {e}')
+
+    # Mensagens não lidas e sinalização de atraso também na fila operacional.
     ids = [p.get('id') for p in pedidos if p.get('id') is not None]
     nao_lidas = {}
     if ids:
         try:
-            msgs = supabase.table('mensagens_pedido').select('pedido_id,remetente_email,lida').eq('tipo_pedido','breed').in_('pedido_id',ids).execute().data or []
+            msgs = supabase.table('mensagens_pedido').select(
+                'pedido_id,remetente_email,lida'
+            ).eq('tipo_pedido','breed').in_('pedido_id',ids).execute().data or []
             for m in msgs:
                 if not m.get('lida') and m.get('remetente_email') != email:
-                    pid=m.get('pedido_id'); nao_lidas[pid]=nao_lidas.get(pid,0)+1
-        except Exception as e: print(f'Erro ao contar mensagens da fila: {e}')
+                    pid = m.get('pedido_id')
+                    nao_lidas[pid] = nao_lidas.get(pid,0) + 1
+        except Exception as e:
+            print(f'Erro ao contar mensagens da fila: {e}')
     for p in pedidos:
-        p['mensagens_nao_lidas']=nao_lidas.get(p.get('id'),0)
-        inicio=parse_data_supabase(p.get('assumido_em'))
-        p['atrasado']=bool(inicio and p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado') and (datetime.now(timezone.utc)-inicio).total_seconds()>3*86400)
-    meus_ativos = len([p for p in pedidos if p.get('breeder_responsavel') == email and p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado')])
+        p['mensagens_nao_lidas'] = nao_lidas.get(p.get('id'),0)
+        inicio = parse_data_supabase(p.get('pagamento_confirmado_em') or p.get('assumido_em'))
+        p['atrasado'] = bool(
+            inicio
+            and p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado')
+            and (datetime.now(timezone.utc)-inicio).total_seconds() > 3*86400
+        )
+
+    meus_ativos = sum(
+        1 for p in pedidos
+        if p.get('breeder_responsavel') == email
+        and p.get('status') in ('aguardando_pagamento','em_producao','cancelamento_solicitado')
+    )
     max_ativos = 4
+    status_breeder = 'disponivel'
     try:
-        perfil = supabase.table('breeders_perfil').select('max_ativos').eq('usuario_email', email).limit(1).execute().data or []
+        perfil = supabase.table('breeders_perfil').select(
+            'max_ativos,status'
+        ).eq('usuario_email', email).limit(1).execute().data or []
         if perfil and perfil[0].get('max_ativos') is not None:
             max_ativos = int(perfil[0]['max_ativos'])
+        # disponibilidade_funcoes é a fonte operacional principal; breeders_perfil
+        # continua sincronizado por compatibilidade com versões anteriores.
+        disp = supabase.table('disponibilidade_funcoes').select('status').eq(
+            'usuario_email', email
+        ).eq('funcao','breeder').limit(1).execute().data or []
+        status_breeder = (
+            (disp[0].get('status') if disp else None)
+            or (perfil[0].get('status') if perfil else None)
+            or 'disponivel'
+        )
+        if status_breeder == 'ausente':
+            status_breeder = 'indisponivel'
     except Exception as e:
-        print(f'Erro ao buscar limite do Breeder: {e}')
-    # V15.1: histórico cancelado visível na Fila, com restauração segura do mesmo pedido.
+        print(f'Erro ao buscar limite/status do Breeder: {e}')
+
+    # V23: todos os pedidos operacionais são enviados para a página e os filtros
+    # atuam instantaneamente no navegador. O parâmetro ?filtro= continua sendo
+    # aceito para abrir a tela já posicionada no filtro escolhido.
+    filtro_atual = (request.args.get('filtro') or 'todos').strip().lower()
+    filtros_validos = {'todos','pendente','em_andamento','concluido','meus'}
+    if filtro_atual not in filtros_validos:
+        filtro_atual = 'todos'
+
+    # Histórico cancelado continua disponível, porém recolhido no fim da página.
     try:
-        historico_cancelados = supabase.table('pedidos_breed').select('*').eq('status','cancelado').order('created_at', desc=True).limit(100).execute().data or []
+        historico_cancelados = supabase.table('pedidos_breed').select('*').eq(
+            'status','cancelado'
+        ).order('created_at', desc=True).limit(100).execute().data or []
     except Exception as e:
         print(f'Erro ao buscar histórico cancelado da fila: {e}')
         historico_cancelados = []
     historico_cancelados = enriquecer_pedidos_com_nicks(historico_cancelados)
-    return render_template('breed_fila.html', fila_ativa=pedidos, historico_cancelados=historico_cancelados, permissoes=permissoes, breeder_email=email, meus_ativos=meus_ativos, max_ativos=max_ativos)
+
+    return render_template(
+        'breed_fila.html',
+        fila_ativa=pedidos,
+        filtro_atual=filtro_atual,
+        historico_cancelados=historico_cancelados,
+        permissoes=permissoes,
+        breeder_email=email,
+        meus_ativos=meus_ativos,
+        max_ativos=max_ativos,
+        status_breeder=status_breeder,
+        resumo_fila=resumo_fila,
+        contagens_fila=contagens_fila,
+        breeders_transferencia=listar_breeders_transferencia()
+    )
 
 
 
@@ -1592,7 +1940,7 @@ def api_breed_fila_status():
     email=session.get('usuario_email'); perm=obter_permissoes_usuario(email)
     if not perm.get('pode_ver_fila_breed'): return jsonify({'ok':False}),403
     try:
-        pedidos=supabase.table('pedidos_breed').select('*').in_('status',['pendente','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao']).order('created_at',desc=False).execute().data or []
+        pedidos=supabase.table('pedidos_breed').select('*').in_('status',['pendente','em_andamento','aguardando_pagamento','em_producao','cancelamento_solicitado','concluido','aguardando_confirmacao','aguardando_confirmacao_cliente']).order('created_at',desc=False).execute().data or []
         return jsonify({'ok':True,'pedidos':_breed_payload(pedidos,email),'server_time':agora_iso()})
     except Exception as e: return jsonify({'ok':False,'error':str(e)}),500
 
@@ -1638,12 +1986,22 @@ def alterar_status_breeder():
     email=session.get('usuario_email'); perm=obter_permissoes_usuario(email)
     if not perm.get('pode_assumir_breed'): return redirect(url_for('breed_meus_pedidos'))
     status=request.form.get('status','disponivel')
-    if status not in ('disponivel','ocupado','ausente'): status='disponivel'
+    if status not in ('disponivel','ocupado','indisponivel','ausente'): status='disponivel'
+    if status == 'ausente': status = 'indisponivel'
+    filtro=(request.form.get('filtro') or 'todos').strip().lower()
+    if filtro not in {'todos','pendente','em_andamento','concluido','meus'}: filtro='todos'
     try:
-        supabase.table('breeders_perfil').upsert({'usuario_email':email,'status':status,'updated_at':agora_iso()},on_conflict='usuario_email').execute()
+        agora=agora_iso()
+        supabase.table('breeders_perfil').upsert(
+            {'usuario_email':email,'status':status,'updated_at':agora},on_conflict='usuario_email'
+        ).execute()
+        supabase.table('disponibilidade_funcoes').upsert(
+            {'usuario_email':email,'funcao':'breeder','status':status,'updated_at':agora},
+            on_conflict='usuario_email,funcao'
+        ).execute()
         flash('Disponibilidade atualizada.','sucesso')
     except Exception as e: flash(f'Erro ao atualizar disponibilidade: {e}','erro')
-    return redirect(url_for('breed_fila_breeders'))
+    return redirect(url_for('breed_fila_breeders', filtro=filtro) if filtro!='todos' else url_for('breed_fila_breeders'))
 
 @app.route('/breed/admin/prioridade/<int:pedido_id>',methods=['POST'])
 @login_required
@@ -1694,6 +2052,7 @@ def api_breed_preco():
         ha = request.args.get('ha', '').strip().lower()
         genero = request.args.get('genero', 'indiferente').strip().lower()
         treinado = request.args.get('treinado', 'nao').strip().lower() == 'sim'
+        zero_speed = request.args.get('zero_speed', 'nao').strip().lower() == 'sim'
         nature = request.args.get('nature', '').strip()
         if pokemon_id <= 0 or not pokemon or breed_tipo not in ('F5','F6') or ha not in ('sim','nao') or genero not in ('macho','femea','indiferente'):
             return jsonify({'ok': False, 'error': 'Complete as características para calcular o preço.'}), 400
@@ -1709,7 +2068,7 @@ def api_breed_preco():
         total, detalhes = calcular_preco_breed(
             breed_tipo, ha=(ha=='sim'), genero=genero, categoria=categoria,
             usa_ditto=bool(regra.get('so_com_ditto')), treinado=treinado,
-            nature=nature or None
+            nature=nature or None, zero_speed=(zero_speed and breed_tipo == 'F5')
         )
         if total <= 0:
             return jsonify({'ok': False, 'error': 'Tabela de preços ainda não configurada para esta combinação.'}), 422
@@ -1936,13 +2295,20 @@ def assumir_breed(pedido_id):
         pedido = checar_pedido.data[0]
         try:
             disp = supabase.table('breeders_perfil').select('status').eq('usuario_email',email).limit(1).execute().data or []
-            if disp and disp[0].get('status') == 'ausente' and not permissoes.get('pode_gerenciar_cargos'):
+            if disp and disp[0].get('status') in ('ausente','indisponivel') and not permissoes.get('pode_gerenciar_cargos'):
                 flash('Seu perfil de Breeder está pausado. Marque-se como disponível antes de assumir novos pedidos.','erro')
                 return redirect(url_for('breed_fila_breeders'))
         except Exception as e: print(f'Erro ao validar disponibilidade: {e}')
         if pedido.get('status') != 'pendente':
             flash('Este pedido não está mais disponível para ser assumido.', 'erro')
-            return redirect(url_for('breed'))
+            return redirect(url_for('breed_fila_breeders'))
+
+        # Um pedido já atribuído é exclusivo do Breeder responsável. Mesmo que um
+        # registro legado esteja como pendente por engano, outro Breeder não pode
+        # assumir por cima do responsável atual; somente a administração transfere.
+        if pedido.get('breeder_responsavel'):
+            flash('Este pedido já está atribuído a outro Breeder. Somente a administração pode transferi-lo.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
 
         pedidos_ativos = supabase.table('pedidos_breed').select('id').eq(
             'breeder_responsavel', email
@@ -1964,7 +2330,7 @@ def assumir_breed(pedido_id):
             'breeder_responsavel': email,
             'assumido_em': agora_iso(),
             'prazo_notificado': False
-        }).eq('id', pedido_id).eq('status', 'pendente').execute()
+        }).eq('id', pedido_id).eq('status', 'pendente').is_('breeder_responsavel', 'null').execute()
 
         if not resultado.data:
             flash('Este pedido acabou de ser assumido por outro Breeder.', 'erro')
@@ -1998,6 +2364,121 @@ def assumir_breed(pedido_id):
         flash(f'Erro ao assumir pedido: {e}', 'erro')
 
     return redirect(url_for('breed'))
+
+
+@app.route('/breed/devolver/<int:pedido_id>', methods=['POST'])
+@login_required
+def devolver_breed_fila(pedido_id):
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+    motivo = (request.form.get('motivo') or '').strip()[:500]
+    if len(motivo) < 3:
+        flash('Informe o motivo da devolução para a fila.', 'erro')
+        return redirect(url_for('breed_fila_breeders'))
+    try:
+        rows = supabase.table('pedidos_breed').select('*').eq('id', pedido_id).limit(1).execute().data or []
+        if not rows:
+            flash('Pedido não encontrado.', 'erro'); return redirect(url_for('breed_fila_breeders'))
+        p = rows[0]
+        admin = bool(permissoes.get('pode_gerenciar_cargos'))
+        if p.get('breeder_responsavel') != email and not admin:
+            flash('Somente o Breeder responsável ou um administrador pode devolver este pedido.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+        if p.get('status') not in ('aguardando_pagamento','em_producao','cancelamento_solicitado'):
+            flash('Este pedido não pode ser devolvido para a fila neste status.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+
+        status_anterior = p.get('status')
+        antigo_breeder = p.get('breeder_responsavel')
+        # Se o pagamento já havia sido confirmado, desfaz o extrato antes de liberar o pedido.
+        if p.get('pagamento_confirmado_em'):
+            valor_mov = int(p.get('preco_total') or 0)
+            taxa_clan = int(p.get('taxa_clan_valor') or 0)
+            valor_breeder = int(p.get('valor_breeder') or max(0, valor_mov - taxa_clan))
+            ciclo = str(p.get('pagamento_confirmado_em') or 'sem_pagamento')
+            registrar_transacao_hype(p.get('usuario_email'),'entrada','estorno_breed',f"Estorno por devolução do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=antigo_breeder,chave_unica=f'breed:{pedido_id}:devolucao_cliente:{ciclo}')
+            registrar_transacao_hype(antigo_breeder,'saida','estorno_breed',f"Estorno por devolução do Breed #{pedido_id}",valor_breeder,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('usuario_email'),chave_unica=f'breed:{pedido_id}:devolucao_breeder:{ciclo}')
+            if taxa_clan:
+                registrar_caixa_clan('saida','estorno_taxa_breed',f"Estorno da taxa por devolução do Breed #{pedido_id}",taxa_clan,origem_tipo='breed',origem_id=pedido_id,chave_unica=f'breed:{pedido_id}:devolucao_taxa_clan:{ciclo}')
+
+        updates = {
+            'status':'pendente','breeder_responsavel':None,'assumido_em':None,
+            'pagamento_confirmado_em':None,'pagamento_confirmado_por':None,'prazo_notificado':False,
+            'cancelamento_solicitado_em':None,'cancelamento_solicitado_por':None,
+            'motivo_cancelamento_solicitado':None,'status_antes_cancelamento':None,
+            'cancelamento_decidido_em':None,'cancelamento_decidido_por':None,'cancelamento_decisao':None
+        }
+        res = supabase.table('pedidos_breed').update(updates).eq('id',pedido_id).eq('status',status_anterior).execute()
+        if not res.data:
+            flash('O pedido mudou de estado. Atualize a fila e tente novamente.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+        registrar_historico('breed',pedido_id,status_anterior,'pendente',f'Devolvido à fila por {email}. Motivo: {motivo}')
+        registrar_log('devolver_fila','breed','pedido_breed',pedido_id,{'breeder_anterior':antigo_breeder,'motivo':motivo})
+        criar_notificacao(p.get('usuario_email'),'Breed devolvido à fila',f"Seu pedido #{pedido_id} de {p.get('pokemon')} voltou para a fila. Motivo informado: {motivo}",'aviso',url_for('breed_meus_pedidos'))
+        flash('Pedido devolvido para a fila e Breeder liberado.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao devolver pedido: {e}', 'erro')
+    return redirect(url_for('breed_fila_breeders'))
+
+
+@app.route('/breed/admin/transferir/<int:pedido_id>', methods=['POST'])
+@login_required
+def admin_transferir_breed(pedido_id):
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+    if not permissoes.get('pode_gerenciar_cargos'):
+        flash('Você não tem permissão para transferir pedidos.', 'erro')
+        return redirect(url_for('breed_fila_breeders'))
+    destino = (request.form.get('breeder_destino') or '').strip().lower()
+    motivo = (request.form.get('motivo') or '').strip()[:500]
+    forcar = request.form.get('forcar_limite') == '1'
+    if not destino or len(motivo) < 3:
+        flash('Selecione o Breeder de destino e informe o motivo da transferência.', 'erro')
+        return redirect(url_for('breed_fila_breeders'))
+    try:
+        rows = supabase.table('pedidos_breed').select('*').eq('id',pedido_id).limit(1).execute().data or []
+        if not rows:
+            flash('Pedido não encontrado.', 'erro'); return redirect(url_for('breed_fila_breeders'))
+        p = rows[0]
+        if p.get('status') not in ('aguardando_pagamento','em_producao','cancelamento_solicitado','concluido'):
+            flash('Somente pedidos já atribuídos e ainda não entregues podem ser transferidos.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+        candidatos = {x['email']: x for x in listar_breeders_transferencia()}
+        if destino not in candidatos:
+            flash('O usuário selecionado não está autorizado como Breeder.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+        if destino == p.get('breeder_responsavel'):
+            flash('O pedido já está atribuído a este Breeder.', 'info')
+            return redirect(url_for('breed_fila_breeders'))
+        perfil = candidatos[destino]
+        ativos = supabase.table('pedidos_breed').select('id').eq('breeder_responsavel',destino).in_('status',['aguardando_pagamento','em_producao','cancelamento_solicitado']).execute().data or []
+        limite = max(1, int(perfil.get('max_ativos') or 4))
+        if len(ativos) >= limite and not forcar:
+            flash(f"{perfil.get('nick')} já atingiu o limite de {limite} pedidos ativos. Marque a exceção administrativa para forçar.", 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+        anterior = p.get('breeder_responsavel')
+        res = supabase.table('pedidos_breed').update({'breeder_responsavel':destino}).eq('id',pedido_id).eq('breeder_responsavel',anterior).execute()
+        if not res.data:
+            flash('O responsável mudou antes da transferência. Atualize a fila.', 'erro')
+            return redirect(url_for('breed_fila_breeders'))
+        # Se o pagamento já ocorreu, transfere também o repasse líquido do Breeder.
+        if p.get('pagamento_confirmado_em') and anterior:
+            valor_liquido = int(p.get('valor_breeder') or 0)
+            if valor_liquido <= 0:
+                _, _, valor_liquido = calcular_divisao_breed(int(p.get('preco_total') or 0), p.get('taxa_clan_percentual') or None)
+            tag = agora_iso()
+            registrar_transacao_hype(anterior,'saida','transferencia_breed',f"Transferência financeira do Breed #{pedido_id}",valor_liquido,origem_tipo='breed',origem_id=pedido_id,contraparte_email=destino,chave_unica=f'breed:{pedido_id}:transfer_saida:{tag}')
+            registrar_transacao_hype(destino,'entrada','transferencia_breed',f"Repasse transferido do Breed #{pedido_id}",valor_liquido,origem_tipo='breed',origem_id=pedido_id,contraparte_email=anterior,chave_unica=f'breed:{pedido_id}:transfer_entrada:{tag}')
+        registrar_historico('breed',pedido_id,p.get('status'),p.get('status'),f'Transferido de {anterior or "sem breeder"} para {destino}. Motivo: {motivo}')
+        registrar_log('transferir_breeder','breed','pedido_breed',pedido_id,{'de':anterior,'para':destino,'motivo':motivo,'excecao_limite':forcar})
+        if anterior:
+            criar_notificacao(anterior,'Breed transferido',f"O pedido #{pedido_id} foi transferido para {perfil.get('nick')}. Motivo: {motivo}",'aviso',url_for('breed_fila_breeders'))
+        criar_notificacao(destino,'Novo Breed transferido',f"O pedido #{pedido_id} de {p.get('pokemon')} foi transferido para você.",'aviso',url_for('breed_fila_breeders'))
+        criar_notificacao(p.get('usuario_email'),'Breeder atualizado',f"Seu pedido #{pedido_id} agora está com {perfil.get('nick')}.",'info',url_for('breed_meus_pedidos'))
+        flash('Pedido transferido com sucesso.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao transferir pedido: {e}', 'erro')
+    return redirect(url_for('breed_fila_breeders'))
 
 
 @app.route('/breed/confirmar-pagamento/<int:pedido_id>', methods=['POST'])
@@ -2043,17 +2524,30 @@ def confirmar_pagamento_breed(pedido_id):
         registrar_log('confirmar_pagamento', 'breed', 'pedido_breed', pedido_id, {'valor': pedido.get('preco_total') or 0})
         registrar_atividade_reino('breed_pagamento_confirmado', email, f"Pagamento confirmado: {pedido.get('pokemon')}", 'breed', pedido_id)
         valor_mov = int(pedido.get('preco_total') or 0)
+        pct_salvo = pedido.get('taxa_clan_percentual')
+        try:
+            pct_taxa, taxa_clan, valor_breeder = calcular_divisao_breed(valor_mov, pct_salvo if pct_salvo is not None else None)
+        except Exception:
+            pct_taxa, taxa_clan, valor_breeder = calcular_divisao_breed(valor_mov)
+        # Congela a divisão financeira no próprio pedido para auditoria futura.
+        supabase.table('pedidos_breed').update({
+            'taxa_clan_percentual': pct_taxa, 'taxa_clan_valor': taxa_clan, 'valor_breeder': valor_breeder
+        }).eq('id', pedido_id).execute()
         registrar_transacao_hype(
             pedido.get('usuario_email'), 'saida', 'breed',
             f"Pagamento do Breed #{pedido_id} - {pedido.get('pokemon')}", valor_mov,
             origem_tipo='breed', origem_id=pedido_id, contraparte_email=pedido.get('breeder_responsavel'),
-            chave_unica=f'breed:{pedido_id}:cliente'
+            chave_unica=f'breed:{pedido_id}:cliente:{agora}'
         )
         registrar_transacao_hype(
             pedido.get('breeder_responsavel'), 'entrada', 'breed',
-            f"Recebimento do Breed #{pedido_id} - {pedido.get('pokemon')}", valor_mov,
+            f"Repasse do Breed #{pedido_id} - {pedido.get('pokemon')}", valor_breeder,
             origem_tipo='breed', origem_id=pedido_id, contraparte_email=pedido.get('usuario_email'),
-            chave_unica=f'breed:{pedido_id}:breeder'
+            chave_unica=f'breed:{pedido_id}:breeder:{agora}'
+        )
+        registrar_caixa_clan(
+            'entrada', 'taxa_breed', f"Taxa do Breed #{pedido_id} - {pedido.get('pokemon')}", taxa_clan,
+            origem_tipo='breed', origem_id=pedido_id, chave_unica=f'breed:{pedido_id}:taxa_clan:{agora}'
         )
         flash('Pagamento confirmado. Agora a produção pode começar.', 'sucesso')
     except Exception as e:
@@ -2180,6 +2674,117 @@ def team_breeders():
     ordem={'disponivel':0,'ocupado':1,'ausente':2}
     cards.sort(key=lambda x:(ordem.get(x['status'],9),x['ativos'],x['nick'].casefold()))
     return render_template('team_breeders.html', breeders=cards, permissoes=obter_permissoes_usuario(session.get('usuario_email')))
+
+@app.route('/breed/painel-breeder', endpoint='painel_breeder_hype')
+@login_required
+def painel_breeder_hype():
+    """Central pessoal do Breeder: operação, capacidade, avaliações e repasses."""
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+    if not (usuario_tem_funcao(email, 'breeder') or permissoes.get('pode_assumir_breed') or _is_admin(email)):
+        flash('A Central do Breeder é exclusiva para Breeders autorizados.', 'erro')
+        return redirect(url_for('painel'))
+
+    pedidos = _safe_table('pedidos_breed', '*')
+    meus = [p for p in pedidos if p.get('breeder_responsavel') == email]
+    meus.sort(key=lambda x: str(x.get('updated_at') or x.get('created_at') or ''), reverse=True)
+    avaliacoes = [a for a in _safe_table('avaliacoes', '*') if a.get('tipo_pedido') == 'breed' and a.get('avaliado_email') == email]
+    metricas = _hype_breeder_metricas(email, pedidos, avaliacoes)
+
+    perfil = next(iter(_safe_table('breeders_perfil', '*', usuario_email=email)), {})
+    disponibilidade = next((d for d in _safe_table('disponibilidade_funcoes', '*', usuario_email=email) if d.get('funcao') == 'breeder'), {})
+    usuario = next(iter(_safe_table('usuarios_clan', '*', email=email)), {})
+    max_ativos = int(perfil.get('max_ativos') or 4)
+
+    ativos_status = ('aguardando_pagamento', 'em_producao', 'cancelamento_solicitado')
+    ativos = [p for p in meus if p.get('status') in ativos_status]
+    aguardando_pagamento = [p for p in meus if p.get('status') == 'aguardando_pagamento']
+    em_producao = [p for p in meus if p.get('status') in ('em_producao', 'cancelamento_solicitado')]
+    prontos = [p for p in meus if p.get('status') in ('concluido', 'aguardando_confirmacao')]
+    entregues = [p for p in meus if p.get('status') == 'entregue']
+
+    ids = [p.get('id') for p in meus if p.get('id') is not None]
+    nao_lidas = {}
+    if ids:
+        try:
+            msgs = supabase.table('mensagens_pedido').select('pedido_id,remetente_email,lida').eq('tipo_pedido','breed').in_('pedido_id', ids).execute().data or []
+            for m in msgs:
+                if not m.get('lida') and m.get('remetente_email') != email:
+                    pid = m.get('pedido_id')
+                    nao_lidas[pid] = nao_lidas.get(pid, 0) + 1
+        except Exception as e:
+            print(f'Erro ao contar mensagens no painel Breeder: {e}')
+
+    mapa = mapa_nicks_por_email()
+    for p in meus:
+        p['cliente_nick'] = mapa.get(p.get('usuario_email'), {}).get('nick') or p.get('player') or 'Membro HYPE'
+        p['mensagens_nao_lidas'] = nao_lidas.get(p.get('id'), 0)
+
+    repasse_total = sum(int(p.get('valor_breeder') or p.get('preco_total') or 0) for p in entregues)
+    agora = datetime.now(HYPE_TZ)
+    repasse_mes = 0
+    entregues_mes = 0
+    for p in entregues:
+        dt = parse_data_supabase(p.get('entregue_em'))
+        if dt and dt.astimezone(HYPE_TZ).year == agora.year and dt.astimezone(HYPE_TZ).month == agora.month:
+            repasse_mes += int(p.get('valor_breeder') or p.get('preco_total') or 0)
+            entregues_mes += 1
+
+    avaliacoes.sort(key=lambda x: str(x.get('created_at') or ''), reverse=True)
+    for a in avaliacoes[:8]:
+        a['avaliador_nick'] = mapa.get(a.get('avaliador_email'), {}).get('nick') or 'Membro HYPE'
+
+    return render_template(
+        'painel_breeder_hype.html', usuario=usuario, perfil=perfil, disponibilidade=disponibilidade,
+        metricas=metricas, max_ativos=max_ativos, ativos=ativos, aguardando_pagamento=aguardando_pagamento,
+        em_producao=em_producao, prontos=prontos, entregues=entregues[:8], repasse_total=repasse_total,
+        repasse_mes=repasse_mes, entregues_mes=entregues_mes, avaliacoes=avaliacoes[:8], permissoes=permissoes
+    )
+
+
+@app.route('/breed/pedido/<int:pedido_id>')
+@login_required
+def breed_pedido_detalhe(pedido_id):
+    """Detalhes completos de um pedido Breed com acesso por cliente, responsável ou equipe autorizada."""
+    email = session.get('usuario_email')
+    permissoes = obter_permissoes_usuario(email)
+    pedido = _pedido('breed', pedido_id)
+    if not pedido:
+        flash('Pedido de Breed não encontrado.', 'erro')
+        return redirect(url_for('breed_meus_pedidos'))
+    pode_ver = email in (pedido.get('usuario_email'), pedido.get('breeder_responsavel')) or permissoes.get('pode_ver_fila_breed') or _is_admin(email)
+    if not pode_ver:
+        flash('Você não tem acesso a este pedido.', 'erro')
+        return redirect(url_for('breed_meus_pedidos'))
+
+    mapa = mapa_nicks_por_email()
+    pedido['cliente_nick'] = mapa.get(pedido.get('usuario_email'), {}).get('nick') or pedido.get('player') or 'Membro HYPE'
+    pedido['breeder_nick'] = mapa.get(pedido.get('breeder_responsavel'), {}).get('nick') if pedido.get('breeder_responsavel') else None
+
+    historico = []
+    mensagens = []
+    avaliacao = None
+    try:
+        historico = supabase.table('historico_pedidos').select('*').eq('tipo_pedido','breed').eq('pedido_id',pedido_id).order('created_at').execute().data or []
+    except Exception as e:
+        print(f'Erro ao carregar histórico do pedido #{pedido_id}: {e}')
+    try:
+        mensagens = supabase.table('mensagens_pedido').select('*').eq('tipo_pedido','breed').eq('pedido_id',pedido_id).order('created_at', desc=True).limit(6).execute().data or []
+        mensagens.reverse()
+    except Exception as e:
+        print(f'Erro ao carregar mensagens do pedido #{pedido_id}: {e}')
+    try:
+        avs = supabase.table('avaliacoes').select('*').eq('tipo_pedido','breed').eq('pedido_id',pedido_id).limit(1).execute().data or []
+        avaliacao = avs[0] if avs else None
+    except Exception as e:
+        print(f'Erro ao carregar avaliação do pedido #{pedido_id}: {e}')
+
+    for m in mensagens:
+        m['autor_nick'] = 'Você' if m.get('remetente_email') == email else (mapa.get(m.get('remetente_email'), {}).get('nick') or 'Equipe HYPE')
+
+    return render_template('breed_pedido_detalhe.html', pedido=pedido, historico=historico, mensagens=mensagens,
+                           avaliacao=avaliacao, permissoes=permissoes, usuario_email=email)
+
 
 @app.route('/admin/breeders')
 @login_required
@@ -2499,7 +3104,10 @@ def admin_conteudo():
     for t in torneios_lista: t['total_inscritos']=len(_safe_table('inscricoes_torneio','id',torneio_id=t.get('id')))
     temporadas_lista = sorted(_safe_table('temporadas'), key=lambda x: str(x.get('inicio') or ''), reverse=True)
     formatos_lista = sorted([x for x in _safe_table('formatos_competitivos') if x.get('ativo', True)], key=lambda x:(x.get('nome') or '').casefold())
-    return render_template('admin_conteudo.html', eventos=eventos_lista, torneios=torneios_lista, temporadas=temporadas_lista, formatos_competitivos=formatos_lista)
+    replays = sorted(_safe_table('hype_live_replays'), key=lambda x: str(x.get('created_at') or ''), reverse=True)
+    cfg = {x.get('chave'): (x.get('valor') or '') for x in _safe_table('configuracoes_site')}
+    return render_template('admin_conteudo.html', eventos=eventos_lista, torneios=torneios_lista, temporadas=temporadas_lista,
+                           formatos_competitivos=formatos_lista, replays=replays, cfg=cfg)
 
 
 @app.route('/admin/eventos/criar', methods=['POST'])
@@ -2810,8 +3418,10 @@ def admin_precos():
                 if percentual <= 0 or percentual > 100: raise ValueError('O desconto deve ficar entre 0,01% e 100%.')
                 todos=request.form.get('aplicar_todos')=='1'; codigos=request.form.getlist('codigos_preco')
                 if not todos and not codigos: raise ValueError('Selecione pelo menos um preço ou marque Aplicar em todos.')
-                inicio=request.form.get('inicio_em') or None; fim=request.form.get('fim_em') or None
-                if inicio and fim and inicio >= fim: raise ValueError('O término precisa ser posterior ao início.')
+                inicio_local=request.form.get('inicio_em') or None; fim_local=request.form.get('fim_em') or None
+                inicio=_promo_datetime_form_para_utc(inicio_local); fim=_promo_datetime_form_para_utc(fim_local)
+                if inicio and fim and _parse_promo_datetime(inicio) >= _parse_promo_datetime(fim):
+                    raise ValueError('O término precisa ser posterior ao início.')
                 supabase.table('promocoes_breed').insert({'nome':nome,'percentual':percentual,'aplicar_todos':todos,'codigos_preco':codigos,'inicio_em':inicio,'fim_em':fim,'ativo':True,'criado_por':session.get('usuario_email')}).execute()
                 flash('Promoção criada. O desconto será aplicado automaticamente no período configurado.','sucesso')
             elif acao == 'toggle_promocao':
@@ -2819,11 +3429,22 @@ def admin_precos():
                 supabase.table('promocoes_breed').update({'ativo':ativo,'updated_at':agora_iso()}).eq('id',pid).execute(); flash('Promoção atualizada.','sucesso')
             elif acao == 'excluir_promocao':
                 pid=int(request.form.get('promocao_id')); supabase.table('promocoes_breed').delete().eq('id',pid).execute(); flash('Promoção removida. Pedidos antigos mantêm o preço já fechado.','sucesso')
+            elif acao == 'taxa_clan':
+                taxa=float((request.form.get('taxa_clan_percentual') or '0').replace(',','.'))
+                if taxa < 0 or taxa > 100: raise ValueError('A taxa do clã deve ficar entre 0% e 100%.')
+                supabase.table('configuracoes_site').upsert({'chave':'breed_taxa_clan_percentual','valor':str(taxa)},on_conflict='chave').execute()
+                flash('Taxa do clã atualizada. Novos pedidos usarão o novo percentual.','sucesso')
         except Exception as e: flash(f'Erro: {e}','erro')
         return redirect(url_for('admin_precos'))
     precos=_safe_table('precos_breed','*'); promos=_safe_table('promocoes_breed','*')
+    agora = datetime.now(timezone.utc)
+    for promo in promos:
+        promo['status_calculado'] = _status_promocao(promo, agora)
+        for campo in ('inicio_em','fim_em'):
+            dt = _parse_promo_datetime(promo.get(campo))
+            promo[campo + '_local'] = dt.astimezone(HYPE_TZ).strftime('%d/%m/%Y %H:%M') if dt else None
     promos.sort(key=lambda x: str(x.get('created_at') or ''), reverse=True)
-    return render_template('admin_precos.html', precos=precos, promocoes=promos)
+    return render_template('admin_precos.html', precos=precos, promocoes=promos, taxa_clan=obter_taxa_clan_breed())
 
 @app.route('/admin/feed', methods=['GET','POST'])
 @login_required
@@ -2989,8 +3610,13 @@ def cancelar_breed(pedido_id):
             registrar_log('cancelar','breed','pedido_breed',pedido_id,{'motivo':motivo,'direto':True})
             if p.get('pagamento_confirmado_em'):
                 valor_mov = int(p.get('preco_total') or 0)
-                registrar_transacao_hype(p.get('usuario_email'),'entrada','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('breeder_responsavel'),chave_unica=f'breed:{pedido_id}:estorno_cliente')
-                registrar_transacao_hype(p.get('breeder_responsavel'),'saida','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('usuario_email'),chave_unica=f'breed:{pedido_id}:estorno_breeder')
+                taxa_clan = int(p.get('taxa_clan_valor') or 0)
+                valor_breeder = int(p.get('valor_breeder') or max(0, valor_mov - taxa_clan))
+                ciclo = str(p.get('pagamento_confirmado_em') or 'sem_pagamento')
+                registrar_transacao_hype(p.get('usuario_email'),'entrada','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('breeder_responsavel'),chave_unica=f'breed:{pedido_id}:estorno_cliente:{ciclo}')
+                registrar_transacao_hype(p.get('breeder_responsavel'),'saida','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_breeder,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('usuario_email'),chave_unica=f'breed:{pedido_id}:estorno_breeder:{ciclo}')
+                if taxa_clan:
+                    registrar_caixa_clan('saida','estorno_taxa_breed',f"Estorno da taxa do Breed #{pedido_id}",taxa_clan,origem_tipo='breed',origem_id=pedido_id,chave_unica=f'breed:{pedido_id}:estorno_taxa_clan:{ciclo}')
             if p.get('breeder_responsavel') and p.get('breeder_responsavel') != email:
                 criar_notificacao(p.get('breeder_responsavel'),'Breed cancelado',f"O pedido de {p.get('pokemon')} foi cancelado.",'aviso',url_for('breed'))
             flash('Pedido cancelado.', 'sucesso')
@@ -3064,8 +3690,12 @@ def decidir_cancelamento_breed(pedido_id, decisao):
         supabase.table('pedidos_breed').update(updates).eq('id',pedido_id).eq('status','cancelamento_solicitado').execute()
         if decisao == 'aprovar' and p.get('pagamento_confirmado_em'):
             valor_mov = int(p.get('preco_total') or 0)
-            registrar_transacao_hype(p.get('usuario_email'),'entrada','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('breeder_responsavel'),chave_unica=f'breed:{pedido_id}:estorno_cliente')
-            registrar_transacao_hype(p.get('breeder_responsavel'),'saida','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('usuario_email'),chave_unica=f'breed:{pedido_id}:estorno_breeder')
+            taxa_clan = int(p.get('taxa_clan_valor') or 0)
+            valor_breeder = int(p.get('valor_breeder') or max(0, valor_mov - taxa_clan))
+            registrar_transacao_hype(p.get('usuario_email'),'entrada','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('breeder_responsavel'),chave_unica=f'breed:{pedido_id}:estorno_cliente:{str(p.get("pagamento_confirmado_em") or "sem_pagamento")}')
+            registrar_transacao_hype(p.get('breeder_responsavel'),'saida','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_breeder,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('usuario_email'),chave_unica=f'breed:{pedido_id}:estorno_breeder:{str(p.get("pagamento_confirmado_em") or "sem_pagamento")}')
+            if taxa_clan:
+                registrar_caixa_clan('saida','estorno_taxa_breed',f"Estorno da taxa do Breed #{pedido_id}",taxa_clan,origem_tipo='breed',origem_id=pedido_id,chave_unica=f'breed:{pedido_id}:estorno_taxa_clan:{str(p.get("pagamento_confirmado_em") or "sem_pagamento")}')
         registrar_historico('breed',pedido_id,'cancelamento_solicitado',novo_status,f'Cancelamento {updates["cancelamento_decisao"]}.')
         registrar_log('decidir_cancelamento','breed','pedido_breed',pedido_id,{'decisao':updates['cancelamento_decisao']})
         criar_notificacao(p.get('usuario_email'),'Cancelamento do Breed',msg,'aviso',url_for('breed'))
@@ -3200,7 +3830,20 @@ def chat_pedido(tipo, pedido_id):
         return redirect(url_for('chat_pedido',tipo=tipo,pedido_id=pedido_id))
     msgs=supabase.table('mensagens_pedido').select('*').eq('tipo_pedido',tipo).eq('pedido_id',pedido_id).order('created_at').execute().data or []
     supabase.table('mensagens_pedido').update({'lida':True}).eq('tipo_pedido',tipo).eq('pedido_id',pedido_id).neq('remetente_email',email).execute()
-    return render_template('chat_pedido.html',tipo=tipo,pedido=p,mensagens=msgs,chat_readonly=(tipo == 'breed' and p.get('status') in ('entregue','cancelado')))
+    mapa = mapa_nicks_por_email()
+    cliente_nick = mapa.get(p.get('usuario_email'), {}).get('nick') or p.get('player') or 'Membro HYPE'
+    responsavel_nick = mapa.get(responsavel_atual, {}).get('nick') if responsavel_atual else None
+    for m in msgs:
+        remetente = m.get('remetente_email')
+        if remetente == email:
+            m['autor_nick'] = 'Você'
+        elif remetente == p.get('usuario_email'):
+            m['autor_nick'] = cliente_nick
+        elif remetente == responsavel_atual:
+            m['autor_nick'] = responsavel_nick or 'Breeder HYPE'
+        else:
+            m['autor_nick'] = mapa.get(remetente, {}).get('nick') or 'Equipe HYPE'
+    return render_template('chat_pedido.html',tipo=tipo,pedido=p,mensagens=msgs,chat_readonly=(tipo == 'breed' and p.get('status') in ('entregue','cancelado')), cliente_nick=cliente_nick, responsavel_nick=responsavel_nick, permissoes=obter_permissoes_usuario(email))
 
 @app.route('/pedido/<tipo>/<int:pedido_id>/avaliar', methods=['POST'])
 @login_required
@@ -3239,8 +3882,16 @@ def disponibilidade_breeder():
     if not (usuario_tem_funcao(email,'breeder') or obter_permissoes_usuario(email).get('pode_assumir_breed') or _is_admin(email)): return redirect(url_for('painel'))
     status=request.form.get('status','disponivel')
     if status not in ('disponivel','ocupado','indisponivel'): status='disponivel'
-    supabase.table('disponibilidade_funcoes').upsert({'usuario_email':email,'funcao':'breeder','status':status,'updated_at':agora_iso()}).execute()
-    return redirect(url_for('breed'))
+    agora=agora_iso()
+    supabase.table('disponibilidade_funcoes').upsert(
+        {'usuario_email':email,'funcao':'breeder','status':status,'updated_at':agora},
+        on_conflict='usuario_email,funcao'
+    ).execute()
+    # Mantém o perfil operacional sincronizado para telas/rotas antigas.
+    supabase.table('breeders_perfil').upsert(
+        {'usuario_email':email,'status':status,'updated_at':agora},on_conflict='usuario_email'
+    ).execute()
+    return redirect(request.referrer or url_for('painel_breeder_hype'))
 
 @app.route('/builds/cancelar/<int:pedido_id>', methods=['POST'])
 @login_required
@@ -3855,6 +4506,472 @@ def admin_lojas():
     return redirect(request.referrer or url_for('loja_detalhe', loja_id=loja_id))
 
 
+
+# ============================================================================
+# HYPE V25 - TESOURO / ARSENAL COMPETITIVO 2.0
+# Área exclusiva para membros ativos do Clã HYPE: Pokémon e Megas.
+# ============================================================================
+
+def _tesouro_pode_gerenciar(email=None):
+    email = email or session.get('usuario_email')
+    if not email or not membro_hype_ativo(email):
+        return False
+    permissoes = obter_permissoes_usuario(email)
+    return bool(permissoes.get('pode_gerenciar_cofre', permissoes.get('pode_gerenciar_cargos', False)))
+
+
+def _tesouro_proximo_codigo(tipo):
+    prefixo = 'HYPE-PKM-' if tipo == 'pokemon' else 'HYPE-MEGA-'
+    maior = 0
+    for item in _safe_table('cofre_itens', 'codigo'):
+        codigo = str(item.get('codigo') or '')
+        if not codigo.startswith(prefixo):
+            continue
+        try:
+            maior = max(maior, int(codigo.rsplit('-', 1)[-1]))
+        except Exception:
+            pass
+    return f'{prefixo}{maior + 1:04d}'
+
+
+def _tesouro_metadata(item):
+    metadata = item.get('metadata') if isinstance(item, dict) else {}
+    return metadata if isinstance(metadata, dict) else {}
+
+
+def _tesouro_upload_imagem(arquivo):
+    if not arquivo or not getattr(arquivo, 'filename', None):
+        return None
+    nome = secure_filename(arquivo.filename or '')
+    ext = os.path.splitext(nome)[1].lower()
+    if ext not in ('.png','.jpg','.jpeg','.webp','.gif'):
+        raise ValueError('Formato de imagem não permitido. Use PNG, JPG, WEBP ou GIF.')
+    conteudo = arquivo.read()
+    if len(conteudo) > 8 * 1024 * 1024:
+        raise ValueError('A imagem deve ter no máximo 8 MB.')
+    caminho = f"tesouro/{uuid4().hex}{ext}"
+    supabase.storage.from_('hype-media').upload(caminho, conteudo, {'content-type': arquivo.mimetype or 'application/octet-stream'})
+    pub = supabase.storage.from_('hype-media').get_public_url(caminho)
+    return pub if isinstance(pub, str) else getattr(pub, 'public_url', None) or str(pub)
+
+
+def _tesouro_disponivel(item):
+    if not item or not item.get('ativo', True):
+        return 0
+    if (item.get('situacao') or 'disponivel') != 'disponivel':
+        return 0
+    total = int(item.get('quantidade_total') or 0)
+    reservado = int(item.get('quantidade_reservada') or 0)
+    return max(0, total - reservado)
+
+
+def _tesouro_preparar_item(item):
+    item = dict(item or {})
+    item['metadata'] = _tesouro_metadata(item)
+    item['situacao'] = item.get('situacao') or 'disponivel'
+    item['disponivel'] = _tesouro_disponivel(item)
+    item['reservado'] = max(0, int(item.get('quantidade_reservada') or 0))
+    return item
+
+
+def _tesouro_atualizar_atrasos():
+    hoje = datetime.now(HYPE_TZ).date()
+    for emp in _safe_table('cofre_emprestimos', '*'):
+        if emp.get('status') != 'retirado' or not emp.get('prazo_devolucao'):
+            continue
+        try:
+            prazo = datetime.fromisoformat(str(emp.get('prazo_devolucao'))[:10]).date()
+        except Exception:
+            continue
+        if prazo < hoje:
+            try:
+                supabase.table('cofre_emprestimos').update({'status': 'atrasado'}).eq('id', emp.get('id')).eq('status', 'retirado').execute()
+                _tesouro_registrar_movimento(emp.get('item_id'), emp.get('id'), 'emprestimo_atrasado', f'Prazo vencido em {prazo.isoformat()}')
+            except Exception as e:
+                print(f'[tesouro atraso] {e}')
+
+
+def _tesouro_registrar_movimento(item_id, emprestimo_id, acao, observacao=None):
+    try:
+        supabase.table('cofre_movimentacoes').insert({
+            'item_id': item_id,
+            'emprestimo_id': emprestimo_id,
+            'usuario_email': session.get('usuario_email'),
+            'acao': acao,
+            'observacao': (observacao or '').strip()[:1000] or None
+        }).execute()
+    except Exception as e:
+        print(f'[cofre_movimentacoes] {e}')
+
+
+def _tesouro_enriquecer_emprestimos(emprestimos, itens_map=None, usuarios_map=None):
+    itens_map = itens_map or {x.get('id'): _tesouro_preparar_item(x) for x in _safe_table('cofre_itens')}
+    usuarios_map = usuarios_map or mapa_nicks_por_email()
+    hoje = datetime.now(HYPE_TZ).date()
+    saida = []
+    for raw in emprestimos or []:
+        emp = dict(raw)
+        emp['item'] = itens_map.get(emp.get('item_id'), {})
+        usuario = usuarios_map.get(emp.get('usuario_email'), {})
+        emp['usuario_nick'] = usuario.get('nick') or emp.get('usuario_email')
+        emp['dias_restantes'] = None
+        if emp.get('prazo_devolucao'):
+            try:
+                prazo = datetime.fromisoformat(str(emp.get('prazo_devolucao'))[:10]).date()
+                emp['dias_restantes'] = (prazo - hoje).days
+            except Exception:
+                pass
+        saida.append(emp)
+    return saida
+
+
+@app.route('/tesouro')
+@membro_hype_required
+def tesouro_hype():
+    email = session['usuario_email']
+    _tesouro_atualizar_atrasos()
+    todos_itens = [_tesouro_preparar_item(x) for x in _safe_table('cofre_itens')]
+    itens = [x for x in todos_itens if x.get('ativo', True)]
+    ordem = {'pokemon': 0, 'mega': 1}
+    itens = sorted(itens, key=lambda x: (0 if x.get('destaque') else 1, ordem.get(x.get('tipo'), 9), (x.get('nome') or '').lower()))
+    emprestimos = sorted(
+        _tesouro_enriquecer_emprestimos(_safe_table('cofre_emprestimos', '*', usuario_email=email), {x.get('id'):x for x in todos_itens}),
+        key=lambda x: x.get('solicitado_em') or x.get('created_at') or '', reverse=True
+    )
+    ativos_status = ('solicitado','aprovado','retirado','atrasado','devolucao_solicitada')
+    ativos = [e for e in emprestimos if e.get('status') in ativos_status]
+    resumo = {
+        'pokemons': sum(int(x.get('quantidade_total') or 0) for x in itens if x.get('tipo') == 'pokemon'),
+        'megas': sum(int(x.get('quantidade_total') or 0) for x in itens if x.get('tipo') == 'mega'),
+        'disponiveis': sum(int(x.get('disponivel') or 0) for x in itens),
+        'meus_ativos': len(ativos),
+        'meus_atrasados': sum(1 for e in ativos if e.get('status') == 'atrasado'),
+    }
+    return render_template(
+        'tesouro_hype.html', itens=itens, emprestimos=emprestimos, emprestimos_ativos=ativos,
+        resumo=resumo, pode_gerenciar=_tesouro_pode_gerenciar(email)
+    )
+
+
+@app.route('/tesouro/item/<int:item_id>')
+@membro_hype_required
+def tesouro_item(item_id):
+    email = session['usuario_email']
+    _tesouro_atualizar_atrasos()
+    rows = _safe_table('cofre_itens', '*', id=item_id)
+    if not rows or not rows[0].get('ativo', True):
+        flash('Patrimônio do Tesouro não encontrado.', 'erro')
+        return redirect(url_for('tesouro_hype'))
+    item = _tesouro_preparar_item(rows[0])
+    meus = _tesouro_enriquecer_emprestimos(_safe_table('cofre_emprestimos', '*', usuario_email=email), {item_id:item})
+    meus = [e for e in meus if e.get('item_id') == item_id]
+    meus.sort(key=lambda x: x.get('solicitado_em') or '', reverse=True)
+    todos_item = _safe_table('cofre_emprestimos', '*', item_id=item_id)
+    resumo_item = {
+        'emprestimos_total': len(todos_item),
+        'devolvidos': sum(1 for e in todos_item if e.get('status') == 'devolvido'),
+        'em_uso': sum(1 for e in todos_item if e.get('status') in ('aprovado','retirado','atrasado','devolucao_solicitada')),
+    }
+    return render_template(
+        'tesouro_item.html', item=item, meus_emprestimos=meus, resumo_item=resumo_item,
+        pode_gerenciar=_tesouro_pode_gerenciar(email)
+    )
+
+
+@app.route('/tesouro/solicitar/<int:item_id>', methods=['POST'])
+@membro_hype_required
+def tesouro_solicitar(item_id):
+    email = session['usuario_email']
+    itens = _safe_table('cofre_itens', '*', id=item_id)
+    if not itens:
+        flash('Item do Tesouro não encontrado.', 'erro')
+        return redirect(url_for('tesouro_hype'))
+    item = _tesouro_preparar_item(itens[0])
+    if not item.get('ativo', True) or item.get('situacao') != 'disponivel':
+        flash('Este patrimônio está temporariamente indisponível para empréstimo.', 'erro')
+        return redirect(request.referrer or url_for('tesouro_hype'))
+    try:
+        quantidade = max(1, min(99, int(request.form.get('quantidade') or 1)))
+    except Exception:
+        quantidade = 1
+    disponivel = _tesouro_disponivel(item)
+    if quantidade > disponivel:
+        flash('Não há quantidade suficiente disponível no Tesouro.', 'erro')
+        return redirect(request.referrer or url_for('tesouro_hype'))
+    existentes = _safe_table('cofre_emprestimos', '*', usuario_email=email)
+    if any(e.get('item_id') == item_id and e.get('status') in ('solicitado','aprovado','retirado','atrasado','devolucao_solicitada') for e in existentes):
+        flash('Você já possui uma solicitação ou empréstimo ativo deste patrimônio.', 'erro')
+        return redirect(request.referrer or url_for('tesouro_hype'))
+    observacao = request.form.get('observacao','').strip()[:800] or None
+    try:
+        res = supabase.table('cofre_emprestimos').insert({
+            'item_id': item_id,
+            'usuario_email': email,
+            'quantidade': quantidade,
+            'status': 'solicitado',
+            'observacao_solicitante': observacao
+        }).execute()
+        emp = (res.data or [{}])[0]
+        _tesouro_registrar_movimento(item_id, emp.get('id'), 'solicitacao_criada', observacao)
+        registrar_atividade_reino('tesouro_solicitacao', email, f"Solicitação no Tesouro: {item.get('nome')}", 'tesouro', item_id)
+        flash('Solicitação enviada ao Tesouro HYPE.', 'sucesso')
+    except Exception as e:
+        flash(f'Não foi possível solicitar o empréstimo: {e}', 'erro')
+    return redirect(request.referrer or url_for('tesouro_hype'))
+
+
+@app.route('/tesouro/emprestimo/<int:emprestimo_id>/cancelar', methods=['POST'])
+@membro_hype_required
+def tesouro_cancelar_solicitacao(emprestimo_id):
+    email = session['usuario_email']
+    rows = _safe_table('cofre_emprestimos', '*', id=emprestimo_id)
+    if not rows or rows[0].get('usuario_email') != email or rows[0].get('status') != 'solicitado':
+        flash('Esta solicitação não pode ser cancelada.', 'erro')
+        return redirect(request.referrer or url_for('tesouro_hype'))
+    try:
+        supabase.table('cofre_emprestimos').update({'status':'cancelado'}).eq('id', emprestimo_id).eq('usuario_email', email).eq('status','solicitado').execute()
+        _tesouro_registrar_movimento(rows[0].get('item_id'), emprestimo_id, 'solicitacao_cancelada')
+        flash('Solicitação cancelada.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao cancelar: {e}', 'erro')
+    return redirect(request.referrer or url_for('tesouro_hype'))
+
+
+@app.route('/tesouro/emprestimo/<int:emprestimo_id>/solicitar-devolucao', methods=['POST'])
+@membro_hype_required
+def tesouro_solicitar_devolucao(emprestimo_id):
+    email = session['usuario_email']
+    rows = _safe_table('cofre_emprestimos', '*', id=emprestimo_id)
+    if not rows or rows[0].get('usuario_email') != email or rows[0].get('status') not in ('retirado','atrasado'):
+        flash('Este empréstimo não está disponível para solicitação de devolução.', 'erro')
+        return redirect(request.referrer or url_for('tesouro_hype'))
+    emp = rows[0]
+    observacao = request.form.get('observacao','').strip()[:800] or None
+    agora = datetime.now(timezone.utc).isoformat()
+    try:
+        supabase.table('cofre_emprestimos').update({
+            'status':'devolucao_solicitada',
+            'devolucao_solicitada_em':agora,
+            'devolucao_observacao':observacao
+        }).eq('id', emprestimo_id).eq('usuario_email', email).execute()
+        _tesouro_registrar_movimento(emp.get('item_id'), emprestimo_id, 'devolucao_solicitada', observacao)
+        flash('Devolução solicitada. A administração precisa confirmar o recebimento.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao solicitar devolução: {e}', 'erro')
+    return redirect(request.referrer or url_for('tesouro_hype'))
+
+
+@app.route('/admin/tesouro')
+@membro_hype_required
+def admin_tesouro():
+    email = session['usuario_email']
+    if not _tesouro_pode_gerenciar(email):
+        flash('Você não possui permissão para gerenciar o Tesouro.', 'erro')
+        return redirect(url_for('tesouro_hype'))
+    _tesouro_atualizar_atrasos()
+    itens = [_tesouro_preparar_item(x) for x in _safe_table('cofre_itens')]
+    itens.sort(key=lambda x: (x.get('tipo') or '', x.get('nome') or ''))
+    itens_map = {x.get('id'):x for x in itens}
+    usuarios_map = mapa_nicks_por_email()
+    emprestimos = _tesouro_enriquecer_emprestimos(_safe_table('cofre_emprestimos'), itens_map, usuarios_map)
+    emprestimos.sort(key=lambda x: x.get('solicitado_em') or x.get('created_at') or '', reverse=True)
+    movimentos = sorted(_safe_table('cofre_movimentacoes'), key=lambda x: x.get('created_at') or '', reverse=True)[:60]
+    for mov in movimentos:
+        mov['item'] = itens_map.get(mov.get('item_id'), {})
+        mov['usuario_nick'] = usuarios_map.get(mov.get('usuario_email'),{}).get('nick') or mov.get('usuario_email') or 'Sistema'
+    resumo = {
+        'itens': len([x for x in itens if x.get('ativo', True)]),
+        'disponiveis': sum(int(x.get('disponivel') or 0) for x in itens if x.get('ativo', True)),
+        'solicitados': sum(1 for e in emprestimos if e.get('status') == 'solicitado'),
+        'em_uso': sum(1 for e in emprestimos if e.get('status') in ('aprovado','retirado','devolucao_solicitada')),
+        'atrasados': sum(1 for e in emprestimos if e.get('status') == 'atrasado'),
+        'devolucao': sum(1 for e in emprestimos if e.get('status') == 'devolucao_solicitada'),
+    }
+    return render_template('admin_tesouro.html', itens=itens, emprestimos=emprestimos, movimentos=movimentos, resumo=resumo)
+
+
+@app.route('/admin/tesouro/item/novo', methods=['POST'])
+@membro_hype_required
+def admin_tesouro_novo_item():
+    email = session['usuario_email']
+    if not _tesouro_pode_gerenciar(email):
+        return redirect(url_for('tesouro_hype'))
+    tipo = request.form.get('tipo','').strip().lower()
+    if tipo not in ('pokemon','mega'):
+        flash('Tipo inválido. Use Pokémon ou Mega.', 'erro')
+        return redirect(url_for('admin_tesouro'))
+    nome = request.form.get('nome','').strip()[:120]
+    if not nome:
+        flash('Informe o nome do Pokémon ou da Mega.', 'erro')
+        return redirect(url_for('admin_tesouro'))
+    try:
+        quantidade = max(1, min(999, int(request.form.get('quantidade_total') or 1)))
+    except Exception:
+        quantidade = 1
+    metadata = {
+        'pokemon': request.form.get('pokemon','').strip()[:100] or None,
+        'nature': request.form.get('nature','').strip()[:60] or None,
+        'ability': request.form.get('ability','').strip()[:100] or None,
+        'ivs': request.form.get('ivs','').strip()[:150] or None,
+        'evs': request.form.get('evs','').strip()[:180] or None,
+        'level': request.form.get('level','').strip()[:20] or None,
+        'genero': request.form.get('genero','').strip()[:40] or None,
+        'item': request.form.get('held_item','').strip()[:100] or None,
+        'moves': request.form.get('moves','').strip()[:300] or None,
+        'compatibilidade': request.form.get('compatibilidade','').strip()[:150] or None,
+    }
+    metadata = {k:v for k,v in metadata.items() if v}
+    imagem_url = request.form.get('imagem_url','').strip()[:1000] or None
+    if request.files.get('imagem') and request.files.get('imagem').filename:
+        try:
+            imagem_url = _tesouro_upload_imagem(request.files.get('imagem'))
+        except Exception as e:
+            flash(f'Erro na imagem: {e}', 'erro')
+            return redirect(url_for('admin_tesouro'))
+    dados = {
+        'codigo': _tesouro_proximo_codigo(tipo), 'tipo': tipo, 'nome': nome,
+        'descricao': request.form.get('descricao','').strip()[:1200] or None,
+        'imagem_url': imagem_url,
+        'quantidade_total': quantidade, 'quantidade_reservada': 0,
+        'metadata': metadata, 'ativo': True, 'situacao': 'disponivel',
+        'destaque': request.form.get('destaque') == '1', 'criado_por': email
+    }
+    try:
+        res = supabase.table('cofre_itens').insert(dados).execute()
+        item = (res.data or [{}])[0]
+        _tesouro_registrar_movimento(item.get('id'), None, 'item_cadastrado', dados['codigo'])
+        registrar_log('criar','tesouro','item',item.get('id'),{'codigo':dados['codigo'],'tipo':tipo})
+        flash(f"{nome} adicionado ao Tesouro como {dados['codigo']}.", 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao cadastrar no Tesouro: {e}', 'erro')
+    return redirect(url_for('admin_tesouro'))
+
+
+@app.route('/admin/tesouro/item/<int:item_id>', methods=['POST'])
+@membro_hype_required
+def admin_tesouro_editar_item(item_id):
+    email = session['usuario_email']
+    if not _tesouro_pode_gerenciar(email):
+        return redirect(url_for('tesouro_hype'))
+    rows = _safe_table('cofre_itens','*',id=item_id)
+    if not rows:
+        flash('Item não encontrado.', 'erro'); return redirect(url_for('admin_tesouro'))
+    item=_tesouro_preparar_item(rows[0])
+    try:
+        total = max(int(item.get('quantidade_reservada') or 0), int(request.form.get('quantidade_total') or item.get('quantidade_total') or 1))
+    except Exception:
+        total = int(item.get('quantidade_total') or 1)
+    situacao = request.form.get('situacao','disponivel').strip().lower()
+    if situacao not in ('disponivel','manutencao','indisponivel'):
+        situacao = 'disponivel'
+    metadata = dict(_tesouro_metadata(item))
+    campos = {
+        'pokemon': ('pokemon',100), 'nature': ('nature',60), 'ability': ('ability',100),
+        'ivs': ('ivs',150), 'evs': ('evs',180), 'level': ('level',20),
+        'genero': ('genero',40), 'item': ('held_item',100), 'moves': ('moves',300),
+        'compatibilidade': ('compatibilidade',150)
+    }
+    for chave,(form_key,limite) in campos.items():
+        if form_key in request.form:
+            valor = request.form.get(form_key,'').strip()[:limite]
+            if valor: metadata[chave] = valor
+            else: metadata.pop(chave, None)
+    imagem_url = request.form.get('imagem_url','').strip()[:1000] or item.get('imagem_url')
+    if request.files.get('imagem') and request.files.get('imagem').filename:
+        try:
+            imagem_url = _tesouro_upload_imagem(request.files.get('imagem'))
+        except Exception as e:
+            flash(f'Erro na imagem: {e}', 'erro')
+            return redirect(url_for('admin_tesouro'))
+    dados = {
+        'nome': request.form.get('nome', item.get('nome') or '').strip()[:120],
+        'descricao': request.form.get('descricao','').strip()[:1200] or None,
+        'imagem_url': imagem_url,
+        'quantidade_total': total, 'metadata': metadata, 'situacao': situacao,
+        'destaque': request.form.get('destaque') == '1',
+        'ativo': request.form.get('ativo') == '1'
+    }
+    try:
+        supabase.table('cofre_itens').update(dados).eq('id',item_id).execute()
+        _tesouro_registrar_movimento(item_id,None,'item_editado', situacao)
+        registrar_log('editar','tesouro','item',item_id,{'nome':dados['nome'],'situacao':situacao,'ativo':dados['ativo']})
+        flash('Patrimônio do Tesouro atualizado.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao atualizar: {e}', 'erro')
+    return redirect(url_for('admin_tesouro'))
+
+
+@app.route('/admin/tesouro/emprestimo/<int:emprestimo_id>/<acao>', methods=['POST'])
+@membro_hype_required
+def admin_tesouro_emprestimo(emprestimo_id, acao):
+    email = session['usuario_email']
+    if not _tesouro_pode_gerenciar(email):
+        return redirect(url_for('tesouro_hype'))
+    rows = _safe_table('cofre_emprestimos','*',id=emprestimo_id)
+    if not rows:
+        flash('Empréstimo não encontrado.', 'erro'); return redirect(url_for('admin_tesouro'))
+    emp=rows[0]
+    itens=_safe_table('cofre_itens','*',id=emp.get('item_id'))
+    if not itens:
+        flash('Item do empréstimo não existe mais.', 'erro'); return redirect(url_for('admin_tesouro'))
+    item=_tesouro_preparar_item(itens[0])
+    status=emp.get('status')
+    qtd=int(emp.get('quantidade') or 1)
+    motivo=request.form.get('motivo','').strip()[:800] or None
+    hoje=datetime.now(HYPE_TZ).date()
+    agora=datetime.now(timezone.utc).isoformat()
+    try:
+        if acao == 'aprovar' and status == 'solicitado':
+            disponivel=_tesouro_disponivel(item)
+            if qtd > disponivel:
+                flash('Estoque insuficiente para aprovar.', 'erro'); return redirect(url_for('admin_tesouro'))
+            if item.get('situacao') != 'disponivel':
+                flash('O patrimônio está marcado como indisponível/manutenção.', 'erro'); return redirect(url_for('admin_tesouro'))
+            prazo_raw=request.form.get('prazo_devolucao','').strip()
+            prazo=prazo_raw or (hoje + timedelta(days=7)).isoformat()
+            supabase.table('cofre_itens').update({'quantidade_reservada':int(item.get('quantidade_reservada') or 0)+qtd}).eq('id',item.get('id')).execute()
+            supabase.table('cofre_emprestimos').update({'status':'aprovado','aprovado_por':email,'aprovado_em':agora,'prazo_devolucao':prazo,'motivo_decisao':motivo}).eq('id',emprestimo_id).eq('status','solicitado').execute()
+            criar_notificacao(emp.get('usuario_email'),'Tesouro HYPE: empréstimo aprovado',f"Seu pedido de {item.get('nome')} foi aprovado. Prazo: {prazo}.",'sucesso',url_for('tesouro_hype'))
+            novo='aprovado'
+        elif acao == 'recusar' and status == 'solicitado':
+            supabase.table('cofre_emprestimos').update({'status':'recusado','decidido_por':email,'decidido_em':agora,'motivo_decisao':motivo}).eq('id',emprestimo_id).eq('status','solicitado').execute()
+            criar_notificacao(emp.get('usuario_email'),'Tesouro HYPE: solicitação recusada',f"A solicitação de {item.get('nome')} foi recusada.",'info',url_for('tesouro_hype'))
+            novo='recusado'
+        elif acao == 'retirar' and status == 'aprovado':
+            supabase.table('cofre_emprestimos').update({'status':'retirado','retirado_em':agora}).eq('id',emprestimo_id).eq('status','aprovado').execute()
+            criar_notificacao(emp.get('usuario_email'),'Tesouro HYPE: retirada registrada',f"A retirada de {item.get('nome')} foi registrada.",'info',url_for('tesouro_hype'))
+            novo='retirado'
+        elif acao == 'prorrogar' and status in ('aprovado','retirado','atrasado'):
+            prazo=request.form.get('prazo_devolucao','').strip()
+            if not prazo:
+                flash('Informe o novo prazo.', 'erro'); return redirect(url_for('admin_tesouro'))
+            novo_status = 'retirado' if status == 'atrasado' else status
+            supabase.table('cofre_emprestimos').update({
+                'status':novo_status,'prazo_devolucao':prazo,'prorrogado_em':agora,
+                'prorrogado_por':email,'prorrogacoes':int(emp.get('prorrogacoes') or 0)+1
+            }).eq('id',emprestimo_id).execute()
+            criar_notificacao(emp.get('usuario_email'),'Tesouro HYPE: prazo atualizado',f"O novo prazo de {item.get('nome')} é {prazo}.",'info',url_for('tesouro_hype'))
+            novo='prazo_prorrogado'
+        elif acao == 'devolver' and status in ('retirado','atrasado','devolucao_solicitada','aprovado'):
+            reservado=max(0,int(item.get('quantidade_reservada') or 0)-qtd)
+            supabase.table('cofre_itens').update({'quantidade_reservada':reservado}).eq('id',item.get('id')).execute()
+            supabase.table('cofre_emprestimos').update({'status':'devolvido','devolvido_em':agora,'devolucao_confirmada_por':email}).eq('id',emprestimo_id).execute()
+            criar_notificacao(emp.get('usuario_email'),'Tesouro HYPE: devolução confirmada',f"A devolução de {item.get('nome')} foi confirmada. Obrigado!",'sucesso',url_for('tesouro_hype'))
+            novo='devolvido'
+        elif acao == 'cancelar' and status == 'aprovado':
+            reservado=max(0,int(item.get('quantidade_reservada') or 0)-qtd)
+            supabase.table('cofre_itens').update({'quantidade_reservada':reservado}).eq('id',item.get('id')).execute()
+            supabase.table('cofre_emprestimos').update({'status':'cancelado','motivo_decisao':motivo}).eq('id',emprestimo_id).eq('status','aprovado').execute()
+            novo='cancelado'
+        else:
+            flash('Ação incompatível com o estado atual do empréstimo.', 'erro'); return redirect(url_for('admin_tesouro'))
+        _tesouro_registrar_movimento(item.get('id'),emprestimo_id,f'emprestimo_{novo}',motivo)
+        registrar_log(acao,'tesouro','emprestimo',emprestimo_id,{'status_anterior':status,'status_novo':novo})
+        flash('Empréstimo atualizado.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao atualizar empréstimo: {e}', 'erro')
+    return redirect(url_for('admin_tesouro'))
+
 @app.route('/reino')
 @login_required
 def painel_reino():
@@ -4415,6 +5532,13 @@ from modules.builders_hub import create_builders_hub_blueprint
 app.register_blueprint(create_builders_hub_blueprint(
     supabase, login_required, _safe_table, _is_admin
 ))
+
+
+from modules.events_v26 import create_events_v26_blueprint
+app.register_blueprint(create_events_v26_blueprint(
+    supabase, login_required, _safe_table, _is_admin, registrar_log, criar_notificacao
+))
+
 
 # ============================================================================
 # INICIALIZADOR DO SERVIDOR
