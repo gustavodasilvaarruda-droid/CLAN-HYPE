@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070707">
   <title>{% block title %}HYPE Builders{% endblock %}</title>
-  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}">
+  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=2701">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="builders-gold-ui hype-core-ui">
@@ -37,7 +37,7 @@
     <div class="hgb-side-divider"></div>
     <div class="hgb-side-section-title">Pokémon</div>
     <nav class="hgb-side-nav">
-      <a class="{{'active' if request.endpoint in ['expansion.team_builder','competitive.analisar_team'] else ''}}" href="{{url_for('expansion.team_builder')}}"><span>♟</span>Team Builder</a>
+      <a class="{{'active' if request.endpoint in ['expansion.team_builder','competitive.analisar_team','competitive.time_compartilhado'] else ''}}" href="{{url_for('expansion.team_builder')}}"><span>♟</span>Team Builder</a>
       <a class="{{'active' if request.endpoint in ['competitive.pokedex_competitiva','competitive.pokedex_detalhe'] else ''}}" href="{{url_for('competitive.pokedex_competitiva')}}"><span>◉</span>Pokédex</a>
       <a class="{{'active' if request.endpoint in ['buildershub.hub','buildershub.formatos'] else ''}}" href="{{url_for('buildershub.hub')}}"><span>✦</span>HYPE Builders</a>
       <a class="{{'active' if request.endpoint=='buildershub.guias' else ''}}" href="{{url_for('buildershub.guias')}}"><span>▤</span>Guias e Builds</a>

@@ -1,0 +1,60 @@
+{% extends 'hype_app_base.html' %}
+{% from '_breed_v147_macros.html' import chips,timeline %}
+{% block title %}Pedido #{{pedido.id}} — HYPE Breed{% endblock %}
+{% block body_class %}hype-breed-order-detail-page{% endblock %}
+{% block content %}
+<div class="hype-v6-page breed-v22-detail-page">
+  <section class="breed-v22-detail-hero">
+    <div class="breed-v22-detail-pokemon">
+      <div class="breed-v22-detail-art">{% if pedido.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{pedido.pokemon_id}}.png" alt="">{% else %}<span>◈</span>{% endif %}</div>
+      <div><span class="hype-v6-kicker">HYPE BREED · PEDIDO #{{pedido.id}}</span><h1>{{pedido.pokemon}}</h1><p>Solicitado por <b>{{pedido.cliente_nick}}</b>{% if pedido.breeder_nick %} · Breeder responsável <b>{{pedido.breeder_nick}}</b>{% endif %}</p>{{chips(pedido,false)}}</div>
+    </div>
+    <div class="breed-v22-detail-price">{% if pedido.promocao_percentual %}<span>-{{pedido.promocao_percentual}}% · {{pedido.promocao_nome or 'Promo HYPE'}}</span>{% endif %}{% if pedido.preco_original and pedido.preco_original > pedido.preco_total %}<del>{{pedido.preco_original|preco}}</del>{% endif %}<strong>{{pedido.preco_total|preco}}</strong><small>valor congelado</small></div>
+  </section>
+
+  <nav class="hype-breed-subnav"><a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}{% if pedido.breeder_responsavel==usuario_email %}<a href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>{% endif %}<a class="active" href="#">Pedido #{{pedido.id}}</a></nav>
+
+  <section class="breed-v22-progress-card"><div>{{timeline(pedido)}}</div><div><span class="status-badge status-{{pedido.status}}">{{pedido.status|replace('_',' ')|title}}</span><small>Criado em {{pedido.created_at|data_br}}</small></div></section>
+
+  {% if pedido.status=='cancelamento_solicitado' and pedido.breeder_responsavel==usuario_email %}
+  <section class="breed-v22-alert"><div><strong>Cancelamento solicitado pelo cliente</strong><p>{{pedido.motivo_cancelamento_solicitado or 'Sem motivo informado.'}}</p></div><div><form method="post" action="{{url_for('decidir_cancelamento_breed',pedido_id=pedido.id,decisao='recusar')}}"><button class="btn-ranking-outline" data-once>Recusar</button></form><form method="post" action="{{url_for('decidir_cancelamento_breed',pedido_id=pedido.id,decisao='aprovar')}}" onsubmit="return confirm('Aprovar o cancelamento deste pedido?')"><button class="btn-danger-hype" data-once>Aprovar cancelamento</button></form></div></section>
+  {% endif %}
+
+  <div class="breed-v22-detail-layout">
+    <main>
+      <section class="breed-v22-detail-card"><div class="breed-v22-section-title"><span class="breed-kicker">REQUISITOS</span><h2>Configuração do Pokémon</h2></div><div class="breed-v22-requirements">
+        <div><span>Pokémon</span><b>{{pedido.pokemon}}</b></div><div><span>Breed</span><b>{{pedido.breed_tipo or '—'}}</b></div><div><span>Nature</span><b>{{pedido.nature or 'Sem Nature'}}</b></div><div><span>Ability</span><b>{{'HA' if pedido.ha else (pedido.ability or 'Sem HA')}}</b></div><div><span>Gênero</span><b>{{pedido.genero or 'Indiferente'}}</b></div><div><span>IV descartado</span><b>{{pedido.iv_descartado or 'Nenhum'}}</b></div><div><span>Zero Speed</span><b>{{'Sim' if pedido.zero_speed else 'Não'}}</b></div><div><span>Treinado</span><b>{{'Sim' if pedido.treinado else 'Não'}}</b></div>
+      </div>{% if pedido.evs_treinamento %}<div class="breed-v22-json"><span>EVs solicitados</span><code>{{pedido.evs_treinamento}}</code></div>{% endif %}</section>
+
+      <section class="breed-v22-detail-card"><div class="breed-v22-section-title"><span class="breed-kicker">HISTÓRICO</span><h2>Linha do tempo do pedido</h2></div><div class="breed-v22-timeline">
+        {% for h in historico %}<article><i></i><div><span>{{h.created_at|data_br}}</span><strong>{{(h.status_anterior or 'Início')|replace('_',' ')|title}} → {{h.status_novo|replace('_',' ')|title}}</strong>{% if h.observacao %}<p>{{h.observacao}}</p>{% endif %}</div></article>{% else %}<p class="muted">Nenhum evento registrado no histórico ainda.</p>{% endfor %}
+      </div></section>
+
+      <section class="breed-v22-detail-card"><div class="breed-v22-section-title"><span class="breed-kicker">CONVERSA</span><h2>Últimas mensagens</h2></div><div class="breed-v22-message-preview">
+        {% for m in mensagens %}<article class="{{'mine' if m.remetente_email==usuario_email else ''}}"><div><strong>{{m.autor_nick}}</strong><small>{{m.created_at|data_br}}</small></div><p>{{m.mensagem}}</p></article>{% else %}<p class="muted">Nenhuma mensagem neste pedido.</p>{% endfor %}
+      </div>{% if pedido.breeder_responsavel %}<a class="btn-ranking-outline" href="{{url_for('chat_pedido',tipo='breed',pedido_id=pedido.id)}}">Abrir conversa completa</a>{% endif %}</section>
+    </main>
+
+    <aside>
+      <section class="breed-v22-detail-card breed-v22-actions-card"><span class="breed-kicker">AÇÕES</span><h3>Próximo passo</h3>
+        {% if pedido.breeder_responsavel==usuario_email %}
+          {% if pedido.status=='aguardando_pagamento' %}<p>Confirme somente depois de receber o pagamento no jogo.</p><form method="post" action="{{url_for('confirmar_pagamento_breed',pedido_id=pedido.id)}}" onsubmit="return confirm('Confirmar o pagamento deste pedido?')"><button class="btn-dourado" data-once>Confirmar pagamento</button></form>
+          {% elif pedido.status=='em_producao' %}<p>Quando o Pokémon estiver pronto, marque o pedido como concluído.</p><form method="post" action="{{url_for('concluir_breed',pedido_id=pedido.id)}}"><button class="btn-dourado" data-once>Marcar como pronto</button></form>
+          {% elif pedido.status=='concluido' %}<p>Depois de entregar no jogo, informe a entrega ao cliente.</p><form method="post" action="{{url_for('entregar_breed',pedido_id=pedido.id)}}"><button class="btn-dourado" data-once>Informar entrega</button></form>
+          {% elif pedido.status=='aguardando_confirmacao' %}<p>A entrega foi informada. Agora aguardamos a confirmação do cliente.</p>
+          {% elif pedido.status=='cancelamento_solicitado' %}<p>Revise a solicitação de cancelamento acima antes de continuar.</p>
+          {% endif %}
+          {% if pedido.status in ('aguardando_pagamento','em_producao') %}<details class="breed-v22-return"><summary>Devolver pedido à fila</summary><form method="post" action="{{url_for('devolver_breed_fila',pedido_id=pedido.id)}}"><textarea name="motivo" required maxlength="500" placeholder="Informe o motivo da devolução"></textarea><button class="btn-danger-hype" data-once>Devolver pedido</button></form></details>{% endif %}
+        {% elif pedido.usuario_email==usuario_email %}
+          {% if pedido.status=='aguardando_confirmacao' %}<p>Confirme somente depois que receber o Pokémon dentro do jogo.</p><form method="post" action="{{url_for('confirmar_recebimento_breed',pedido_id=pedido.id)}}" onsubmit="return confirm('Você confirma que recebeu este Pokémon?')"><button class="btn-dourado" data-once>Confirmar recebimento</button></form>
+          {% elif pedido.status in ('pendente','aguardando_pagamento','em_producao') %}<p>Se precisar cancelar, informe o motivo. Após o Breeder assumir, ele analisará a solicitação.</p><form method="post" action="{{url_for('cancelar_breed',pedido_id=pedido.id)}}"><textarea name="motivo" maxlength="500" placeholder="Motivo do cancelamento"></textarea><button class="btn-danger-hype" data-once>Cancelar / solicitar cancelamento</button></form>{% endif %}
+        {% else %}<p>Você está visualizando este pedido como membro autorizado da equipe.</p>{% endif %}
+      </section>
+
+      <section class="breed-v22-detail-card"><span class="breed-kicker">FINANCEIRO</span><h3>Resumo do pedido</h3><div class="breed-v22-finance"><div><span>Total</span><b>{{pedido.preco_total|preco}}</b></div>{% if pedido.breeder_responsavel==usuario_email or permissoes.get('pode_gerenciar_cargos') %}<div><span>Taxa HYPE</span><b>{{pedido.taxa_clan_valor|preco}}</b></div><div><span>Repasse Breeder</span><b>{{(pedido.valor_breeder or 0)|preco}}</b></div>{% endif %}</div>{% if pedido.promocao_nome %}<small class="breed-v22-promo">Promoção aplicada: {{pedido.promocao_nome}} · -{{pedido.promocao_percentual}}%</small>{% endif %}</section>
+
+      {% if avaliacao %}<section class="breed-v22-detail-card"><span class="breed-kicker">AVALIAÇÃO</span><h3>{{avaliacao.nota}}/5 {{'★' * (avaliacao.nota|int)}}</h3><p>{{avaliacao.comentario or 'Avaliação sem comentário.'}}</p><small>{{avaliacao.created_at|data_br}}</small></section>{% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

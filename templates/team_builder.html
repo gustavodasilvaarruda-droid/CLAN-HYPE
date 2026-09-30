@@ -6,7 +6,7 @@
     <div>
       <span class="breed-kicker">FERRAMENTA COMPETITIVA</span>
       <h1>TEAM BUILDER</h1>
-      <p>Monte e salve seus times com até 6 Pokémon. Configure sets completos, valide regras e reutilize suas Builds.</p>
+      <p>Monte times com até 6 Pokémon, aplique Builds HYPE aprovadas, valide regras, analise cobertura e compartilhe sua composição com a comunidade.</p>
     </div>
     <div class="inline-actions">
       <a class="cta-dark" href="{{url_for('competitive.pokedex_competitiva')}}">Pokédex Competitiva</a>
@@ -97,11 +97,15 @@
 
         <label class="wide-note">Observação do set<textarea id="notesInput" placeholder="Ex.: preserve para o late game, funciona como win condition..."></textarea></label>
 
-        <div class="build-actions">
-          <label>Carregar Build salva
+        <div class="build-actions v27-build-actions">
+          <label>Minha Build salva
             <select id="savedBuildSelect"><option value="">Selecione...</option>{% for b in builds_pessoais %}<option value="{{b.id}}">{{b.nome}} — {{b.pokemon}}</option>{% endfor %}</select>
           </label>
-          <button type="button" class="cta-dark" id="loadBuildBtn">Carregar no slot</button>
+          <button type="button" class="cta-dark" id="loadBuildBtn">Carregar</button>
+          <label>Build HYPE aprovada
+            <select id="hypeBuildSelect"><option value="">Selecione um guia...</option>{% for b in builds_hype %}<option value="{{b.id}}">{{b.pokemon}} — {{b.titulo}}</option>{% endfor %}</select>
+          </label>
+          <button type="button" class="cta-gold" id="loadHypeBuildBtn">Aplicar no slot</button>
           <button type="button" class="cta-dark" id="duplicateSlotBtn">Duplicar set</button>
           <button type="button" class="cta-gold" id="saveBuildBtn">Salvar como Build</button>
         </div>
@@ -135,6 +139,18 @@
     <input name="build_json" id="saveBuildJson">
   </form>
 
+  <section class="dash-card v27-hype-build-library">
+    <div class="section-title-row"><div><span class="breed-kicker">BIBLIOTECA OFICIAL</span><h2>Builds HYPE aprovadas</h2></div><a class="cta-dark" href="{{url_for('buildershub.guias')}}">Ver todos os guias</a></div>
+    <p class="muted">Aplique um set aprovado diretamente em qualquer slot e ajuste o que precisar.</p>
+    <div class="v27-official-build-grid">
+      {% for b in builds_hype[:8] %}<article class="v27-official-build-card">
+        <div><span class="breed-kicker">{{b.formato or 'Formato livre'}}{% if b.papel %} · {{b.papel}}{% endif %}</span><h3>{{b.pokemon}}</h3><b>{{b.titulo}}</b></div>
+        <div class="v27-build-mini"><span>{{b.item or 'Sem item'}}</span><span>{{b.ability or 'Ability não informada'}}</span><span>{{b.nature or 'Nature livre'}}</span></div>
+        <button type="button" class="cta-gold v27-apply-build" data-build-id="{{b.id}}">Aplicar no slot atual</button>
+      </article>{% else %}<p class="muted">Ainda não há Builds HYPE publicadas.</p>{% endfor %}
+    </div>
+  </section>
+
   <section class="dash-card">
     <h2>Minhas Builds pessoais</h2>
     <p class="muted">Cada set salvo pode ser reutilizado em vários times sem precisar configurar tudo de novo.</p>
@@ -149,9 +165,9 @@
     </div>
   </section>
 
-  <section class="dash-card"><h2>Meus times</h2><div class="team-grid">{% for t in meus_times %}<article class="team-card"><span class="breed-kicker">{{t.formato or 'Formato livre'}}</span><h3>{{t.nome}}</h3><p>{{t.descricao or ''}}</p><div class="team-pokemon-list">{% for s in t.slots %}<span><b>{{s.pokemon}}</b><small>{{s.item or '-'}} · {{s.papel or ''}}</small></span>{% endfor %}</div><div class="card-actions"><a class="cta-dark" href="{{url_for('expansion.team_builder',editar=t.id)}}">Editar</a><a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=t.id)}}">Analisar</a><form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=t.id)}}"><button class="cta-dark btn-sm">Duplicar</button></form><form method="post" action="{{url_for('expansion.team_builder_excluir',team_id=t.id)}}"><button class="btn-perigo btn-sm">Excluir</button></form></div></article>{% else %}<p class="muted">Você ainda não salvou nenhum time.</p>{% endfor %}</div></section>
+  <section class="dash-card"><div class="section-title-row"><div><span class="breed-kicker">MINHA BIBLIOTECA</span><h2>Meus times</h2></div><span class="v27-counter">{{meus_times|length}} salvo(s)</span></div><div class="team-grid">{% for t in meus_times %}<article class="team-card v27-team-card"><div class="v27-team-card-head"><div><span class="breed-kicker">{{t.formato or 'Formato livre'}}</span><h3>{{t.nome}}</h3></div><span class="status-pill {{'entrada' if t.publico else 'saida'}}">{{'PÚBLICO' if t.publico else 'PRIVADO'}}</span></div><p>{{t.descricao or 'Sem descrição.'}}</p><div class="team-pokemon-list">{% for s in t.slots %}<span>{% if s.sprite %}<img src="{{s.sprite}}" alt="">{% endif %}<b>{{s.pokemon}}</b><small>{{s.item or '-'}} · {{s.papel or ''}}</small></span>{% endfor %}</div><div class="v27-team-meta"><span>◉ {{t.visualizacoes or 0}} views</span><span>⧉ {{t.duplicacoes or 0}} cópias</span></div><div class="card-actions"><a class="cta-dark" href="{{url_for('expansion.team_builder',editar=t.id)}}">Editar</a><a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=t.id)}}">Analisar</a>{% if t.share_token %}<a class="cta-gold" href="{{url_for('competitive.time_compartilhado',share_token=t.share_token)}}">Abrir / Compartilhar</a>{% endif %}<form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=t.id)}}"><button class="cta-dark btn-sm">Duplicar</button></form><form method="post" action="{{url_for('expansion.team_builder_excluir',team_id=t.id)}}"><button class="btn-perigo btn-sm">Excluir</button></form></div></article>{% else %}<p class="muted">Você ainda não salvou nenhum time.</p>{% endfor %}</div></section>
 
-  <section class="dash-card"><h2>Times públicos</h2><div class="team-grid">{% for t in times_publicos %}<article class="team-card"><span class="breed-kicker">{{t.formato or 'Formato livre'}}</span><h3>{{t.nome}}</h3><p>{{t.descricao or ''}}</p><div class="team-pokemon-list">{% for s in t.slots %}<span><b>{{s.pokemon}}</b><small>{{s.item or '-'}} · {{s.papel or ''}}</small></span>{% endfor %}</div><div class="card-actions"><a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=t.id)}}">Ver análise</a><form method="post" action="{{url_for('expansion.team_builder_favoritar',team_id=t.id)}}"><button class="cta-dark btn-sm">{{ '★ Favoritado' if t.id in favoritos_ids else '☆ Favoritar' }}</button></form><form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=t.id)}}"><button class="cta-gold btn-sm">Usar como base</button></form></div></article>{% else %}<p class="muted">Nenhum time público ainda.</p>{% endfor %}</div></section>
+  <section class="dash-card"><div class="section-title-row"><div><span class="breed-kicker">COMUNIDADE HYPE</span><h2>Times públicos</h2></div></div><div class="team-grid">{% for t in times_publicos %}<article class="team-card v27-team-card"><span class="breed-kicker">{{t.formato or 'Formato livre'}}</span><h3>{{t.nome}}</h3><p>{{t.descricao or 'Time compartilhado pela comunidade.'}}</p><div class="team-pokemon-list">{% for s in t.slots %}<span>{% if s.sprite %}<img src="{{s.sprite}}" alt="">{% endif %}<b>{{s.pokemon}}</b><small>{{s.item or '-'}} · {{s.papel or ''}}</small></span>{% endfor %}</div><div class="v27-team-meta"><span>◉ {{t.visualizacoes or 0}}</span><span>⧉ {{t.duplicacoes or 0}}</span></div><div class="card-actions">{% if t.share_token %}<a class="cta-dark" href="{{url_for('competitive.time_compartilhado',share_token=t.share_token)}}">Ver time</a>{% else %}<a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=t.id)}}">Ver análise</a>{% endif %}<form method="post" action="{{url_for('expansion.team_builder_favoritar',team_id=t.id)}}"><button class="cta-dark btn-sm">{{ '★ Favoritado' if t.id in favoritos_ids else '☆ Favoritar' }}</button></form><form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=t.id)}}"><button class="cta-gold btn-sm">Usar como base</button></form></div></article>{% else %}<p class="muted">Nenhum time público ainda.</p>{% endfor %}</div></section>
 </div>
 {% endblock %}
 {% block extra_scripts %}
@@ -161,10 +177,12 @@
   const natures = ['Adamant','Bashful','Bold','Brave','Calm','Careful','Docile','Gentle','Hardy','Hasty','Impish','Jolly','Lax','Lonely','Mild','Modest','Naive','Naughty','Quiet','Quirky','Rash','Relaxed','Sassy','Serious','Timid'];
   const types = ['Normal','Fire','Water','Electric','Grass','Ice','Fighting','Poison','Ground','Flying','Psychic','Bug','Rock','Ghost','Dragon','Dark','Steel','Fairy'];
   const savedBuilds = {{ builds_pessoais|tojson }};
+  const hypeBuilds = {{ builds_hype|tojson }};
+  const prefillBuild = {{ prefill_build|tojson if prefill_build else 'null' }};
   const formatos = {{ formatos|tojson }};
   const prefillPokemon = {{ prefill_pokemon|default('', true)|tojson }};
   const editingTeam = {{ editing_team|tojson if editing_team else 'null' }};
-  const emptySlot = () => ({pokemon:'',pokemon_id:null,tipos:[],sprite:'',item:'',ability:'',nature:'',papel:'',mecanica:'nenhuma',tera_type:'',moves:['','','',''],evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31},observacao:''});
+  const emptySlot = () => ({pokemon:'',pokemon_id:null,tipos:[],sprite:'',item:'',ability:'',nature:'',papel:'',mecanica:'nenhuma',tera_type:'',moves:['','','',''],evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31},base_stats:{},move_types:{},move_categories:{},observacao:''});
   let slots = Array.from({length:6}, emptySlot);
   if(editingTeam && Array.isArray(editingTeam.slots)){ editingTeam.slots.slice(0,6).forEach((x,i)=>{ slots[i]=Object.assign(emptySlot(),x||{}); }); }
   let active = 0;
@@ -184,7 +202,7 @@
   function slug(v){ return String(v||'').trim().toLowerCase().replaceAll(' ','-').replace(/[^a-z0-9-]/g,''); }
   function current(){ return slots[active]; }
   function capInt(v,min,max,def){ const n=parseInt(v,10); return Number.isFinite(n)?Math.max(min,Math.min(max,n)):def; }
-  function cleanForStorage(s){ return {pokemon:s.pokemon||'',pokemon_id:Number.isInteger(s.pokemon_id)?s.pokemon_id:null,tipos:Array.isArray(s.tipos)?s.tipos.slice(0,2):[],sprite:s.sprite||'',item:s.item||'',ability:s.ability||'',nature:s.nature||'',papel:s.papel||'',mecanica:s.mecanica||'nenhuma',tera_type:s.tera_type||'',moves:Array.isArray(s.moves)?s.moves.slice(0,4):[],evs:s.evs||{},ivs:s.ivs||{},observacao:s.observacao||''}; }
+  function cleanForStorage(s){ return {pokemon:s.pokemon||'',pokemon_id:Number.isInteger(s.pokemon_id)?s.pokemon_id:null,tipos:Array.isArray(s.tipos)?s.tipos.slice(0,2):[],sprite:s.sprite||'',item:s.item||'',ability:s.ability||'',nature:s.nature||'',papel:s.papel||'',mecanica:s.mecanica||'nenhuma',tera_type:s.tera_type||'',moves:Array.isArray(s.moves)?s.moves.slice(0,4):[],evs:s.evs||{},ivs:s.ivs||{},base_stats:s.base_stats||{},move_types:s.move_types||{},move_categories:s.move_categories||{},observacao:s.observacao||''}; }
 
   function renderTabs(){
     $('slotTabs').innerHTML = slots.map((s,i)=>`<button type="button" class="slot-tab ${i===active?'active':''}" data-slot="${i}">${s.sprite?`<img src="${s.sprite}" alt="">`:'<span class="slot-number">'+(i+1)+'</span>'}<span><b>${s.pokemon?pretty(s.pokemon):'Slot '+(i+1)}</b><small>${s.item?pretty(s.item):'Vazio'}</small></span></button>`).join('');
@@ -218,12 +236,18 @@
     const key=slug(name); if(!key) return;
     try{
       const r=await fetch(`https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(key)}`); if(!r.ok) throw new Error(); const p=await r.json();
-      const s=current(); s.pokemon=p.name; s.pokemon_id=p.id; s.tipos=p.types.map(x=>x.type.name); s.sprite=p.sprites?.other?.['official-artwork']?.front_default || p.sprites?.front_default || ''; s.abilities=p.abilities.map(x=>x.ability.name); s.moves_available=p.moves.map(x=>x.move.name).sort();
+      const s=current(); s.pokemon=p.name; s.pokemon_id=p.id; s.tipos=p.types.map(x=>x.type.name); s.sprite=p.sprites?.other?.['official-artwork']?.front_default || p.sprites?.front_default || ''; s.abilities=p.abilities.map(x=>x.ability.name); s.moves_available=p.moves.map(x=>x.move.name).sort(); s.base_stats={}; const statMap={'hp':'hp','attack':'atk','defense':'def','special-attack':'spa','special-defense':'spd','speed':'spe'}; (p.stats||[]).forEach(x=>{const k=statMap[x.stat?.name];if(k)s.base_stats[k]=x.base_stat;});
       if(!s.ability && s.abilities.length) s.ability=s.abilities[0]; pokemonInput.value=s.pokemon; renderEditor(); renderTabs();
     }catch(e){ current().pokemon=name.trim(); renderTabs(); $('editorPokemonName').textContent=name.trim()||'Escolha um Pokémon'; }
   }
 
   function updateMoveList(list){ $('moveList').innerHTML=(list||[]).slice(0,900).map(x=>`<option value="${x}">${pretty(x)}</option>`).join(''); }
+  async function loadMoveMeta(move){
+    const key=slug(move); if(!key) return;
+    const s=current(); s.move_types=s.move_types||{}; s.move_categories=s.move_categories||{};
+    if(s.move_types[move] && s.move_categories[move]) return;
+    try{ const r=await fetch(`https://pokeapi.co/api/v2/move/${encodeURIComponent(key)}`); if(!r.ok) return; const d=await r.json(); s.move_types[move]=d.type?.name||''; s.move_types[key]=d.type?.name||''; s.move_categories[move]=d.damage_class?.name||''; s.move_categories[key]=d.damage_class?.name||''; }catch(e){}
+  }
   function updateEvTotal(){ const total=[...document.querySelectorAll('.evInput')].reduce((a,x)=>a+capInt(x.value,0,252,0),0); $('evTotal').textContent=total; $('evWarning').textContent=total>510?'— excedeu o limite!':(total===510?'— completo':''); $('evWarning').className=total>510?'bad-text':'good-text'; }
   function updateMechanicVisibility(){ $('teraWrap').style.display=mechanicSelect.value==='tera'?'flex':'none'; }
 
@@ -242,12 +266,16 @@
   pokemonInput.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{const exact=pokemonNames.find(x=>x===slug(pokemonInput.value));if(exact) loadPokemonDetails(exact);},350);});
   [itemInput,abilitySelect,natureSelect,roleSelect,mechanicSelect,teraSelect,notesInput,$('formatSelect')].forEach(el=>el.addEventListener('change',()=>{saveEditor();updateMechanicVisibility();}));
   document.querySelectorAll('.moveInput,.evInput,.ivInput').forEach(el=>el.addEventListener('input',()=>{saveEditor();updateEvTotal();}));
+  document.querySelectorAll('.moveInput').forEach(el=>el.addEventListener('change',async()=>{await loadMoveMeta(el.value.trim()); saveEditor();}));
 
   $('removeSlotBtn').addEventListener('click',()=>{slots[active]=emptySlot();renderEditor();renderTabs();});
   $('clearTeamBtn').addEventListener('click',()=>{if(confirm('Limpar todos os seis slots?')){slots=Array.from({length:6},emptySlot);active=0;renderEditor();renderTabs();}});
   $('duplicateSlotBtn').addEventListener('click',()=>{saveEditor();const target=slots.findIndex((s,i)=>i!==active&&!s.pokemon);if(target<0){alert('Não há slot vazio para duplicar.');return;} slots[target]=JSON.parse(JSON.stringify(current()));active=target;renderEditor();renderTabs();});
 
   $('loadBuildBtn').addEventListener('click',()=>{const id=Number($('savedBuildSelect').value);const row=savedBuilds.find(x=>Number(x.id)===id);if(!row){alert('Selecione uma Build salva.');return;} const dados=row.dados||{}; slots[active]=Object.assign(emptySlot(),dados);renderEditor();renderTabs();if(slots[active].pokemon) loadPokemonDetails(slots[active].pokemon);});
+  function applyHypeBuild(id){ const row=hypeBuilds.find(x=>Number(x.id)===Number(id)); if(!row){alert('Selecione uma Build HYPE.');return;} slots[active]=Object.assign(emptySlot(),row._slot||{}); renderEditor(); renderTabs(); if(slots[active].pokemon) loadPokemonDetails(slots[active].pokemon); }
+  $('loadHypeBuildBtn').addEventListener('click',()=>applyHypeBuild($('hypeBuildSelect').value));
+  document.querySelectorAll('.v27-apply-build').forEach(btn=>btn.addEventListener('click',()=>{applyHypeBuild(btn.dataset.buildId); window.scrollTo({top:document.querySelector('.showdown-workspace').offsetTop-80,behavior:'smooth'});}));
   $('saveBuildBtn').addEventListener('click',()=>{saveEditor();if(!current().pokemon){alert('Escolha um Pokémon antes de salvar a Build.');return;}const name=prompt('Nome desta Build:',`${pretty(current().pokemon)} - ${current().papel||'Set'}`);if(!name)return;$('saveBuildName').value=name;$('saveBuildFormat').value=$('formatSelect').value;$('saveBuildJson').value=JSON.stringify(cleanForStorage(current()));$('saveBuildForm').submit();});
 
   $('reviewTeamBtn').addEventListener('click',()=>{saveEditor();const empty=slots.map((s,i)=>!s.pokemon?i+1:null).filter(Boolean); alert(empty.length?`Slots vazios: ${empty.join(', ')}. Você pode salvar assim mesmo e completar depois.`:'Os 6 slots estão preenchidos. Salve o time e clique em “Analisar Time” para receber vantagens, riscos e plano de jogo.');});
@@ -263,7 +291,10 @@
   }
 
   bootLists(); renderTabs(); renderEditor();
-  if(prefillPokemon){
+  if(prefillBuild && prefillBuild._slot){
+    slots[0]=Object.assign(emptySlot(),prefillBuild._slot); active=0; renderEditor(); renderTabs();
+    if(slots[0].pokemon) loadPokemonDetails(slots[0].pokemon);
+  } else if(prefillPokemon){
     pokemonInput.value = prefillPokemon;
     loadPokemonDetails(prefillPokemon);
   }

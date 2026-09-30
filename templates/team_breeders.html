@@ -2,22 +2,110 @@
 {% block title %}Team HYPE Breeders{% endblock %}
 {% block body_class %}hype-team-breeders-page{% endblock %}
 {% block content %}
-<div class="hype-v6-page hype-v7-page team-breeders-page">
-  <section class="hype-v6-banner hype-v7-cinematic-banner">
-    <div class="hype-v6-banner-copy"><span class="hype-v6-kicker">BERÇÁRIO HYPE</span><h1>TEAM HYPE BREEDERS</h1><p>Conheça a equipe responsável pelos pedidos, veja disponibilidade e carga atual antes de acompanhar a fila.</p></div>
+<div class="hype-v6-page hype-v7-page team-breeders-page team-breeders-v213">
+  <section class="hype-v6-banner hype-v7-cinematic-banner team-breeders-hero">
+    <div class="hype-v6-banner-copy">
+      <span class="hype-v6-kicker">BERÇÁRIO HYPE</span>
+      <h1>TEAM HYPE BREEDERS</h1>
+      <p>Conheça quem cuida dos seus Pokémon, acompanhe disponibilidade, produção, avaliações e desempenho da equipe.</p>
+    </div>
     <img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="Emblema HYPE">
   </section>
-  <nav class="hype-breed-subnav"><a href="{{url_for('breed')}}">Fazer Pedido</a><a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}<a class="active" href="{{url_for('team_breeders')}}">Team Breeders</a><a href="{{url_for('ranking_breeders')}}">Ranking</a></nav>
-  <section class="team-breeders-grid">
-  {% for b in breeders %}
-    <article class="team-breeder-card">
-      <div class="team-breeder-top"><div class="team-breeder-avatar">{% if b.avatar_url %}<img src="{{b.avatar_url}}" alt="{{b.nick}}">{% else %}<span>{{b.nick[0]|upper}}</span>{% endif %}</div><div><span class="breeder-status {{b.status}}">{{b.status|replace('_',' ')|title}}</span><h2>{{b.nick}}</h2><small>{{b.cargo|replace('_',' ')|title}}</small></div></div>
-      <p>{{b.bio or 'Breeder oficial da equipe HYPE.'}}</p>
-      <div class="team-breeder-stats"><div><b>{{b.ativos}}/{{b.max_ativos}}</b><span>Ativos</span></div><div><b>{{b.concluidos}}</b><span>Concluídos</span></div><div><b>{{b.avaliacao or '—'}}</b><span>Avaliação</span></div></div>
-      {% if b.especialidades %}<div class="breeder-specialties">{% for e in b.especialidades %}<span>{{e}}</span>{% endfor %}</div>{% endif %}
-      <a class="cta-dark full-btn" href="{{url_for('perfil_publico',nick=b.nick_url)}}">Ver perfil</a>
-    <div class="hype-career-extra"><span>⏱ {{ b.tempo_medio_h ~ 'h' if b.tempo_medio_h is not none else '—' }}</span><span>✓ {{ b.taxa_conclusao ~ '%' if b.taxa_conclusao is not none else '—' }}</span></div><a class="cta-dark full-btn" href="{{url_for('perfil_breeder',nick=b.nick_url)}}">Ver carreira completa</a></article>
-  {% else %}<section class="dash-card"><p class="muted">Nenhum Breeder foi configurado ainda.</p></section>{% endfor %}
+
+  <nav class="hype-breed-subnav">
+    <a href="{{url_for('breed')}}">Fazer Pedido</a>
+    <a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>
+    {% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}
+    {% if 'breeder' in funcoes_usuario or permissoes.get('pode_assumir_breed') %}<a href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>{% endif %}
+    <a class="active" href="{{url_for('team_breeders')}}">Team Breeders</a>
+    <a href="{{url_for('ranking_breeders')}}">Ranking</a>
+  </nav>
+
+  <section class="tb-v213-toolbar" aria-label="Filtros da equipe de Breeders">
+    <div class="tb-v213-title">
+      <span class="tb-v213-eyebrow">EQUIPE OPERACIONAL</span>
+      <div><h2>Breeders HYPE</h2><span class="tb-v213-total">{{ breeders|length }} integrante{{ '' if breeders|length == 1 else 's' }}</span></div>
+    </div>
+    <div class="tb-v213-filters" role="group" aria-label="Filtrar por disponibilidade">
+      <button type="button" class="active" data-breeder-filter="todos">Todos</button>
+      <button type="button" data-breeder-filter="disponivel"><i></i> Disponíveis</button>
+      <button type="button" data-breeder-filter="ocupado"><i></i> Ocupados</button>
+      <button type="button" data-breeder-filter="ausente"><i></i> Indisponíveis</button>
+    </div>
   </section>
+
+  <section class="team-breeders-grid tb-v213-grid" id="teamBreedersGrid">
+  {% for b in breeders %}
+    {% set carga = ((b.ativos * 100 / b.max_ativos)|round(0)|int) if b.max_ativos else 0 %}
+    <article class="team-breeder-card tb-v213-card" data-breeder-status="{{b.status}}">
+      <div class="tb-v213-watermark" aria-hidden="true"></div>
+
+      <header class="tb-v213-head">
+        <div class="team-breeder-avatar tb-v213-avatar">
+          {% if b.avatar_url %}<img src="{{b.avatar_url}}" alt="Avatar de {{b.nick}}">{% else %}<span>{{b.nick[0]|upper}}</span>{% endif %}
+        </div>
+        <div class="tb-v213-identity">
+          <span class="breeder-status tb-v213-status {{b.status}}"><i></i>{{ 'Indisponível' if b.status == 'ausente' else b.status|replace('_',' ')|title }}</span>
+          <h2 title="{{b.nick}}">{{b.nick}}</h2>
+          <small class="tb-v213-role"><span>{{ '♛' if b.cargo in ('lider','sub_lider') else '◆' }}</span>{% if b.cargo == 'lider' %}Líder{% elif b.cargo == 'sub_lider' %}Sub-Líder{% elif b.cargo == 'breeder' %}Breeder{% else %}{{b.cargo|replace('_',' ')|title}}{% endif %}</small>
+        </div>
+      </header>
+
+      <p class="tb-v213-bio">{{b.bio or 'Breeder oficial da equipe HYPE.'}}</p>
+
+      <div class="team-breeder-stats tb-v213-stats">
+        <div><span class="tb-v213-stat-icon">♟</span><b>{{b.ativos}}/{{b.max_ativos}}</b><span>Ativos</span></div>
+        <div><span class="tb-v213-stat-icon">✓</span><b>{{b.concluidos}}</b><span>Concluídos</span></div>
+        <div><span class="tb-v213-stat-icon">★</span><b>{{b.avaliacao or '—'}}</b><span>Avaliação</span></div>
+      </div>
+
+      <div class="tb-v213-capacity">
+        <div class="tb-v213-capacity-head"><span>Carga atual</span><b>{{carga}}%</b></div>
+        <div class="tb-v213-capacity-track"><span style="width:{{ [carga,100]|min }}%"></span></div>
+      </div>
+
+      {% if b.especialidades %}
+      <div class="breeder-specialties tb-v213-specialties">
+        {% for e in b.especialidades[:3] %}<span>{{e}}</span>{% endfor %}
+        {% if b.especialidades|length > 3 %}<span>+{{b.especialidades|length - 3}}</span>{% endif %}
+      </div>
+      {% endif %}
+
+      <div class="hype-career-extra tb-v213-performance">
+        <span><i>◷</i><b>{{ b.tempo_medio_h ~ 'h' if b.tempo_medio_h is not none else '—' }}</b><small>Tempo médio</small></span>
+        <span><i>↗</i><b>{{ b.taxa_conclusao ~ '%' if b.taxa_conclusao is not none else '—' }}</b><small>Conclusão</small></span>
+      </div>
+
+      <div class="tb-v213-actions">
+        <a class="tb-v213-btn tb-v213-btn-primary" href="{{url_for('perfil_publico',nick=b.nick_url)}}"><span>♙</span>Ver perfil<b>›</b></a>
+        <a class="tb-v213-btn tb-v213-btn-secondary" href="{{url_for('perfil_breeder',nick=b.nick_url)}}"><span>▥</span>Ver carreira completa<b>›</b></a>
+      </div>
+    </article>
+  {% else %}
+    <section class="dash-card tb-v213-empty"><p class="muted">Nenhum Breeder foi configurado ainda.</p></section>
+  {% endfor %}
+  </section>
+
+  <div class="tb-v213-no-results" id="teamBreedersEmpty" hidden>Nenhum Breeder encontrado neste filtro.</div>
 </div>
+
+<script>
+(() => {
+  const buttons = [...document.querySelectorAll('[data-breeder-filter]')];
+  const cards = [...document.querySelectorAll('[data-breeder-status]')];
+  const empty = document.getElementById('teamBreedersEmpty');
+  if (!buttons.length || !cards.length) return;
+  buttons.forEach(button => button.addEventListener('click', () => {
+    const filter = button.dataset.breederFilter;
+    buttons.forEach(x => x.classList.toggle('active', x === button));
+    let visible = 0;
+    cards.forEach(card => {
+      const show = filter === 'todos' || card.dataset.breederStatus === filter;
+      card.hidden = !show;
+      if (show) visible += 1;
+    });
+    if (empty) empty.hidden = visible !== 0;
+  }));
+})();
+</script>
 {% endblock %}

@@ -41,7 +41,7 @@
           <span class="hype-v7-cover-date">{{e.data_evento|replace('T',' ') if e.data_evento else 'Data a definir'}}</span>
         </div>
         <div class="hype-v6-event-body">
-          <h2>{{e.titulo}}</h2><p>{{e.descricao}}</p>
+          <h2><a class="v26-card-title" href="{{url_for('events26.evento_detalhe',evento_id=e.id)}}">{{e.titulo}}</a></h2><p>{{e.descricao}}</p>
           <div class="hype-v6-card-meta">
             {% if e.local_evento %}<span>⌖ {{e.local_evento}}</span>{% endif %}
             <span>♙ {{e.total_inscritos}}{% if e.limite_participantes %}/{{e.limite_participantes}}{% endif %}</span>
@@ -68,7 +68,7 @@
     </div>
     <div class="hype-v6-event-grid hype-v7-event-grid">
       {% for t in torneios_resumo %}
-      <a class="hype-v6-event-card hype-v7-event-card tournament" href="{{url_for('torneios')}}">
+      <a class="hype-v6-event-card hype-v7-event-card tournament" href="{{url_for('events26.torneio_detalhe',torneio_id=t.id)}}">
         <div class="hype-v6-event-cover">
           {% if t.imagem_url %}<img src="{{t.imagem_url}}" alt="{{t.titulo}}">{% else %}<img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="">{% endif %}
           <span class="hype-v6-card-badge">TORNEIO</span>

@@ -6,7 +6,7 @@
   <section class="breed-ref-hero">
     <div class="breed-ref-hero-copy">
       <span class="breed-ref-kicker">HYPE BREED</span>
-      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">GRANDE ATUALIZAÇÃO • V14.7.1</small>
+      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">GRANDE ATUALIZAÇÃO • V20</small>
       <p>Monte seu Breed em etapas. Escolha o Pokémon, configure as características, revise e envie.</p>
     </div>
     <div class="breed-ref-hero-mark">HYPE</div>
@@ -80,6 +80,7 @@
           <label><span>Gênero</span><select id="genero" name="genero" required><option value="indiferente">Indiferente</option><option value="femea">Fêmea</option><option value="macho">Macho</option></select></label>
           <label><span>Breed</span><select id="breed_tipo" name="breed_tipo" required><option value="">Selecionar...</option><option value="F5">F5</option><option value="F6">F6</option></select></label>
         </div>
+        <div id="genderPriceAlert" class="breed-extra-price-alert" hidden><b>ADICIONAL DE GÊNERO</b><span id="genderPriceText">Escolher Macho ou Fêmea possui valor adicional.</span></div>
         <div id="breed_special_alert" class="breed-ref-alert" hidden><b>BREED ESPECIAL</b><span>Esta espécie exige regra especial com Ditto. O servidor aplicará a tabela correta.</span></div>
         <div class="breed-stage-actions"><button type="button" class="breed-ref-back" data-back="1">← Voltar</button><button type="button" class="breed-ref-next" data-next="3">Próximo →</button></div>
       </div>
@@ -106,7 +107,8 @@
           </div>
           <div class="hype-ev-meter"><i id="evMeter"></i></div><small id="evHint">Até 252 por atributo e 510 no total.</small>
         </div>
-        <label class="breed-ref-check"><input type="checkbox" id="zero_speed" name="zero_speed" value="sim"><span><b>Zero Speed</b><small>0 IV em Velocidade. Esta opção é separada do EV de Speed.</small></span></label>
+        <label class="breed-ref-check"><input type="checkbox" id="zero_speed" name="zero_speed" value="sim"><span><b>Zero Speed</b><small id="zeroSpeedLabel">0 IV em Velocidade. Esta opção possui valor adicional.</small></span></label>
+        <div id="zeroSpeedPriceAlert" class="breed-extra-price-alert" hidden><b>ZERO SPEED</b><span id="zeroSpeedPriceText">Esta opção possui valor adicional.</span></div>
         <div class="breed-stage-actions"><button type="button" class="breed-ref-back" data-back="2">← Voltar</button><button type="button" class="breed-ref-next" data-next="4">Revisar Pedido →</button></div>
       </div>
     </section>
@@ -131,7 +133,7 @@
   </form>
   {% else %}<div class="breed-stage-card"><h2>Breed indisponível</h2><p>Seu cargo não possui permissão para fazer pedidos.</p></div>{% endif %}
 
-  <nav class="hype-breed-subnav breed-ref-subnav"><a class="active" href="{{url_for('breed')}}">Fazer Pedido</a><a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}<a href="{{url_for('team_breeders')}}">Team Breeders</a><a href="{{url_for('ranking_breed')}}">Ranking</a></nav>
+  <nav class="hype-breed-subnav breed-ref-subnav"><a class="active" href="{{url_for('breed')}}">Fazer Pedido</a><a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}{% if 'breeder' in funcoes_usuario or permissoes.get('pode_assumir_breed') %}<a href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>{% endif %}<a href="{{url_for('team_breeders')}}">Team Breeders</a><a href="{{url_for('ranking_breed')}}">Ranking</a></nav>
 </div>
 {% endblock %}
 
@@ -145,6 +147,7 @@ const form=$('#breedForm');
 if(!form) return;
 const search=$('#pokemon_search'), idInput=$('#pokemon_id'), results=$('#pokemon_results'), status=$('#pokemon_status');
 const breedTipo=$('#breed_tipo'), ivSelect=$('#iv_descartado'), zeroSpeed=$('#zero_speed');
+const HYPE_BREED_EXTRA_PRICES={{ (precos_ui or {})|tojson }};
 let selected=null, currentStep=1, searchTimer=null, priceTimer=null, lastPrice=null;
 const favorites=new Set(JSON.parse(localStorage.getItem('hypeBreedFavorites')||'[]').map(Number));
 let onlyFavorites=false;
@@ -323,6 +326,7 @@ async function selectPokemon(id,name){
     idInput.value=String(id); search.value=pretty(selected.name);
     $('#pokemonNext').disabled=false; $('#breed_special_alert').hidden=!info.breed_especial;
     renderDetail(false);
+    updateExtraPriceAlerts();
     setStatus(info.breed_especial?'Pokémon válido • Breed especial com Ditto ✓':'Pokémon válido para Breed ✓');
   }catch(e){
     if(selected&&selected.id===id){selected.validated=false;$('#pokemonNext').disabled=true;renderDetail(false)}
@@ -353,7 +357,8 @@ function renderDetail(loading=false){
 function validateStep(step){
   if(step===1&&(!selected||!selected.validated||!idInput.value)){setStatus('Selecione e aguarde a validação do Pokémon antes de continuar.',true);return false}
   if(step===2){if(!$('#ha').value){alert('Selecione Ability/HA.');return false}if(!$('#genero').value){alert('Selecione o gênero.');return false}if(!breedTipo.value){alert('Selecione F5 ou F6.');return false}}
-  if(step===3&&breedTipo.value==='F5'&&!ivSelect.value){alert('No F5, escolha qual IV não precisa.');return false}
+  if(step===3&&breedTipo.value==='F5'&&!ivSelect.value){alert(zeroSpeed.checked?'Com Zero Speed, escolha qual OUTRO IV pode ficar menor.':'No F5, escolha qual IV não precisa.');return false}
+  if(step===3&&breedTipo.value==='F5'&&zeroSpeed.checked&&ivSelect.value==='velocidade'){alert('Zero Speed já define a Velocidade em 0 IV. Escolha outro IV que pode ficar menor.');return false}
   return true;
 }
 function goStep(n){
@@ -365,21 +370,54 @@ function goStep(n){
 }
 function updateIvs(){
   $$('.breed-ref-ivs b').forEach(x=>{x.textContent='31';x.className=''}); const f5=breedTipo.value==='F5'; $('#ivDiscardField').hidden=!f5; ivSelect.required=f5;
-  if(!f5)ivSelect.value=''; if(f5&&ivSelect.value){const x=$(`.breed-ref-ivs b[data-iv="${ivSelect.value}"]`);if(x){x.textContent='—';x.classList.add('discarded')}}
+  const speedOption=ivSelect.querySelector('option[value="velocidade"]'), zeroWrap=zeroSpeed.closest('.breed-ref-check');
+  if(zeroWrap)zeroWrap.hidden=!f5;
+  if(!f5){ivSelect.value='';zeroSpeed.checked=false;}
+  if(speedOption)speedOption.disabled=!!(f5&&zeroSpeed.checked);
+  if(f5&&zeroSpeed.checked&&ivSelect.value==='velocidade')ivSelect.value='';
+  const label=$('#ivDiscardField span'); if(label)label.textContent=(f5&&zeroSpeed.checked)?'Com Zero Speed, qual OUTRO IV pode ficar menor?':'No F5, qual IV não precisa?';
+  if(f5&&ivSelect.value){const x=$(`.breed-ref-ivs b[data-iv="${ivSelect.value}"]`);if(x){x.textContent='—';x.classList.add('discarded')}}
   if(zeroSpeed.checked&&f5){const x=$('.breed-ref-ivs b[data-iv="velocidade"]');if(x){x.textContent='0';x.className='zero'}}
-  if(!f5)zeroSpeed.checked=false;
+  updateExtraPriceAlerts();
 }
-const HYPE_BREED_BUILD = 'V14.7.1';
+const HYPE_BREED_BUILD = 'V20.1';
 const HYPE_BREED_PRICE_URL = '/api/breed/preco';
 function formatHypePrice(v){
   const n=Math.max(0, Math.round(Number(v)||0));
   return '$'+n.toLocaleString('pt-BR');
 }
+function priceEntry(code){return HYPE_BREED_EXTRA_PRICES[code]||{valor:0,valor_original:0,promocao_nome:null,promocao_percentual:0}}
+function priceText(entry){
+  const atual=Number(entry&&entry.valor||0), original=Number(entry&&entry.valor_original||atual);
+  if(entry&&entry.promocao_nome&&original>atual)return `${formatHypePrice(atual)} (${entry.promocao_nome}; tabela ${formatHypePrice(original)})`;
+  return formatHypePrice(atual);
+}
+function updateExtraPriceAlerts(){
+  const gender=$('#genero')?.value||'indiferente', ha=$('#ha')?.value||'', info=(selected&&selected.info)||{};
+  const genderBox=$('#genderPriceAlert'), genderText=$('#genderPriceText');
+  if(genderBox&&genderText){
+    if(gender==='macho'||gender==='femea'){
+      const useDitto=!!info.so_com_ditto, rare=String(info.categoria||'comum').toLowerCase()==='raro';
+      const baseCode=(ha==='sim'&&!useDitto)?'ha_sem_ditto_genero':'comum_genero';
+      const candidate=priceEntry(baseCode), base=Number(candidate.valor||0)>0?candidate:priceEntry('escolher_genero');
+      let total=Number(base.valor||0), parts=[`gênero ${priceText(base)}`];
+      if(rare&&gender==='femea'){const rareExtra=priceEntry('femea_rara');total+=Number(rareExtra.valor||0);parts.push(`fêmea rara ${priceText(rareExtra)}`);}
+      genderText.textContent=`Escolher ${gender==='femea'?'Fêmea':'Macho'} adiciona ${formatHypePrice(total)} ao pedido (${parts.join(' + ')}).`;
+      genderBox.hidden=false;
+    }else genderBox.hidden=true;
+  }
+  const zeroBox=$('#zeroSpeedPriceAlert'), zeroText=$('#zeroSpeedPriceText'), zeroLabel=$('#zeroSpeedLabel'), z=priceEntry('zero_speed');
+  if(zeroLabel)zeroLabel.textContent=`0 IV em Velocidade. Adicional atual: ${priceText(z)}.`;
+  if(zeroBox&&zeroText){
+    if(zeroSpeed.checked&&breedTipo.value==='F5'){zeroText.textContent=`Selecionar Zero Speed adiciona ${priceText(z)} ao pedido. Escolha também outro IV que pode ficar menor.`;zeroBox.hidden=false;}
+    else zeroBox.hidden=true;
+  }
+}
 async function refreshPrice(){
   if(!selected||!selected.validated||!breedTipo.value||!$('#ha').value||!$('#genero').value)return;
   const value=$('#breedPriceValue'), detail=$('#breedPriceDetail'), send=$('#sendPrice');
   if(value)value.textContent='Calculando...';
-  const q=new URLSearchParams({pokemon_id:String(selected.id),pokemon:selected.name,breed_tipo:breedTipo.value,ha:$('#ha').value,genero:$('#genero').value,treinado:$('#treinado').value,nature:$('#nature').value||'',build:HYPE_BREED_BUILD,ts:String(Date.now())});
+  const q=new URLSearchParams({pokemon_id:String(selected.id),pokemon:selected.name,breed_tipo:breedTipo.value,ha:$('#ha').value,genero:$('#genero').value,treinado:$('#treinado').value,zero_speed:(zeroSpeed.checked?'sim':'nao'),nature:$('#nature').value||'',build:HYPE_BREED_BUILD,ts:String(Date.now())});
   try{
     const r=await fetch(HYPE_BREED_PRICE_URL+'?'+q.toString(),{headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'},cache:'no-store',credentials:'same-origin'});
     const contentType=(r.headers.get('content-type')||'').toLowerCase();
@@ -433,7 +471,7 @@ results.addEventListener('click',e=>{const b=e.target.closest('.pokemon-result')
 quickGrid.addEventListener('click',e=>{const card=e.target.closest('.breed-ref-poke-card');if(!card)return;e.preventDefault();if(e.target.closest('.breed-card-star')){toggleFav(+card.dataset.id);return}selectPokemon(card.dataset.id,card.dataset.name)});
 $('#detailFavorite').addEventListener('click',()=>selected&&toggleFav(selected.id));
 $$('[data-next]').forEach(b=>b.addEventListener('click',()=>goStep(+b.dataset.next))); $$('[data-back]').forEach(b=>b.addEventListener('click',()=>goStep(+b.dataset.back)));
-breedTipo.addEventListener('change',()=>{updateIvs();schedulePrice()});ivSelect.addEventListener('change',updateIvs);zeroSpeed.addEventListener('change',updateIvs);['nature','ha','genero'].forEach(id=>$('#'+id).addEventListener('change',schedulePrice)); $('#treinado').addEventListener('change',()=>{updateEvs();schedulePrice()});
+breedTipo.addEventListener('change',()=>{updateIvs();schedulePrice()});ivSelect.addEventListener('change',updateIvs);zeroSpeed.addEventListener('change',()=>{updateIvs();schedulePrice()});['nature','ha','genero'].forEach(id=>$('#'+id).addEventListener('change',()=>{updateExtraPriceAlerts();schedulePrice()})); $('#treinado').addEventListener('change',()=>{updateEvs();schedulePrice()});
 $('#sortFilter').addEventListener('change',filterCards); $('#favoriteFilter').addEventListener('click',e=>{onlyFavorites=!onlyFavorites;e.currentTarget.classList.toggle('active',onlyFavorites);filterCards()});
 // Os filtros de tipo/Egg Group serão preenchidos visualmente quando houver dados; não bloqueiam o pedido.
 $('#typeFilter').disabled=true; $('#eggFilter').disabled=true;
@@ -445,7 +483,7 @@ form.addEventListener('submit',e=>{
   search.value=selected.name; idInput.value=String(selected.id);
   const btn=form.querySelector('.breed-submit-final'); if(btn){btn.disabled=true;btn.textContent='Enviando pedido...'}
 });
-renderFavs(); updateIvs(); updateEvs(); loadFullCatalog().then(c=>{if(!search.value.trim()){paintPokemonGrid(c.length?c:seedCatalog,visibleLimit);setStatus(catalogReady?'Catálogo HYPE carregado. Role para ver mais Pokémon.':'Catálogo inicial carregado. Use a busca para encontrar Pokémon.')}});
+renderFavs(); updateIvs(); updateEvs(); updateExtraPriceAlerts(); loadFullCatalog().then(c=>{if(!search.value.trim()){paintPokemonGrid(c.length?c:seedCatalog,visibleLimit);setStatus(catalogReady?'Catálogo HYPE carregado. Role para ver mais Pokémon.':'Catálogo inicial carregado. Use a busca para encontrar Pokémon.')}});
 quickGrid.addEventListener('scroll',()=>{});
 window.addEventListener('scroll',()=>{if(currentQuery)return;const rect=quickGrid.getBoundingClientRect();if(rect.bottom<window.innerHeight+500&&fullCatalog.length>visibleLimit){visibleLimit+=40;paintPokemonGrid(fullCatalog,visibleLimit)}});
 })();

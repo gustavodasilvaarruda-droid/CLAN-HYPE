@@ -33,6 +33,7 @@
   <nav class="hype-breed-subnav">
     <a href="{{ url_for('breed') }}">Fazer Pedido</a>
     <a href="{{ url_for('breed_meus_pedidos') }}">Meus Pedidos</a>
+    {% if 'breeder' in funcoes_usuario or hype_permissoes.get('pode_assumir_breed') %}<a href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>{% endif %}
     <a href="{{ url_for('team_breeders') }}">Team Breeders</a>
     <a href="{{ url_for('ranking_breeders') }}">Ranking</a>
     <a href="{{ url_for('breed_hall_fama') }}">Hall da Fama</a>

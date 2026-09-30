@@ -18,6 +18,11 @@
     <section class="dash-card"><h2>Resistências / imunidades</h2>{% for tipo,qtd in analise.resistencias_tipos[:8] %}<div class="dash-row"><b>{{tipo|title}}</b><span>{{qtd}} resposta(s)</span></div>{% else %}<p class="muted">Os tipos dos Pokémon ainda não foram registrados.</p>{% endfor %}</section>
   </div>
 
+  <div class="dash-grid">
+    <section class="dash-card"><span class="breed-kicker">V27 · OFENSIVA</span><h2>Cobertura de golpes</h2>{% for tipo,qtd in analise.cobertura_ofensiva[:10] %}<div class="dash-row"><b>{{tipo|title}}</b><span>{{qtd}} golpe(s)</span></div>{% else %}<p class="muted">Edite e salve os sets na V27 para registrar automaticamente o tipo dos golpes.</p>{% endfor %}<p class="muted">Perfil: {{analise.perfil_ofensivo.get('physical',0)}} físicos · {{analise.perfil_ofensivo.get('special',0)}} especiais.</p></section>
+    <section class="dash-card"><span class="breed-kicker">V27 · SPEED</span><h2>Perfil de velocidade</h2>{% for x in analise.perfil_velocidade[:8] %}<div class="dash-row"><b>{{x.pokemon}}</b><span>Base {{x.speed}}{% if x.item %} · {{x.item}}{% endif %}</span></div>{% else %}<p class="muted">Os Base Stats ainda não foram salvos para este time. Abra-o no Team Builder V27 e salve novamente.</p>{% endfor %}</section>
+  </div>
+
   <section class="dash-card"><div class="section-title-row"><h2>Cobertura de papéis</h2><a class="cta-secondary" href="{{url_for('buildershub.sinergia')}}?team_id={{time.id}}">Abrir Sinergia Completa</a></div><div class="admin-shortcuts">{% for nome,ativo in analise.cobertura_papeis.items() %}<span class="status-pill {{'entrada' if ativo else 'saida'}}">{{nome|replace('_',' ')|title}}: {{'SIM' if ativo else 'NÃO'}}</span>{% endfor %}</div><p class="muted">O analisador do time usa os dados salvos no set e as regras do formato. A análise é uma orientação estratégica, não uma garantia de resultado em batalha.</p></section>
 </div>
 {% endblock %}
