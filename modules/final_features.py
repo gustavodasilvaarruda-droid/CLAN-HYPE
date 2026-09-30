@@ -126,10 +126,13 @@ def create_final_blueprint(supabase, login_required, safe_table, is_admin, regis
     def financeiro():
         if not is_admin(): return redirect(url_for('painel'))
         pedidos=[x for x in safe_table('pedidos_breed') if x.get('status')=='entregue']
-        total=sum(float(x.get('preco_total') or 0) for x in pedidos); por={}
+        total=sum(float(x.get('preco_total') or 0) for x in pedidos)
+        total_taxa=sum(float(x.get('taxa_clan_valor') or 0) for x in pedidos)
+        total_breeders=sum(float(x.get('valor_breeder') or x.get('preco_total') or 0) for x in pedidos)
+        por={}
         for x in pedidos:
-            b=x.get('breeder_responsavel') or 'Sem breeder'; por[b]=por.get(b,0)+float(x.get('preco_total') or 0)
-        return render_template('financeiro.html',total=total,por_breeder=sorted(por.items(),key=lambda z:z[1],reverse=True),pedidos=pedidos)
+            b=x.get('breeder_responsavel') or 'Sem breeder'; por[b]=por.get(b,0)+float(x.get('valor_breeder') or x.get('preco_total') or 0)
+        return render_template('financeiro.html',total=total,total_taxa=total_taxa,total_breeders=total_breeders,por_breeder=sorted(por.items(),key=lambda z:z[1],reverse=True),pedidos=pedidos)
 
     @bp.route('/admin/configuracoes', methods=['GET','POST'])
     @login_required

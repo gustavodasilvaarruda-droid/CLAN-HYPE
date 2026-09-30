@@ -3,6 +3,8 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
 import json
 import os
+import re
+import secrets
 
 
 def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, registrar_log,
@@ -117,12 +119,25 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
     def hype_live():
         cfg = config_dict()
         ativo = str(cfg.get('youtube_live_ativo', '')).lower() in ('1', 'true', 'on', 'sim', 'yes')
+        replays = [x for x in safe_table('hype_live_replays') if x.get('publicado', True)]
+        replays.sort(key=lambda x: (bool(x.get('destaque')), str(x.get('created_at') or '')), reverse=True)
+        for r in replays:
+            r['embed_url'] = youtube_embed_url(r.get('youtube_url'))
+        agenda = []
+        for e in safe_table('eventos'):
+            if e.get('publicado', True) and e.get('status_evento') not in ('finalizado','cancelado'):
+                agenda.append({'tipo':'Evento','titulo':e.get('titulo'),'data':e.get('data_evento'),'id':e.get('id')})
+        for t in safe_table('torneios'):
+            if t.get('publicado', True) and t.get('status_torneio') not in ('finalizado','cancelado'):
+                agenda.append({'tipo':'Torneio','titulo':t.get('titulo'),'data':t.get('data_torneio'),'id':t.get('id')})
+        agenda.sort(key=lambda x: str(x.get('data') or ''))
         return render_template(
             'hype_live.html',
             titulo=cfg.get('youtube_live_titulo') or 'HYPE Live',
             youtube_url=cfg.get('youtube_live_url') or '',
             embed_url=youtube_embed_url(cfg.get('youtube_live_url')) if ativo else None,
             ativo=ativo,
+            replays=replays[:12], agenda=agenda[:6]
         )
 
     @bp.route('/reino/mapa')
@@ -252,10 +267,12 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
 
         usuarios = sorted(safe_table('usuarios_clan', 'email,nick_jogo'), key=lambda x: (x.get('nick_jogo') or '').lower())
         transacoes = sorted(safe_table('transacoes_hype'), key=lambda x: x.get('created_at') or '', reverse=True)[:300]
+        caixa_clan = sorted(safe_table('hype_caixa_clan'), key=lambda x: x.get('created_at') or '', reverse=True)[:300]
+        saldo_clan = sum((int(x.get('valor') or 0) if x.get('tipo') == 'entrada' else -int(x.get('valor') or 0)) for x in caixa_clan)
         por_usuario = []
         for u in usuarios:
             por_usuario.append({**u, 'saldo': saldo_usuario(u.get('email'))})
-        return render_template('admin_economia.html', usuarios=usuarios, transacoes=transacoes, por_usuario=por_usuario)
+        return render_template('admin_economia.html', usuarios=usuarios, transacoes=transacoes, por_usuario=por_usuario, caixa_clan=caixa_clan, saldo_clan=saldo_clan)
 
     @bp.route('/admin/economia/cobrar-alugueis', methods=['POST'])
     @login_required
@@ -298,6 +315,64 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         registrar_log('cobrar_alugueis', 'economia', detalhes={'registros': total})
         flash(f'{total} cobrança(s) de aluguel registrada(s).', 'sucesso')
         return redirect(url_for('expansion.admin_economia'))
+
+    def _parse_spread_texto(valor, padrao=0):
+        """Converte textos como '252 Atk / 4 SpD / 252 Spe' no formato do Team Builder."""
+        base = {k: padrao for k in ('hp','atk','def','spa','spd','spe')}
+        texto = str(valor or '').strip()
+        if not texto:
+            return base
+        aliases = {
+            'hp':'hp','vida':'hp',
+            'atk':'atk','attack':'atk','ataque':'atk',
+            'def':'def','defense':'def','defesa':'def',
+            'spa':'spa','spatk':'spa','sp atk':'spa','special attack':'spa','ataque especial':'spa',
+            'spd':'spd','spdef':'spd','sp def':'spd','special defense':'spd','defesa especial':'spd',
+            'spe':'spe','speed':'spe','velocidade':'spe',
+        }
+        for quantidade, nome in re.findall(r'(\d{1,3})\s*([A-Za-zÀ-ÿ ._-]+)', texto):
+            chave = aliases.get(re.sub(r'\s+', ' ', nome.strip().lower().replace('_',' ')))
+            if chave:
+                limite = 31 if padrao == 31 else 252
+                base[chave] = max(0, min(limite, int(quantidade)))
+        return base
+
+    def _split_moves_build(valor):
+        texto = str(valor or '').replace('•', '\n').replace(';', '\n')
+        partes = []
+        for linha in texto.splitlines():
+            for item in re.split(r'\s*[,|]\s*', linha):
+                item = item.strip(' -\t')
+                if item and item not in partes:
+                    partes.append(item[:100])
+        return partes[:4]
+
+    def _build_hype_para_slot(row):
+        pokemon = str(row.get('pokemon') or '').strip()
+        sprite = ''
+        pokemon_id = None
+        tipos = []
+        if pokemon:
+            pokedex = [x for x in safe_table('pokedex_competitiva') if str(x.get('pokemon') or '').strip().casefold() == pokemon.casefold()]
+            if pokedex:
+                px = pokedex[0]
+                sprite = str(px.get('imagem_url') or '')
+                pokemon_id = px.get('dex_id') if isinstance(px.get('dex_id'), int) else None
+                tipos = [str(px.get(k) or '').strip().lower() for k in ('tipo1','tipo2') if str(px.get(k) or '').strip()][:2]
+        tera = str(row.get('tipo_tera') or '').strip()
+        return {
+            'pokemon': pokemon[:80], 'pokemon_id': pokemon_id, 'sprite': sprite[:500], 'tipos': tipos,
+            'item': str(row.get('item') or '').strip()[:100],
+            'ability': str(row.get('ability') or '').strip()[:100],
+            'nature': str(row.get('nature') or '').strip()[:40],
+            'papel': str(row.get('papel') or '').strip()[:80],
+            'mecanica': 'tera' if tera else 'nenhuma', 'tera_type': tera[:30],
+            'observacao': str(row.get('estrategia') or '').strip()[:500],
+            'moves': _split_moves_build(row.get('moves')),
+            'evs': _parse_spread_texto(row.get('evs'), 0),
+            'ivs': _parse_spread_texto(row.get('ivs'), 31),
+            'base_stats': {}, 'move_types': {}, 'move_categories': {},
+        }
 
     @bp.route('/team-builder', methods=['GET', 'POST'])
     @login_required
@@ -347,6 +422,9 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                                 'moves': [str(x).strip()[:100] for x in (slot.get('moves') or []) if str(x).strip()][:4],
                                 'evs': slot.get('evs') if isinstance(slot.get('evs'), dict) else {},
                                 'ivs': slot.get('ivs') if isinstance(slot.get('ivs'), dict) else {},
+                                'base_stats': slot.get('base_stats') if isinstance(slot.get('base_stats'), dict) else {},
+                                'move_types': slot.get('move_types') if isinstance(slot.get('move_types'), dict) else {},
+                                'move_categories': slot.get('move_categories') if isinstance(slot.get('move_categories'), dict) else {},
                             }
                             slots.append(clean)
                 except (ValueError, TypeError):
@@ -368,6 +446,8 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             if not nome or not slots:
                 flash('Informe o nome do time e pelo menos um Pokémon.', 'erro')
             else:
+                existente = safe_table('times_pokemon', '*', id=team_id) if team_id else []
+                share_token = (existente[0].get('share_token') if existente else None) or secrets.token_urlsafe(9)
                 payload = {
                     'usuario_email': email,
                     'nome': nome,
@@ -375,9 +455,9 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                     'formato_codigo': formato_codigo,
                     'descricao': descricao,
                     'slots': slots,
-                    'publico': request.form.get('publico') == 'on'
+                    'publico': request.form.get('publico') == 'on',
+                    'share_token': share_token,
                 }
-                existente = safe_table('times_pokemon', '*', id=team_id) if team_id else []
                 if existente and existente[0].get('usuario_email') == email:
                     payload.pop('usuario_email', None)
                     supabase.table('times_pokemon').update(payload).eq('id', team_id).execute()
@@ -390,10 +470,17 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         meus = sorted(safe_table('times_pokemon', '*', usuario_email=email), key=lambda x: x.get('updated_at') or '', reverse=True)
         publicos = sorted([x for x in safe_table('times_pokemon') if x.get('publico') and x.get('usuario_email') != email], key=lambda x: x.get('updated_at') or '', reverse=True)[:20]
         builds_pessoais = sorted(safe_table('builds_pessoais', '*', usuario_email=email), key=lambda x: x.get('updated_at') or x.get('created_at') or '', reverse=True)
+        builds_hype = [dict(x) for x in safe_table('builds_pokemon') if x.get('publicado') and str(x.get('status_publicacao') or 'publicado') == 'publicado']
+        builds_hype.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+        for b in builds_hype[:80]:
+            b['_slot'] = _build_hype_para_slot(b)
+        builds_hype = builds_hype[:80]
         favoritos_rows = safe_table('times_favoritos', '*', usuario_email=email)
         favoritos_ids = [int(x.get('time_id')) for x in favoritos_rows if x.get('time_id') is not None]
         prefill_pokemon = (request.args.get('pokemon') or '').strip()[:80]
-        return render_template('team_builder.html', meus_times=meus, times_publicos=publicos, formatos=formatos, builds_pessoais=builds_pessoais, prefill_pokemon=prefill_pokemon, editing_team=editing_team, favoritos_ids=favoritos_ids)
+        prefill_build_id = request.args.get('build_id', type=int)
+        prefill_build = next((x for x in builds_hype if int(x.get('id') or 0) == int(prefill_build_id or 0)), None)
+        return render_template('team_builder.html', meus_times=meus, times_publicos=publicos, formatos=formatos, builds_pessoais=builds_pessoais, builds_hype=builds_hype, prefill_build=prefill_build, prefill_pokemon=prefill_pokemon, editing_team=editing_team, favoritos_ids=favoritos_ids)
 
     @bp.route('/team-builder/build/salvar', methods=['POST'])
     @login_required
@@ -425,6 +512,9 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             'moves': [str(x).strip()[:100] for x in (dados.get('moves') or []) if str(x).strip()][:4],
             'evs': dados.get('evs') if isinstance(dados.get('evs'), dict) else {},
             'ivs': dados.get('ivs') if isinstance(dados.get('ivs'), dict) else {},
+            'base_stats': dados.get('base_stats') if isinstance(dados.get('base_stats'), dict) else {},
+            'move_types': dados.get('move_types') if isinstance(dados.get('move_types'), dict) else {},
+            'move_categories': dados.get('move_categories') if isinstance(dados.get('move_categories'), dict) else {},
         }
         try:
             supabase.table('builds_pessoais').insert({
@@ -467,8 +557,13 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             'formato_codigo': origem.get('formato_codigo'),
             'descricao': origem.get('descricao'),
             'slots': origem.get('slots') or [],
-            'publico': False
+            'publico': False,
+            'share_token': secrets.token_urlsafe(9),
         }).execute()
+        try:
+            supabase.table('times_pokemon').update({'duplicacoes': int(origem.get('duplicacoes') or 0) + 1}).eq('id', team_id).execute()
+        except Exception:
+            pass
         flash('Time duplicado para a sua biblioteca.', 'sucesso')
         return redirect(url_for('expansion.team_builder'))
 
@@ -487,7 +582,7 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         else:
             supabase.table('times_favoritos').insert({'usuario_email': email, 'time_id': team_id}).execute()
             flash('Time adicionado aos favoritos.', 'sucesso')
-        return redirect(url_for('expansion.team_builder'))
+        return redirect(request.referrer or url_for('expansion.team_builder'))
 
     @bp.route('/team-builder/<int:team_id>/excluir', methods=['POST'])
     @login_required

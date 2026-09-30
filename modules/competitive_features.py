@@ -1,3 +1,4 @@
+from collections import Counter
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 
 
@@ -171,6 +172,45 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
         else:
             coach.append('O time aparenta ser mais defensivo ou ainda está incompleto. Defina claramente quem será sua condição de vitória antes de finalizar a equipe.')
 
+        # V27: cobertura ofensiva e perfil de velocidade usando os metadados
+        # que o Team Builder salva junto dos slots. Times antigos continuam válidos.
+        cobertura_ofensiva = Counter()
+        perfil_ofensivo = Counter()
+        perfil_velocidade = []
+        for s in slots:
+            move_types = s.get('move_types') if isinstance(s.get('move_types'), dict) else {}
+            move_categories = s.get('move_categories') if isinstance(s.get('move_categories'), dict) else {}
+            for move in [str(x or '').strip() for x in (s.get('moves') or []) if str(x or '').strip()]:
+                chave = move.casefold()
+                tipo = str(move_types.get(move) or move_types.get(chave) or '').strip().lower()
+                categoria = str(move_categories.get(move) or move_categories.get(chave) or '').strip().lower()
+                if categoria in ('physical','special'):
+                    perfil_ofensivo[categoria] += 1
+                if tipo and categoria != 'status':
+                    cobertura_ofensiva[tipo] += 1
+            base = s.get('base_stats') if isinstance(s.get('base_stats'), dict) else {}
+            try:
+                speed = int(base.get('spe') or base.get('speed') or 0)
+            except (TypeError, ValueError):
+                speed = 0
+            if speed:
+                perfil_velocidade.append({
+                    'pokemon': s.get('pokemon') or 'Pokémon',
+                    'speed': speed,
+                    'item': s.get('item') or '',
+                    'papel': s.get('papel') or '',
+                })
+        perfil_velocidade.sort(key=lambda x: (-x['speed'], str(x['pokemon']).casefold()))
+        cobertura_ofensiva_rows = sorted(cobertura_ofensiva.items(), key=lambda x: (-x[1], x[0]))
+        if cobertura_ofensiva_rows:
+            if len(cobertura_ofensiva_rows) < 6:
+                coach.append(f'A cobertura ofensiva registrada usa {len(cobertura_ofensiva_rows)} tipos diferentes. Variar mais os tipos de golpes pode reduzir matchups em que o time fica travado.')
+            else:
+                ok.append(f'Cobertura ofensiva diversificada: {len(cobertura_ofensiva_rows)} tipos de golpes ofensivos registrados.')
+        if perfil_velocidade:
+            mais_rapido = perfil_velocidade[0]
+            coach.append(f'O maior Base Speed registrado é {mais_rapido["speed"]}, de {mais_rapido["pokemon"]}. Use esse dado junto de Scarf, prioridade e boosts para planejar o controle de velocidade.')
+
         return {
             'formato': formato,
             'avisos': avisos,
@@ -180,6 +220,9 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             'cobertura_papeis': cobertura,
             'fraquezas_tipos': fraquezas_ordenadas,
             'resistencias_tipos': resist_ordenadas,
+            'cobertura_ofensiva': cobertura_ofensiva_rows,
+            'perfil_ofensivo': dict(perfil_ofensivo),
+            'perfil_velocidade': perfil_velocidade,
         }
 
     @bp.route('/pokedex-competitiva')
@@ -424,5 +467,29 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             return redirect(url_for('expansion.team_builder'))
         analise = analisar_time(time)
         return render_template('team_analise.html', time=time, analise=analise)
+
+    @bp.route('/team-builder/t/<share_token>')
+    def time_compartilhado(share_token):
+        token = str(share_token or '').strip()[:80]
+        rows = safe_table('times_pokemon', '*', share_token=token) if token else []
+        if not rows:
+            flash('Time compartilhado não encontrado.', 'erro')
+            return redirect(url_for('buildershub.hub'))
+        time = rows[0]
+        dono = time.get('usuario_email') == email_atual()
+        if not time.get('publico') and not dono and not is_admin():
+            flash('Este time é privado.', 'erro')
+            return redirect(url_for('buildershub.hub'))
+        try:
+            supabase.table('times_pokemon').update({'visualizacoes': int(time.get('visualizacoes') or 0) + 1}).eq('id', time.get('id')).execute()
+            time['visualizacoes'] = int(time.get('visualizacoes') or 0) + 1
+        except Exception:
+            pass
+        autor_rows = safe_table('usuarios_clan', '*', email=time.get('usuario_email'))
+        autor = autor_rows[0] if autor_rows else {}
+        favoritos = safe_table('times_favoritos', '*', time_id=time.get('id'))
+        favoritado = bool(email_atual() and any(x.get('usuario_email') == email_atual() for x in favoritos))
+        analise = analisar_time(time)
+        return render_template('team_publico.html', time=time, analise=analise, autor=autor, favoritos_total=len(favoritos), favoritado=favoritado, dono=dono)
 
     return bp
