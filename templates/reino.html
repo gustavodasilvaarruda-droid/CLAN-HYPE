@@ -19,7 +19,10 @@
     <a href="{{url_for('lojas')}}">Lojas ({{reino_resumo.lojas_total}})</a>
     <a href="{{url_for('construtores')}}">Construtores</a>
     <a href="{{url_for('expansion.mapa_reino')}}">Mapa</a>
+    <a href="{{url_for('reino_financeiro_usuario')}}">Meu aluguel</a>
   </div>
+
+  <section class="reino-v31-finance-banner"><div><b>Meu aluguel no Reino</b><p>{% if meu_reino.divida %}Você possui {{meu_reino.divida|preco}} em aberto. {% if meu_reino.informado %}{{meu_reino.informado|preco}} já foi informado e aguarda confirmação.{% endif %}{% else %}Nenhuma dívida de aluguel em aberto.{% endif %}{% if meu_reino.proximo_vencimento %} Próximo vencimento: {{meu_reino.proximo_vencimento}}.{% endif %}</p></div><a href="{{url_for('reino_financeiro_usuario')}}">Abrir meu financeiro →</a></section>
 
   <section class="hype-v6-mini-stats kingdom-stats hype-v7-kingdom-stats">
     <article><span>⌂</span><div><b>{{reino_resumo.casas_total}}</b><small>Casas do Reino</small></div></article>

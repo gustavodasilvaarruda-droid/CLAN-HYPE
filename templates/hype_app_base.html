@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#070707">
   <title>{% block title %}Clã HYPE{% endblock %}</title>
-  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3001">
-  <link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3001">
-  <link rel="stylesheet" href="{{url_for('static',filename='community_v30.css')}}?v=3001">
+  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3101">
+  <link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3101">
+  <link rel="stylesheet" href="{{url_for('static',filename='community_v30.css')}}?v=3101">
+  <link rel="stylesheet" href="{{url_for('static',filename='reino_v31.css')}}?v=3101">
   <link rel="manifest" href="{{url_for('expansion.manifest')}}">
   {% block extra_head %}{% endblock %}
 </head>
@@ -23,7 +24,7 @@
     <a class="{{'active' if request.endpoint in ['breed','breed_meus_pedidos','breed_fila_breeders','breed_historico_geral','team_breeders','ranking_breed','ranking_breeders','painel_breeder_hype','breed_pedido_detalhe','chat_pedido'] else ''}}" href="{{url_for('breed')}}"><span>◈</span>Breed</a>
     <a class="{{'active' if request.endpoint in ['expansion.team_builder','buildershub.hub','buildershub.formatos','buildershub.catalogo','buildershub.guias','buildershub.sinergia','buildershub.calculadora_dano','buildershub.tier_list'] else ''}}" href="{{url_for('buildershub.hub')}}"><span>♟</span>Ferramentas</a>
     <a class="{{'active' if request.endpoint in ['eventos','torneios'] else ''}}" href="{{url_for('eventos')}}"><span>▣</span>Eventos</a>
-    <a class="{{'active' if request.endpoint in ['painel_reino','casas_reino','lojas','loja_detalhe'] else ''}}" href="{{url_for('painel_reino')}}"><span>♛</span>Reino HYPE</a>
+    <a class="{{'active' if request.endpoint in ['painel_reino','casas_reino','lojas','loja_detalhe','reino_financeiro_usuario'] else ''}}" href="{{url_for('painel_reino')}}"><span>♛</span>Reino HYPE</a>
     {% if hype_membro_hype %}<a class="{{'active' if request.endpoint in ['tesouro_hype','tesouro_item','admin_tesouro'] else ''}}" href="{{url_for('tesouro_hype')}}"><span>◆</span>Tesouro</a>{% endif %}
     <a class="{{'active' if request.endpoint in ['central_rankings','ranking_detalhe','ranking_pokemon_detalhe'] else ''}}" href="{{url_for('central_rankings')}}"><span>▥</span>Rankings</a>
     <a class="{{'active' if request.endpoint=='expansion.hype_live' else ''}}" href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>
@@ -83,7 +84,8 @@
     <div class="hgb-side-section-title">Clã</div>
     <nav class="hgb-side-nav">
       <a class="{{'active' if request.endpoint in ['eventos','torneios'] else ''}}" href="{{url_for('eventos')}}"><span>♛</span>Eventos e Torneios</a>
-      <a class="{{'active' if request.endpoint in ['painel_reino','casas_reino','lojas','loja_detalhe'] else ''}}" href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a>
+      <a class="{{'active' if request.endpoint in ['painel_reino','casas_reino','lojas','loja_detalhe','reino_financeiro_usuario'] else ''}}" href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a>
+      <a class="{{'active' if request.endpoint=='reino_financeiro_usuario' else ''}}" href="{{url_for('reino_financeiro_usuario')}}"><span>¤</span>Meu Aluguel</a>
       {% if hype_membro_hype %}<a class="{{'active' if request.endpoint in ['tesouro_hype','tesouro_item','admin_tesouro'] else ''}}" href="{{url_for('tesouro_hype')}}"><span>◆</span>Tesouro do Clã</a>{% endif %}
       <a class="{{'active' if request.endpoint=='expansion.hype_live' else ''}}" href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>
       <a class="{{'active' if request.endpoint in ['central_rankings','ranking_detalhe','ranking_pokemon_detalhe','ranking_breed','ranking_breeders','final.ranking_competitivo'] else ''}}" href="{{url_for('central_rankings')}}"><span>▥</span>Rankings</a>
