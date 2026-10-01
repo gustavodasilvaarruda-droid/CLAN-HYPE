@@ -8,7 +8,7 @@ import secrets
 
 
 def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, registrar_log,
-                               parse_valor, criar_notificacao):
+                               parse_valor, criar_notificacao, sincronizar_cobrancas_reino=None):
     bp = Blueprint('expansion', __name__)
 
     def email_atual():
@@ -279,42 +279,16 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
     def cobrar_alugueis():
         if not tem_permissao_extra('pode_gerenciar_economia'):
             return redirect(url_for('painel'))
-        hoje = datetime.now(timezone.utc).date()
-        total = 0
-        for tabela, prefixo, origem, id_key in [
-            ('contratos_casas', 'Casa', 'aluguel_casa', 'casa_id'),
-            ('contratos_lojas', 'Loja', 'aluguel_loja', 'loja_id'),
-        ]:
-            for c in safe_table(tabela, '*', status='ativo'):
-                venc = c.get('proximo_vencimento')
-                if not venc:
-                    continue
-                try:
-                    data_venc = datetime.fromisoformat(str(venc)[:10]).date()
-                except Exception:
-                    continue
-                if data_venc > hoje:
-                    continue
-                valor = int(c.get('valor_semanal') or 0)
-                chave = f'{origem}:{c.get("id")}:{data_venc.isoformat()}'
-                if registrar_transacao(
-                    c.get('usuario_email'), 'saida', origem,
-                    f'{prefixo} - aluguel semanal vencido em {data_venc.isoformat()}', valor,
-                    origem_tipo=origem, origem_id=c.get(id_key), chave_unica=chave
-                ):
-                    total += 1
-                    novo_venc = data_venc + timedelta(days=7)
-                    while novo_venc <= hoje:
-                        novo_venc += timedelta(days=7)
-                    supabase.table(tabela).update({'proximo_vencimento': novo_venc.isoformat()}).eq('id', c.get('id')).execute()
-                    criar_notificacao(
-                        c.get('usuario_email'), 'Aluguel registrado',
-                        f'Foi registrado no seu extrato o aluguel semanal de {prefixo.lower()} no valor de {valor}.',
-                        'info', url_for('expansion.economia_usuario')
-                    )
-        registrar_log('cobrar_alugueis', 'economia', detalhes={'registros': total})
-        flash(f'{total} cobrança(s) de aluguel registrada(s).', 'sucesso')
-        return redirect(url_for('expansion.admin_economia'))
+        if sincronizar_cobrancas_reino is None:
+            flash('O Financeiro do Reino ainda não está disponível nesta versão.', 'erro')
+            return redirect(url_for('expansion.admin_economia'))
+        try:
+            total = int(sincronizar_cobrancas_reino() or 0)
+            registrar_log('sincronizar_alugueis', 'reino_financeiro', detalhes={'cobrancas_criadas': total})
+            flash(f'{total} nova(s) cobrança(s) de aluguel gerada(s).', 'sucesso')
+        except Exception as e:
+            flash(f'Não foi possível sincronizar os aluguéis: {e}', 'erro')
+        return redirect(url_for('admin_reino_financeiro'))
 
     def _parse_spread_texto(valor, padrao=0):
         """Converte textos como '252 Atk / 4 SpD / 252 Spe' no formato do Team Builder."""
