@@ -167,7 +167,7 @@ def create_builders_hub_blueprint(supabase, login_required, safe_table, is_admin
         rows = _format_visual_rows()
         pokedex = [x for x in safe_table('pokedex_competitiva') if x.get('publicado', True)]
         poke_by_name = {_norm(x.get('pokemon')): x for x in pokedex if x.get('pokemon')}
-        builds = [dict(x) for x in safe_table('builds_pokemon') if x.get('publicado')]
+        builds = [dict(x) for x in safe_table('builds_pokemon') if x.get('publicado') and str(x.get('moderacao_status') or 'visivel') != 'oculto']
         builds.sort(key=lambda x: x.get('created_at') or '', reverse=True)
         guias = []
         for build in builds[:8]:
@@ -204,7 +204,7 @@ def create_builders_hub_blueprint(supabase, login_required, safe_table, is_admin
 
     @bp.route('/hype-builders/guias')
     def guias():
-        rows = [x for x in safe_table('builds_pokemon') if x.get('publicado')]
+        rows = [x for x in safe_table('builds_pokemon') if x.get('publicado') and str(x.get('moderacao_status') or 'visivel') != 'oculto']
         termo = (request.args.get('q') or '').strip().casefold()
         if termo:
             rows = [x for x in rows if termo in str(x.get('pokemon') or '').casefold()

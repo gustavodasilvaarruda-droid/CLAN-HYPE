@@ -182,7 +182,7 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         eventos = [x for x in safe_table('eventos') if x.get('publicado', True)]
         torneios = [x for x in safe_table('torneios') if x.get('publicado', True)]
         trans = safe_table('transacoes_hype')
-        pokemon_catalogo = safe_table('precos_pokemon')
+        pokemon_catalogo = safe_table('pokemon_precificacao')
 
         casas_ocupadas = sum(x.get('status') == 'ocupada' for x in casas)
         lojas_ocupadas = sum(x.get('status') == 'ocupada' for x in lojas)
@@ -468,9 +468,9 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             return redirect(url_for('expansion.team_builder'))
 
         meus = sorted(safe_table('times_pokemon', '*', usuario_email=email), key=lambda x: x.get('updated_at') or '', reverse=True)
-        publicos = sorted([x for x in safe_table('times_pokemon') if x.get('publico') and x.get('usuario_email') != email], key=lambda x: x.get('updated_at') or '', reverse=True)[:20]
+        publicos = sorted([x for x in safe_table('times_pokemon') if x.get('publico') and str(x.get('moderacao_status') or 'visivel') != 'oculto' and x.get('usuario_email') != email], key=lambda x: x.get('updated_at') or '', reverse=True)[:20]
         builds_pessoais = sorted(safe_table('builds_pessoais', '*', usuario_email=email), key=lambda x: x.get('updated_at') or x.get('created_at') or '', reverse=True)
-        builds_hype = [dict(x) for x in safe_table('builds_pokemon') if x.get('publicado') and str(x.get('status_publicacao') or 'publicado') == 'publicado']
+        builds_hype = [dict(x) for x in safe_table('builds_pokemon') if x.get('publicado') and str(x.get('status_publicacao') or 'publicado') == 'publicado' and str(x.get('moderacao_status') or 'visivel') != 'oculto']
         builds_hype.sort(key=lambda x: x.get('created_at') or '', reverse=True)
         for b in builds_hype[:80]:
             b['_slot'] = _build_hype_para_slot(b)
@@ -547,7 +547,7 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             flash('Time não encontrado.', 'erro')
             return redirect(url_for('expansion.team_builder'))
         origem = rows[0]
-        if not origem.get('publico') and origem.get('usuario_email') != email_atual() and not is_admin():
+        if (str(origem.get('moderacao_status') or 'visivel') == 'oculto' and origem.get('usuario_email') != email_atual() and not is_admin()) or (not origem.get('publico') and origem.get('usuario_email') != email_atual() and not is_admin()):
             flash('Esse time não está disponível para duplicação.', 'erro')
             return redirect(url_for('expansion.team_builder'))
         supabase.table('times_pokemon').insert({
@@ -571,7 +571,7 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
     @login_required
     def team_builder_favoritar(team_id):
         rows = safe_table('times_pokemon', '*', id=team_id)
-        if not rows or (not rows[0].get('publico') and rows[0].get('usuario_email') != email_atual()):
+        if not rows or (str(rows[0].get('moderacao_status') or 'visivel') == 'oculto' and rows[0].get('usuario_email') != email_atual() and not is_admin()) or (not rows[0].get('publico') and rows[0].get('usuario_email') != email_atual()):
             flash('Time não disponível.', 'erro')
             return redirect(url_for('expansion.team_builder'))
         email = email_atual()

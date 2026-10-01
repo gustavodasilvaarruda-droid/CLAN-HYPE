@@ -91,6 +91,7 @@ def create_final_blueprint(supabase, login_required, safe_table, is_admin, regis
                 flash('Build publicada.' if admin else 'Build enviada para revisão antes da publicação.','sucesso')
             return redirect(url_for('final.builds_pokemon'))
         rows=supabase.table('builds_pokemon').select('*').eq('publicado',True).order('created_at',desc=True).execute().data or []
+        rows=[x for x in rows if str(x.get('moderacao_status') or 'visivel') != 'oculto']
         minhas=[]
         try:
             minhas=supabase.table('builds_pokemon').select('*').eq('autor_email',current_email()).neq('status_publicacao','publicado').order('created_at',desc=True).execute().data or []
@@ -118,21 +119,62 @@ def create_final_blueprint(supabase, login_required, safe_table, is_admin, regis
     @login_required
     def estatisticas():
         email=current_email(); breeds=safe_table('pedidos_breed'); builds=safe_table('pedidos_build'); inscr_e=safe_table('inscricoes_evento'); inscr_t=safe_table('inscricoes_torneio'); cons=safe_table('conquistas_usuario')
-        stats={'breeds_pedidos':sum(x.get('usuario_email')==email for x in breeds),'breeds_feitos':sum(x.get('breeder_responsavel')==email and x.get('status')=='entregue' for x in breeds),'builds_pedidos':sum(x.get('usuario_email')==email for x in builds),'builds_feitos':sum(x.get('builder_email')==email and x.get('status')=='entregue' for x in builds),'eventos':sum(x.get('usuario_email')==email for x in inscr_e),'torneios':sum(x.get('usuario_email')==email for x in inscr_t),'conquistas':sum(x.get('usuario_email')==email for x in cons)}
+        stats={'breeds_pedidos':sum(x.get('usuario_email')==email for x in breeds),'breeds_feitos':sum(x.get('breeder_responsavel')==email and x.get('status')=='entregue' for x in breeds),'builds_pedidos':sum(x.get('usuario_email')==email for x in builds),'builds_feitos':sum(x.get('builder_responsavel')==email and x.get('status')=='entregue' for x in builds),'eventos':sum(x.get('usuario_email')==email for x in inscr_e),'torneios':sum(x.get('usuario_email')==email for x in inscr_t),'conquistas':sum(x.get('usuario_email')==email for x in cons)}
         return render_template('estatisticas.html',stats=stats)
 
     @bp.route('/admin/financeiro')
     @login_required
     def financeiro():
         if not is_admin(): return redirect(url_for('painel'))
-        pedidos=[x for x in safe_table('pedidos_breed') if x.get('status')=='entregue']
-        total=sum(float(x.get('preco_total') or 0) for x in pedidos)
-        total_taxa=sum(float(x.get('taxa_clan_valor') or 0) for x in pedidos)
-        total_breeders=sum(float(x.get('valor_breeder') or x.get('preco_total') or 0) for x in pedidos)
-        por={}
-        for x in pedidos:
-            b=x.get('breeder_responsavel') or 'Sem breeder'; por[b]=por.get(b,0)+float(x.get('valor_breeder') or x.get('preco_total') or 0)
-        return render_template('financeiro.html',total=total,total_taxa=total_taxa,total_breeders=total_breeders,por_breeder=sorted(por.items(),key=lambda z:z[1],reverse=True),pedidos=pedidos)
+        pedidos=safe_table('pedidos_breed')
+        pedidos_map={x.get('id'):x for x in pedidos}
+        usuarios={x.get('email'):x for x in safe_table('usuarios_clan','email,nick_jogo,nome_exibicao,avatar_url')}
+        comissoes=safe_table('hype_breed_comissoes')
+        comissoes.sort(key=lambda x:str(x.get('gerada_em') or x.get('created_at') or ''), reverse=True)
+
+        aberto=('pendente','informado')
+        total_a_receber=sum(int(c.get('valor') or 0) for c in comissoes if c.get('status') in aberto)
+        total_informado=sum(int(c.get('valor') or 0) for c in comissoes if c.get('status')=='informado')
+        total_recebido=sum(int(c.get('valor') or 0) for c in comissoes if c.get('status')=='pago')
+        agora=datetime.now(timezone.utc)
+        total_recebido_mes=0
+        for c in comissoes:
+            if c.get('status')!='pago' or not c.get('confirmado_em'): continue
+            try:
+                dt=datetime.fromisoformat(str(c.get('confirmado_em')).replace('Z','+00:00'))
+                if dt.year==agora.year and dt.month==agora.month:
+                    total_recebido_mes += int(c.get('valor') or 0)
+            except Exception: pass
+
+        agrupado={}
+        for c in comissoes:
+            email=c.get('breeder_email') or 'Sem breeder'
+            g=agrupado.setdefault(email, {'email':email,'nick':(usuarios.get(email) or {}).get('nome_exibicao') or (usuarios.get(email) or {}).get('nick_jogo') or email,
+                'pendente':0,'informado':0,'pago':0,'total_devido':0,'quantidade_aberta':0})
+            valor=int(c.get('valor') or 0); status=c.get('status')
+            if status=='pendente': g['pendente']+=valor
+            elif status=='informado': g['informado']+=valor
+            elif status=='pago': g['pago']+=valor
+            if status in aberto:
+                g['total_devido']+=valor; g['quantidade_aberta']+=1
+        por_breeder=sorted(agrupado.values(), key=lambda x:(-x['total_devido'],-x['informado'],x['nick'].lower()))
+
+        for c in comissoes:
+            p=pedidos_map.get(c.get('pedido_id')) or {}
+            u=usuarios.get(c.get('breeder_email')) or {}
+            c['pokemon']=p.get('pokemon') or 'Pokemon'
+            c['pokemon_id']=p.get('pokemon_id')
+            c['preco_total']=p.get('preco_total') or 0
+            c['breeder_nick']=u.get('nome_exibicao') or u.get('nick_jogo') or c.get('breeder_email')
+
+        caixa=safe_table('hype_caixa_clan')
+        caixa_entradas=sum(int(x.get('valor') or 0) for x in caixa if x.get('tipo')=='entrada')
+        caixa_saidas=sum(int(x.get('valor') or 0) for x in caixa if x.get('tipo')=='saida')
+        saldo_caixa=max(0,caixa_entradas-caixa_saidas)
+        return render_template('financeiro.html', comissoes=comissoes, por_breeder=por_breeder,
+            total_a_receber=total_a_receber,total_informado=total_informado,total_recebido=total_recebido,
+            total_recebido_mes=total_recebido_mes,saldo_caixa=saldo_caixa,
+            breeders_pendentes=sum(1 for g in por_breeder if g['total_devido']>0))
 
     @bp.route('/admin/configuracoes', methods=['GET','POST'])
     @login_required

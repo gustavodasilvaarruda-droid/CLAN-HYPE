@@ -252,7 +252,7 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             return redirect(url_for('competitive.pokedex_competitiva'))
         pokemon = rows[0]
         builds = [x for x in safe_table('builds_pokemon')
-                  if x.get('publicado') and str(x.get('pokemon') or '').casefold() == str(pokemon.get('pokemon') or '').casefold()]
+                  if x.get('publicado') and str(x.get('moderacao_status') or 'visivel') != 'oculto' and str(x.get('pokemon') or '').casefold() == str(pokemon.get('pokemon') or '').casefold()]
         builds.sort(key=lambda x: x.get('created_at') or '', reverse=True)
         return render_template('pokedex_competitiva_detalhe.html', pokemon=pokemon, builds=builds)
 
@@ -429,8 +429,8 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
     @login_required
     def favoritar_build(build_id):
         email = email_atual()
-        builds = safe_table('builds_pokemon', 'id,publicado', id=build_id)
-        if not builds or not builds[0].get('publicado'):
+        builds = safe_table('builds_pokemon', 'id,publicado,moderacao_status', id=build_id)
+        if not builds or not builds[0].get('publicado') or str(builds[0].get('moderacao_status') or 'visivel') == 'oculto':
             flash('Build não encontrada.', 'erro')
             return redirect(url_for('final.builds_pokemon'))
         fav = safe_table('builds_favoritos', '*', usuario_email=email, build_id=build_id)
@@ -450,7 +450,7 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
     def meus_favoritos():
         favs = safe_table('builds_favoritos', '*', usuario_email=email_atual())
         ids = {x.get('build_id') for x in favs}
-        builds = [x for x in safe_table('builds_pokemon') if x.get('id') in ids and x.get('publicado')]
+        builds = [x for x in safe_table('builds_pokemon') if x.get('id') in ids and x.get('publicado') and str(x.get('moderacao_status') or 'visivel') != 'oculto']
         builds.sort(key=lambda x: x.get('created_at') or '', reverse=True)
         return render_template('builds_favoritos.html', builds=builds)
 
@@ -462,6 +462,9 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             flash('Time não encontrado.', 'erro')
             return redirect(url_for('expansion.team_builder'))
         time = rows[0]
+        if str(time.get('moderacao_status') or 'visivel') == 'oculto' and time.get('usuario_email') != email_atual() and not is_admin():
+            flash('Este time está indisponível na comunidade.', 'erro')
+            return redirect(url_for('community.home'))
         if time.get('usuario_email') != email_atual() and not time.get('publico') and not is_admin():
             flash('Você não tem acesso a este time.', 'erro')
             return redirect(url_for('expansion.team_builder'))
@@ -477,6 +480,9 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             return redirect(url_for('buildershub.hub'))
         time = rows[0]
         dono = time.get('usuario_email') == email_atual()
+        if str(time.get('moderacao_status') or 'visivel') == 'oculto' and not dono and not is_admin():
+            flash('Este time está indisponível na comunidade.', 'erro')
+            return redirect(url_for('community.home'))
         if not time.get('publico') and not dono and not is_admin():
             flash('Este time é privado.', 'erro')
             return redirect(url_for('buildershub.hub'))
@@ -489,7 +495,12 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
         autor = autor_rows[0] if autor_rows else {}
         favoritos = safe_table('times_favoritos', '*', time_id=time.get('id'))
         favoritado = bool(email_atual() and any(x.get('usuario_email') == email_atual() for x in favoritos))
+        comentarios = [dict(x) for x in safe_table('comunidade_comentarios', '*', alvo_tipo='time', alvo_id=time.get('id')) if str(x.get('status') or 'ativo') == 'ativo']
+        comentarios.sort(key=lambda x: str(x.get('created_at') or ''))
+        usuarios_comentarios = {u.get('email'):u for u in safe_table('usuarios_clan','email,nick_jogo,nome_exibicao,avatar_url') if u.get('email')}
+        for c in comentarios:
+            c['autor'] = usuarios_comentarios.get(c.get('usuario_email')) or {}
         analise = analisar_time(time)
-        return render_template('team_publico.html', time=time, analise=analise, autor=autor, favoritos_total=len(favoritos), favoritado=favoritado, dono=dono)
+        return render_template('team_publico.html', time=time, analise=analise, autor=autor, favoritos_total=len(favoritos), favoritado=favoritado, dono=dono, comentarios=comentarios)
 
     return bp
