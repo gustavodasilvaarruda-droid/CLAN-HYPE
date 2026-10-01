@@ -27,7 +27,7 @@
   </div>
 
   {% if permissoes.get('pode_fazer_pedido_breed', True) %}
-  <form method="POST" id="breedForm" autocomplete="off">
+  <form method="POST" id="breedForm" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="pokemon_id" id="pokemon_id">
 
     <section class="breed-wizard-panel active" data-panel="1">

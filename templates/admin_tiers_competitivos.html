@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin Tier List - HYPE</title>
-  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}">
-</head>
-<body class="hype-home builders-hub-page">
+  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3001">
+<link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3001"></head>
+<body class="hype-home builders-hub-page">{% include 'admin_v29_nav.html' %}
 <main class="dashboard-shell builders-shell">
   <div class="page-topline"><a class="smart-back" href="{{url_for('competitive.admin_pokedex_competitiva')}}">← Pokédex Competitiva</a><span>Admin › Tiers por formato</span></div>
   {% with ms=get_flashed_messages(with_categories=true) %}{% for c,m in ms %}<div class="alert alert-{{c}}">{{m}}</div>{% endfor %}{% endwith %}
@@ -17,7 +17,7 @@
 
   <section class="dash-card">
     <h2>Adicionar / atualizar tier</h2>
-    <form method="post" class="admin-form-grid">
+    <form method="post" class="admin-form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>Pokémon
         <select name="pokemon_id" required>
           <option value="">Selecione...</option>
@@ -50,7 +50,7 @@
       <article class="tier-admin-row">
         <div><b>{{row._pokemon}}</b><span>{{row._formato}}</span>{% if row.observacao %}<small>{{row.observacao}}</small>{% endif %}</div>
         <strong class="tier-mini">{{row.tier}}</strong>
-        <form method="post" onsubmit="return confirm('Remover este tier específico?')">
+        <form method="post" onsubmit="return confirm('Remover este tier específico?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="acao" value="excluir"><input type="hidden" name="pokemon_id" value="{{row.pokemon_id}}"><input type="hidden" name="formato_codigo" value="{{row.formato_codigo}}">
           <button class="btn-perigo" type="submit">Remover</button>
         </form>

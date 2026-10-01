@@ -16,7 +16,7 @@
     </section>
 
     {% if chat_readonly %}<div class="chat-v22-readonly"><strong>Conversa arquivada</strong><span>O pedido foi finalizado. O histórico permanece disponível somente para leitura.</span></div>{% else %}
-    <form method="post" class="chat-v22-composer"><textarea name="mensagem" maxlength="1500" required placeholder="Digite sua mensagem para {{responsavel_nick or cliente_nick or 'a equipe HYPE'}}..."></textarea><div><small><b id="chatCount">0</b>/1500</small><button class="btn-dourado" data-once>Enviar mensagem</button></div></form>
+    <form method="post" class="chat-v22-composer"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><textarea name="mensagem" maxlength="1500" required placeholder="Digite sua mensagem para {{responsavel_nick or cliente_nick or 'a equipe HYPE'}}..."></textarea><div><small><b id="chatCount">0</b>/1500</small><button class="btn-dourado" data-once>Enviar mensagem</button></div></form>
     {% endif %}
   </div>
 </div>

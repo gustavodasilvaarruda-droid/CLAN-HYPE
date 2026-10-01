@@ -34,7 +34,7 @@
       <span>Minha disponibilidade</span>
       <strong class="breeder-status {{disponibilidade.status or perfil.status or 'disponivel'}}">{{(disponibilidade.status or perfil.status or 'disponivel')|replace('_',' ')|title}}</strong>
     </div>
-    <form method="post" action="{{url_for('disponibilidade_breeder')}}" class="breeder-v22-status-form">
+    <form method="post" action="{{url_for('disponibilidade_breeder')}}" class="breeder-v22-status-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button name="status" value="disponivel">Disponível</button>
       <button name="status" value="ocupado">Ocupado</button>
       <button name="status" value="indisponivel">Indisponível</button>
@@ -52,6 +52,35 @@
     <article><span>Prontos</span><strong>{{prontos|length}}</strong><small>aguardando entrega</small></article>
     <article><span>Nota média</span><strong>{{metricas.media if metricas.media is not none else '—'}}</strong><small>{{metricas.avaliacoes}} avaliações</small></article>
     <article><span>Repasse do mês</span><strong>{{repasse_mes|preco}}</strong><small>{{entregues_mes}} entregas</small></article>
+    <article class="v28-debt-kpi"><span>Pendente com o Clã</span><strong>{{comissao_devida|preco}}</strong><small>{{comissoes_abertas|length}} comissão(ões) aberta(s)</small></article>
+  </section>
+
+  <section class="v28-breeder-finance">
+    <div class="v28-finance-head">
+      <div><span class="breed-kicker">FINANCEIRO HYPE</span><h2>Minhas comissões com o Clã</h2><p>A comissão só vira dívida quando você marca o Pokémon como pronto. O pagamento só é baixado após confirmação da administração.</p></div>
+      <div class="v28-finance-summary"><span><small>Devo agora</small><b>{{comissao_devida|preco}}</b></span><span><small>Pagamento informado</small><b>{{comissao_aguardando|preco}}</b></span></div>
+    </div>
+    {% if comissao_pendente > 0 %}
+    <form method="post" action="{{url_for('informar_pagamento_total_comissoes_breed')}}" class="v28-pay-all" onsubmit="return confirm('Confirmar que você entregou ao Clã o valor total pendente? A administração ainda precisará confirmar o recebimento.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input name="observacao" maxlength="500" placeholder="Observação opcional (ex.: pago ao Líder no jogo)">
+      <button class="btn-dourado" data-once>Informar pagamento total · {{comissao_pendente|preco}}</button>
+    </form>
+    {% endif %}
+    <div class="v28-commission-list">
+      {% for c in comissoes %}
+      <article class="v28-commission status-{{c.status}}">
+        <div class="v28-commission-main">
+          <div class="v28-commission-poke">{% if c.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{c.pokemon_id}}.png" alt="">{% else %}◇{% endif %}</div>
+          <div><small>Breed #{{c.pedido_id}}</small><strong>{{c.pokemon}}</strong><span>Taxa HYPE {{c.percentual}}%</span></div>
+        </div>
+        <div class="v28-commission-value"><small>Comissão</small><b>{{c.valor|preco}}</b></div>
+        <div class="v28-commission-state"><span class="v28-fin-status {{c.status}}">{% if c.status=='pendente' %}Pendente{% elif c.status=='informado' %}Aguardando confirmação{% elif c.status=='pago' %}Pago{% else %}Cancelado{% endif %}</span><small>{{(c.gerada_em or c.created_at)|data_br}}</small></div>
+        <div class="v28-commission-actions">
+          {% if c.status=='pendente' %}<form method="post" action="{{url_for('informar_pagamento_comissao_breed',comissao_id=c.id)}}" onsubmit="return confirm('Você já entregou esta comissão ao Clã HYPE?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="observacao" value="Pagamento informado pelo Painel do Breeder"><button data-once>Informar pagamento</button></form>{% elif c.status=='informado' %}<span>Aguardando Admin</span>{% elif c.status=='pago' %}<span class="paid">✓ Confirmado</span>{% endif %}
+        </div>
+      </article>
+      {% else %}<div class="breeder-v22-empty"><strong>Nenhuma comissão gerada.</strong><span>Quando você marcar um Pokémon como pronto, a taxa correspondente aparecerá aqui.</span></div>{% endfor %}
+    </div>
   </section>
 
   <div class="breeder-v22-layout">
@@ -69,11 +98,11 @@
             <a href="{{url_for('breed_pedido_detalhe',pedido_id=p.id)}}">Detalhes</a>
             <a href="{{url_for('chat_pedido',tipo='breed',pedido_id=p.id)}}">Chat{% if p.mensagens_nao_lidas %} <b>{{p.mensagens_nao_lidas}}</b>{% endif %}</a>
             {% if p.status=='aguardando_pagamento' %}
-              <form method="post" action="{{url_for('confirmar_pagamento_breed',pedido_id=p.id)}}" onsubmit="return confirm('Confirmar que o pagamento foi recebido?')"><button data-once>Confirmar pagamento</button></form>
+              <form method="post" action="{{url_for('confirmar_pagamento_breed',pedido_id=p.id)}}" onsubmit="return confirm('Confirmar que o pagamento foi recebido?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button data-once>Confirmar pagamento</button></form>
             {% elif p.status=='em_producao' %}
-              <form method="post" action="{{url_for('concluir_breed',pedido_id=p.id)}}"><button data-once>Marcar pronto</button></form>
+              <form method="post" action="{{url_for('concluir_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button data-once>Marcar pronto</button></form>
             {% elif p.status=='concluido' %}
-              <form method="post" action="{{url_for('entregar_breed',pedido_id=p.id)}}"><button data-once>Informar entrega</button></form>
+              <form method="post" action="{{url_for('entregar_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button data-once>Informar entrega</button></form>
             {% elif p.status=='cancelamento_solicitado' %}
               <a class="attention" href="{{url_for('breed_pedido_detalhe',pedido_id=p.id)}}">Decidir cancelamento</a>
             {% elif p.status=='aguardando_confirmacao' %}

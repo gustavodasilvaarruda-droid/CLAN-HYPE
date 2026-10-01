@@ -1,6 +1,6 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}Admin Tesouro | HYPE{% endblock %}
-{% block content %}
+{% block content %}{% include 'admin_v29_nav.html' %}
 <section class="vault-admin">
   <header class="va-hero">
     <div><span>ADMINISTRAÇÃO HYPE • TESOURO 2.0</span><h1>Controle do Tesouro</h1><p>Gerencie Pokémon, Megas, solicitações, prazos, devoluções e histórico do patrimônio.</p></div>
@@ -12,7 +12,7 @@
   </div>
 
   <div class="va-layout">
-    <form class="va-panel va-create" method="post" enctype="multipart/form-data" action="{{url_for('admin_tesouro_novo_item')}}">
+    <form class="va-panel va-create" method="post" enctype="multipart/form-data" action="{{url_for('admin_tesouro_novo_item')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="va-title"><span>NOVO PATRIMÔNIO</span><h2>Adicionar ao Tesouro</h2></div>
       <div class="va-2"><label>Tipo<select name="tipo" required><option value="pokemon">Pokémon</option><option value="mega">Mega</option></select></label><label>Quantidade<input name="quantidade_total" type="number" min="1" value="1"></label></div>
       <label>Nome<input name="nome" required placeholder="Ex.: Garchomp F6 / Garchompite"></label>
@@ -33,7 +33,7 @@
         {% for item in itens %}
         <details class="va-item" data-search="{{(item.codigo ~ ' ' ~ item.nome ~ ' ' ~ item.tipo)|lower}}">
           <summary><div><b>{{item.codigo}}</b><strong>{{item.nome}}</strong></div><span class="type type-{{item.tipo}}">{{'POKÉMON' if item.tipo=='pokemon' else 'MEGA'}}</span><span class="situation situation-{{item.situacao}}">{{item.situacao|title}}</span><div class="stock"><b>{{item.disponivel}}</b><small>livre / {{item.quantidade_total}}</small></div></summary>
-          <form method="post" enctype="multipart/form-data" action="{{url_for('admin_tesouro_editar_item',item_id=item.id)}}">
+          <form method="post" enctype="multipart/form-data" action="{{url_for('admin_tesouro_editar_item',item_id=item.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="va-2"><label>Nome<input name="nome" value="{{item.nome}}"></label><label>Quantidade<input name="quantidade_total" type="number" min="{{item.quantidade_reservada or 0}}" value="{{item.quantidade_total or 1}}"></label></div>
             <div class="va-3"><label>Situação<select name="situacao"><option value="disponivel" {{'selected' if item.situacao=='disponivel' else ''}}>Disponível</option><option value="manutencao" {{'selected' if item.situacao=='manutencao' else ''}}>Manutenção</option><option value="indisponivel" {{'selected' if item.situacao=='indisponivel' else ''}}>Indisponível</option></select></label><label>Cadastro<select name="ativo"><option value="1" {{'selected' if item.ativo else ''}}>Ativo</option><option value="0" {{'selected' if not item.ativo else ''}}>Arquivado</option></select></label><label>Destaque<select name="destaque"><option value="0" {{'selected' if not item.destaque else ''}}>Não</option><option value="1" {{'selected' if item.destaque else ''}}>Sim</option></select></label></div>
             <div class="va-2"><label>Pokémon<input name="pokemon" value="{{item.metadata.get('pokemon','')}}"></label><label>Compatibilidade<input name="compatibilidade" value="{{item.metadata.get('compatibilidade','')}}"></label></div>
@@ -61,17 +61,17 @@
         <div class="deadline"><small>Prazo</small><b>{{e.prazo_devolucao or '—'}}</b>{% if e.dias_restantes is not none and e.status in ['retirado','atrasado'] %}<span>{{e.dias_restantes}} dia(s)</span>{% endif %}</div>
         <div class="loan-actions">
           {% if e.status == 'solicitado' %}
-            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='aprovar')}}"><input type="date" name="prazo_devolucao"><input name="motivo" placeholder="Observação"><button class="ok">Aprovar</button></form>
-            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='recusar')}}"><input name="motivo" placeholder="Motivo"><button class="danger">Recusar</button></form>
+            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='aprovar')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="date" name="prazo_devolucao"><input name="motivo" placeholder="Observação"><button class="ok">Aprovar</button></form>
+            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='recusar')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" placeholder="Motivo"><button class="danger">Recusar</button></form>
           {% elif e.status == 'aprovado' %}
-            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='retirar')}}"><button class="ok">Registrar retirada</button></form>
-            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='cancelar')}}"><button class="danger">Cancelar</button></form>
+            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='retirar')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="ok">Registrar retirada</button></form>
+            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='cancelar')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="danger">Cancelar</button></form>
           {% elif e.status in ['retirado','atrasado'] %}
-            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='prorrogar')}}"><input type="date" name="prazo_devolucao" required><button class="neutral">Prorrogar</button></form>
-            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='devolver')}}"><button class="ok">Confirmar devolução</button></form>
+            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='prorrogar')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="date" name="prazo_devolucao" required><button class="neutral">Prorrogar</button></form>
+            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='devolver')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="ok">Confirmar devolução</button></form>
           {% elif e.status == 'devolucao_solicitada' %}
             <div class="return-note">{{e.devolucao_observacao or 'Membro informou que deseja devolver.'}}</div>
-            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='devolver')}}"><button class="ok">Confirmar recebimento</button></form>
+            <form method="post" action="{{url_for('admin_tesouro_emprestimo',emprestimo_id=e.id,acao='devolver')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="ok">Confirmar recebimento</button></form>
           {% endif %}
         </div>
       </article>

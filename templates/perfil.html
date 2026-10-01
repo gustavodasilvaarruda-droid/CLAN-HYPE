@@ -5,7 +5,7 @@
 <div class="hype-profile-v3">
   <section class="profile3-cover" {% if membro.banner_url %}style="background-image:linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,.94)),url('{{membro.banner_url}}')"{% endif %}>
     <div class="profile3-id"><div class="profile3-avatar">{% if membro.avatar_url %}<img src="{{membro.avatar_url}}" alt="Avatar">{% else %}<span>{{membro.nick_jogo[0]|upper}}</span>{% endif %}</div><div><span class="breed-kicker">PERFIL HYPE</span><h1>{% if membro.membro_hype %}<em>[HYPE]</em> {% endif %}{{membro.nome_exibicao or membro.nick_jogo}}</h1><p>@{{membro.nick_jogo}} · {{membro.cargo|replace('_',' ')|title}}</p></div></div>
-    <div class="profile3-level"><b>NÍVEL {{membro.nivel or 1}}</b><span>{{membro.xp or 0}} XP</span></div>
+    <div class="profile3-level"><b>NÍVEL {{membro.nivel or 1}}</b><span>{{membro.xp or 0}} XP</span><small>{{membro.seguidores_total or 0}} seguidores · {{membro.seguindo_total or 0}} seguindo</small>{% if session.get('usuario_email') and not membro.viewer_is_owner %}<form method="post" action="{{url_for('community.seguir',nick=membro.nick_jogo)}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><button class="community-follow {{'active' if membro.viewer_seguindo else ''}}">{{'Seguindo' if membro.viewer_seguindo else 'Seguir'}}</button></form>{% endif %}</div>
   </section>
   <nav class="profile3-tabs"><button class="active" data-tab="overview">Visão Geral</button><button data-tab="pokemon">Pokémon</button><button data-tab="achievements">Conquistas</button><button data-tab="activity">Atividade</button></nav>
   <section class="profile3-tab active" id="overview"><div class="profile3-grid"><main>

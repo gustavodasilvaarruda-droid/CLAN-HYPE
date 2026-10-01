@@ -54,7 +54,7 @@
             </nav>
           </div>
 
-          <form class="breedq-availability" method="post" action="{{url_for('alterar_status_breeder')}}">
+          <form class="breedq-availability" method="post" action="{{url_for('alterar_status_breeder')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="filtro" id="availabilityFilter" value="{{filtro_atual}}">
             <span class="breedq-control-label">Minha disponibilidade</span>
             <div class="breedq-status-segments">
@@ -129,13 +129,13 @@
           <div class="breed-v21-order-actions">
             <div class="breed-v21-primary-actions">
               {% if p.status == 'pendente' and not p.breeder_responsavel and permissoes.get('pode_assumir_breed') %}
-                <form method="post" action="{{url_for('assumir_breed',pedido_id=p.id)}}"><button class="breed-v21-gold" data-once {% if meus_ativos >= max_ativos and not permissoes.get('pode_gerenciar_cargos') %}disabled title="Limite de Breeds ativos atingido"{% endif %}>Assumir pedido</button></form>
+                <form method="post" action="{{url_for('assumir_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="breed-v21-gold" data-once {% if meus_ativos >= max_ativos and not permissoes.get('pode_gerenciar_cargos') %}disabled title="Limite de Breeds ativos atingido"{% endif %}>Assumir pedido</button></form>
               {% elif p.status == 'aguardando_pagamento' and p.breeder_responsavel == breeder_email %}
-                <form method="post" action="{{url_for('confirmar_pagamento_breed',pedido_id=p.id)}}"><button class="breed-v21-gold" data-once>Confirmar pagamento</button></form>
+                <form method="post" action="{{url_for('confirmar_pagamento_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="breed-v21-gold" data-once>Confirmar pagamento</button></form>
               {% elif p.status == 'em_producao' and p.breeder_responsavel == breeder_email %}
-                <form method="post" action="{{url_for('concluir_breed',pedido_id=p.id)}}"><button class="breed-v21-gold" data-once>✨ Marcar como pronto</button></form>
+                <form method="post" action="{{url_for('concluir_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="breed-v21-gold" data-once>✨ Marcar como pronto</button></form>
               {% elif p.status == 'concluido' and p.breeder_responsavel == breeder_email %}
-                <form method="post" action="{{url_for('entregar_breed',pedido_id=p.id)}}"><button class="breed-v21-gold" data-once>📦 Informar entrega</button></form>
+                <form method="post" action="{{url_for('entregar_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="breed-v21-gold" data-once>📦 Informar entrega</button></form>
               {% endif %}
               {% if p.breeder_responsavel or permissoes.get('pode_gerenciar_cargos') %}<a class="breed-v21-chat" href="{{url_for('chat_pedido',tipo='breed',pedido_id=p.id)}}">💬 Chat{% if p.mensagens_nao_lidas %}<span>{{p.mensagens_nao_lidas}}</span>{% endif %}</a>{% endif %}
             </div>
@@ -163,17 +163,17 @@
                 <span class="breed-v21-kicker">AÇÕES DO PEDIDO</span>
                 <div class="breed-v21-detail-actions">
                   {% if p.breeder_responsavel == breeder_email and p.status in ('aguardando_pagamento','em_producao','cancelamento_solicitado') %}
-                    <details class="breed-inline-action"><summary>↩ Devolver à fila</summary><form method="post" action="{{url_for('devolver_breed_fila',pedido_id=p.id)}}" onsubmit="return confirm('Devolver este pedido para a fila? O motivo ficará registrado.')"><input name="motivo" minlength="3" maxlength="500" placeholder="Motivo obrigatório" required><button class="btn-muted-hype btn-sm" data-once>Confirmar devolução</button></form></details>
+                    <details class="breed-inline-action"><summary>↩ Devolver à fila</summary><form method="post" action="{{url_for('devolver_breed_fila',pedido_id=p.id)}}" onsubmit="return confirm('Devolver este pedido para a fila? O motivo ficará registrado.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" minlength="3" maxlength="500" placeholder="Motivo obrigatório" required><button class="btn-muted-hype btn-sm" data-once>Confirmar devolução</button></form></details>
                   {% endif %}
 
                   {% if permissoes.get('pode_gerenciar_cargos') %}
                     <details class="breed-inline-action"><summary>⚙ Administração</summary><div class="breed-v21-admin-box">
-                      <form method="post" action="{{url_for('admin_prioridade_breed',pedido_id=p.id)}}"><select name="prioridade"><option value="normal" {{'selected' if p.prioridade=='normal' else ''}}>Prioridade normal</option><option value="alta" {{'selected' if p.prioridade=='alta' else ''}}>Alta</option><option value="urgente" {{'selected' if p.prioridade=='urgente' else ''}}>Urgente</option></select><button class="btn-muted-hype btn-sm" data-once>Salvar prioridade</button></form>
+                      <form method="post" action="{{url_for('admin_prioridade_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="prioridade"><option value="normal" {{'selected' if p.prioridade=='normal' else ''}}>Prioridade normal</option><option value="alta" {{'selected' if p.prioridade=='alta' else ''}}>Alta</option><option value="urgente" {{'selected' if p.prioridade=='urgente' else ''}}>Urgente</option></select><button class="btn-muted-hype btn-sm" data-once>Salvar prioridade</button></form>
                       {% if p.breeder_responsavel and p.status in ('aguardando_pagamento','em_producao','cancelamento_solicitado','concluido') %}
-                      <form class="breed-v21-transfer" method="post" action="{{url_for('admin_transferir_breed',pedido_id=p.id)}}"><select name="breeder_destino" required><option value="">Transferir para...</option>{% for b in breeders_transferencia %}{% if b.email != p.breeder_responsavel %}<option value="{{b.email}}">{{b.nick}} · {{b.status}} · limite {{b.max_ativos}}</option>{% endif %}{% endfor %}</select><input name="motivo" minlength="3" maxlength="500" placeholder="Motivo da transferência" required><label><input type="checkbox" name="forcar_limite" value="1"> Permitir exceção de limite</label><button class="btn-dourado btn-sm" data-once>Transferir</button></form>
+                      <form class="breed-v21-transfer" method="post" action="{{url_for('admin_transferir_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="breeder_destino" required><option value="">Transferir para...</option>{% for b in breeders_transferencia %}{% if b.email != p.breeder_responsavel %}<option value="{{b.email}}">{{b.nick}} · {{b.status}} · limite {{b.max_ativos}}</option>{% endif %}{% endfor %}</select><input name="motivo" minlength="3" maxlength="500" placeholder="Motivo da transferência" required><label><input type="checkbox" name="forcar_limite" value="1"> Permitir exceção de limite</label><button class="btn-dourado btn-sm" data-once>Transferir</button></form>
                       {% endif %}
                       {% if p.status not in ('entregue','cancelado') %}
-                      <div class="breed-v21-admin-row"><form method="post" action="{{url_for('admin_resetar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Resetar este pedido para Pendente e liberar o Breeder atual?')"><button class="btn-muted-hype btn-sm" data-once>↺ Resetar</button></form><form method="post" action="{{url_for('cancelar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Cancelar este pedido? Esta ação ficará registrada.')"><input type="hidden" name="motivo" value="Cancelado administrativamente"><button class="btn-danger-hype btn-sm" data-once>Cancelar</button></form></div>
+                      <div class="breed-v21-admin-row"><form method="post" action="{{url_for('admin_resetar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Resetar este pedido para Pendente e liberar o Breeder atual?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-muted-hype btn-sm" data-once>↺ Resetar</button></form><form method="post" action="{{url_for('cancelar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Cancelar este pedido? Esta ação ficará registrada.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="motivo" value="Cancelado administrativamente"><button class="btn-danger-hype btn-sm" data-once>Cancelar</button></form></div>
                       {% endif %}
                     </div></details>
                   {% endif %}
@@ -199,7 +199,7 @@
             <div><strong>#{{p.id}} · {{p.pokemon}}</strong><small>{{p.player_nick or p.player}} · {{p.motivo_cancelamento or 'Sem motivo registrado'}}</small></div>
             <span>${{p.preco_total|preco}}</span>
             {% set pode_restaurar = permissoes.get('pode_gerenciar_cargos') or (permissoes.get('pode_assumir_breed') and (p.breeder_responsavel == breeder_email or p.cancelado_por == breeder_email)) %}
-            {% if pode_restaurar %}<form method="post" action="{{url_for('restaurar_breed_cancelado',pedido_id=p.id)}}" onsubmit="return confirm('Restaurar o pedido #{{p.id}} para Pendente?')"><button class="btn-dourado btn-sm" data-once>↩ Restaurar</button></form>{% endif %}
+            {% if pode_restaurar %}<form method="post" action="{{url_for('restaurar_breed_cancelado',pedido_id=p.id)}}" onsubmit="return confirm('Restaurar o pedido #{{p.id}} para Pendente?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-dourado btn-sm" data-once>↩ Restaurar</button></form>{% endif %}
           </article>
           {% else %}<p>Nenhum pedido cancelado.</p>{% endfor %}
         </div>

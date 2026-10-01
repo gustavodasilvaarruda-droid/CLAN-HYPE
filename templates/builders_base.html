@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070707">
   <title>{% block title %}HYPE Builders{% endblock %}</title>
-  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=2701">
+  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3001">
+  <link rel="stylesheet" href="{{url_for('static',filename='community_v30.css')}}?v=3001">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="builders-gold-ui hype-core-ui">
@@ -16,6 +17,7 @@
     <a href="{{url_for('eventos')}}"><span>▣</span>Eventos</a>
     <a href="{{url_for('painel_reino')}}"><span>♛</span>Reino HYPE</a>
     <a href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>
+    <a href="{{url_for('community.home')}}"><span>✣</span>Comunidade</a>
   </nav>
   <div class="hgb-top-actions">
     <form class="hgb-global-search" action="{{url_for('competitive.pokedex_competitiva')}}" method="get"><span>⌕</span><input name="q" placeholder="Buscar Pokémon, move, item..."></form>
@@ -51,7 +53,7 @@
       <a href="{{url_for('final.builds_pokemon')}}"><span>✣</span>Comunidade</a>
     </nav>
     <div class="hgb-side-divider"></div>
-    <nav class="hgb-side-nav"><a href="{{url_for('eventos')}}"><span>♛</span>Eventos e Torneios</a><a href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a><a href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>{% if session.get('usuario_email') %}<a href="{{url_for('logout')}}"><span>↪</span>Sair</a>{% endif %}</nav>
+    <nav class="hgb-side-nav"><a href="{{url_for('eventos')}}"><span>♛</span>Eventos e Torneios</a><a href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a><a href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>{% if session.get('usuario_email') %}<form class="hgb-logout-inline" action="{{url_for('logout')}}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="hgb-account-logout" type="submit"><span>↪</span>Sair</button></form>{% endif %}</nav>
     <div class="hgb-sidebar-art"></div>
   </aside>
   <main class="hgb-main hype-core-main">

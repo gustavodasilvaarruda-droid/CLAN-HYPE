@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#070707">
   <title>{% block title %}Clã HYPE{% endblock %}</title>
-  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=2701">
+  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3001">
+  <link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3001">
+  <link rel="stylesheet" href="{{url_for('static',filename='community_v30.css')}}?v=3001">
   <link rel="manifest" href="{{url_for('expansion.manifest')}}">
   {% block extra_head %}{% endblock %}
 </head>
@@ -85,7 +87,7 @@
       {% if hype_membro_hype %}<a class="{{'active' if request.endpoint in ['tesouro_hype','tesouro_item','admin_tesouro'] else ''}}" href="{{url_for('tesouro_hype')}}"><span>◆</span>Tesouro do Clã</a>{% endif %}
       <a class="{{'active' if request.endpoint=='expansion.hype_live' else ''}}" href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>
       <a class="{{'active' if request.endpoint in ['central_rankings','ranking_detalhe','ranking_pokemon_detalhe','ranking_breed','ranking_breeders','final.ranking_competitivo'] else ''}}" href="{{url_for('central_rankings')}}"><span>▥</span>Rankings</a>
-      <a href="{{url_for('final.builds_pokemon')}}"><span>✣</span>Comunidade</a>
+      <a class="{{'active' if request.endpoint and request.endpoint.startswith('community.') else ''}}" href="{{url_for('community.home')}}"><span>✣</span>Comunidade</a>
     </nav>
 
     <div class="hgb-side-divider"></div>
@@ -110,7 +112,7 @@
   <div class="hgb-logout-dialog" role="dialog" aria-modal="true" aria-labelledby="logoutTitle">
     <span class="hgb-logout-icon">↪</span><h2 id="logoutTitle">Sair da conta HYPE?</h2>
     <p>Sua sessão neste dispositivo será encerrada. Sua conta e o Discord vinculado continuarão intactos.</p>
-    <div><button type="button" class="hgb-dialog-cancel" data-close-logout>Cancelar</button><a class="hgb-dialog-exit" href="{{url_for('logout')}}">Sair da conta</a></div>
+    <div><button type="button" class="hgb-dialog-cancel" data-close-logout>Cancelar</button><form class="hgb-logout-inline" action="{{url_for('logout')}}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="hgb-dialog-exit" type="submit">Sair da conta</button></form></div>
   </div>
 </div>
 {% endif %}

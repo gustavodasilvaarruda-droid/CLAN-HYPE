@@ -21,7 +21,7 @@
       </div>
       {% endif %}
       <div class="asset-history-mini"><div><b>{{resumo_item.emprestimos_total}}</b><span>solicitações registradas</span></div><div><b>{{resumo_item.devolvidos}}</b><span>devoluções concluídas</span></div><div><b>{{resumo_item.em_uso}}</b><span>em uso/reservado</span></div></div>
-      <form class="asset-request" method="post" action="{{url_for('tesouro_solicitar',item_id=item.id)}}">
+      <form class="asset-request" method="post" action="{{url_for('tesouro_solicitar',item_id=item.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div><label>Quantidade</label><input type="number" name="quantidade" min="1" max="{{item.disponivel}}" value="1" {{'disabled' if item.disponivel <= 0 else ''}}></div>
         <div class="wide"><label>Motivo / uso</label><textarea name="observacao" maxlength="800" rows="3" placeholder="Ex.: torneio, treino competitivo, evento interno..."></textarea></div>
         <button type="submit" {{'disabled' if item.disponivel <= 0 or item.situacao != 'disponivel' else ''}}>{{'Indisponível para empréstimo' if item.disponivel <= 0 or item.situacao != 'disponivel' else 'Solicitar empréstimo'}}</button>
@@ -37,8 +37,8 @@
         <div><small>Solicitado</small><b>{{e.solicitado_em|data_br if e.solicitado_em else '—'}}</b></div>
         <div><small>Status</small><span class="loan loan-{{e.status}}">{{'Devolução solicitada' if e.status == 'devolucao_solicitada' else e.status|replace('_',' ')|title}}</span></div>
         <div><small>Prazo</small><b>{{e.prazo_devolucao or '—'}}</b></div>
-        {% if e.status == 'solicitado' %}<form method="post" action="{{url_for('tesouro_cancelar_solicitacao',emprestimo_id=e.id)}}"><button class="danger">Cancelar solicitação</button></form>{% endif %}
-        {% if e.status in ['retirado','atrasado'] %}<form method="post" action="{{url_for('tesouro_solicitar_devolucao',emprestimo_id=e.id)}}"><textarea name="observacao" rows="2" maxlength="800" placeholder="Observação da devolução (opcional)"></textarea><button class="ok">Solicitar devolução</button></form>{% endif %}
+        {% if e.status == 'solicitado' %}<form method="post" action="{{url_for('tesouro_cancelar_solicitacao',emprestimo_id=e.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="danger">Cancelar solicitação</button></form>{% endif %}
+        {% if e.status in ['retirado','atrasado'] %}<form method="post" action="{{url_for('tesouro_solicitar_devolucao',emprestimo_id=e.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><textarea name="observacao" rows="2" maxlength="800" placeholder="Observação da devolução (opcional)"></textarea><button class="ok">Solicitar devolução</button></form>{% endif %}
       </article>
       {% else %}<div class="asset-empty">Você ainda não possui histórico com este patrimônio.</div>{% endfor %}
     </div>

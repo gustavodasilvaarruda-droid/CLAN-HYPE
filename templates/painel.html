@@ -45,6 +45,7 @@
     <a class="hype-v6-action-card purple" href="{{url_for('breed_meus_pedidos')}}"><span>▤</span><div><b>Meus Pedidos</b><small>Acompanhe andamento e histórico.</small></div></a>
     <a class="hype-v6-action-card cyan" href="{{url_for('expansion.team_builder')}}"><span>♟</span><div><b>Team Builder</b><small>Monte e salve seus times.</small></div></a>
     <a class="hype-v6-action-card pink" href="{{url_for('eventos')}}"><span>♛</span><div><b>Eventos e Torneios</b><small>Inscrições, regras e resultados.</small></div></a>
+    <a class="hype-v6-action-card" href="{{url_for('community.home')}}"><span>✣</span><div><b>Comunidade HYPE</b><small>Membros, times, Builds e conversas.</small></div></a>
   </section>
 
   <div class="hype-v6-dashboard-columns">
@@ -72,7 +73,7 @@
   </div>
 
   <section class="hype-v6-panel">
-    <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">NOTIFICAÇÕES</span><h2>Central de avisos</h2></div>{% if notificacoes %}<form method="post" action="{{url_for('ler_notificacoes')}}"><button class="hype-v6-btn secondary" type="submit">Marcar como lidas</button></form>{% endif %}</div>
+    <div class="hype-v6-panel-head"><div><span class="hype-v6-kicker">NOTIFICAÇÕES</span><h2>Central de avisos</h2></div>{% if notificacoes %}<form method="post" action="{{url_for('ler_notificacoes')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="hype-v6-btn secondary" type="submit">Marcar como lidas</button></form>{% endif %}</div>
     <div class="hype-v6-notifications">
       {% for n in notificacoes %}<article><span class="hype-v6-notify-dot"></span><div><b>{{n.titulo}}</b><p>{{n.mensagem}}</p></div>{% if n.link %}<a href="{{n.link}}">Abrir →</a>{% endif %}</article>{% else %}<p class="hype-v6-empty">Nenhuma notificação no momento.</p>{% endfor %}
     </div>
@@ -96,7 +97,7 @@
 </div>
 
 {% if mostrar_tour_hype %}
-<div class="onboarding-overlay" id="tourHype"><div class="onboarding-card"><span class="breed-kicker">PRIMEIRO ACESSO</span><h2>Bem-vindo ao seu Painel HYPE</h2><div class="tour-steps"><article><b>1. Perfil</b><p>Edite avatar, bio e Pokémon favorito.</p></article><article><b>2. Notificações</b><p>Acompanhe Breed, lojas, eventos e torneios.</p></article><article><b>3. Recursos</b><p>Use Berçário, Builders, Reino HYPE e HYPE Live.</p></article><article><b>4. Extrato</b><p>Consulte suas movimentações registradas.</p></article></div><form method="post" action="{{url_for('expansion.onboarding_concluir')}}"><button class="cta-gold">Concluir introdução</button></form></div></div>
+<div class="onboarding-overlay" id="tourHype"><div class="onboarding-card"><span class="breed-kicker">PRIMEIRO ACESSO</span><h2>Bem-vindo ao seu Painel HYPE</h2><div class="tour-steps"><article><b>1. Perfil</b><p>Edite avatar, bio e Pokémon favorito.</p></article><article><b>2. Notificações</b><p>Acompanhe Breed, lojas, eventos e torneios.</p></article><article><b>3. Recursos</b><p>Use Berçário, Builders, Reino HYPE e HYPE Live.</p></article><article><b>4. Extrato</b><p>Consulte suas movimentações registradas.</p></article></div><form method="post" action="{{url_for('expansion.onboarding_concluir')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-gold">Concluir introdução</button></form></div></div>
 {% endif %}
 {% endblock %}
 

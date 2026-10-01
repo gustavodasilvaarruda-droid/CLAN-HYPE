@@ -48,9 +48,9 @@
           </div>
           {% if session.get('usuario_email') %}
             {% if e.usuario_inscrito %}
-              <form method="post" action="{{url_for('cancelar_evento',evento_id=e.id)}}"><button class="hype-v6-btn secondary" type="submit">Cancelar participação</button></form>
+              <form method="post" action="{{url_for('cancelar_evento',evento_id=e.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="hype-v6-btn secondary" type="submit">Cancelar participação</button></form>
             {% else %}
-              <form method="post" action="{{url_for('inscrever_evento',evento_id=e.id)}}"><button class="hype-v6-btn gold" type="submit">Inscrever-me</button></form>
+              <form method="post" action="{{url_for('inscrever_evento',evento_id=e.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="hype-v6-btn gold" type="submit">Inscrever-me</button></form>
             {% endif %}
           {% else %}
             <a class="hype-v6-btn gold" href="{{url_for('pagina_inicial')}}#entrar">Entrar para participar</a>

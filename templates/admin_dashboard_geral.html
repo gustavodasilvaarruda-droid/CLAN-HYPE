@@ -13,6 +13,7 @@
       {% if hype_membro_hype %}<a href="{{ url_for('admin_tesouro') }}">◆ <span>Tesouro do Clã</span></a>{% endif %}
       <a href="{{ url_for('expansion.admin_economia') }}">◉ <span>Preços e Economia</span></a>
       <a href="{{ url_for('admin_precos') }}">＄ <span>Preços do Breed</span></a>
+      <a href="{{ url_for('final.financeiro') }}">▣ <span>Comissões Breed</span></a>
       <a href="{{ url_for('gestao_breeders') }}">☷ <span>Pedidos de Breed</span></a>
       <a href="{{ url_for('admin_conteudo') }}">▣ <span>Eventos e Torneios</span></a>
       <a href="{{ url_for('final.configuracoes') }}">◉ <span>HYPE Live</span></a>
@@ -43,6 +44,7 @@
       <a href="{{url_for('admin_reino')}}"><b>⌂ REINO</b><span>Casas e lojas HYPE</span></a>
       {% if hype_membro_hype %}<a href="{{url_for('admin_tesouro')}}"><b>◆ TESOURO</b><span>Pokémon e Megas do clã</span></a>{% endif %}
       <a href="{{url_for('admin_precos')}}"><b>＄ PREÇOS</b><span>Economia e preços de Breed</span></a>
+      <a href="{{url_for('final.financeiro')}}"><b>▣ COMISSÕES</b><span>Dívidas dos Breeders com o Clã</span></a>
       <a href="{{url_for('admin_logs')}}"><b>▤ LOGS</b><span>Atividade administrativa</span></a>
     </section>
 
@@ -60,7 +62,7 @@
 
       <aside class="admin2-stack">
         <article class="admin2-card"><header><b>▣ ESTATÍSTICAS GERAIS</b></header><div class="admin2-mini-grid"><div><b>{{stats.membros}}</b><small>Membros</small></div><div><b>{{stats.breed_total}}</b><small>Breed</small></div><div><b>{{stats.casas_ocupadas}}</b><small>Casas ocupadas</small></div><div><b>{{stats.eventos}}</b><small>Eventos</small></div></div></article>
-        <article class="admin2-card admin2-system"><header><b>⚙ SISTEMA</b><span>● Operacional</span></header><p>✓ Banco e autenticação</p><p>✓ Breed e breeders</p><p>✓ Eventos e torneios</p><p>✓ Reino HYPE</p></article>
+        <article class="admin2-card admin2-system"><header><b>⚙ SISTEMA · V29</b><span>● Protegido</span></header><p>✓ CSRF em formulários e ações</p><p>✓ Bloqueio contra tentativas de login</p><p>✓ Sessão/cookies endurecidos</p><p>✓ Breed, Tesouro, Eventos e Reino</p></article>
       </aside>
     </section>
 

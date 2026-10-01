@@ -1,1 +1,46 @@
-<!doctype html><html lang="pt-br"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Financeiro Breed</title><link rel="stylesheet" href="{{url_for('static',filename='style.css')}}"></head><body class="hype-home"><main class="dashboard-shell"><div class="page-topline"><a class="smart-back" href="{{url_for('painel')}}">← Painel</a><span>Administração › Financeiro Breed</span></div><section class="dash-welcome"><div><span class="breed-kicker">HYPE BREED</span><h1>Financeiro do Berçário</h1><p>Valores congelados por pedido: total pago, taxa do clã e repasse líquido dos Breeders.</p></div></section><section class="gestao-cards"><article><small>TOTAL DOS BREEDS</small><strong>{{total|preco}}</strong><span>Pedidos entregues</span></article><article><small>CAIXA DO CLÃ</small><strong>{{total_taxa|preco}}</strong><span>Taxas registradas</span></article><article><small>REPASSE BREEDERS</small><strong>{{total_breeders|preco}}</strong><span>Valor líquido</span></article><article><small>PEDIDOS ENTREGUES</small><strong>{{pedidos|length}}</strong><span>Histórico</span></article></section><section class="dash-card"><h2>Repasse por Breeder</h2><div class="table-wrap"><table class="admin-table"><thead><tr><th>Breeder</th><th>Valor líquido</th></tr></thead><tbody>{% for email,valor in por_breeder %}<tr><td>{{email}}</td><td><b>{{valor|preco}}</b></td></tr>{% else %}<tr><td colspan="2">Nenhum pedido entregue.</td></tr>{% endfor %}</tbody></table></div></section><section class="dash-card"><h2>Pedidos entregues</h2><div class="table-wrap"><table class="admin-table"><thead><tr><th>#</th><th>Pokémon</th><th>Breeder</th><th>Total</th><th>Taxa HYPE</th><th>Repasse</th></tr></thead><tbody>{% for p in pedidos %}<tr><td>#{{p.id}}</td><td>{{p.pokemon}}</td><td>{{p.breeder_responsavel or '—'}}</td><td>{{p.preco_total|preco}}</td><td>{{p.taxa_clan_valor|preco}}</td><td>{{(p.valor_breeder or p.preco_total)|preco}}</td></tr>{% else %}<tr><td colspan="6">Nenhum pedido entregue.</td></tr>{% endfor %}</tbody></table></div></section></main></body></html>
+{% extends 'hype_app_base.html' %}
+{% block title %}Financeiro Breed — HYPE{% endblock %}
+{% block body_class %}hype-finance-v28-page{% endblock %}
+{% block content %}
+<div class="hype-v6-page v28-finance-page">
+  <section class="v28-finance-hero">
+    <div><span class="hype-v6-kicker">FINANCEIRO BREED 2.0</span><h1>Comissões HYPE</h1><p>Controle real de quanto cada Breeder deve ao Clã. A dívida nasce quando o Pokémon fica pronto e só entra no Caixa após confirmação administrativa.</p></div>
+    <a class="btn-ranking-outline" href="{{url_for('expansion.admin_dashboard')}}">← Painel Admin</a>
+  </section>
+
+  <section class="v28-admin-kpis">
+    <article class="danger"><span>A receber dos Breeders</span><strong>{{total_a_receber|preco}}</strong><small>{{breeders_pendentes}} Breeder(s) com pendência</small></article>
+    <article class="warning"><span>Informado / conferir</span><strong>{{total_informado|preco}}</strong><small>Aguardando confirmação do Admin</small></article>
+    <article><span>Recebido este mês</span><strong>{{total_recebido_mes|preco}}</strong><small>Comissões confirmadas</small></article>
+    <article><span>Recebido no histórico</span><strong>{{total_recebido|preco}}</strong><small>Inclui registros migrados</small></article>
+    <article><span>Saldo do Caixa HYPE</span><strong>{{saldo_caixa|preco}}</strong><small>Entradas menos saídas registradas</small></article>
+  </section>
+
+  <section class="v28-fin-card">
+    <header><div><span class="breed-kicker">POR BREEDER</span><h2>Quem está devendo ao Clã</h2></div></header>
+    <div class="v28-debtor-grid">
+      {% for b in por_breeder %}
+      <article class="v28-debtor {% if b.total_devido %}has-debt{% endif %}">
+        <div><span class="v28-avatar-letter">{{b.nick[0]|upper}}</span><section><strong>{{b.nick}}</strong><small>{{b.email}}</small></section></div>
+        <dl><div><dt>Pendente</dt><dd>{{b.pendente|preco}}</dd></div><div><dt>Informado</dt><dd>{{b.informado|preco}}</dd></div><div><dt>Total devido</dt><dd>{{b.total_devido|preco}}</dd></div></dl>
+        <small>{{b.quantidade_aberta}} comissão(ões) aberta(s)</small>
+      </article>
+      {% else %}<p class="muted">Nenhuma comissão registrada ainda.</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="v28-fin-card">
+    <header><div><span class="breed-kicker">AUDITORIA</span><h2>Comissões por pedido</h2></div><span class="v28-legend"><i class="pendente"></i>Pendente <i class="informado"></i>Informado <i class="pago"></i>Pago</span></header>
+    <div class="v28-fin-table-wrap"><table class="v28-fin-table"><thead><tr><th>Pedido</th><th>Pokémon</th><th>Breeder</th><th>Taxa</th><th>Valor</th><th>Status</th><th>Gerada</th><th>Ações</th></tr></thead><tbody>
+      {% for c in comissoes %}<tr>
+        <td>#{{c.pedido_id}}</td><td><b>{{c.pokemon}}</b></td><td>{{c.breeder_nick}}</td><td>{{c.percentual}}%</td><td><strong>{{c.valor|preco}}</strong></td>
+        <td><span class="v28-fin-status {{c.status}}">{% if c.status=='pendente' %}Pendente{% elif c.status=='informado' %}Pagamento informado{% elif c.status=='pago' %}Pago{% else %}Cancelado{% endif %}</span></td>
+        <td>{{(c.gerada_em or c.created_at)|data_br}}</td><td><div class="v28-table-actions">
+          {% if c.status in ('pendente','informado') %}<form method="post" action="{{url_for('admin_confirmar_comissao_breed',comissao_id=c.id)}}" onsubmit="return confirm('Confirmar que o Clã recebeu {{c.valor|preco}}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="confirm" data-once>Confirmar recebimento</button></form>{% endif %}
+          {% if c.status=='informado' %}<form method="post" action="{{url_for('admin_rejeitar_comissao_breed',comissao_id=c.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" maxlength="500" placeholder="Motivo"><button class="reject" data-once>Não recebido</button></form>{% endif %}
+        </div></td>
+      </tr>{% else %}<tr><td colspan="8">Nenhuma comissão gerada ainda.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endblock %}

@@ -38,7 +38,7 @@
         </div>
       </div>
 
-      {% if p.status == 'aguardando_confirmacao' %}<div class="mybreed-v22-receipt"><div><span>✓</span><p><strong>O Breeder informou a entrega.</strong><small>Confirme somente depois de receber o Pokémon dentro do jogo.</small></p></div><form method="post" action="{{url_for('confirmar_recebimento_breed',pedido_id=p.id)}}" onsubmit="return confirm('Você confirma que recebeu este Pokémon?')"><button class="btn-dourado" data-once>Confirmar recebimento</button></form></div>{% endif %}
+      {% if p.status == 'aguardando_confirmacao' %}<div class="mybreed-v22-receipt"><div><span>✓</span><p><strong>O Breeder informou a entrega.</strong><small>Confirme somente depois de receber o Pokémon dentro do jogo.</small></p></div><form method="post" action="{{url_for('confirmar_recebimento_breed',pedido_id=p.id)}}" onsubmit="return confirm('Você confirma que recebeu este Pokémon?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-dourado" data-once>Confirmar recebimento</button></form></div>{% endif %}
 
       <div class="mybreed-v22-actions">
         <a class="btn-dourado" href="{{url_for('breed_pedido_detalhe',pedido_id=p.id)}}">Ver detalhes</a>
@@ -49,7 +49,7 @@
 
       <div class="breed-v15-details mybreed-v22-quickdetail">
         <div class="breed-req-grid"><span><b>Breed</b>{{p.breed_tipo or '—'}}</span><span><b>Nature</b>{{p.nature or 'Sem Nature'}}</span><span><b>Ability</b>{{'HA' if p.ha else (p.ability or 'Sem HA')}}</span><span><b>Gênero</b>{{p.genero or 'Indiferente'}}</span><span><b>IV descartado</b>{{p.iv_descartado or 'Nenhum'}}</span><span><b>Zero Speed</b>{{'Sim' if p.zero_speed else 'Não'}}</span><span><b>Treinado</b>{{'Sim' if p.treinado else 'Não'}}</span><span><b>Prioridade</b>{{p.prioridade or 'Normal'}}</span></div>
-        {% if p.status not in ('entregue','cancelado','concluido','aguardando_confirmacao','cancelamento_solicitado') %}<form class="mybreed-v22-cancel" method="post" action="{{url_for('cancelar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Cancelar ou solicitar cancelamento deste pedido?')"><input name="motivo" maxlength="500" placeholder="Motivo do cancelamento"><button class="btn-danger-hype" data-once>Cancelar pedido</button></form>{% endif %}
+        {% if p.status not in ('entregue','cancelado','concluido','aguardando_confirmacao','cancelamento_solicitado') %}<form class="mybreed-v22-cancel" method="post" action="{{url_for('cancelar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Cancelar ou solicitar cancelamento deste pedido?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" maxlength="500" placeholder="Motivo do cancelamento"><button class="btn-danger-hype" data-once>Cancelar pedido</button></form>{% endif %}
       </div>
     </article>
     {% else %}<div class="mybreed-v22-empty"><strong>Você ainda não possui pedidos.</strong><span>Crie seu primeiro Breed para acompanhar tudo por aqui.</span><a class="btn-dourado" href="{{url_for('breed')}}#fazer-pedido">Fazer pedido</a></div>{% endfor %}
@@ -64,7 +64,7 @@
     <h2 id="breedRatingTitle">Como foi seu Breed?</h2>
     <p id="breedRatingSubtitle">Sua avaliação ajuda a reconhecer o trabalho dos Breeders HYPE.</p>
 
-    <form id="breedRatingForm" method="post">
+    <form id="breedRatingForm" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="nota" id="breedRatingValue" value="5">
 
       <div class="breed-star-picker" role="radiogroup" aria-label="Nota de 1 a 5 estrelas">

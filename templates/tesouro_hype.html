@@ -91,8 +91,8 @@
           <div class="loan-date"><small>Prazo</small><b>{{e.prazo_devolucao or 'Aguardando aprovação'}}</b>{% if e.dias_restantes is not none and e.status in ['retirado','atrasado'] %}<span class="{{'danger' if e.dias_restantes < 0 else ''}}">{{(-e.dias_restantes)|abs}} dia{{'' if (-e.dias_restantes)|abs == 1 else 's'}} {{'em atraso' if e.dias_restantes < 0 else 'restante' + ('' if e.dias_restantes == 1 else 's')}}</span>{% endif %}</div>
           <div class="loan-actions">
             <a href="{{url_for('tesouro_item',item_id=e.item_id)}}">Ver ficha</a>
-            {% if e.status == 'solicitado' %}<form method="post" action="{{url_for('tesouro_cancelar_solicitacao',emprestimo_id=e.id)}}"><button class="loan-cancel" type="submit">Cancelar</button></form>{% endif %}
-            {% if e.status in ['retirado','atrasado'] %}<form method="post" action="{{url_for('tesouro_solicitar_devolucao',emprestimo_id=e.id)}}"><button class="loan-return" type="submit">Solicitar devolução</button></form>{% endif %}
+            {% if e.status == 'solicitado' %}<form method="post" action="{{url_for('tesouro_cancelar_solicitacao',emprestimo_id=e.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="loan-cancel" type="submit">Cancelar</button></form>{% endif %}
+            {% if e.status in ['retirado','atrasado'] %}<form method="post" action="{{url_for('tesouro_solicitar_devolucao',emprestimo_id=e.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="loan-return" type="submit">Solicitar devolução</button></form>{% endif %}
           </div>
         </article>
       {% else %}<div class="treasury-empty small">Você ainda não solicitou nenhum empréstimo.</div>{% endfor %}

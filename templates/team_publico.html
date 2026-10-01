@@ -22,8 +22,8 @@
   <div class="v27-public-actions">
     <button type="button" class="cta-gold" id="copyTeamLink">Copiar link</button>
     {% if session.get('usuario_email') %}
-      <form method="post" action="{{url_for('expansion.team_builder_favoritar',team_id=time.id)}}"><button class="cta-dark">{{'★ Favoritado' if favoritado else '☆ Favoritar'}}</button></form>
-      <form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=time.id)}}"><button class="cta-gold">Usar como base</button></form>
+      <form method="post" action="{{url_for('expansion.team_builder_favoritar',team_id=time.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-dark">{{'★ Favoritado' if favoritado else '☆ Favoritar'}}</button></form>
+      <form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=time.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-gold">Usar como base</button></form>
       <a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=time.id)}}">Análise completa</a>
     {% else %}
       <a class="cta-dark" href="{{url_for('pagina_inicial')}}">Entrar para usar como base</a>
@@ -53,6 +53,12 @@
   </div>
 
   <section class="dash-card coach-card"><span class="breed-kicker">HYPE TEAM COACH</span><h2>Leitura rápida</h2>{% for x in analise.coach[:6] %}<p>◆ {{x}}</p>{% else %}<p class="muted">Sem recomendações automáticas.</p>{% endfor %}</section>
+
+  <section class="dash-card community-comments" id="comentarios">
+    <div class="community-heading"><div><span class="breed-kicker">COMUNIDADE</span><h2>Comentários sobre o time</h2></div><span>{{comentarios|length}}</span></div>
+    {% if session.get('usuario_email') %}<form class="community-comment-form" method="post" action="{{url_for('community.comentar')}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="alvo_tipo" value="time"><input type="hidden" name="alvo_id" value="{{time.id}}"><textarea name="conteudo" maxlength="800" required placeholder="Comente a composição, matchup ou uma sugestão de melhoria..."></textarea><button class="cta-gold">Comentar</button></form>{% else %}<p class="community-empty">Entre na conta para comentar.</p>{% endif %}
+    <div class="community-comment-list">{% for c in comentarios %}<article><div class="mini-avatar">{% if c.autor.avatar_url %}<img src="{{c.autor.avatar_url}}" alt="">{% else %}{{(c.autor.nick_jogo or 'H')[:1]|upper}}{% endif %}</div><div><div class="comment-head"><a href="{{url_for('perfil_publico',nick=c.autor.nick_jogo)}}">{{c.autor.nome_exibicao or c.autor.nick_jogo or 'Membro'}}</a><small>{{(c.created_at or '')[:16]|replace('T',' ')}}</small></div><p>{{c.conteudo}}</p>{% if session.get('usuario_email')==c.usuario_email %}<form method="post" action="{{url_for('community.excluir_comentario',comentario_id=c.id)}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><button class="comment-remove">Remover</button></form>{% endif %}</div></article>{% else %}<p class="community-empty">Seja o primeiro a comentar este time.</p>{% endfor %}</div>
+  </section>
 </div>
 {% endblock %}
 {% block extra_scripts %}
