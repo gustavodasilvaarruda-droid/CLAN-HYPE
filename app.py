@@ -4,6 +4,7 @@ import csv
 import io
 import hashlib
 import hmac
+import secrets
 from functools import wraps, lru_cache
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -16,7 +17,6 @@ from urllib.request import urlopen
 from urllib.parse import quote, urlencode, urlparse
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from flask_wtf.csrf import CSRFProtect, CSRFError
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
@@ -45,11 +45,49 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
     SESSION_REFRESH_EACH_REQUEST=True,
     MAX_CONTENT_LENGTH=10 * 1024 * 1024,
-    WTF_CSRF_TIME_LIMIT=timedelta(hours=2),
 )
 
-# Proteção CSRF para todos os POST/PUT/PATCH/DELETE do site.
-csrf = CSRFProtect(app)
+# V31.1: proteção CSRF nativa, sem dependência de Flask-WTF.
+# O token fica vinculado à sessão e é exigido em toda requisição que altera dados.
+def csrf_token():
+    token = session.get('_csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['_csrf_token'] = token
+    return token
+
+
+app.jinja_env.globals['csrf_token'] = csrf_token
+
+
+def _destino_seguro_csrf():
+    destino = request.referrer or url_for('pagina_inicial')
+    try:
+        ref = urlparse(destino)
+        if ref.netloc and ref.netloc != request.host:
+            destino = url_for('pagina_inicial')
+    except Exception:
+        destino = url_for('pagina_inicial')
+    return destino
+
+
+@app.before_request
+def proteger_csrf_global():
+    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        return None
+
+    esperado = session.get('_csrf_token')
+    recebido = (
+        request.form.get('csrf_token')
+        or request.headers.get('X-CSRFToken')
+        or request.headers.get('X-CSRF-Token')
+    )
+
+    if not esperado or not recebido or not hmac.compare_digest(str(esperado), str(recebido)):
+        flash('Sua sessão de segurança expirou. Atualize a página e tente novamente.', 'erro')
+        return redirect(_destino_seguro_csrf())
+
+    return None
 
 
 @app.template_filter('preco')
@@ -89,19 +127,6 @@ if not SUPABASE_KEY:
     raise RuntimeError("A variável de ambiente SUPABASE_KEY não foi configurada.")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
-@app.errorhandler(CSRFError)
-def tratar_erro_csrf(_erro):
-    flash('Sua sessão de segurança expirou. Atualize a página e tente novamente.', 'erro')
-    destino = request.referrer or url_for('pagina_inicial')
-    try:
-        ref = urlparse(destino)
-        if ref.netloc and ref.netloc != request.host:
-            destino = url_for('pagina_inicial')
-    except Exception:
-        destino = url_for('pagina_inicial')
-    return redirect(destino)
 
 
 @app.errorhandler(413)
@@ -3337,7 +3362,8 @@ def criar_novo_cargo():
             'pode_gerenciar_midias': request.form.get('pode_gerenciar_midias') is not None,
             'pode_gerenciar_conquistas': request.form.get('pode_gerenciar_conquistas') is not None,
             'pode_revisar_builds': request.form.get('pode_revisar_builds') is not None,
-            'pode_gerenciar_economia': request.form.get('pode_gerenciar_economia') is not None
+            'pode_gerenciar_economia': request.form.get('pode_gerenciar_economia') is not None,
+            'pode_gerenciar_reino': request.form.get('pode_gerenciar_reino') is not None
         }).execute()
 
         flash(f'Cargo "{nome_cargo}" criado com sucesso!', 'sucesso')
@@ -4483,6 +4509,164 @@ def registrar_atividade_reino(tipo, ator_email, descricao, referencia_tipo=None,
         print(f"Atividade do Reino não registrada: {e}")
 
 
+# ============================================================================
+# HYPE V31 - REINO HYPE 2.0 / ALUGUEIS E COBRANCAS
+# Dividas semanais de casas e lojas: membro informa pagamento e Admin confirma.
+# ============================================================================
+def _reino_admin_financeiro(email=None):
+    email = email or session.get('usuario_email')
+    if not email:
+        return False
+    p = obter_permissoes_usuario(email)
+    return bool(
+        p.get('pode_gerenciar_reino')
+        or p.get('pode_gerenciar_economia')
+        or p.get('pode_gerenciar_cargos')
+    )
+
+
+def _reino_data(valor):
+    if not valor:
+        return None
+    try:
+        return datetime.fromisoformat(str(valor)[:10]).date()
+    except Exception:
+        return None
+
+
+def _reino_sincronizar_cobrancas(usuario_email=None):
+    """Gera cobranças vencidas de forma idempotente e avança o próximo vencimento.
+
+    A função só avança o contrato quando a cobrança correspondente já existe ou
+    foi criada com sucesso. Assim uma falha de schema/conexão não faz o Reino
+    perder uma semana de aluguel.
+    """
+    hoje = datetime.now(timezone.utc).date()
+    criadas = 0
+    for tabela, tipo, id_key in (
+        ('contratos_casas', 'casa', 'casa_id'),
+        ('contratos_lojas', 'loja', 'loja_id'),
+    ):
+        filtros = {'status': 'ativo'}
+        if usuario_email:
+            filtros['usuario_email'] = usuario_email
+        contratos = _safe_table(tabela, '*', **filtros)
+        for contrato in contratos:
+            venc = _reino_data(contrato.get('proximo_vencimento'))
+            if not venc:
+                continue
+            processou = False
+            seguranca = 0
+            while venc <= hoje and seguranca < 260:
+                seguranca += 1
+                existente = _safe_table(
+                    'hype_reino_cobrancas', 'id,status',
+                    tipo_unidade=tipo,
+                    contrato_id=contrato.get('id'),
+                    referencia_vencimento=venc.isoformat(),
+                )
+                if not existente:
+                    payload = {
+                        'tipo_unidade': tipo,
+                        'contrato_id': contrato.get('id'),
+                        'usuario_email': contrato.get('usuario_email'),
+                        'casa_id': contrato.get('casa_id') if tipo == 'casa' else None,
+                        'loja_id': contrato.get('loja_id') if tipo == 'loja' else None,
+                        'referencia_vencimento': venc.isoformat(),
+                        'valor': max(0, int(contrato.get('valor_semanal') or 0)),
+                        'status': 'pendente',
+                        'gerada_em': agora_iso(),
+                    }
+                    try:
+                        supabase.table('hype_reino_cobrancas').insert(payload).execute()
+                        criadas += 1
+                        criar_notificacao(
+                            contrato.get('usuario_email'),
+                            'Aluguel do Reino pendente',
+                            f"O aluguel da sua {('casa' if tipo == 'casa' else 'loja')} venceu em {venc.strftime('%d/%m/%Y')}. Valor: {formatar_preco(payload['valor'])}.",
+                            'aviso', url_for('reino_financeiro_usuario')
+                        )
+                    except Exception as e:
+                        # Se outra requisição criou ao mesmo tempo, pode continuar.
+                        texto = str(e).lower()
+                        if 'duplicate' not in texto and 'unique' not in texto:
+                            print(f'[V31 Reino] Falha ao gerar cobrança do contrato #{contrato.get("id")}: {e}')
+                            break
+                processou = True
+                venc += timedelta(days=7)
+            if processou:
+                try:
+                    supabase.table(tabela).update({'proximo_vencimento': venc.isoformat()}).eq('id', contrato.get('id')).execute()
+                except Exception as e:
+                    print(f'[V31 Reino] Falha ao avançar vencimento do contrato #{contrato.get("id")}: {e}')
+            # Aviso de vencimento próximo (uma vez por data de vencimento).
+            dias_para_vencer = (venc - hoje).days
+            ultimo_aviso = str(contrato.get('ultimo_aviso_vencimento') or '')[:10]
+            if 0 < dias_para_vencer <= 1 and ultimo_aviso != venc.isoformat():
+                try:
+                    criar_notificacao(
+                        contrato.get('usuario_email'), 'Aluguel do Reino vence amanhã',
+                        f"Seu aluguel de {('casa' if tipo == 'casa' else 'loja')} no valor de {formatar_preco(contrato.get('valor_semanal'))} vence em {venc.strftime('%d/%m/%Y')}.",
+                        'aviso', url_for('reino_financeiro_usuario')
+                    )
+                    supabase.table(tabela).update({'ultimo_aviso_vencimento': venc.isoformat()}).eq('id', contrato.get('id')).execute()
+                except Exception as e:
+                    print(f'[V31 Reino] Aviso de vencimento não enviado para contrato #{contrato.get("id")}: {e}')
+    return criadas
+
+
+def _reino_decorar_cobrancas(cobrancas):
+    cobrancas = [dict(x) for x in (cobrancas or [])]
+    usuarios = {x.get('email'): x for x in _safe_table('usuarios_clan', 'email,nick_jogo,nome_exibicao,avatar_url')}
+    casas = {x.get('id'): x for x in _safe_table('casas_reino')}
+    lojas_map = {x.get('id'): x for x in _safe_table('lojas_reino')}
+    for c in cobrancas:
+        u = usuarios.get(c.get('usuario_email')) or {}
+        c['usuario_nick'] = u.get('nome_exibicao') or u.get('nick_jogo') or c.get('usuario_email')
+        c['avatar_url'] = u.get('avatar_url')
+        if c.get('tipo_unidade') == 'casa':
+            un = casas.get(c.get('casa_id')) or {}
+            c['unidade_nome'] = un.get('nome') or f"Casa #{c.get('casa_id')}"
+            c['unidade_codigo'] = un.get('codigo') or 'CASA'
+        else:
+            un = lojas_map.get(c.get('loja_id')) or {}
+            c['unidade_nome'] = un.get('nome') or f"Loja #{c.get('loja_id')}"
+            c['unidade_codigo'] = un.get('codigo') or (f"LOJA-{un.get('posicao'):03d}" if un.get('posicao') else 'LOJA')
+    return cobrancas
+
+
+def _reino_resumo_usuario(email):
+    _reino_sincronizar_cobrancas(email)
+    cobrancas = _safe_table('hype_reino_cobrancas', '*', usuario_email=email)
+    contratos_c = _safe_table('contratos_casas', '*', usuario_email=email, status='ativo')
+    contratos_l = _safe_table('contratos_lojas', '*', usuario_email=email, status='ativo')
+    abertas = [x for x in cobrancas if x.get('status') in ('pendente', 'informado')]
+    pendentes = [x for x in cobrancas if x.get('status') == 'pendente']
+    informadas = [x for x in cobrancas if x.get('status') == 'informado']
+    proximos = [
+        _reino_data(x.get('proximo_vencimento'))
+        for x in (contratos_c + contratos_l)
+        if _reino_data(x.get('proximo_vencimento'))
+    ]
+    return {
+        'divida': sum(int(x.get('valor') or 0) for x in abertas),
+        'pendente': sum(int(x.get('valor') or 0) for x in pendentes),
+        'informado': sum(int(x.get('valor') or 0) for x in informadas),
+        'quantidade_aberta': len(abertas),
+        'contratos_ativos': len(contratos_c) + len(contratos_l),
+        'proximo_vencimento': min(proximos).isoformat() if proximos else None,
+    }
+
+
+def _reino_notificar_admins(titulo, mensagem):
+    try:
+        for u in _safe_table('usuarios_clan', 'email,cargo'):
+            if u.get('cargo') in ('lider', 'sub_lider') and u.get('email'):
+                criar_notificacao(u.get('email'), titulo, mensagem, 'aviso', url_for('admin_reino_financeiro'))
+    except Exception as e:
+        print(f'[V31 Reino] Falha ao notificar administração: {e}')
+
+
 def _construtor_perfil(email):
     if not email:
         return None
@@ -4691,14 +4875,16 @@ def admin_construtores():
 @app.route('/lojas')
 @login_required
 def lojas():
+    email = session.get('usuario_email')
+    _reino_sincronizar_cobrancas(email)
     itens = sorted([x for x in _safe_table('lojas_reino') if x.get('ativa', True) and x.get('status') != 'desativada'], key=lambda x: int(x.get('posicao') or 999999))
     produtos = _safe_table('produtos_loja')
     for loja in itens:
         loja['produtos'] = [p for p in produtos if p.get('loja_id') == loja.get('id') and p.get('ativo', True)]
-    email = session.get('usuario_email')
+        loja['eh_minha'] = loja.get('dono_email') == email
     admin = bool(obter_permissoes_usuario(email).get('pode_gerenciar_cargos'))
     meus_pedidos = [p for p in _safe_table('pedidos_loja') if p.get('comprador_email') == email or p.get('lojista_email') == email]
-    return render_template('lojas.html', lojas=itens, meus_pedidos=meus_pedidos, admin=admin)
+    return render_template('lojas.html', lojas=itens, meus_pedidos=meus_pedidos, admin=admin, meu_reino=_reino_resumo_usuario(email))
 
 
 @app.route('/lojas/<int:loja_id>')
@@ -5357,9 +5543,233 @@ def admin_tesouro_emprestimo(emprestimo_id, acao):
         flash(f'Erro ao atualizar empréstimo: {e}', 'erro')
     return redirect(url_for('admin_tesouro'))
 
+@app.route('/reino/financeiro')
+@login_required
+def reino_financeiro_usuario():
+    email = session.get('usuario_email')
+    _reino_sincronizar_cobrancas(email)
+    cobrancas = _reino_decorar_cobrancas(
+        sorted(_safe_table('hype_reino_cobrancas', '*', usuario_email=email), key=lambda x: str(x.get('referencia_vencimento') or ''), reverse=True)
+    )
+    contratos_c = _safe_table('contratos_casas', '*', usuario_email=email, status='ativo')
+    contratos_l = _safe_table('contratos_lojas', '*', usuario_email=email, status='ativo')
+    casas = {x.get('id'): x for x in _safe_table('casas_reino')}
+    lojas_map = {x.get('id'): x for x in _safe_table('lojas_reino')}
+    contratos = []
+    for c in contratos_c:
+        un = casas.get(c.get('casa_id')) or {}
+        contratos.append({**c, 'tipo':'Casa', 'unidade_nome':un.get('nome') or 'Casa', 'unidade_codigo':un.get('codigo') or 'CASA'})
+    for c in contratos_l:
+        un = lojas_map.get(c.get('loja_id')) or {}
+        contratos.append({**c, 'tipo':'Loja', 'unidade_nome':un.get('nome') or 'Loja', 'unidade_codigo':un.get('codigo') or 'LOJA'})
+    resumo = _reino_resumo_usuario(email)
+    resumo['pago'] = sum(int(x.get('valor') or 0) for x in cobrancas if x.get('status') == 'pago')
+    return render_template('reino_financeiro.html', cobrancas=cobrancas, contratos=contratos, resumo=resumo)
+
+
+@app.route('/reino/financeiro/cobranca/<int:cobranca_id>/informar', methods=['POST'])
+@login_required
+def reino_informar_pagamento(cobranca_id):
+    email = session.get('usuario_email')
+    rows = _safe_table('hype_reino_cobrancas', '*', id=cobranca_id)
+    if not rows or rows[0].get('usuario_email') != email:
+        flash('Cobrança não encontrada.', 'erro')
+        return redirect(url_for('reino_financeiro_usuario'))
+    c = rows[0]
+    if c.get('status') != 'pendente':
+        flash('Esta cobrança não está pendente para informar pagamento.', 'info')
+        return redirect(url_for('reino_financeiro_usuario'))
+    obs = (request.form.get('observacao') or '').strip()[:500] or None
+    try:
+        supabase.table('hype_reino_cobrancas').update({
+            'status':'informado', 'informado_pagamento_em':agora_iso(),
+            'informado_pagamento_por':email, 'observacao_pagamento':obs,
+            'recusado_em':None, 'recusado_por':None, 'motivo_recusa':None,
+        }).eq('id', cobranca_id).eq('status', 'pendente').execute()
+        registrar_log('informar_pagamento_aluguel','reino_financeiro','cobranca_reino',cobranca_id,{'valor':c.get('valor')})
+        registrar_atividade_reino('aluguel_informado', email, f"Pagamento de aluguel informado: {formatar_preco(c.get('valor'))}", 'cobranca_reino', cobranca_id)
+        _reino_notificar_admins('Pagamento de aluguel informado', f"{session.get('nick_jogo') or email} informou pagamento de {formatar_preco(c.get('valor'))} no Reino HYPE.")
+        flash('Pagamento informado. Agora aguarde a confirmação do Admin.', 'sucesso')
+    except Exception as e:
+        flash(f'Não foi possível informar o pagamento: {e}', 'erro')
+    return redirect(url_for('reino_financeiro_usuario'))
+
+
+@app.route('/reino/financeiro/informar-todas', methods=['POST'])
+@login_required
+def reino_informar_todas():
+    email = session.get('usuario_email')
+    pendentes = _safe_table('hype_reino_cobrancas', '*', usuario_email=email, status='pendente')
+    if not pendentes:
+        flash('Você não possui aluguéis pendentes.', 'info')
+        return redirect(url_for('reino_financeiro_usuario'))
+    agora = agora_iso()
+    ids = []
+    total = 0
+    try:
+        for c in pendentes:
+            supabase.table('hype_reino_cobrancas').update({
+                'status':'informado', 'informado_pagamento_em':agora,
+                'informado_pagamento_por':email,
+            }).eq('id', c.get('id')).eq('status', 'pendente').execute()
+            ids.append(c.get('id')); total += int(c.get('valor') or 0)
+        registrar_log('informar_pagamento_total_alugueis','reino_financeiro','usuario',email,{'cobrancas':ids,'valor':total})
+        _reino_notificar_admins('Pagamento total de aluguéis informado', f"{session.get('nick_jogo') or email} informou pagamento total de {formatar_preco(total)} em {len(ids)} aluguel(is).")
+        flash(f'Pagamento de {formatar_preco(total)} informado. Aguarde a confirmação do Admin.', 'sucesso')
+    except Exception as e:
+        flash(f'Não foi possível informar todos os pagamentos: {e}', 'erro')
+    return redirect(url_for('reino_financeiro_usuario'))
+
+
+@app.route('/admin/reino/financeiro')
+@login_required
+def admin_reino_financeiro():
+    email = session.get('usuario_email')
+    if not _reino_admin_financeiro(email):
+        return redirect(url_for('painel'))
+    _reino_sincronizar_cobrancas()
+    cobrancas = _reino_decorar_cobrancas(
+        sorted(_safe_table('hype_reino_cobrancas'), key=lambda x: str(x.get('referencia_vencimento') or ''), reverse=True)
+    )
+    aberto = ('pendente','informado')
+    total_a_receber = sum(int(x.get('valor') or 0) for x in cobrancas if x.get('status') in aberto)
+    total_informado = sum(int(x.get('valor') or 0) for x in cobrancas if x.get('status') == 'informado')
+    total_recebido = sum(int(x.get('valor') or 0) for x in cobrancas if x.get('status') == 'pago')
+    agora = datetime.now(timezone.utc)
+    recebido_mes = 0
+    for x in cobrancas:
+        if x.get('status') != 'pago' or not x.get('confirmado_em'):
+            continue
+        try:
+            dt = datetime.fromisoformat(str(x.get('confirmado_em')).replace('Z','+00:00'))
+            if dt.year == agora.year and dt.month == agora.month:
+                recebido_mes += int(x.get('valor') or 0)
+        except Exception:
+            pass
+    agrupado = {}
+    for c in cobrancas:
+        e = c.get('usuario_email') or 'sem-usuario'
+        g = agrupado.setdefault(e, {'email':e,'nick':c.get('usuario_nick') or e,'pendente':0,'informado':0,'pago':0,'total_devido':0,'quantidade_aberta':0})
+        v = int(c.get('valor') or 0); st = c.get('status')
+        if st == 'pendente': g['pendente'] += v
+        elif st == 'informado': g['informado'] += v
+        elif st == 'pago': g['pago'] += v
+        if st in aberto:
+            g['total_devido'] += v; g['quantidade_aberta'] += 1
+    por_membro = sorted(agrupado.values(), key=lambda x:(-x['total_devido'],-x['informado'],x['nick'].lower()))
+    contratos_ativos = len(_safe_table('contratos_casas','id',status='ativo')) + len(_safe_table('contratos_lojas','id',status='ativo'))
+    atrasados = sum(1 for x in cobrancas if x.get('status') in aberto and (_reino_data(x.get('referencia_vencimento')) or agora.date()) < agora.date())
+    caixa = _safe_table('hype_caixa_clan')
+    saldo_caixa = sum((int(x.get('valor') or 0) if x.get('tipo') == 'entrada' else -int(x.get('valor') or 0)) for x in caixa)
+    return render_template('admin_reino_financeiro.html', cobrancas=cobrancas, por_membro=por_membro,
+        total_a_receber=total_a_receber,total_informado=total_informado,total_recebido=total_recebido,
+        recebido_mes=recebido_mes,contratos_ativos=contratos_ativos,atrasados=atrasados,saldo_caixa=saldo_caixa)
+
+
+@app.route('/admin/reino/financeiro/cobranca/<int:cobranca_id>/confirmar', methods=['POST'])
+@login_required
+def admin_reino_confirmar_pagamento(cobranca_id):
+    email = session.get('usuario_email')
+    if not _reino_admin_financeiro(email):
+        return redirect(url_for('painel'))
+    rows = _safe_table('hype_reino_cobrancas', '*', id=cobranca_id)
+    if not rows:
+        flash('Cobrança não encontrada.', 'erro')
+        return redirect(url_for('admin_reino_financeiro'))
+    c = rows[0]
+    if c.get('status') not in ('pendente','informado'):
+        flash('Esta cobrança já foi finalizada.', 'info')
+        return redirect(url_for('admin_reino_financeiro'))
+    agora = agora_iso(); valor = int(c.get('valor') or 0)
+    try:
+        chave_caixa = f'reino:cobranca:{cobranca_id}:pago'
+        chave_usuario = f'reino:cobranca:{cobranca_id}:usuario'
+        caixa_ok = registrar_caixa_clan(
+            'entrada','aluguel_reino',f"Aluguel {c.get('tipo_unidade')} - cobrança #{cobranca_id}",valor,
+            origem_tipo='reino_cobranca',origem_id=cobranca_id,chave_unica=chave_caixa
+        ) or bool(_safe_table('hype_caixa_clan','id',chave_unica=chave_caixa))
+        usuario_ok = registrar_transacao_hype(
+            c.get('usuario_email'),'saida','aluguel_reino',f"Pagamento de aluguel do Reino - cobrança #{cobranca_id}",valor,
+            origem_tipo='reino_cobranca',origem_id=cobranca_id,chave_unica=chave_usuario
+        ) or bool(_safe_table('transacoes_hype','id',chave_unica=chave_usuario))
+        if not caixa_ok or not usuario_ok:
+            raise RuntimeError('Não foi possível registrar a movimentação financeira antes da baixa.')
+        supabase.table('hype_reino_cobrancas').update({
+            'status':'pago','confirmado_em':agora,'confirmado_por':email
+        }).eq('id',cobranca_id).execute()
+        criar_notificacao(c.get('usuario_email'),'Aluguel HYPE confirmado',f"O Clã confirmou o recebimento de {formatar_preco(valor)}. Obrigado!",'sucesso',url_for('reino_financeiro_usuario'))
+        registrar_log('confirmar_pagamento_aluguel','reino_financeiro','cobranca_reino',cobranca_id,{'valor':valor,'usuario':c.get('usuario_email')})
+        registrar_atividade_reino('aluguel_pago', c.get('usuario_email'), f"Aluguel confirmado: {formatar_preco(valor)}", 'cobranca_reino', cobranca_id)
+        flash('Recebimento confirmado e valor lançado no Caixa HYPE.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao confirmar pagamento: {e}', 'erro')
+    return redirect(url_for('admin_reino_financeiro'))
+
+
+@app.route('/admin/reino/financeiro/cobranca/<int:cobranca_id>/rejeitar', methods=['POST'])
+@login_required
+def admin_reino_rejeitar_pagamento(cobranca_id):
+    email = session.get('usuario_email')
+    if not _reino_admin_financeiro(email):
+        return redirect(url_for('painel'))
+    rows = _safe_table('hype_reino_cobrancas', '*', id=cobranca_id)
+    if not rows or rows[0].get('status') != 'informado':
+        flash('Somente pagamentos informados podem voltar para pendente.', 'erro')
+        return redirect(url_for('admin_reino_financeiro'))
+    motivo = (request.form.get('motivo') or '').strip()[:500]
+    if not motivo:
+        flash('Informe o motivo da recusa.', 'erro')
+        return redirect(url_for('admin_reino_financeiro'))
+    c = rows[0]
+    try:
+        supabase.table('hype_reino_cobrancas').update({
+            'status':'pendente','recusado_em':agora_iso(),'recusado_por':email,'motivo_recusa':motivo,
+            'informado_pagamento_em':None,'informado_pagamento_por':None
+        }).eq('id',cobranca_id).execute()
+        criar_notificacao(c.get('usuario_email'),'Pagamento de aluguel não confirmado',f"O pagamento informado não foi confirmado. Motivo: {motivo}",'aviso',url_for('reino_financeiro_usuario'))
+        registrar_log('rejeitar_pagamento_aluguel','reino_financeiro','cobranca_reino',cobranca_id,{'motivo':motivo})
+        flash('Cobrança devolvida para pendente.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao rejeitar pagamento: {e}', 'erro')
+    return redirect(url_for('admin_reino_financeiro'))
+
+
+@app.route('/admin/reino/financeiro/cobranca/<int:cobranca_id>/cancelar', methods=['POST'])
+@login_required
+def admin_reino_cancelar_cobranca(cobranca_id):
+    email = session.get('usuario_email')
+    if not _reino_admin_financeiro(email):
+        return redirect(url_for('painel'))
+    rows = _safe_table('hype_reino_cobrancas', '*', id=cobranca_id)
+    if not rows:
+        flash('Cobrança não encontrada.', 'erro')
+        return redirect(url_for('admin_reino_financeiro'))
+    c = rows[0]
+    if c.get('status') == 'pago':
+        flash('Cobrança já paga não pode ser cancelada por esta tela.', 'erro')
+        return redirect(url_for('admin_reino_financeiro'))
+    motivo = (request.form.get('motivo') or '').strip()[:500]
+    if not motivo:
+        flash('Informe o motivo do cancelamento.', 'erro')
+        return redirect(url_for('admin_reino_financeiro'))
+    try:
+        supabase.table('hype_reino_cobrancas').update({
+            'status':'cancelado','cancelado_em':agora_iso(),'cancelado_por':email,'motivo_cancelamento':motivo
+        }).eq('id',cobranca_id).execute()
+        criar_notificacao(c.get('usuario_email'),'Cobrança de aluguel cancelada',f"Uma cobrança de aluguel foi cancelada. Motivo: {motivo}",'info',url_for('reino_financeiro_usuario'))
+        registrar_log('cancelar_cobranca_aluguel','reino_financeiro','cobranca_reino',cobranca_id,{'motivo':motivo})
+        flash('Cobrança cancelada.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao cancelar cobrança: {e}', 'erro')
+    return redirect(url_for('admin_reino_financeiro'))
+
+
 @app.route('/reino')
 @login_required
 def painel_reino():
+    email = session.get('usuario_email')
+    _reino_sincronizar_cobrancas(email)
+    meu_reino = _reino_resumo_usuario(email)
     breeds = sorted(_safe_table('pedidos_breed'), key=lambda x: x.get('created_at') or '', reverse=True)[:8]
     construcoes = sorted(_safe_table('pedidos_construcao'), key=lambda x: x.get('created_at') or '', reverse=True)[:8]
     lojas_pedidos = sorted(_safe_table('pedidos_loja'), key=lambda x: x.get('created_at') or '', reverse=True)[:8]
@@ -5376,7 +5786,7 @@ def painel_reino():
     }
     return render_template(
         'reino.html', breeds=breeds, construcoes=construcoes, lojas_pedidos=lojas_pedidos,
-        eventos=eventos, atividades=atividades, reino_resumo=reino_resumo,
+        eventos=eventos, atividades=atividades, reino_resumo=reino_resumo, meu_reino=meu_reino,
         casas_preview=casas[:8], lojas_preview=lojas_unidades[:6]
     )
 
@@ -5452,11 +5862,14 @@ def admin_membros_hype():
 @app.route('/casas')
 @login_required
 def casas_reino():
+    email = session.get('usuario_email')
+    _reino_sincronizar_cobrancas(email)
     casas = sorted([c for c in _safe_table('casas_reino') if c.get('ativa', True) and c.get('status') != 'desativada'], key=lambda x:(x.get('setor') or '', x.get('codigo') or ''))
     mapa = mapa_nicks_por_email()
     for casa in casas:
         casa['ocupante_nick'] = mapa.get(casa.get('ocupante_email'),{}).get('nick') if casa.get('ocupante_email') else None
-    return render_template('casas.html', casas=casas)
+        casa['eh_minha'] = casa.get('ocupante_email') == email
+    return render_template('casas.html', casas=casas, meu_reino=_reino_resumo_usuario(email))
 
 
 @app.route('/admin/reino')
@@ -5465,6 +5878,7 @@ def admin_reino():
     email = session.get('usuario_email')
     if not obter_permissoes_usuario(email).get('pode_gerenciar_cargos'):
         return redirect(url_for('painel'))
+    _reino_sincronizar_cobrancas()
     casas = sorted(_safe_table('casas_reino'), key=lambda x:(x.get('setor') or '', x.get('codigo') or ''))
     lojas = sorted(_safe_table('lojas_reino'), key=lambda x:int(x.get('posicao') or 999999))
     membros_ativos = {x.get('usuario_email') for x in _safe_table('membros_hype','usuario_email,ativo',ativo=True)}
@@ -5905,7 +6319,7 @@ app.register_blueprint(create_final_blueprint(supabase, login_required, _safe_ta
 from modules.expansion_features import create_expansion_blueprint
 app.register_blueprint(create_expansion_blueprint(
     supabase, login_required, _safe_table, _is_admin, registrar_log,
-    parse_valor_moeda, criar_notificacao
+    parse_valor_moeda, criar_notificacao, _reino_sincronizar_cobrancas
 ))
 
 from modules.competitive_features import create_competitive_blueprint
