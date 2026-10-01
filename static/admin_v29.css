@@ -1,0 +1,7 @@
+/* HYPE V29 - Admin 3.0 foundation */
+.admin-v29-nav{position:sticky;top:0;z-index:1400;min-height:58px;display:flex;align-items:center;gap:16px;padding:8px 18px;border-bottom:1px solid rgba(255,199,46,.3);background:rgba(6,7,9,.96);backdrop-filter:blur(14px);box-shadow:0 8px 24px rgba(0,0,0,.3);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.admin-v29-brand{display:flex;align-items:baseline;gap:7px;text-decoration:none;white-space:nowrap}.admin-v29-brand b{font-size:1.05rem;letter-spacing:.08em;color:#ffd33d}.admin-v29-brand span{font-size:.58rem;letter-spacing:.16em;color:#8e929a}
+.admin-v29-links{display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none}.admin-v29-links::-webkit-scrollbar{display:none}.admin-v29-links a,.admin-v29-exit{padding:7px 9px;border:1px solid transparent;border-radius:7px;color:#b9bdc5;text-decoration:none;font-size:.7rem;font-weight:750;white-space:nowrap}.admin-v29-links a:hover{border-color:#66551a;background:#17140a;color:#ffd33d}.admin-v29-exit{margin-left:auto;border-color:#30343b;color:#e2e3e6}
+.hgb-logout-inline{display:inline-flex;margin:0}.hgb-logout-inline button{font-family:inherit}
+.admin-v29-security-note{border:1px solid rgba(73,216,143,.28);background:rgba(24,92,61,.12);color:#aee7c8;border-radius:9px;padding:10px 12px;font-size:.72rem}
+@media(max-width:900px){.admin-v29-nav{align-items:flex-start;flex-wrap:wrap}.admin-v29-links{order:3;width:100%;padding-bottom:2px}.admin-v29-exit{margin-left:auto}}

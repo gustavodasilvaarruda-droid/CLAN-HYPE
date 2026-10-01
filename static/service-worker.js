@@ -1,5 +1,5 @@
-const CACHE = 'hype-shell-v27';
-const SHELL = ['/', '/static/style.css?v=2701', '/static/imagens/emblema_hype_novo.png', '/static/imagens/logodragaoh.png'];
+const CACHE = 'hype-shell-v30';
+const SHELL = ['/', '/static/style.css?v=3001', '/static/community_v30.css?v=3001', '/static/imagens/emblema_hype_novo.png', '/static/imagens/logodragaoh.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).catch(() => null));
   self.skipWaiting();
