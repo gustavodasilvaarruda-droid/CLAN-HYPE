@@ -2,6 +2,8 @@ import os
 import json
 import csv
 import io
+import hashlib
+import hmac
 from functools import wraps, lru_cache
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -11,9 +13,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from uuid import uuid4
 from urllib.request import urlopen
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlparse
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from flask_wtf.csrf import CSRFProtect, CSRFError
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
@@ -23,6 +26,30 @@ try:
     HYPE_TZ = ZoneInfo('America/Sao_Paulo')
 except Exception:
     HYPE_TZ = timezone(timedelta(hours=-3))
+
+
+def _env_bool(nome, padrao=False):
+    valor = str(os.environ.get(nome, '')).strip().lower()
+    if not valor:
+        return bool(padrao)
+    return valor in ('1', 'true', 'on', 'sim', 'yes')
+
+
+# V29: endurecimento de sessão e uploads. Em produção no Render, cookie HTTPS é
+# ativado automaticamente; no desenvolvimento local HTTP ele continua utilizável.
+app.config.update(
+    SESSION_COOKIE_NAME='hype_session',
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=_env_bool('SESSION_COOKIE_SECURE', bool(os.environ.get('RENDER'))),
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+    SESSION_REFRESH_EACH_REQUEST=True,
+    MAX_CONTENT_LENGTH=10 * 1024 * 1024,
+    WTF_CSRF_TIME_LIMIT=timedelta(hours=2),
+)
+
+# Proteção CSRF para todos os POST/PUT/PATCH/DELETE do site.
+csrf = CSRFProtect(app)
 
 
 @app.template_filter('preco')
@@ -64,6 +91,37 @@ if not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
+@app.errorhandler(CSRFError)
+def tratar_erro_csrf(_erro):
+    flash('Sua sessão de segurança expirou. Atualize a página e tente novamente.', 'erro')
+    destino = request.referrer or url_for('pagina_inicial')
+    try:
+        ref = urlparse(destino)
+        if ref.netloc and ref.netloc != request.host:
+            destino = url_for('pagina_inicial')
+    except Exception:
+        destino = url_for('pagina_inicial')
+    return redirect(destino)
+
+
+@app.errorhandler(413)
+def tratar_upload_grande(_erro):
+    flash('O arquivo enviado é muito grande. O limite do site é 10 MB.', 'erro')
+    return redirect(request.referrer or url_for('painel'))
+
+
+@app.after_request
+def cabecalhos_seguranca(response):
+    # Cabeçalhos seguros que não quebram os embeds/JS atuais do HYPE.
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    if os.environ.get('RENDER') or request.is_secure:
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    if session.get('usuario_email') and (request.path.startswith('/admin') or request.path.startswith('/conta') or request.path.startswith('/perfil/midia')):
+        response.headers.setdefault('Cache-Control', 'no-store, private')
+    return response
 
 
 # ============================================================================
@@ -186,6 +244,65 @@ def parse_data_supabase(valor):
         return data
     except Exception:
         return None
+
+
+def _login_guard_chave(email):
+    # Nunca grava IP/e-mail em texto puro na tabela de tentativas.
+    origem = f"{str(email or '').strip().lower()}|{request.remote_addr or 'sem-ip'}".encode('utf-8')
+    return hmac.new(app.secret_key.encode('utf-8'), origem, hashlib.sha256).hexdigest()
+
+
+def _login_guard_bloqueado(email):
+    """Retorna minutos restantes do bloqueio ou 0. Falha aberta se a migração ainda não rodou."""
+    try:
+        chave = _login_guard_chave(email)
+        rows = supabase.table('hype_login_seguranca').select('bloqueado_ate').eq('chave', chave).limit(1).execute().data or []
+        if not rows or not rows[0].get('bloqueado_ate'):
+            return 0
+        bloqueado = parse_data_supabase(rows[0].get('bloqueado_ate'))
+        if not bloqueado:
+            return 0
+        restante = bloqueado - datetime.now(timezone.utc)
+        if restante.total_seconds() <= 0:
+            return 0
+        return max(1, int((restante.total_seconds() + 59) // 60))
+    except Exception as e:
+        print(f'[login guard consultar] {e}')
+        return 0
+
+
+def _login_guard_falha(email):
+    """Registra falha e bloqueia por 15 min após 5 erros na mesma origem/e-mail."""
+    try:
+        chave = _login_guard_chave(email)
+        rows = supabase.table('hype_login_seguranca').select('*').eq('chave', chave).limit(1).execute().data or []
+        row = rows[0] if rows else {}
+        agora = datetime.now(timezone.utc)
+        ultima = parse_data_supabase(row.get('ultima_falha_em'))
+        falhas = int(row.get('falhas') or 0)
+        if not ultima or (agora - ultima) > timedelta(minutes=30):
+            falhas = 0
+        falhas += 1
+        bloqueado_ate = None
+        if falhas >= 5:
+            bloqueado_ate = (agora + timedelta(minutes=15)).isoformat()
+        supabase.table('hype_login_seguranca').upsert({
+            'chave': chave,
+            'falhas': min(falhas, 20),
+            'ultima_falha_em': agora.isoformat(),
+            'bloqueado_ate': bloqueado_ate,
+        }, on_conflict='chave').execute()
+        return 15 if bloqueado_ate else 0
+    except Exception as e:
+        print(f'[login guard falha] {e}')
+        return 0
+
+
+def _login_guard_limpar(email):
+    try:
+        supabase.table('hype_login_seguranca').delete().eq('chave', _login_guard_chave(email)).execute()
+    except Exception as e:
+        print(f'[login guard limpar] {e}')
 
 
 @app.template_filter('data_br')
@@ -570,6 +687,99 @@ def registrar_caixa_clan(tipo, categoria, descricao, valor, origem_tipo=None, or
             return False
         print(f"Movimentação do caixa HYPE não registrada: {e}")
         return False
+
+
+
+# ============================================================================
+# HYPE V28 - FINANCEIRO BREED 2.0 / COMISSOES DO CLA
+# A taxa vira divida somente quando o Pokemon e marcado como pronto.
+# ============================================================================
+def obter_comissao_breed(pedido_id):
+    try:
+        rows = supabase.table('hype_breed_comissoes').select('*').eq('pedido_id', pedido_id).limit(1).execute().data or []
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def gerar_comissao_breed_pendente(pedido):
+    """Cria, de forma idempotente, a divida do Breeder quando o Breed fica pronto."""
+    if not pedido or not pedido.get('id') or not pedido.get('breeder_responsavel'):
+        return None
+    existente = obter_comissao_breed(pedido.get('id'))
+    if existente:
+        return existente
+    valor = int(pedido.get('taxa_clan_valor') or 0)
+    pct = float(pedido.get('taxa_clan_percentual') or 0)
+    if valor <= 0:
+        return None
+    payload = {
+        'pedido_id': pedido.get('id'),
+        'breeder_email': pedido.get('breeder_responsavel'),
+        'percentual': pct,
+        'valor': valor,
+        'status': 'pendente',
+        'origem_fluxo': 'v28',
+        'gerada_em': agora_iso(),
+    }
+    try:
+        res = supabase.table('hype_breed_comissoes').insert(payload).execute()
+        comissao = (res.data or [payload])[0]
+        criar_notificacao(
+            pedido.get('breeder_responsavel'),
+            'Comissao HYPE pendente',
+            f"O Breed #{pedido.get('id')} de {pedido.get('pokemon')} ficou pronto. Sua comissao com o Cla e de {formatar_preco(valor)}.",
+            'aviso',
+            url_for('painel_breeder_hype')
+        )
+        registrar_log('gerar_comissao', 'financeiro_breed', 'pedido_breed', pedido.get('id'), {
+            'breeder': pedido.get('breeder_responsavel'), 'valor': valor, 'percentual': pct
+        })
+        return comissao
+    except Exception as e:
+        # UNIQUE(pedido_id) protege contra clique duplo/race condition.
+        print(f'[V28 comissao] Nao foi possivel gerar comissao do pedido #{pedido.get("id")}: {e}')
+        return obter_comissao_breed(pedido.get('id'))
+
+
+def cancelar_comissao_breed(pedido_id, motivo='Pedido cancelado/estornado'):
+    """Cancela a divida. Se ja estava paga, estorna o caixa do cla uma unica vez."""
+    comissao = obter_comissao_breed(pedido_id)
+    if not comissao or comissao.get('status') == 'cancelado':
+        return comissao
+    status_anterior = comissao.get('status')
+    if status_anterior == 'pago' and int(comissao.get('valor') or 0) > 0:
+        registrar_caixa_clan(
+            'saida', 'estorno_taxa_breed', f"Estorno da comissao do Breed #{pedido_id}", int(comissao.get('valor') or 0),
+            origem_tipo='breed_comissao', origem_id=comissao.get('id'),
+            chave_unica=f'breed:comissao:{comissao.get("id")}:estorno'
+        )
+    try:
+        supabase.table('hype_breed_comissoes').update({
+            'status':'cancelado', 'cancelado_em':agora_iso(), 'motivo_cancelamento':motivo,
+            'updated_at':agora_iso()
+        }).eq('id', comissao.get('id')).execute()
+    except Exception as e:
+        print(f'[V28 comissao] Falha ao cancelar comissao #{comissao.get("id")}: {e}')
+    return comissao
+
+
+def formatar_preco(valor):
+    try:
+        return f"{int(valor or 0):,}".replace(',', '.')
+    except Exception:
+        return str(valor or 0)
+
+
+def notificar_admins_financeiro(titulo, mensagem):
+    """Envia aviso aos Lideres/Sub-Lideres quando um Breeder informa pagamento."""
+    try:
+        usuarios = _safe_table('usuarios_clan', 'email,cargo')
+        for u in usuarios:
+            if u.get('cargo') in ('lider','sub_lider') and u.get('email'):
+                criar_notificacao(u.get('email'), titulo, mensagem, 'aviso', url_for('final.financeiro'))
+    except Exception as e:
+        print(f'[V28 comissao] Falha ao notificar administracao: {e}')
 
 
 def classificar_pokemon_preco(pokemon_id):
@@ -1064,11 +1274,20 @@ def login_membro():
     if not email or not senha:
         flash('Preencha todos os campos obrigatórios!', 'erro')
         return redirect(url_for('pagina_inicial'))
+    if '@' not in email or len(email) > 254:
+        flash('Informe um e-mail válido.', 'erro')
+        return redirect(url_for('pagina_inicial'))
 
     # CADASTRO DE NOVO GUERREIRO
     if acao == 'cadastro':
         if not nick_jogo:
             flash('Informe seu Nick no Jogo para se cadastrar.', 'erro')
+            return redirect(url_for('pagina_inicial'))
+        if len(nick_jogo) < 2 or len(nick_jogo) > 80:
+            flash('O Nick deve ter entre 2 e 80 caracteres.', 'erro')
+            return redirect(url_for('pagina_inicial'))
+        if len(senha) < 8:
+            flash('Para novas contas, use uma senha com pelo menos 8 caracteres.', 'erro')
             return redirect(url_for('pagina_inicial'))
 
         # Verificar se e-mail já existe
@@ -1087,6 +1306,8 @@ def login_membro():
                 'cargo': 'membro'
             }).execute()
 
+            session.clear()
+            session.permanent = True
             session['usuario_email'] = email
             session['nick_jogo'] = nick_jogo
             session['cargo'] = 'membro'
@@ -1094,17 +1315,30 @@ def login_membro():
             flash(f'Bem-vindo ao Clã, {nick_jogo}!', 'sucesso')
             return redirect(url_for('painel'))
         except Exception as e:
-            flash(f'Erro ao cadastrar: {e}', 'erro')
+            print(f'[cadastro] {e}')
+            flash('Não foi possível concluir o cadastro agora. Tente novamente.', 'erro')
             return redirect(url_for('pagina_inicial'))
 
     # LOGIN DE GUERREIRO EXISTENTE
     else:
-        res = supabase.table('usuarios_clan').select('*').eq('email', email).execute()
-        if not res.data or not check_password_hash(res.data[0]['senha'], senha):
-            flash('E-mail ou senha incorretos.', 'erro')
+        minutos = _login_guard_bloqueado(email)
+        if minutos:
+            flash(f'Muitas tentativas de login. Tente novamente em cerca de {minutos} minuto(s).', 'erro')
             return redirect(url_for('pagina_inicial'))
 
+        res = supabase.table('usuarios_clan').select('*').eq('email', email).execute()
+        if not res.data or not check_password_hash(res.data[0]['senha'], senha):
+            bloqueio = _login_guard_falha(email)
+            if bloqueio:
+                flash('Muitas tentativas incorretas. O login nesta origem foi bloqueado por 15 minutos.', 'erro')
+            else:
+                flash('E-mail ou senha incorretos.', 'erro')
+            return redirect(url_for('pagina_inicial'))
+
+        _login_guard_limpar(email)
         usuario = res.data[0]
+        session.clear()
+        session.permanent = True
         session['usuario_email'] = usuario['email']
         session['nick_jogo'] = usuario['nick_jogo']
         session['cargo'] = usuario['cargo']
@@ -1113,7 +1347,7 @@ def login_membro():
         return redirect(url_for('painel'))
 
 
-@app.route('/logout')
+@app.route('/logout', methods=['POST'])
 def logout():
     """Encerra a sessão do usuário."""
     session.clear()
@@ -1232,7 +1466,7 @@ def perfil_publico(nick):
         # Em perfil público, só times marcados como públicos são expostos. O dono
         # continua vendo os próprios times para conferir como o perfil está montado.
         if not viewer_is_owner:
-            times_perfil = [t for t in times_perfil if bool(t.get('publico'))]
+            times_perfil = [t for t in times_perfil if bool(t.get('publico')) and str(t.get('moderacao_status') or 'visivel') != 'oculto']
         membro['times_salvos'] = sorted(times_perfil, key=lambda x: x.get('updated_at') or x.get('created_at') or '', reverse=True)[:6]
         membro['viewer_is_owner'] = viewer_is_owner
         xp_atual = int(membro.get('xp') or 0)
@@ -1246,6 +1480,12 @@ def perfil_publico(nick):
         mh = _safe_table('membros_hype', '*', usuario_email=email)
         membro['membro_hype'] = bool(mh and mh[0].get('ativo'))
         membro['membro_hype_desde'] = mh[0].get('entrou_em') if membro['membro_hype'] else None
+        seguidores = _safe_table('comunidade_seguidores', 'seguidor_email', seguido_email=email)
+        seguindo = _safe_table('comunidade_seguidores', 'seguido_email', seguidor_email=email)
+        membro['seguidores_total'] = len(seguidores)
+        membro['seguindo_total'] = len(seguindo)
+        viewer_email = session.get('usuario_email')
+        membro['viewer_seguindo'] = bool(viewer_email and viewer_email != email and _safe_table('comunidade_seguidores', 'seguido_email', seguidor_email=viewer_email, seguido_email=email))
         return render_template('perfil.html', membro=membro)
     except Exception as e:
         print(f'Erro perfil: {e}')
@@ -2398,8 +2638,7 @@ def devolver_breed_fila(pedido_id):
             ciclo = str(p.get('pagamento_confirmado_em') or 'sem_pagamento')
             registrar_transacao_hype(p.get('usuario_email'),'entrada','estorno_breed',f"Estorno por devolução do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=antigo_breeder,chave_unica=f'breed:{pedido_id}:devolucao_cliente:{ciclo}')
             registrar_transacao_hype(antigo_breeder,'saida','estorno_breed',f"Estorno por devolução do Breed #{pedido_id}",valor_breeder,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('usuario_email'),chave_unica=f'breed:{pedido_id}:devolucao_breeder:{ciclo}')
-            if taxa_clan:
-                registrar_caixa_clan('saida','estorno_taxa_breed',f"Estorno da taxa por devolução do Breed #{pedido_id}",taxa_clan,origem_tipo='breed',origem_id=pedido_id,chave_unica=f'breed:{pedido_id}:devolucao_taxa_clan:{ciclo}')
+            cancelar_comissao_breed(pedido_id, 'Pedido devolvido pelo Breeder')
 
         updates = {
             'status':'pendente','breeder_responsavel':None,'assumido_em':None,
@@ -2545,10 +2784,9 @@ def confirmar_pagamento_breed(pedido_id):
             origem_tipo='breed', origem_id=pedido_id, contraparte_email=pedido.get('usuario_email'),
             chave_unica=f'breed:{pedido_id}:breeder:{agora}'
         )
-        registrar_caixa_clan(
-            'entrada', 'taxa_breed', f"Taxa do Breed #{pedido_id} - {pedido.get('pokemon')}", taxa_clan,
-            origem_tipo='breed', origem_id=pedido_id, chave_unica=f'breed:{pedido_id}:taxa_clan:{agora}'
-        )
+        # V28: a taxa NAO entra mais no caixa aqui. O Breeder apenas recebeu o
+        # pagamento do cliente. A divida com o Cla nasce quando o Pokemon fica pronto
+        # e o caixa so recebe quando um Admin confirmar o pagamento da comissao.
         flash('Pagamento confirmado. Agora a produção pode começar.', 'sucesso')
     except Exception as e:
         flash(f'Erro ao confirmar pagamento: {e}', 'erro')
@@ -2591,6 +2829,11 @@ def concluir_breed(pedido_id):
             flash('Não foi possível concluir este pedido.', 'erro')
             return redirect(url_for('breed'))
 
+        pedido_pronto = dict(pedido)
+        pedido_pronto['status'] = 'concluido'
+        pedido_pronto['concluido_em'] = agora_iso()
+        gerar_comissao_breed_pendente(pedido_pronto)
+
         criar_notificacao(pedido.get('usuario_email'), 'Pokémon pronto!', f"Seu {pedido.get('pokemon')} foi concluído e está pronto para entrega.", 'sucesso', url_for('breed'), {'categoria':'breed','status':'concluido','pedido_id':pedido_id,'pokemon':pedido.get('pokemon'),'pokemon_id':pedido.get('pokemon_id'),'valor':pedido.get('preco_total'),'breeder':session.get('nick_jogo'),'instrucao':'Seu Pokémon está pronto. Combine a entrega com o Breeder.'})
         atualizar_conquistas_breeder(pedido.get('breeder_responsavel') or email)
         registrar_atividade_reino('breed_concluido', email, f"Breed concluído: {pedido.get('pokemon')}", 'breed', pedido_id)
@@ -2599,6 +2842,130 @@ def concluir_breed(pedido_id):
         flash(f'Erro ao concluir pedido: {e}', 'erro')
 
     return redirect(url_for('breed'))
+
+
+
+@app.route('/breed/comissao/<int:comissao_id>/informar-pagamento', methods=['POST'])
+@login_required
+def informar_pagamento_comissao_breed(comissao_id):
+    email = session.get('usuario_email')
+    observacao = (request.form.get('observacao') or '').strip()[:500] or None
+    try:
+        rows = supabase.table('hype_breed_comissoes').select('*').eq('id', comissao_id).limit(1).execute().data or []
+        if not rows:
+            flash('Comissao nao encontrada.', 'erro')
+            return redirect(url_for('painel_breeder_hype'))
+        c = rows[0]
+        if c.get('breeder_email') != email:
+            flash('Esta comissao pertence a outro Breeder.', 'erro')
+            return redirect(url_for('painel_breeder_hype'))
+        if c.get('status') == 'pago':
+            flash('Esta comissao ja foi confirmada como paga.', 'info')
+            return redirect(url_for('painel_breeder_hype'))
+        if c.get('status') != 'pendente':
+            flash('Esta comissao nao pode ser informada neste estado.', 'erro')
+            return redirect(url_for('painel_breeder_hype'))
+        agora = agora_iso()
+        supabase.table('hype_breed_comissoes').update({
+            'status':'informado', 'informado_pagamento_em':agora,
+            'informado_pagamento_por':email, 'observacao_pagamento':observacao,
+            'recusado_em':None, 'recusado_por':None, 'motivo_recusa':None,
+            'updated_at':agora
+        }).eq('id',comissao_id).eq('status','pendente').execute()
+        registrar_log('informar_pagamento_comissao','financeiro_breed','comissao_breed',comissao_id,{'valor':c.get('valor')})
+        notificar_admins_financeiro('Pagamento de comissao informado', f"{session.get('nick_jogo') or email} informou o pagamento de {formatar_preco(c.get('valor'))} da comissao do Breed #{c.get('pedido_id')}.")
+        flash('Pagamento informado. Agora aguarde a confirmacao da administracao.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao informar pagamento da comissao: {e}', 'erro')
+    return redirect(url_for('painel_breeder_hype'))
+
+
+@app.route('/breed/comissoes/informar-pagamento-total', methods=['POST'])
+@login_required
+def informar_pagamento_total_comissoes_breed():
+    email = session.get('usuario_email')
+    observacao = (request.form.get('observacao') or '').strip()[:500] or None
+    try:
+        rows = supabase.table('hype_breed_comissoes').select('*').eq('breeder_email',email).eq('status','pendente').execute().data or []
+        if not rows:
+            flash('Voce nao possui comissoes pendentes para informar.', 'info')
+            return redirect(url_for('painel_breeder_hype'))
+        agora = agora_iso()
+        ids=[]; total=0
+        for c in rows:
+            supabase.table('hype_breed_comissoes').update({
+                'status':'informado','informado_pagamento_em':agora,'informado_pagamento_por':email,
+                'observacao_pagamento':observacao,'updated_at':agora
+            }).eq('id',c.get('id')).eq('status','pendente').execute()
+            ids.append(c.get('id')); total += int(c.get('valor') or 0)
+        registrar_log('informar_pagamento_total_comissoes','financeiro_breed','breeder',email,{'comissoes':ids,'valor':total})
+        notificar_admins_financeiro('Pagamento total de comissoes informado', f"{session.get('nick_jogo') or email} informou o pagamento total de {formatar_preco(total)} em {len(ids)} comissao(oes).")
+        flash(f'Pagamento de {formatar_preco(total)} informado. Aguarde a confirmacao da administracao.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao informar pagamento: {e}', 'erro')
+    return redirect(url_for('painel_breeder_hype'))
+
+
+@app.route('/admin/financeiro/comissao/<int:comissao_id>/confirmar', methods=['POST'])
+@login_required
+def admin_confirmar_comissao_breed(comissao_id):
+    if not _is_admin():
+        flash('Apenas a administracao pode confirmar comissoes.', 'erro')
+        return redirect(url_for('painel'))
+    try:
+        rows = supabase.table('hype_breed_comissoes').select('*').eq('id',comissao_id).limit(1).execute().data or []
+        if not rows:
+            flash('Comissao nao encontrada.', 'erro')
+            return redirect(url_for('final.financeiro'))
+        c=rows[0]
+        if c.get('status') == 'pago':
+            flash('Esta comissao ja esta paga.', 'info')
+            return redirect(url_for('final.financeiro'))
+        if c.get('status') not in ('pendente','informado'):
+            flash('Esta comissao nao pode ser confirmada neste estado.', 'erro')
+            return redirect(url_for('final.financeiro'))
+        agora=agora_iso()
+        supabase.table('hype_breed_comissoes').update({
+            'status':'pago','confirmado_em':agora,'confirmado_por':session.get('usuario_email'),'updated_at':agora
+        }).eq('id',comissao_id).in_('status',['pendente','informado']).execute()
+        pedido = _pedido('breed', c.get('pedido_id')) or {}
+        registrar_caixa_clan(
+            'entrada','taxa_breed',f"Comissao recebida do Breed #{c.get('pedido_id')} - {pedido.get('pokemon') or 'Pokemon'}",int(c.get('valor') or 0),
+            origem_tipo='breed_comissao', origem_id=comissao_id,
+            chave_unica=f'breed:comissao:{comissao_id}:recebida'
+        )
+        registrar_log('confirmar_comissao','financeiro_breed','comissao_breed',comissao_id,{'valor':c.get('valor'),'breeder':c.get('breeder_email')})
+        criar_notificacao(c.get('breeder_email'),'Comissao HYPE confirmada',f"A administracao confirmou o recebimento de {formatar_preco(c.get('valor'))} referente ao Breed #{c.get('pedido_id')}.",'sucesso',url_for('painel_breeder_hype'))
+        flash('Recebimento confirmado e valor lancado no Caixa do Cla.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao confirmar comissao: {e}', 'erro')
+    return redirect(url_for('final.financeiro'))
+
+
+@app.route('/admin/financeiro/comissao/<int:comissao_id>/rejeitar', methods=['POST'])
+@login_required
+def admin_rejeitar_comissao_breed(comissao_id):
+    if not _is_admin():
+        return redirect(url_for('painel'))
+    motivo=(request.form.get('motivo') or '').strip()[:500] or 'Pagamento nao localizado pela administracao.'
+    try:
+        rows=supabase.table('hype_breed_comissoes').select('*').eq('id',comissao_id).limit(1).execute().data or []
+        if not rows:
+            flash('Comissao nao encontrada.','erro'); return redirect(url_for('final.financeiro'))
+        c=rows[0]
+        if c.get('status')!='informado':
+            flash('Somente pagamentos informados podem ser devolvidos para pendente.','erro'); return redirect(url_for('final.financeiro'))
+        agora=agora_iso()
+        supabase.table('hype_breed_comissoes').update({
+            'status':'pendente','recusado_em':agora,'recusado_por':session.get('usuario_email'),
+            'motivo_recusa':motivo,'updated_at':agora
+        }).eq('id',comissao_id).eq('status','informado').execute()
+        registrar_log('rejeitar_pagamento_comissao','financeiro_breed','comissao_breed',comissao_id,{'motivo':motivo})
+        criar_notificacao(c.get('breeder_email'),'Pagamento da comissao nao confirmado',f"A administracao nao confirmou o pagamento do Breed #{c.get('pedido_id')}. Motivo: {motivo}",'aviso',url_for('painel_breeder_hype'))
+        flash('Pagamento devolvido para Pendente.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao rejeitar informacao: {e}','erro')
+    return redirect(url_for('final.financeiro'))
 
 
 @app.route('/breed/entregar/<int:pedido_id>', methods=['POST'])
@@ -2730,6 +3097,23 @@ def painel_breeder_hype():
             repasse_mes += int(p.get('valor_breeder') or p.get('preco_total') or 0)
             entregues_mes += 1
 
+    comissoes = []
+    try:
+        comissoes = supabase.table('hype_breed_comissoes').select('*').eq('breeder_email', email).order('gerada_em', desc=True).execute().data or []
+    except Exception as e:
+        print(f'Erro ao carregar comissoes do Breeder: {e}')
+    comissoes_abertas = [c for c in comissoes if c.get('status') in ('pendente','informado')]
+    comissoes_pendentes = [c for c in comissoes if c.get('status') == 'pendente']
+    comissoes_informadas = [c for c in comissoes if c.get('status') == 'informado']
+    comissao_devida = sum(int(c.get('valor') or 0) for c in comissoes_abertas)
+    comissao_pendente = sum(int(c.get('valor') or 0) for c in comissoes_pendentes)
+    comissao_aguardando = sum(int(c.get('valor') or 0) for c in comissoes_informadas)
+    pedidos_por_id = {p.get('id'): p for p in meus}
+    for c in comissoes:
+        p = pedidos_por_id.get(c.get('pedido_id')) or {}
+        c['pokemon'] = p.get('pokemon') or 'Pokemon'
+        c['pokemon_id'] = p.get('pokemon_id')
+
     avaliacoes.sort(key=lambda x: str(x.get('created_at') or ''), reverse=True)
     for a in avaliacoes[:8]:
         a['avaliador_nick'] = mapa.get(a.get('avaliador_email'), {}).get('nick') or 'Membro HYPE'
@@ -2738,7 +3122,9 @@ def painel_breeder_hype():
         'painel_breeder_hype.html', usuario=usuario, perfil=perfil, disponibilidade=disponibilidade,
         metricas=metricas, max_ativos=max_ativos, ativos=ativos, aguardando_pagamento=aguardando_pagamento,
         em_producao=em_producao, prontos=prontos, entregues=entregues[:8], repasse_total=repasse_total,
-        repasse_mes=repasse_mes, entregues_mes=entregues_mes, avaliacoes=avaliacoes[:8], permissoes=permissoes
+        repasse_mes=repasse_mes, entregues_mes=entregues_mes, avaliacoes=avaliacoes[:8], permissoes=permissoes,
+        comissoes=comissoes[:12], comissoes_abertas=comissoes_abertas, comissao_devida=comissao_devida,
+        comissao_pendente=comissao_pendente, comissao_aguardando=comissao_aguardando
     )
 
 
@@ -2782,8 +3168,9 @@ def breed_pedido_detalhe(pedido_id):
     for m in mensagens:
         m['autor_nick'] = 'Você' if m.get('remetente_email') == email else (mapa.get(m.get('remetente_email'), {}).get('nick') or 'Equipe HYPE')
 
+    comissao = obter_comissao_breed(pedido_id)
     return render_template('breed_pedido_detalhe.html', pedido=pedido, historico=historico, mensagens=mensagens,
-                           avaliacao=avaliacao, permissoes=permissoes, usuario_email=email)
+                           avaliacao=avaliacao, permissoes=permissoes, usuario_email=email, comissao=comissao)
 
 
 @app.route('/admin/breeders')
@@ -3615,8 +4002,7 @@ def cancelar_breed(pedido_id):
                 ciclo = str(p.get('pagamento_confirmado_em') or 'sem_pagamento')
                 registrar_transacao_hype(p.get('usuario_email'),'entrada','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('breeder_responsavel'),chave_unica=f'breed:{pedido_id}:estorno_cliente:{ciclo}')
                 registrar_transacao_hype(p.get('breeder_responsavel'),'saida','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_breeder,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('usuario_email'),chave_unica=f'breed:{pedido_id}:estorno_breeder:{ciclo}')
-                if taxa_clan:
-                    registrar_caixa_clan('saida','estorno_taxa_breed',f"Estorno da taxa do Breed #{pedido_id}",taxa_clan,origem_tipo='breed',origem_id=pedido_id,chave_unica=f'breed:{pedido_id}:estorno_taxa_clan:{ciclo}')
+                cancelar_comissao_breed(pedido_id, 'Pedido cancelado pela administracao/cliente')
             if p.get('breeder_responsavel') and p.get('breeder_responsavel') != email:
                 criar_notificacao(p.get('breeder_responsavel'),'Breed cancelado',f"O pedido de {p.get('pokemon')} foi cancelado.",'aviso',url_for('breed'))
             flash('Pedido cancelado.', 'sucesso')
@@ -3694,8 +4080,7 @@ def decidir_cancelamento_breed(pedido_id, decisao):
             valor_breeder = int(p.get('valor_breeder') or max(0, valor_mov - taxa_clan))
             registrar_transacao_hype(p.get('usuario_email'),'entrada','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_mov,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('breeder_responsavel'),chave_unica=f'breed:{pedido_id}:estorno_cliente:{str(p.get("pagamento_confirmado_em") or "sem_pagamento")}')
             registrar_transacao_hype(p.get('breeder_responsavel'),'saida','estorno_breed',f"Estorno do Breed #{pedido_id}",valor_breeder,origem_tipo='breed',origem_id=pedido_id,contraparte_email=p.get('usuario_email'),chave_unica=f'breed:{pedido_id}:estorno_breeder:{str(p.get("pagamento_confirmado_em") or "sem_pagamento")}')
-            if taxa_clan:
-                registrar_caixa_clan('saida','estorno_taxa_breed',f"Estorno da taxa do Breed #{pedido_id}",taxa_clan,origem_tipo='breed',origem_id=pedido_id,chave_unica=f'breed:{pedido_id}:estorno_taxa_clan:{str(p.get("pagamento_confirmado_em") or "sem_pagamento")}')
+            cancelar_comissao_breed(pedido_id, 'Cancelamento aprovado pelo Breeder/administracao')
         registrar_historico('breed',pedido_id,'cancelamento_solicitado',novo_status,f'Cancelamento {updates["cancelamento_decisao"]}.')
         registrar_log('decidir_cancelamento','breed','pedido_breed',pedido_id,{'decisao':updates['cancelamento_decisao']})
         criar_notificacao(p.get('usuario_email'),'Cancelamento do Breed',msg,'aviso',url_for('breed'))
@@ -5536,6 +5921,11 @@ app.register_blueprint(create_builders_hub_blueprint(
 
 from modules.events_v26 import create_events_v26_blueprint
 app.register_blueprint(create_events_v26_blueprint(
+    supabase, login_required, _safe_table, _is_admin, registrar_log, criar_notificacao
+))
+
+from modules.community_v30 import create_community_blueprint
+app.register_blueprint(create_community_blueprint(
     supabase, login_required, _safe_table, _is_admin, registrar_log, criar_notificacao
 ))
 
