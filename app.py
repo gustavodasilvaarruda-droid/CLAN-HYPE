@@ -443,6 +443,28 @@ PROMO_CODIGO_EQUIVALENCIAS = {
     'ha_sem_ditto_f5_sem_nature': {'ha_sem_ditto_f5', 'ha_sem_ditto_f5_sem_nature'},
 }
 
+# V31.2: aliases entre a antiga tabela por combinação e os novos componentes.
+# Uma promoção antiga de HA+Ditto, por exemplo, continua incidindo sobre base + HA + Ditto.
+PROMO_CODIGO_EQUIVALENCIAS.update({
+    'base_comum_f5': {'base_comum_f5','comum_f5_naturado','comum_f5_sem_nature','ditto_f5_naturado','ha_sem_ditto_f5','ha_sem_ditto_f5_naturado','ha_sem_ditto_f5_sem_nature','ha_com_ditto_f5','ha_com_ditto_f5_naturado','ha_com_ditto_f5_sem_nature'},
+    'base_comum_f6': {'base_comum_f6','comum_f6_naturado','comum_f6_sem_nature','ditto_f6_naturado','ditto_f6_sem_nature','ha_sem_ditto_f6_naturado','ha_sem_ditto_f6_sem_nature','ha_com_ditto_f6_naturado','ha_com_ditto_f6_sem_nature'},
+    'base_raro_f5': {'base_raro_f5','raro_f5_naturado','raro_f5_sem_nature'},
+    'base_raro_f6': {'base_raro_f6','raro_f6_naturado','raro_f6_sem_nature'},
+    'adicional_ha_comum_f5': {'adicional_ha_comum_f5','ha_sem_ditto_f5','ha_sem_ditto_f5_naturado','ha_sem_ditto_f5_sem_nature','ha_com_ditto_f5','ha_com_ditto_f5_naturado','ha_com_ditto_f5_sem_nature'},
+    'adicional_ha_raro_f5': {'adicional_ha_raro_f5','ha_sem_ditto_f5','ha_sem_ditto_f5_naturado','ha_sem_ditto_f5_sem_nature','ha_com_ditto_f5','ha_com_ditto_f5_naturado','ha_com_ditto_f5_sem_nature'},
+    'adicional_ha_comum_f6': {'adicional_ha_comum_f6','ha_sem_ditto_f6_naturado','ha_sem_ditto_f6_sem_nature','ha_com_ditto_f6_naturado','ha_com_ditto_f6_sem_nature'},
+    'adicional_ha_raro_f6': {'adicional_ha_raro_f6','ha_sem_ditto_f6_naturado','ha_sem_ditto_f6_sem_nature','ha_com_ditto_f6_naturado','ha_com_ditto_f6_sem_nature'},
+    'adicional_ditto_comum_f5': {'adicional_ditto_comum_f5','ditto_f5_naturado','ha_com_ditto_f5','ha_com_ditto_f5_naturado','ha_com_ditto_f5_sem_nature'},
+    'adicional_ditto_raro_f5': {'adicional_ditto_raro_f5','ditto_f5_naturado','ha_com_ditto_f5','ha_com_ditto_f5_naturado','ha_com_ditto_f5_sem_nature'},
+    'adicional_ditto_comum_f6': {'adicional_ditto_comum_f6','ditto_f6_naturado','ditto_f6_sem_nature','ha_com_ditto_f6_naturado','ha_com_ditto_f6_sem_nature'},
+    'adicional_ditto_raro_f6': {'adicional_ditto_raro_f6','ditto_f6_naturado','ditto_f6_sem_nature','ha_com_ditto_f6_naturado','ha_com_ditto_f6_sem_nature'},
+    'adicional_zero_speed_comum': {'adicional_zero_speed_comum','zero_speed'},
+    'adicional_zero_speed_raro': {'adicional_zero_speed_raro','zero_speed'},
+    'adicional_genero_comum': {'adicional_genero_comum','comum_genero','escolher_genero'},
+    'adicional_genero_raro': {'adicional_genero_raro','ha_sem_ditto_genero','escolher_genero_raro','femea_rara'},
+    'adicional_treinado': {'adicional_treinado','treinado'},
+})
+
 
 def _promo_codigos_equivalentes(codigo):
     codigo = str(codigo or '').strip()
@@ -493,11 +515,18 @@ def _status_promocao(p, agora=None):
     return 'ativa'
 
 
-def promocoes_breed_ativas():
-    """Promoções válidas agora. Falha fechada: sem tabela/migração = sem desconto."""
+def promocoes_breed_ativas(codigo_cupom=None, usuario_email=None, forcar_membro_hype=False):
+    """Promoções válidas agora, incluindo cupons e regras exclusivas de membro.
+
+    Promoções antigas continuam automáticas. Promoções com ``codigo_cupom`` só
+    entram no cálculo quando o código informado confere. Falha fechada: sem
+    tabela/migração = sem desconto.
+    """
     agora = datetime.now(timezone.utc)
+    cupom = str(codigo_cupom or '').strip().upper()
     rows = _safe_table('promocoes_breed', '*')
     validas = []
+    eh_membro = bool(forcar_membro_hype) or (membro_hype_ativo(usuario_email) if usuario_email else False)
     for p in rows:
         if p.get('ativo') is False:
             continue
@@ -513,7 +542,24 @@ def promocoes_breed_ativas():
             continue
         if pct <= 0 or pct > 100:
             continue
-        p = dict(p); p['percentual'] = pct
+        codigo = str(p.get('codigo_cupom') or '').strip().upper()
+        if codigo:
+            if not cupom or cupom != codigo:
+                continue
+        elif p.get('aplicar_automaticamente', True) is False:
+            continue
+        if p.get('somente_membros_hype') and not eh_membro:
+            continue
+        limite = p.get('limite_usos')
+        if limite not in (None, ''):
+            try:
+                if int(p.get('usos') or 0) >= int(limite):
+                    continue
+            except (TypeError, ValueError):
+                pass
+        p = dict(p)
+        p['percentual'] = pct
+        p['codigo_cupom_normalizado'] = codigo or None
         validas.append(p)
     validas.sort(key=lambda x: float(x.get('percentual') or 0), reverse=True)
     return validas
@@ -557,8 +603,8 @@ def _aplicar_promocao_componente(codigo, valor, promocoes):
     return final, promo
 
 
-def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='comum',
-                         usa_ditto=False, treinado=False, nature=None, zero_speed=False):
+def _calcular_preco_breed_legacy(breed_tipo, ha=False, genero='indiferente', categoria='comum',
+                                 usa_ditto=False, treinado=False, nature=None, zero_speed=False):
     """Calcula o preço no servidor. Ditto é automático; HPWR foi removido do formulário."""
     # Compatibilidade com bancos HYPE antigos e novos: versões anteriores de
     # precos_breed podem não ter a coluna `ativo`. Primeiro usamos apenas preços
@@ -658,8 +704,8 @@ def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='
     }
 
 
-def precos_breed_interface():
-    """Valores dos adicionais enviados junto com o HTML; não dependem de API no navegador."""
+def _precos_breed_interface_legacy():
+    """Valores legados dos adicionais enviados junto com o HTML."""
     linhas = _safe_table('precos_breed', '*')
     ativos = [x for x in linhas if x.get('ativo', True) is not False]
     precos = dict(PRECO_BREED_FALLBACK)
@@ -678,6 +724,382 @@ def precos_breed_interface():
         }
     return saida
 
+
+
+# ============================================================================
+# HYPE V31.2 / V31.3 - BREED PRICING + RARITY 3.0
+# Tabelas versionadas, raridade automática, HA, Zero Speed, exceções por espécie,
+# desconto de membro, margem mínima e simulador administrativo.
+# ============================================================================
+BREED_V312_COMPONENTES_META = {
+    'base_comum_f5': ('Base Comum F5', 'base', 10),
+    'base_comum_f6': ('Base Comum F6', 'base', 20),
+    'base_raro_f5': ('Base Raro F5', 'base', 30),
+    'base_raro_f6': ('Base Raro F6', 'base', 40),
+    'base_ultra_raro_f5': ('Base Ultra Raro F5', 'base', 50),
+    'base_ultra_raro_f6': ('Base Ultra Raro F6', 'base', 60),
+    'desconto_sem_nature_comum_f5': ('Desconto sem Nature · Comum F5', 'nature', 70),
+    'desconto_sem_nature_comum_f6': ('Desconto sem Nature · Comum F6', 'nature', 80),
+    'desconto_sem_nature_raro_f5': ('Desconto sem Nature · Raro F5', 'nature', 90),
+    'desconto_sem_nature_raro_f6': ('Desconto sem Nature · Raro F6', 'nature', 100),
+    'desconto_sem_nature_ultra_raro_f5': ('Desconto sem Nature · Ultra Raro F5', 'nature', 110),
+    'desconto_sem_nature_ultra_raro_f6': ('Desconto sem Nature · Ultra Raro F6', 'nature', 120),
+    'adicional_ha_comum_f5': ('HA · Comum F5', 'ha', 130),
+    'adicional_ha_comum_f6': ('HA · Comum F6', 'ha', 140),
+    'adicional_ha_raro_f5': ('HA · Raro F5', 'ha', 150),
+    'adicional_ha_raro_f6': ('HA · Raro F6', 'ha', 160),
+    'adicional_ha_ultra_raro_f5': ('HA · Ultra Raro F5', 'ha', 170),
+    'adicional_ha_ultra_raro_f6': ('HA · Ultra Raro F6', 'ha', 180),
+    'adicional_zero_speed_comum': ('Zero Speed · Comum', 'zero_speed', 190),
+    'adicional_zero_speed_raro': ('Zero Speed · Raro', 'zero_speed', 200),
+    'adicional_zero_speed_ultra_raro': ('Zero Speed · Ultra Raro', 'zero_speed', 210),
+    # V31.3: Ditto deixa de ser adicional para espécies Ultra Raras; a dificuldade já está no preço-base.
+    # Os componentes antigos de Ditto continuam no banco apenas por compatibilidade/histórico.
+    'adicional_genero_comum': ('Escolher gênero · Comum', 'extras', 220),
+    'adicional_genero_raro': ('Escolher gênero · Raro', 'extras', 230),
+    'adicional_genero_ultra_raro': ('Escolher gênero · Ultra Raro', 'extras', 240),
+    'adicional_treinado': ('Pokémon treinado', 'extras', 250),
+}
+
+BREED_V312_PACOTES = [
+    {'codigo':'economico_f5','nome':'F5 Econômico','breed_tipo':'F5','ha':False,'zero_speed':False,'categoria':'comum','usa_ditto':False},
+    {'codigo':'f5_ha','nome':'F5 + HA','breed_tipo':'F5','ha':True,'zero_speed':False,'categoria':'comum','usa_ditto':False},
+    {'codigo':'f5_zero','nome':'F5 Zero Speed','breed_tipo':'F5','ha':False,'zero_speed':True,'categoria':'comum','usa_ditto':False},
+    {'codigo':'raro_comp','nome':'Raro Competitivo','breed_tipo':'F5','ha':True,'zero_speed':True,'categoria':'raro','usa_ditto':False},
+    {'codigo':'ultra_comp','nome':'Ultra Raro Competitivo','breed_tipo':'F5','ha':True,'zero_speed':True,'categoria':'ultra_raro','usa_ditto':True},
+]
+
+BREED_CATEGORIAS_PRECO = ('comum', 'raro', 'ultra_raro')
+BREED_CATEGORIA_LABELS = {
+    'comum': 'Comum',
+    'raro': 'Raro',
+    'ultra_raro': 'Ultra Raro',
+}
+
+
+
+def _breed_v312_tabelas():
+    return _safe_table('breed_tabelas_preco', '*')
+
+
+def _breed_v312_tabela_por_id(tabela_id):
+    try:
+        alvo = int(tabela_id)
+    except (TypeError, ValueError):
+        return None
+    rows = _safe_table('breed_tabelas_preco', '*', id=alvo)
+    return rows[0] if rows else None
+
+
+def _breed_v312_tabela_atual():
+    """Resolve a tabela em vigor. Uma tabela agendada sobrepõe a ativa só na janela."""
+    agora = datetime.now(timezone.utc)
+    rows = _breed_v312_tabelas()
+    agendadas = []
+    ativas = []
+    for row in rows:
+        status = str(row.get('status') or '').lower()
+        inicio = parse_data_supabase(row.get('inicio_em'))
+        fim = parse_data_supabase(row.get('fim_em'))
+        dentro = (not inicio or inicio <= agora) and (not fim or agora < fim)
+        if status == 'agendada' and dentro:
+            agendadas.append(row)
+        elif status == 'ativa' and dentro:
+            ativas.append(row)
+    def chave(row):
+        dt = parse_data_supabase(row.get('inicio_em')) or parse_data_supabase(row.get('publicado_em')) or parse_data_supabase(row.get('created_at'))
+        return (dt or datetime.min.replace(tzinfo=timezone.utc), int(row.get('id') or 0))
+    if agendadas:
+        return sorted(agendadas, key=chave, reverse=True)[0]
+    if ativas:
+        return sorted(ativas, key=chave, reverse=True)[0]
+    return None
+
+
+def _breed_v312_componentes(tabela_id):
+    if not tabela_id:
+        return {}
+    rows = _safe_table('breed_tabela_componentes', '*', tabela_id=tabela_id)
+    return {str(x.get('codigo')): x for x in rows if x.get('codigo') and x.get('ativo', True) is not False}
+
+
+def _breed_v312_excecao(tabela_id, pokemon_id):
+    if not tabela_id or not pokemon_id:
+        return None
+    rows = _safe_table('breed_preco_especie_excecoes', '*', tabela_id=tabela_id, pokemon_id=int(pokemon_id))
+    return rows[0] if rows else None
+
+
+def _breed_v312_valor(componentes, codigo, padrao=0):
+    row = componentes.get(codigo) or {}
+    try:
+        return max(0, int(row.get('valor') if row else padrao))
+    except (TypeError, ValueError):
+        return max(0, int(padrao or 0))
+
+
+def _breed_v312_registrar_historico(tabela_id, acao, codigo=None, anterior=None, novo=None, detalhes=None):
+    try:
+        supabase.table('breed_preco_historico').insert({
+            'tabela_id': tabela_id, 'acao': acao, 'codigo': codigo,
+            'valor_anterior': anterior, 'valor_novo': novo,
+            'usuario_email': session.get('usuario_email'), 'detalhes': detalhes or {}
+        }).execute()
+    except Exception as exc:
+        print(f'[V31.2 historico preco] {exc}')
+
+
+def _breed_v312_validar_tabela(tabela_id):
+    c = _breed_v312_componentes(tabela_id)
+    erros = []
+    def v(k): return _breed_v312_valor(c, k)
+    obrigatorios = [
+        k for k in BREED_V312_COMPONENTES_META
+        if k.startswith('base_') or k.startswith('adicional_ha_') or k.startswith('adicional_zero_speed_')
+    ]
+    faltando = [k for k in obrigatorios if k not in c]
+    if faltando:
+        erros.append('Existem componentes obrigatórios ausentes: ' + ', '.join(faltando[:4]) + ('…' if len(faltando) > 4 else ''))
+
+    for bt in ('f5', 'f6'):
+        if v(f'base_raro_{bt}') <= v(f'base_comum_{bt}'):
+            erros.append(f'Raro {bt.upper()} precisa custar mais que Comum {bt.upper()}.')
+        if v(f'base_ultra_raro_{bt}') <= v(f'base_raro_{bt}'):
+            erros.append(f'Ultra Raro {bt.upper()} precisa custar mais que Raro {bt.upper()}.')
+
+    for cat in BREED_CATEGORIAS_PRECO:
+        if v(f'base_{cat}_f6') < v(f'base_{cat}_f5'):
+            erros.append(f'F6 não pode ficar abaixo do F5 em {BREED_CATEGORIA_LABELS[cat]}.')
+        for bt in ('f5','f6'):
+            if v(f'desconto_sem_nature_{cat}_{bt}') > v(f'base_{cat}_{bt}'):
+                erros.append(f'O desconto sem Nature de {BREED_CATEGORIA_LABELS[cat]} {bt.upper()} não pode superar o preço-base.')
+
+    for bt in ('f5','f6'):
+        efetivos = {}
+        for cat in BREED_CATEGORIAS_PRECO:
+            base = v(f'base_{cat}_{bt}')
+            efetivos[cat] = base - min(v(f'desconto_sem_nature_{cat}_{bt}'), base)
+        if efetivos['raro'] <= efetivos['comum']:
+            erros.append(f'Mesmo sem Nature, Raro {bt.upper()} precisa continuar acima do Comum.')
+        if efetivos['ultra_raro'] <= efetivos['raro']:
+            erros.append(f'Mesmo sem Nature, Ultra Raro {bt.upper()} precisa continuar acima do Raro.')
+
+    for bt in ('f5','f6'):
+        if v(f'adicional_ha_comum_{bt}') <= 0:
+            erros.append(f'HA deve ter adicional positivo para Comum {bt.upper()}.')
+        if v(f'adicional_ha_raro_{bt}') < v(f'adicional_ha_comum_{bt}'):
+            erros.append(f'HA Raro {bt.upper()} deve ser igual ou mais caro que HA Comum.')
+        if v(f'adicional_ha_ultra_raro_{bt}') < v(f'adicional_ha_raro_{bt}'):
+            erros.append(f'HA Ultra Raro {bt.upper()} deve ser igual ou mais caro que HA Raro.')
+
+    if v('adicional_zero_speed_comum') <= 0:
+        erros.append('Zero Speed deve ter adicional positivo.')
+    if v('adicional_zero_speed_raro') < v('adicional_zero_speed_comum'):
+        erros.append('Zero Speed Raro deve ser igual ou mais caro que Zero Speed Comum.')
+    if v('adicional_zero_speed_ultra_raro') < v('adicional_zero_speed_raro'):
+        erros.append('Zero Speed Ultra Raro deve ser igual ou mais caro que Zero Speed Raro.')
+    return erros
+
+
+def _breed_v312_promo_aplicada(codigo, valor, promocoes, max_pct=100):
+    promo = _promocao_para_codigo(codigo, promocoes)
+    original = max(0, int(valor or 0))
+    if not promo:
+        return original, None
+    pct = min(float(promo.get('percentual') or 0), max(0.0, min(100.0, float(max_pct or 100))))
+    final = max(0, int(round(original * (100.0 - pct) / 100.0)))
+    promo = dict(promo); promo['percentual_aplicado'] = pct
+    return final, promo
+
+
+def _calcular_preco_breed_v312(breed_tipo, ha=False, genero='indiferente', categoria='comum',
+                                usa_ditto=False, treinado=False, nature=None, zero_speed=False,
+                                pokemon_id=None, usuario_email=None, codigo_cupom=None, tabela_id_override=None, forcar_membro_hype=False):
+    tabela = _breed_v312_tabela_por_id(tabela_id_override) if tabela_id_override else _breed_v312_tabela_atual()
+    if not tabela:
+        return None
+    componentes = _breed_v312_componentes(tabela.get('id'))
+    if not componentes:
+        return None
+
+    bt = str(breed_tipo or '').lower()
+    if bt not in ('f5','f6'):
+        return 0, {'erro':'Breed inválido.'}
+    categoria = str(categoria or 'comum').lower()
+    if categoria not in BREED_CATEGORIAS_PRECO:
+        categoria = 'comum'
+
+    excecao = _breed_v312_excecao(tabela.get('id'), pokemon_id)
+    if excecao and excecao.get('categoria_override') in BREED_CATEGORIAS_PRECO:
+        categoria = excecao.get('categoria_override')
+
+    # V31.3: se a espécie realmente depende de Ditto, ela pertence à categoria Ultra Raro.
+    # O Ditto já está embutido no preço-base Ultra Raro e não é somado novamente.
+    if usa_ditto:
+        categoria = 'ultra_raro'
+
+    # Compatibilidade de deploy: se o código V31.3 subir antes da migração SQL,
+    # usa temporariamente a antiga estrutura Raro + adicional Ditto em vez de zerar o preço.
+    ultra_fallback_legado = False
+    if categoria == 'ultra_raro' and f'base_ultra_raro_{bt}' not in componentes:
+        categoria = 'raro'
+        ultra_fallback_legado = True
+
+    max_pct = float(tabela.get('desconto_maximo_percentual') or 100)
+    promocoes = promocoes_breed_ativas(codigo_cupom=codigo_cupom, usuario_email=usuario_email, forcar_membro_hype=forcar_membro_hype)
+    cupom_digitado = str(codigo_cupom or '').strip().upper()
+    cupom_promo = next((p for p in promocoes if str(p.get('codigo_cupom') or '').strip().upper() == cupom_digitado), None) if cupom_digitado else None
+
+    itens = []
+    promos_usadas = []
+    def adicionar(codigo, valor=None, tipo='adicional'):
+        if valor is None:
+            valor = _breed_v312_valor(componentes, codigo)
+        valor = max(0, int(valor or 0))
+        final, promo = _breed_v312_promo_aplicada(codigo, valor, promocoes, max_pct=max_pct)
+        meta = BREED_V312_COMPONENTES_META.get(codigo, (codigo.replace('_',' ').title(), 'outros', 999))
+        itens.append({'codigo':codigo,'nome':meta[0],'tipo':tipo,'valor_original':valor,'valor':final,
+                      'promocao': promo.get('nome') if promo else None})
+        if promo: promos_usadas.append(promo)
+        return valor, final
+
+    base_codigo = f'base_{categoria}_{bt}'
+    base_original = _breed_v312_valor(componentes, base_codigo)
+    if excecao and excecao.get('valor_base_override') is not None:
+        try: base_original = max(0, int(excecao.get('valor_base_override') or 0))
+        except (TypeError, ValueError): pass
+    _, base_final = adicionar(base_codigo, base_original, 'base')
+    estrutural_original = base_original
+    subtotal = base_final
+
+    # Sem Nature é uma regra estrutural da tabela, não uma promoção.
+    if not nature:
+        desconto_codigo = f'desconto_sem_nature_{categoria}_{bt}'
+        desconto_nature = min(_breed_v312_valor(componentes, desconto_codigo), estrutural_original)
+        if desconto_nature:
+            estrutural_original -= desconto_nature
+            subtotal = max(0, subtotal - desconto_nature)
+            meta = BREED_V312_COMPONENTES_META.get(desconto_codigo, (desconto_codigo, 'nature', 0))
+            itens.append({'codigo':desconto_codigo,'nome':meta[0],'tipo':'desconto_tabela','valor_original':-desconto_nature,'valor':-desconto_nature,'promocao':None})
+
+    codigos_extras = []
+    if ha: codigos_extras.append(f'adicional_ha_{categoria}_{bt}')
+    if zero_speed: codigos_extras.append(f'adicional_zero_speed_{categoria}')
+    if usa_ditto and ultra_fallback_legado:
+        codigos_extras.append(f'adicional_ditto_{categoria}_{bt}')
+    if genero in ('macho','femea'): codigos_extras.append(f'adicional_genero_{categoria}')
+    if treinado: codigos_extras.append('adicional_treinado')
+    for codigo in codigos_extras:
+        o, f = adicionar(codigo)
+        estrutural_original += o
+        subtotal += f
+
+    if excecao:
+        adicional = max(0, int(excecao.get('adicional_fixo') or 0))
+        if adicional:
+            o, f = adicionar('especie_adicional', adicional)
+            estrutural_original += o; subtotal += f
+        try: multiplicador = float(excecao.get('multiplicador') or 1)
+        except (TypeError, ValueError): multiplicador = 1.0
+        multiplicador = max(.1, min(10.0, multiplicador))
+        if abs(multiplicador - 1.0) > 0.0001:
+            estrutural_original = int(round(estrutural_original * multiplicador))
+            subtotal = int(round(subtotal * multiplicador))
+            itens.append({'codigo':'especie_multiplicador','nome':f'Multiplicador da espécie ×{multiplicador:g}','tipo':'regra_especie','valor_original':0,'valor':0,'promocao':None})
+
+    desconto_membro_pct = 0.0
+    desconto_membro_valor = 0
+    if forcar_membro_hype or (usuario_email and membro_hype_ativo(usuario_email)):
+        try: desconto_membro_pct = max(0.0, min(100.0, float(tabela.get('desconto_membro_hype_percentual') or 0)))
+        except (TypeError, ValueError): desconto_membro_pct = 0
+        if desconto_membro_pct:
+            desconto_membro_valor = int(round(subtotal * desconto_membro_pct / 100.0))
+            subtotal = max(0, subtotal - desconto_membro_valor)
+
+    # Proteção de desconto máximo considerando promoções + desconto de membro.
+    piso_desconto = int(round(estrutural_original * (100.0 - max_pct) / 100.0))
+    total = max(subtotal, piso_desconto)
+
+    # Proteção de margem: garante o líquido mínimo configurado para o Breeder.
+    minimo_breeder = max(0, int(tabela.get('minimo_breeder_liquido') or 0))
+    margem_protegida = False
+    if minimo_breeder:
+        taxa_pct = obter_taxa_clan_breed()
+        fator = max(0.0001, 1.0 - taxa_pct / 100.0)
+        piso_total = int((minimo_breeder / fator) + 0.999999)
+        if total < piso_total:
+            total = piso_total
+            margem_protegida = True
+
+    promo_principal = max(promos_usadas, key=lambda x: float(x.get('percentual_aplicado', x.get('percentual') or 0)), default=None)
+    cupom_aplicado = bool(cupom_promo and any(str(p.get('id')) == str(cupom_promo.get('id')) for p in promos_usadas))
+    desconto_total = max(0, estrutural_original - total)
+    return total, {
+        'pricing_v2': True, 'pricing_v3_raridade': not ultra_fallback_legado,
+        'tabela_preco_id': tabela.get('id'), 'tabela_preco_nome': tabela.get('nome'),
+        'categoria': categoria, 'base_codigo': base_codigo, 'base_valor_original': base_original,
+        'base_valor': next((x.get('valor') for x in itens if x.get('codigo') == base_codigo), base_final),
+        'breed_especial_ditto': bool(usa_ditto), 'extras': [x for x in itens if x.get('tipo') != 'base'],
+        'componentes': itens, 'preco_original': estrutural_original, 'desconto_valor': desconto_total, 'total': total,
+        'promocao_ativa': bool(desconto_total),
+        'promocao_id': promo_principal.get('id') if promo_principal else None,
+        'promocao_nome': promo_principal.get('nome') if promo_principal else None,
+        'promocao_percentual': float(promo_principal.get('percentual_aplicado', promo_principal.get('percentual') or 0)) if promo_principal else 0,
+        'cupom_codigo': cupom_digitado or None, 'cupom_valido': bool(cupom_promo) if cupom_digitado else None,
+        'cupom_aplicado': cupom_aplicado if cupom_digitado else None,
+        'cupom_id': cupom_promo.get('id') if (cupom_promo and cupom_aplicado) else None,
+        'desconto_membro_hype_percentual': desconto_membro_pct,
+        'desconto_membro_hype_valor': desconto_membro_valor,
+        'margem_protegida': margem_protegida, 'minimo_breeder_liquido': minimo_breeder,
+        'regra_especie': excecao or None,
+    }
+
+
+def calcular_preco_breed(breed_tipo, ha=False, genero='indiferente', categoria='comum',
+                         usa_ditto=False, treinado=False, nature=None, zero_speed=False,
+                         pokemon_id=None, usuario_email=None, codigo_cupom=None):
+    """Preço oficial do Breed. V31.3 usa três raridades; mantém fallback legado para deploy seguro."""
+    v2 = _calcular_preco_breed_v312(
+        breed_tipo, ha=ha, genero=genero, categoria=categoria, usa_ditto=usa_ditto,
+        treinado=treinado, nature=nature, zero_speed=zero_speed, pokemon_id=pokemon_id,
+        usuario_email=usuario_email, codigo_cupom=codigo_cupom
+    )
+    if v2 is not None:
+        return v2
+    total, detalhes = _calcular_preco_breed_legacy(
+        breed_tipo, ha=ha, genero=genero, categoria=categoria, usa_ditto=usa_ditto,
+        treinado=treinado, nature=nature, zero_speed=zero_speed
+    )
+    detalhes['pricing_v2'] = False
+    detalhes['cupom_codigo'] = str(codigo_cupom or '').strip().upper() or None
+    detalhes['cupom_valido'] = None
+    detalhes['tabela_preco_id'] = None
+    return total, detalhes
+
+
+def precos_breed_interface():
+    """Valores usados nos avisos instantâneos do formulário; o servidor recalcula no envio."""
+    tabela = _breed_v312_tabela_atual()
+    if not tabela:
+        return _precos_breed_interface_legacy()
+    c = _breed_v312_componentes(tabela.get('id'))
+    promocoes = promocoes_breed_ativas(usuario_email=session.get('usuario_email'))
+    mapa = {
+        'zero_speed':'adicional_zero_speed_comum', 'zero_speed_raro':'adicional_zero_speed_raro',
+        'zero_speed_ultra_raro':'adicional_zero_speed_ultra_raro',
+        'comum_genero':'adicional_genero_comum', 'escolher_genero':'adicional_genero_comum',
+        'ha_sem_ditto_genero':'adicional_genero_comum', 'femea_rara':'adicional_genero_raro',
+        'genero_raro':'adicional_genero_raro', 'genero_ultra_raro':'adicional_genero_ultra_raro', 'treinado':'adicional_treinado',
+    }
+    saida = {}
+    max_pct = float(tabela.get('desconto_maximo_percentual') or 100)
+    for alias, codigo in mapa.items():
+        original = _breed_v312_valor(c, codigo)
+        valor, promo = _breed_v312_promo_aplicada(codigo, original, promocoes, max_pct=max_pct)
+        saida[alias] = {'valor_original':original,'valor':valor,'promocao_nome':promo.get('nome') if promo else None,
+                        'promocao_percentual':float(promo.get('percentual_aplicado', promo.get('percentual') or 0)) if promo else 0}
+    saida['_meta'] = {'pricing_v2':True,'tabela_id':tabela.get('id'),'tabela_nome':tabela.get('nome')}
+    return saida
 
 def obter_taxa_clan_breed():
     """Percentual de comissão do clã configurado no banco (padrão 30%)."""
@@ -808,9 +1230,82 @@ def notificar_admins_financeiro(titulo, mensagem):
 
 
 def classificar_pokemon_preco(pokemon_id):
-    rows=_safe_table('pokemon_precificacao','*',pokemon_id=pokemon_id)
-    return rows[0] if rows else {'categoria':'comum','usa_ditto_padrao':False}
+    """V31.3: classificação automática por regra objetiva de breeding.
 
+    Prioridade automática: Ultra Raro (só com Ditto) > Raro (12,5% fêmea) > Comum.
+    O Admin pode criar override explícito para a economia/regra do servidor.
+    """
+    rows = _safe_table('pokemon_precificacao', '*', pokemon_id=pokemon_id)
+    meta_db = dict(rows[0]) if rows else {}
+    externa = _pokeapi_species_rule(pokemon_id)
+
+    gender_rate = meta_db.get('gender_rate')
+    try:
+        gender_rate = int(gender_rate) if gender_rate is not None else None
+    except (TypeError, ValueError):
+        gender_rate = None
+    so_com_ditto_auto = bool(meta_db.get('usa_ditto_padrao'))
+    if externa:
+        if externa.get('gender_rate') is not None:
+            gender_rate = externa.get('gender_rate')
+        so_com_ditto_auto = bool(externa.get('so_com_ditto')) or so_com_ditto_auto
+
+    override = str(meta_db.get('categoria_override') or '').strip().lower()
+    ditto_override = meta_db.get('usa_ditto_override')
+    if isinstance(ditto_override, bool):
+        so_com_ditto = ditto_override
+        ditto_origem = 'manual'
+    elif override == 'ultra_raro':
+        # Forçar Ultra Raro também força a regra de Ditto, preservando a definição da categoria.
+        so_com_ditto = True
+        ditto_origem = 'manual'
+    else:
+        so_com_ditto = so_com_ditto_auto
+        ditto_origem = 'automatico'
+
+    if so_com_ditto:
+        categoria_auto = 'ultra_raro'
+        motivo_auto = 'Reprodução dependente de Ditto.'
+    elif gender_rate == 1:
+        categoria_auto = 'raro'
+        motivo_auto = 'Taxa de fêmea de 12,5% (1/8).'
+    else:
+        categoria_auto = 'comum'
+        motivo_auto = 'Reprodução padrão: não depende de Ditto e não possui taxa de fêmea de 12,5%.'
+
+    # Ultra Raro tem prioridade sempre que a regra efetiva exigir Ditto. Para rebaixar
+    # uma espécie que no jogo padrão depende de Ditto, o Admin precisa forçar "não depende".
+    if so_com_ditto:
+        categoria = 'ultra_raro'
+        origem = 'manual' if ditto_origem == 'manual' else 'automatico'
+        motivo = (meta_db.get('motivo_override') or '').strip() if origem == 'manual' else motivo_auto
+        motivo = motivo or motivo_auto
+    elif override in BREED_CATEGORIAS_PRECO:
+        categoria = override
+        origem = 'manual'
+        motivo = (meta_db.get('motivo_override') or '').strip() or f'Categoria definida manualmente como {BREED_CATEGORIA_LABELS[override]}.'
+    else:
+        categoria = categoria_auto
+        origem = 'automatico'
+        motivo = motivo_auto
+
+    taxa_femea = None
+    if isinstance(gender_rate, int) and gender_rate >= 0:
+        taxa_femea = round((gender_rate / 8) * 100, 2)
+
+    return {
+        **meta_db,
+        'categoria': categoria,
+        'categoria_automatica': categoria_auto,
+        'categoria_label': BREED_CATEGORIA_LABELS.get(categoria, 'Comum'),
+        'classificacao_origem': origem,
+        'classificacao_motivo': motivo,
+        'gender_rate': gender_rate,
+        'taxa_femea_percentual': taxa_femea,
+        'so_com_ditto': so_com_ditto,
+        'usa_ditto_padrao': so_com_ditto,
+        'ditto_origem': ditto_origem,
+    }
 
 
 @lru_cache(maxsize=2048)
@@ -829,6 +1324,7 @@ def _pokeapi_species_rule(pokemon_id):
         return {
             "breedavel": breedavel,
             "so_com_ditto": so_com_ditto,
+            "gender_rate": data.get("gender_rate"),
             "egg_groups": egg_groups,
             "nome": data.get("name"),
             "is_baby": is_baby,
@@ -861,6 +1357,7 @@ def _pokeapi_species_rule(pokemon_id):
         return {
             'breedavel': breedavel,
             'so_com_ditto': breedavel and gender_rate == -1,
+            'gender_rate': gender_rate,
             'egg_groups': egg_groups,
             'nome': species.get('identifier'),
             'is_baby': is_baby,
@@ -922,12 +1419,17 @@ def regra_breed_pokemon(pokemon_id, pokemon_nome):
             "is_mythical": bool(externa.get('is_mythical')),
         }
 
-    so_com_ditto = bool(meta.get("usa_ditto_padrao") or externa.get("so_com_ditto"))
+    so_com_ditto = bool(meta.get("so_com_ditto"))
     return {
         "breedavel": True, "so_com_ditto": so_com_ditto,
         "breed_especial": so_com_ditto, "motivo": None,
         "egg_groups": externa.get("egg_groups", []), "categoria_bloqueio": None,
         "is_baby": False, "is_legendary": False, "is_mythical": False,
+        "categoria_preco": meta.get('categoria') or 'comum',
+        "categoria_label": meta.get('categoria_label') or 'Comum',
+        "classificacao_motivo": meta.get('classificacao_motivo'),
+        "classificacao_origem": meta.get('classificacao_origem'),
+        "taxa_femea_percentual": meta.get('taxa_femea_percentual'),
     }
 
 
@@ -1734,6 +2236,7 @@ def breed():
         iv_descartado = request.form.get('iv_descartado', '').strip().lower()
         zero_speed = request.form.get('zero_speed') == 'sim'
         treinado = request.form.get('treinado') == 'sim'
+        cupom_breed = request.form.get('cupom_breed', '').strip().upper()
 
         ev_keys = ('hp', 'attack', 'defense', 'sp_attack', 'sp_defense', 'speed')
         evs_treinamento = {}
@@ -1834,11 +2337,14 @@ def breed():
 
         meta = classificar_pokemon_preco(pokemon_id)
         categoria = (meta.get('categoria') or 'comum').lower()
-        if categoria not in ('comum', 'raro'):
+        if categoria not in BREED_CATEGORIAS_PRECO:
             categoria = 'comum'
 
-        # Ditto nunca é escolha manual. O sistema decide pela regra do Pokémon.
+        # Ditto nunca é escolha do cliente. Pela regra V31.3, toda espécie que
+        # depende efetivamente de Ditto é Ultra Rara e não recebe dupla cobrança.
         usa_ditto = bool(regra.get('so_com_ditto'))
+        if usa_ditto:
+            categoria = 'ultra_raro'
         preco_total, preco_detalhes = calcular_preco_breed(
             breed_tipo,
             ha=(ha == 'sim'),
@@ -1847,8 +2353,23 @@ def breed():
             usa_ditto=usa_ditto,
             treinado=treinado,
             nature=nature or None,
-            zero_speed=zero_speed
+            zero_speed=zero_speed,
+            pokemon_id=pokemon_id,
+            usuario_email=email,
+            codigo_cupom=cupom_breed
         )
+        # Congela também o motivo da classificação V31.3 dentro do pedido.
+        preco_detalhes['classificacao_raridade'] = {
+            'categoria': categoria,
+            'label': meta.get('categoria_label') or BREED_CATEGORIA_LABELS.get(categoria, 'Comum'),
+            'origem': meta.get('classificacao_origem'),
+            'motivo': meta.get('classificacao_motivo'),
+            'taxa_femea_percentual': meta.get('taxa_femea_percentual'),
+            'so_com_ditto': bool(usa_ditto),
+        }
+        if cupom_breed and preco_detalhes.get('pricing_v2') and preco_detalhes.get('cupom_valido') is False:
+            flash('Cupom inválido, expirado ou indisponível para sua conta.', 'erro')
+            return redirect(url_for('breed'))
         if preco_total <= 0:
             flash('Não foi possível calcular o preço. Verifique a tabela de preços no painel administrativo.', 'erro')
             return redirect(url_for('breed'))
@@ -1880,6 +2401,8 @@ def breed():
                 'promocao_id': preco_detalhes.get('promocao_id'),
                 'promocao_nome': preco_detalhes.get('promocao_nome'),
                 'promocao_percentual': preco_detalhes.get('promocao_percentual') or 0,
+                'tabela_preco_id': preco_detalhes.get('tabela_preco_id'),
+                'cupom_codigo': preco_detalhes.get('cupom_codigo'),
                 'preco_detalhes': preco_detalhes,
                 # Mantidos por compatibilidade com pedidos/estrutura antigos.
                 'ability': 'HA' if ha == 'sim' else 'Sem HA',
@@ -1892,15 +2415,31 @@ def breed():
             # uma migração opcional/atrasada. Quando a coluna existir, os EVs são
             # persistidos normalmente; em schema antigo, repete o INSERT sem ela.
             try:
-                supabase.table('pedidos_breed').insert(dados_pedido).execute()
+                resultado_insert = supabase.table('pedidos_breed').insert(dados_pedido).execute()
             except Exception as insert_error:
                 erro_txt = str(insert_error)
-                if 'evs_treinamento' in erro_txt and ('PGRST204' in erro_txt or 'schema cache' in erro_txt.lower()):
+                opcionais = ('evs_treinamento','tabela_preco_id','cupom_codigo')
+                if ('PGRST204' in erro_txt or 'schema cache' in erro_txt.lower()) and any(c in erro_txt for c in opcionais):
                     dados_compat = dict(dados_pedido)
-                    dados_compat.pop('evs_treinamento', None)
-                    supabase.table('pedidos_breed').insert(dados_compat).execute()
+                    for coluna in opcionais:
+                        if coluna in erro_txt:
+                            dados_compat.pop(coluna, None)
+                    resultado_insert = supabase.table('pedidos_breed').insert(dados_compat).execute()
                 else:
                     raise
+
+            # Uso de cupom é contabilizado somente depois de o pedido existir.
+            if preco_detalhes.get('cupom_aplicado') and preco_detalhes.get('cupom_id'):
+                try:
+                    cupom_id = preco_detalhes.get('cupom_id')
+                    promo_rows = _safe_table('promocoes_breed','*',id=cupom_id)
+                    if promo_rows and promo_rows[0].get('codigo_cupom'):
+                        atual = int(promo_rows[0].get('usos') or 0)
+                        limite = promo_rows[0].get('limite_usos')
+                        if limite in (None, '') or atual < int(limite):
+                            supabase.table('promocoes_breed').update({'usos':atual+1,'updated_at':agora_iso()}).eq('id',cupom_id).execute()
+                except Exception as exc:
+                    print(f'[V31.2 cupom] Falha ao contabilizar uso: {exc}')
 
             registrar_atividade_reino('breed_criado', email, f"Pedido de Breed: {pokemon}", 'breed')
             especial_txt = ' • BREED ESPECIAL COM DITTO' if usa_ditto else ''
@@ -2319,6 +2858,7 @@ def api_breed_preco():
         treinado = request.args.get('treinado', 'nao').strip().lower() == 'sim'
         zero_speed = request.args.get('zero_speed', 'nao').strip().lower() == 'sim'
         nature = request.args.get('nature', '').strip()
+        cupom_breed = request.args.get('cupom', '').strip().upper()
         if pokemon_id <= 0 or not pokemon or breed_tipo not in ('F5','F6') or ha not in ('sim','nao') or genero not in ('macho','femea','indiferente'):
             return jsonify({'ok': False, 'error': 'Complete as características para calcular o preço.'}), 400
         if nature and nature not in NATURES_VALIDAS:
@@ -2328,12 +2868,13 @@ def api_breed_preco():
             return jsonify({'ok': False, 'error': regra.get('motivo') or 'Pokémon indisponível para Breed.'}), 400
         meta = classificar_pokemon_preco(pokemon_id)
         categoria = (meta.get('categoria') or 'comum').lower()
-        if categoria not in ('comum','raro'):
+        if categoria not in BREED_CATEGORIAS_PRECO:
             categoria = 'comum'
         total, detalhes = calcular_preco_breed(
             breed_tipo, ha=(ha=='sim'), genero=genero, categoria=categoria,
             usa_ditto=bool(regra.get('so_com_ditto')), treinado=treinado,
-            nature=nature or None, zero_speed=(zero_speed and breed_tipo == 'F5')
+            nature=nature or None, zero_speed=(zero_speed and breed_tipo == 'F5'),
+            pokemon_id=pokemon_id, usuario_email=session.get('usuario_email'), codigo_cupom=cupom_breed
         )
         if total <= 0:
             return jsonify({'ok': False, 'error': 'Tabela de preços ainda não configurada para esta combinação.'}), 422
@@ -2479,6 +3020,10 @@ def api_breed_pokemon(pokemon_id):
         'is_mythical': bool(regra.get('is_mythical')),
         'egg_groups': regra.get('egg_groups') or [],
         'categoria': (meta.get('categoria') or 'comum'),
+        'categoria_label': meta.get('categoria_label') or 'Comum',
+        'classificacao_motivo': meta.get('classificacao_motivo'),
+        'classificacao_origem': meta.get('classificacao_origem'),
+        'taxa_femea_percentual': meta.get('taxa_femea_percentual'),
         'sprite': f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{pokemon_id}.png",
         'types': [], 'abilities': [], 'stats': [], 'height': None, 'weight': None,
         'generation': None
@@ -3815,41 +4360,379 @@ def proxima_rodada(torneio_id):
     return redirect(url_for('admin_chave_torneio',torneio_id=torneio_id))
 
 
+
+def _breed_v312_clonar_tabela(origem_id, nome=None):
+    origem = _breed_v312_tabela_por_id(origem_id)
+    if not origem:
+        raise ValueError('Tabela de origem não encontrada.')
+    payload = {
+        'nome': (nome or f"Cópia de {origem.get('nome') or 'Tabela HYPE'}").strip()[:120],
+        'status': 'rascunho',
+        'desconto_membro_hype_percentual': float(origem.get('desconto_membro_hype_percentual') or 0),
+        'desconto_maximo_percentual': float(origem.get('desconto_maximo_percentual') or 100),
+        'minimo_breeder_liquido': int(origem.get('minimo_breeder_liquido') or 0),
+        'criado_por': session.get('usuario_email'),
+        'updated_at': agora_iso(),
+    }
+    res = supabase.table('breed_tabelas_preco').insert(payload).execute().data or []
+    if not res:
+        raise RuntimeError('Não foi possível criar o rascunho.')
+    nova = res[0]
+    componentes = list(_breed_v312_componentes(origem_id).values())
+    if componentes:
+        supabase.table('breed_tabela_componentes').insert([{
+            'tabela_id': nova['id'], 'codigo': x.get('codigo'), 'nome': x.get('nome'),
+            'grupo': x.get('grupo'), 'valor': int(x.get('valor') or 0),
+            'ativo': x.get('ativo', True), 'ordem': int(x.get('ordem') or 0),
+            'updated_at': agora_iso()
+        } for x in componentes]).execute()
+    excecoes = _safe_table('breed_preco_especie_excecoes', '*', tabela_id=origem_id)
+    if excecoes:
+        supabase.table('breed_preco_especie_excecoes').insert([{
+            'tabela_id': nova['id'], 'pokemon_id': int(x.get('pokemon_id')),
+            'pokemon_nome': x.get('pokemon_nome') or f"Pokémon #{x.get('pokemon_id')}",
+            'categoria_override': x.get('categoria_override'),
+            'valor_base_override': x.get('valor_base_override'),
+            'adicional_fixo': int(x.get('adicional_fixo') or 0),
+            'multiplicador': float(x.get('multiplicador') or 1),
+            'observacao': x.get('observacao')
+        } for x in excecoes if x.get('pokemon_id')]).execute()
+    _breed_v312_registrar_historico(nova['id'], 'criar_rascunho', detalhes={'origem_id':origem_id})
+    return nova
+
+
+def _breed_v312_status_visual(tabela):
+    status = str(tabela.get('status') or '').lower()
+    agora = datetime.now(timezone.utc)
+    inicio = parse_data_supabase(tabela.get('inicio_em'))
+    fim = parse_data_supabase(tabela.get('fim_em'))
+    if status == 'agendada':
+        if inicio and agora < inicio: return 'agendada'
+        if (not inicio or inicio <= agora) and (not fim or agora < fim): return 'ativa_agora'
+        if fim and agora >= fim: return 'encerrada'
+    return status
+
+
+def _breed_v312_relatorio():
+    inicio = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    try:
+        pedidos = supabase.table('pedidos_breed').select(
+            'id,preco_total,taxa_clan_valor,valor_breeder,categoria_preco,ha,zero_speed,status,created_at'
+        ).gte('created_at', inicio).order('created_at', desc=True).limit(1000).execute().data or []
+    except Exception as exc:
+        print(f'[V31.2 relatorio] {exc}')
+        pedidos = []
+    faturamento = sum(int(x.get('preco_total') or 0) for x in pedidos)
+    taxa = sum(int(x.get('taxa_clan_valor') or 0) for x in pedidos)
+    breeder = sum(int(x.get('valor_breeder') or 0) for x in pedidos)
+    return {
+        'pedidos': len(pedidos), 'faturamento': faturamento, 'taxa_clan': taxa,
+        'breeders': breeder, 'ticket_medio': int(faturamento / len(pedidos)) if pedidos else 0,
+        'raros': sum(1 for x in pedidos if str(x.get('categoria_preco') or '').lower() == 'raro'),
+        'ultra_raros': sum(1 for x in pedidos if str(x.get('categoria_preco') or '').lower() == 'ultra_raro'),
+        'ha': sum(1 for x in pedidos if x.get('ha')),
+        'zero_speed': sum(1 for x in pedidos if x.get('zero_speed')),
+    }
+
+
+def _breed_v312_impacto(tabela_id):
+    cenarios = [
+        ('Comum F5','F5',False,False,'comum'), ('Comum F5 + HA','F5',True,False,'comum'),
+        ('Comum F5 + Zero','F5',False,True,'comum'), ('Comum HA + Zero','F5',True,True,'comum'),
+        ('Raro F5','F5',False,False,'raro'), ('Raro F5 + HA','F5',True,False,'raro'),
+        ('Raro HA + Zero','F5',True,True,'raro'), ('Raro F6 + HA','F6',True,False,'raro'),
+        ('Ultra Raro F5','F5',False,False,'ultra_raro'), ('Ultra Raro + HA + Zero','F5',True,True,'ultra_raro'),
+    ]
+    saida=[]
+    for nome, bt, ha, zero, cat in cenarios:
+        calc = _calcular_preco_breed_v312(bt, ha=ha, zero_speed=zero, categoria=cat, nature='Adamant', tabela_id_override=tabela_id)
+        if calc is not None:
+            saida.append({'nome':nome,'valor':int(calc[0] or 0)})
+    return saida
+
 @app.route('/admin/precos', methods=['GET','POST'])
 @login_required
 def admin_precos():
-    if not tem_permissao('pode_gerenciar_precos'): return redirect(url_for('painel'))
-    if request.method=='POST':
-        acao=request.form.get('acao','preco').strip()
+    if not tem_permissao('pode_gerenciar_precos'):
+        return redirect(url_for('painel'))
+    if request.method == 'POST':
+        acao = request.form.get('acao','').strip() or 'preco'
         try:
-            if acao == 'preco':
+            if acao == 'criar_rascunho':
+                origem_id = int(request.form.get('origem_id') or (_breed_v312_tabela_atual() or {}).get('id') or 0)
+                nome = request.form.get('nome','').strip() or None
+                nova = _breed_v312_clonar_tabela(origem_id, nome)
+                flash(f"Rascunho '{nova.get('nome')}' criado. Edite e publique quando estiver pronto.", 'sucesso')
+
+            elif acao == 'salvar_componente':
+                tabela_id = int(request.form.get('tabela_id') or 0)
+                tabela = _breed_v312_tabela_por_id(tabela_id)
+                if not tabela or tabela.get('status') != 'rascunho':
+                    raise ValueError('Somente um rascunho pode ser editado. Crie um rascunho da tabela atual primeiro.')
+                codigo = request.form.get('codigo','').strip()
+                if codigo not in BREED_V312_COMPONENTES_META:
+                    raise ValueError('Componente de preço inválido.')
+                valor = parse_valor_moeda(request.form.get('valor',0))
+                atual = (_breed_v312_componentes(tabela_id).get(codigo) or {})
+                anterior = int(atual.get('valor') or 0)
+                nome, grupo, ordem = BREED_V312_COMPONENTES_META[codigo]
+                supabase.table('breed_tabela_componentes').upsert({
+                    'tabela_id':tabela_id,'codigo':codigo,'nome':nome,'grupo':grupo,'valor':valor,
+                    'ativo':True,'ordem':ordem,'updated_at':agora_iso()
+                }, on_conflict='tabela_id,codigo').execute()
+                _breed_v312_registrar_historico(tabela_id,'alterar_componente',codigo,anterior,valor)
+                flash(f'{nome} atualizado no rascunho.', 'sucesso')
+
+            elif acao == 'salvar_regras':
+                tabela_id = int(request.form.get('tabela_id') or 0)
+                tabela = _breed_v312_tabela_por_id(tabela_id)
+                if not tabela or tabela.get('status') != 'rascunho':
+                    raise ValueError('As regras só podem ser alteradas em um rascunho.')
+                nome = request.form.get('nome','').strip()[:120] or tabela.get('nome') or 'Tabela HYPE'
+                membro = float((request.form.get('desconto_membro_hype_percentual') or '0').replace(',','.'))
+                maximo = float((request.form.get('desconto_maximo_percentual') or '100').replace(',','.'))
+                minimo = parse_valor_moeda(request.form.get('minimo_breeder_liquido',0))
+                if not 0 <= membro <= 100 or not 0 <= maximo <= 100:
+                    raise ValueError('Percentuais precisam ficar entre 0% e 100%.')
+                supabase.table('breed_tabelas_preco').update({
+                    'nome':nome,'desconto_membro_hype_percentual':membro,
+                    'desconto_maximo_percentual':maximo,'minimo_breeder_liquido':minimo,
+                    'updated_at':agora_iso()
+                }).eq('id',tabela_id).execute()
+                _breed_v312_registrar_historico(tabela_id,'alterar_regras',detalhes={'membro_pct':membro,'max_desconto_pct':maximo,'min_breeder':minimo})
+                flash('Regras da tabela salvas.', 'sucesso')
+
+            elif acao in ('publicar_tabela','agendar_tabela'):
+                tabela_id = int(request.form.get('tabela_id') or 0)
+                tabela = _breed_v312_tabela_por_id(tabela_id)
+                if not tabela or tabela.get('status') != 'rascunho':
+                    raise ValueError('Selecione um rascunho válido.')
+                erros = _breed_v312_validar_tabela(tabela_id)
+                if erros:
+                    raise ValueError('Não é possível publicar: ' + ' '.join(erros))
+                if acao == 'publicar_tabela':
+                    for atual in _breed_v312_tabelas():
+                        if atual.get('status') == 'ativa' and int(atual.get('id') or 0) != tabela_id:
+                            supabase.table('breed_tabelas_preco').update({'status':'arquivada','updated_at':agora_iso()}).eq('id',atual.get('id')).execute()
+                    supabase.table('breed_tabelas_preco').update({
+                        'status':'ativa','inicio_em':agora_iso(),'fim_em':None,
+                        'publicado_por':session.get('usuario_email'),'publicado_em':agora_iso(),'updated_at':agora_iso()
+                    }).eq('id',tabela_id).execute()
+                    _breed_v312_registrar_historico(tabela_id,'publicar_tabela')
+                    flash('Nova tabela publicada. Somente novos pedidos usarão esses valores.', 'sucesso')
+                else:
+                    inicio = _promo_datetime_form_para_utc(request.form.get('inicio_em') or '')
+                    fim = _promo_datetime_form_para_utc(request.form.get('fim_em') or '') if request.form.get('fim_em') else None
+                    if not inicio:
+                        raise ValueError('Informe quando a tabela agendada deve começar.')
+                    if fim and _parse_promo_datetime(inicio) >= _parse_promo_datetime(fim):
+                        raise ValueError('O término precisa ser posterior ao início.')
+                    supabase.table('breed_tabelas_preco').update({
+                        'status':'agendada','inicio_em':inicio,'fim_em':fim,
+                        'publicado_por':session.get('usuario_email'),'publicado_em':agora_iso(),'updated_at':agora_iso()
+                    }).eq('id',tabela_id).execute()
+                    _breed_v312_registrar_historico(tabela_id,'agendar_tabela',detalhes={'inicio':inicio,'fim':fim})
+                    flash('Tabela agendada. No período definido ela substituirá temporariamente a tabela normal.', 'sucesso')
+
+            elif acao == 'arquivar_tabela':
+                tabela_id = int(request.form.get('tabela_id') or 0)
+                tabela = _breed_v312_tabela_por_id(tabela_id)
+                if not tabela:
+                    raise ValueError('Tabela não encontrada.')
+                if tabela.get('status') == 'ativa':
+                    raise ValueError('Não arquive a tabela ativa sem publicar/restaurar outra primeiro.')
+                supabase.table('breed_tabelas_preco').update({'status':'arquivada','updated_at':agora_iso()}).eq('id',tabela_id).execute()
+                _breed_v312_registrar_historico(tabela_id,'arquivar_tabela')
+                flash('Tabela arquivada.', 'sucesso')
+
+            elif acao == 'restaurar_tabela':
+                tabela_id = int(request.form.get('tabela_id') or 0)
+                tabela = _breed_v312_tabela_por_id(tabela_id)
+                if not tabela:
+                    raise ValueError('Versão não encontrada.')
+                erros = _breed_v312_validar_tabela(tabela_id)
+                if erros:
+                    raise ValueError('Esta versão não pode ser restaurada: ' + ' '.join(erros))
+                for atual in _breed_v312_tabelas():
+                    if atual.get('status') == 'ativa' and int(atual.get('id') or 0) != tabela_id:
+                        supabase.table('breed_tabelas_preco').update({'status':'arquivada','updated_at':agora_iso()}).eq('id',atual.get('id')).execute()
+                supabase.table('breed_tabelas_preco').update({
+                    'status':'ativa','inicio_em':agora_iso(),'fim_em':None,
+                    'publicado_por':session.get('usuario_email'),'publicado_em':agora_iso(),'updated_at':agora_iso()
+                }).eq('id',tabela_id).execute()
+                _breed_v312_registrar_historico(tabela_id,'restaurar_tabela')
+                flash('Versão restaurada como tabela ativa.', 'sucesso')
+
+            elif acao == 'salvar_classificacao_pokemon':
+                pokemon_id = int(request.form.get('pokemon_id') or 0)
+                pokemon_nome = request.form.get('pokemon_nome','').strip()[:100]
+                categoria_override = request.form.get('categoria_override','').strip().lower() or None
+                ditto_mode = request.form.get('usa_ditto_override','auto').strip().lower()
+                motivo_override = request.form.get('motivo_override','').strip()[:300] or None
+                if pokemon_id <= 0 or not pokemon_nome:
+                    raise ValueError('Informe ID e nome do Pokémon.')
+                if categoria_override not in (None, *BREED_CATEGORIAS_PRECO):
+                    raise ValueError('Categoria inválida.')
+                if ditto_mode not in ('auto','sim','nao'):
+                    raise ValueError('Regra de Ditto inválida.')
+                if categoria_override == 'ultra_raro' and ditto_mode == 'nao':
+                    raise ValueError('Ultra Raro significa que a espécie depende de Ditto. Use Ditto automático ou forçado.')
+                if categoria_override in ('comum','raro') and ditto_mode == 'sim':
+                    raise ValueError('Uma espécie forçada como dependente de Ditto será Ultra Rara. Remova a categoria manual ou escolha Ultra Raro.')
+                ditto_override = None if ditto_mode == 'auto' else ditto_mode == 'sim'
+                atual = classificar_pokemon_preco(pokemon_id)
+                payload = {
+                    'pokemon_id':pokemon_id,'pokemon_nome':pokemon_nome,
+                    'categoria': atual.get('categoria_automatica') or 'comum',
+                    'categoria_override':categoria_override,
+                    'motivo_override':motivo_override,
+                    'usa_ditto_override':ditto_override,
+                    'usa_ditto_padrao': bool(ditto_override) if ditto_override is not None else False,
+                    'gender_rate': atual.get('gender_rate'),
+                    'classificacao_origem':'manual' if categoria_override or ditto_override is not None else 'automatico',
+                    'classificacao_motivo': atual.get('classificacao_motivo'),
+                    'updated_at':agora_iso()
+                }
+                supabase.table('pokemon_precificacao').upsert(payload, on_conflict='pokemon_id').execute()
+                novo = classificar_pokemon_preco(pokemon_id)
+                registrar_log('classificar_pokemon_preco','breed_pricing','pokemon',pokemon_id,{
+                    'categoria_override':categoria_override,'usa_ditto_override':ditto_override,'motivo':motivo_override
+                })
+                if categoria_override or ditto_override is not None:
+                    flash(f'{pokemon_nome}: exceção manual salva. Novos pedidos usarão a regra configurada.', 'sucesso')
+                else:
+                    flash(f'{pokemon_nome}: voltou para classificação automática.', 'sucesso')
+
+            elif acao == 'salvar_excecao':
+                tabela_id = int(request.form.get('tabela_id') or 0)
+                tabela = _breed_v312_tabela_por_id(tabela_id)
+                if not tabela or tabela.get('status') != 'rascunho':
+                    raise ValueError('Exceções por Pokémon são editadas dentro de um rascunho.')
+                pokemon_id = int(request.form.get('pokemon_id') or 0)
+                pokemon_nome = request.form.get('pokemon_nome','').strip()[:100]
+                if pokemon_id <= 0 or not pokemon_nome:
+                    raise ValueError('Informe ID e nome do Pokémon.')
+                cat = request.form.get('categoria_override','').strip().lower() or None
+                if cat not in (None, *BREED_CATEGORIAS_PRECO):
+                    raise ValueError('Categoria inválida.')
+                base_raw = request.form.get('valor_base_override','').strip()
+                base = parse_valor_moeda(base_raw) if base_raw else None
+                adicional = parse_valor_moeda(request.form.get('adicional_fixo',0))
+                mult = float((request.form.get('multiplicador') or '1').replace(',','.'))
+                if mult < .1 or mult > 10:
+                    raise ValueError('Multiplicador precisa ficar entre 0,1 e 10.')
+                supabase.table('breed_preco_especie_excecoes').upsert({
+                    'tabela_id':tabela_id,'pokemon_id':pokemon_id,'pokemon_nome':pokemon_nome,
+                    'categoria_override':cat,'valor_base_override':base,'adicional_fixo':adicional,
+                    'multiplicador':mult,'observacao':request.form.get('observacao','').strip()[:300] or None,
+                    'updated_at':agora_iso()
+                }, on_conflict='tabela_id,pokemon_id').execute()
+                _breed_v312_registrar_historico(tabela_id,'salvar_excecao',detalhes={'pokemon_id':pokemon_id,'pokemon':pokemon_nome})
+                flash('Regra especial do Pokémon salva.', 'sucesso')
+
+            elif acao == 'excluir_excecao':
+                tabela_id = int(request.form.get('tabela_id') or 0)
+                pokemon_id = int(request.form.get('pokemon_id') or 0)
+                tabela = _breed_v312_tabela_por_id(tabela_id)
+                if not tabela or tabela.get('status') != 'rascunho':
+                    raise ValueError('Somente exceções de rascunho podem ser removidas.')
+                supabase.table('breed_preco_especie_excecoes').delete().eq('tabela_id',tabela_id).eq('pokemon_id',pokemon_id).execute()
+                _breed_v312_registrar_historico(tabela_id,'excluir_excecao',detalhes={'pokemon_id':pokemon_id})
+                flash('Exceção removida.', 'sucesso')
+
+            elif acao == 'preco':
+                # Compatibilidade com a tela legada / bancos que ainda não migraram.
                 codigo=request.form.get('codigo','').strip(); valor=parse_valor_moeda(request.form.get('valor',0))
-                supabase.table('precos_breed').update({'valor':valor}).eq('codigo',codigo).execute(); flash('Preço atualizado.','sucesso')
+                supabase.table('precos_breed').update({'valor':valor}).eq('codigo',codigo).execute()
+                flash('Preço legado atualizado.', 'sucesso')
+
             elif acao == 'criar_promocao':
                 nome=request.form.get('nome','').strip() or 'Promoção HYPE'
                 percentual=float((request.form.get('percentual') or '0').replace(',','.'))
-                if percentual <= 0 or percentual > 100: raise ValueError('O desconto deve ficar entre 0,01% e 100%.')
+                if percentual <= 0 or percentual > 100:
+                    raise ValueError('O desconto deve ficar entre 0,01% e 100%.')
+                tabela_atual = _breed_v312_tabela_atual()
+                if tabela_atual and percentual > float(tabela_atual.get('desconto_maximo_percentual') or 100):
+                    raise ValueError(f"Esta tabela permite no máximo {tabela_atual.get('desconto_maximo_percentual')}% de desconto.")
                 todos=request.form.get('aplicar_todos')=='1'; codigos=request.form.getlist('codigos_preco')
-                if not todos and not codigos: raise ValueError('Selecione pelo menos um preço ou marque Aplicar em todos.')
+                if not todos and not codigos:
+                    raise ValueError('Selecione pelo menos um componente ou marque Aplicar em todos.')
                 inicio_local=request.form.get('inicio_em') or None; fim_local=request.form.get('fim_em') or None
                 inicio=_promo_datetime_form_para_utc(inicio_local); fim=_promo_datetime_form_para_utc(fim_local)
                 if inicio and fim and _parse_promo_datetime(inicio) >= _parse_promo_datetime(fim):
                     raise ValueError('O término precisa ser posterior ao início.')
-                supabase.table('promocoes_breed').insert({'nome':nome,'percentual':percentual,'aplicar_todos':todos,'codigos_preco':codigos,'inicio_em':inicio,'fim_em':fim,'ativo':True,'criado_por':session.get('usuario_email')}).execute()
-                flash('Promoção criada. O desconto será aplicado automaticamente no período configurado.','sucesso')
+                codigo_cupom = request.form.get('codigo_cupom','').strip().upper() or None
+                somente_membros = request.form.get('somente_membros_hype') == '1'
+                limite_raw = request.form.get('limite_usos','').strip()
+                limite = int(limite_raw) if limite_raw else None
+                if limite is not None and limite <= 0:
+                    raise ValueError('O limite de usos precisa ser maior que zero.')
+                automatico = False if codigo_cupom else True
+                payload = {'nome':nome,'percentual':percentual,'aplicar_todos':todos,'codigos_preco':codigos,
+                           'inicio_em':inicio,'fim_em':fim,'ativo':True,'criado_por':session.get('usuario_email'),
+                           'codigo_cupom':codigo_cupom,'aplicar_automaticamente':automatico,
+                           'somente_membros_hype':somente_membros,'limite_usos':limite,'usos':0}
+                supabase.table('promocoes_breed').insert(payload).execute()
+                flash('Cupom criado.' if codigo_cupom else 'Promoção automática criada.', 'sucesso')
+
             elif acao == 'toggle_promocao':
                 pid=int(request.form.get('promocao_id')); ativo=request.form.get('ativo')=='1'
-                supabase.table('promocoes_breed').update({'ativo':ativo,'updated_at':agora_iso()}).eq('id',pid).execute(); flash('Promoção atualizada.','sucesso')
+                supabase.table('promocoes_breed').update({'ativo':ativo,'updated_at':agora_iso()}).eq('id',pid).execute()
+                flash('Promoção atualizada.','sucesso')
+
             elif acao == 'excluir_promocao':
-                pid=int(request.form.get('promocao_id')); supabase.table('promocoes_breed').delete().eq('id',pid).execute(); flash('Promoção removida. Pedidos antigos mantêm o preço já fechado.','sucesso')
+                pid=int(request.form.get('promocao_id'))
+                supabase.table('promocoes_breed').delete().eq('id',pid).execute()
+                flash('Promoção removida. Pedidos antigos mantêm o preço já fechado.','sucesso')
+
             elif acao == 'taxa_clan':
                 taxa=float((request.form.get('taxa_clan_percentual') or '0').replace(',','.'))
-                if taxa < 0 or taxa > 100: raise ValueError('A taxa do clã deve ficar entre 0% e 100%.')
+                if taxa < 0 or taxa > 100:
+                    raise ValueError('A taxa do clã deve ficar entre 0% e 100%.')
                 supabase.table('configuracoes_site').upsert({'chave':'breed_taxa_clan_percentual','valor':str(taxa)},on_conflict='chave').execute()
                 flash('Taxa do clã atualizada. Novos pedidos usarão o novo percentual.','sucesso')
-        except Exception as e: flash(f'Erro: {e}','erro')
+
+        except ValueError as exc:
+            flash(str(exc), 'erro')
+        except Exception as exc:
+            print(f'[V31.2 admin precos] {type(exc).__name__}: {exc}')
+            flash('Não foi possível concluir a alteração de preços. Verifique as migrações V31.2/V31.3 e tente novamente.', 'erro')
         return redirect(url_for('admin_precos'))
-    precos=_safe_table('precos_breed','*'); promos=_safe_table('promocoes_breed','*')
+
+    tabelas = _breed_v312_tabelas()
+    pricing_v2 = bool(tabelas)
+    tabela_atual = _breed_v312_tabela_atual() if pricing_v2 else None
+    pricing_v3 = bool(tabela_atual and 'base_ultra_raro_f5' in _breed_v312_componentes(tabela_atual.get('id')))
+    if tabela_atual:
+        tabela_atual['status_visual'] = _breed_v312_status_visual(tabela_atual)
+    rascunhos = sorted([x for x in tabelas if x.get('status') == 'rascunho'], key=lambda x:int(x.get('id') or 0), reverse=True)
+    rascunho = rascunhos[0] if rascunhos else None
+    tabela_edicao = rascunho or tabela_atual
+    componentes = list(_breed_v312_componentes((tabela_edicao or {}).get('id')).values()) if tabela_edicao else []
+    componentes.sort(key=lambda x:(int(x.get('ordem') or 0), str(x.get('nome') or '')))
+    excecoes = _safe_table('breed_preco_especie_excecoes','*',tabela_id=tabela_edicao.get('id')) if tabela_edicao else []
+    classificacoes_pokemon = []
+    for row in _safe_table('pokemon_precificacao','*'):
+        try:
+            calculada = classificar_pokemon_preco(int(row.get('pokemon_id') or 0))
+            exibicao = dict(row)
+            exibicao.update({
+                'categoria': calculada.get('categoria') or row.get('categoria') or 'comum',
+                'categoria_automatica': calculada.get('categoria_automatica'),
+                'classificacao_motivo': calculada.get('classificacao_motivo'),
+                'taxa_femea_percentual': calculada.get('taxa_femea_percentual'),
+                'so_com_ditto': calculada.get('so_com_ditto'),
+            })
+            classificacoes_pokemon.append(exibicao)
+        except Exception:
+            classificacoes_pokemon.append(row)
+    classificacoes_pokemon.sort(key=lambda x: str(x.get('pokemon_nome') or '').lower())
+    historico = []
+    try:
+        historico = supabase.table('breed_preco_historico').select('*').order('created_at',desc=True).limit(80).execute().data or []
+    except Exception as exc:
+        print(f'[V31.2 historico admin] {exc}')
+    promos = _safe_table('promocoes_breed','*')
     agora = datetime.now(timezone.utc)
     for promo in promos:
         promo['status_calculado'] = _status_promocao(promo, agora)
@@ -3857,7 +4740,60 @@ def admin_precos():
             dt = _parse_promo_datetime(promo.get(campo))
             promo[campo + '_local'] = dt.astimezone(HYPE_TZ).strftime('%d/%m/%Y %H:%M') if dt else None
     promos.sort(key=lambda x: str(x.get('created_at') or ''), reverse=True)
-    return render_template('admin_precos.html', precos=precos, promocoes=promos, taxa_clan=obter_taxa_clan_breed())
+    for tabela in tabelas:
+        tabela['status_visual'] = _breed_v312_status_visual(tabela)
+        for campo in ('inicio_em','fim_em','publicado_em','created_at'):
+            dt = parse_data_supabase(tabela.get(campo))
+            tabela[campo + '_local'] = dt.astimezone(HYPE_TZ).strftime('%d/%m/%Y %H:%M') if dt else None
+    tabelas.sort(key=lambda x:int(x.get('id') or 0), reverse=True)
+    alertas = _breed_v312_validar_tabela(tabela_edicao.get('id')) if tabela_edicao else []
+    impacto_atual = _breed_v312_impacto(tabela_atual.get('id')) if tabela_atual else []
+    impacto_rascunho = _breed_v312_impacto(rascunho.get('id')) if rascunho else []
+    promo_itens = [x for x in componentes if x.get('codigo') in BREED_V312_COMPONENTES_META] if componentes else _safe_table('precos_breed','*')
+    return render_template(
+        'admin_precos.html', pricing_v2=pricing_v2, pricing_v3=pricing_v3, tabela_atual=tabela_atual, rascunho=rascunho,
+        tabela_edicao=tabela_edicao, tabelas=tabelas, componentes=componentes, excecoes=excecoes,
+        classificacoes_pokemon=classificacoes_pokemon,
+        historico=historico, promocoes=promos, taxa_clan=obter_taxa_clan_breed(),
+        alertas_preco=alertas, relatorio=_breed_v312_relatorio(), pacotes=BREED_V312_PACOTES,
+        impacto_atual=impacto_atual, impacto_rascunho=impacto_rascunho, promo_itens=promo_itens,
+        precos_legados=_safe_table('precos_breed','*')
+    )
+
+
+@app.route('/admin/precos/simular')
+@login_required
+def admin_precos_simular():
+    if not tem_permissao('pode_gerenciar_precos'):
+        return jsonify({'ok':False,'error':'Sem permissão.'}), 403
+    try:
+        tabela_id = int(request.args.get('tabela_id') or ((_breed_v312_tabela_atual() or {}).get('id') or 0))
+        categoria = request.args.get('categoria','comum').strip().lower()
+        bt = request.args.get('breed_tipo','F5').strip().upper()
+        ha = request.args.get('ha','nao') == 'sim'
+        zero = request.args.get('zero_speed','nao') == 'sim'
+        ditto = request.args.get('usa_ditto','nao') == 'sim'
+        genero = request.args.get('genero','indiferente')
+        treinado = request.args.get('treinado','nao') == 'sim'
+        nature = request.args.get('nature','sim') == 'sim'
+        membro = request.args.get('membro_hype','nao') == 'sim'
+        pokemon_id_raw = request.args.get('pokemon_id','').strip()
+        pokemon_id = int(pokemon_id_raw) if pokemon_id_raw else None
+        cupom = request.args.get('cupom','').strip().upper()
+        usuario = session.get('usuario_email') if membro else None
+        calc = _calcular_preco_breed_v312(bt,ha=ha,zero_speed=zero,categoria=categoria,usa_ditto=ditto,
+                                          genero=genero,treinado=treinado,nature='Adamant' if nature else None,
+                                          pokemon_id=pokemon_id,usuario_email=usuario,codigo_cupom=cupom,
+                                          tabela_id_override=tabela_id, forcar_membro_hype=membro)
+        if calc is None:
+            return jsonify({'ok':False,'error':'Execute a migração V31.2 para habilitar o simulador.'}), 422
+        total, detalhes = calc
+        taxa_pct, taxa_valor, breeder = calcular_divisao_breed(total)
+        return jsonify({'ok':True,'total':total,'taxa_percentual':taxa_pct,'taxa_valor':taxa_valor,'breeder_valor':breeder,**detalhes})
+    except Exception as exc:
+        print(f'[V31.2 simulador] {type(exc).__name__}: {exc}')
+        return jsonify({'ok':False,'error':'Não foi possível simular esta combinação.'}), 400
+
 
 @app.route('/admin/feed', methods=['GET','POST'])
 @login_required
