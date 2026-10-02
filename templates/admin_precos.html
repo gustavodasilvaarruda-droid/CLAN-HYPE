@@ -1,25 +1,180 @@
 {% extends "hype_app_base.html" %}
-{% block title %}Preços e Promoções · HYPE Admin{% endblock %}
-{% block content %}{% include 'admin_v29_nav.html' %}
-<div class="admin-price-shell">
-  <div class="admin-price-head"><div><span>ADMIN · HYPE BREED</span><h1>Preços e Promoções</h1><p>Os preços oficiais continuam intactos. As promoções aplicam descontos automaticamente e pedidos já criados preservam o valor fechado.</p></div><a class="btn-ranking-outline" href="{{url_for('expansion.admin_dashboard')}}">← Central Administrativa</a></div>
-  <section class="promo-admin-panel breed-tax-panel">
-    <div class="promo-admin-title"><div><span>♛ COMISSÃO HYPE</span><h2>Taxa do clã no Breed</h2><p>O percentual fica congelado em cada novo pedido. Alterar aqui não muda pedidos já criados.</p></div></div>
-    <form method="post" action="{{url_for('admin_precos')}}" class="promo-create-form breed-tax-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="acao" value="taxa_clan"><label>Taxa do clã (%)<input name="taxa_clan_percentual" type="number" min="0" max="100" step="0.01" value="{{taxa_clan}}" required></label><button class="cta-gold">Salvar taxa</button></form>
-  </section>
-  <section class="promo-admin-panel">
-    <div class="promo-admin-title"><div><span>🔥 HYPE PROMO</span><h2>Criar promoção</h2><p>Escolha qualquer percentual e aplique em todos os preços ou somente nos itens selecionados.</p></div></div>
-    <form method="post" action="{{url_for('admin_precos')}}" class="promo-create-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="acao" value="criar_promocao">
-      <label>Nome da promoção<input name="nome" placeholder="Ex.: Semana HYPE" required></label>
-      <label>Desconto (%)<input name="percentual" type="number" min="0.01" max="100" step="0.01" placeholder="30" required></label>
-      <label>Início<input name="inicio_em" type="datetime-local"></label><label>Término<input name="fim_em" type="datetime-local"></label>
-      <label class="promo-all"><input type="checkbox" name="aplicar_todos" value="1" id="promoAll"> Aplicar em TODOS os preços</label>
-      <div class="promo-price-options" id="promoPriceOptions">{% for p in precos %}<label><input type="checkbox" name="codigos_preco" value="{{p.codigo}}"><span><b>{{p.nome}}</b><small>{{p.codigo|replace('_',' ')}} · {{p.valor|preco}}</small></span></label>{% endfor %}</div>
-      <button class="cta-gold">🔥 Criar promoção</button>
+{% block title %}Breed Pricing 3.0 · HYPE Admin{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3130">{% endblock %}
+{% block content %}
+{% include 'admin_v29_nav.html' %}
+<div class="bp32-shell">
+  <header class="bp32-hero">
+    <div><span class="bp32-kicker">ADMIN · HYPE BREED</span><h1>Breed Pricing <em>3.0</em></h1><p>Raridade automática: Comum, Raro por 12,5% de fêmea e Ultra Raro quando a espécie depende de Ditto.</p></div>
+    <div class="bp32-hero-status">
+      {% if pricing_v2 and tabela_atual %}<small>TABELA EM VIGOR</small><b>{{tabela_atual.nome}}</b><span>#{{tabela_atual.id}} · {{tabela_atual.status_visual|replace('_',' ')|upper}}</span>{% else %}<small>PRICING 3.0</small><b>Migração pendente</b><span>Execute V31.2 e V31.3</span>{% endif %}
+    </div>
+  </header>
+
+  <nav class="bp32-tabs" aria-label="Breed Pricing 3.0">
+    <button type="button" class="active" data-bp-tab="tabela">Tabela de preços</button>
+    <button type="button" data-bp-tab="simulador">Simulador</button>
+    <button type="button" data-bp-tab="pokemon">Pokémon e categorias</button>
+    <button type="button" data-bp-tab="promocoes">Promoções e cupons</button>
+    <button type="button" data-bp-tab="financeiro">Comissão e relatório</button>
+    <button type="button" data-bp-tab="versoes">Versões e histórico</button>
+  </nav>
+
+  {% if not pricing_v2 %}
+  <section class="bp32-warning"><b>Breed Pricing 2.0 ainda não está no banco.</b><span>Execute primeiro a migração V31.2 e depois a V31.3.</span></section>
+  {% elif not pricing_v3 %}
+  <section class="bp32-warning"><b>Breed Rarity 3.0 ainda não está no banco.</b><span>Execute <code>MIGRACAO_SEGURA_HYPE_V31_3_BREED_RARITY_3_0_2026_10_02.sql</code>. Enquanto isso, o site mantém o cálculo V31.2 como fallback.</span></section>
+  {% endif %}
+
+  <section class="bp32-panel active" data-bp-panel="tabela">
+    <div class="bp32-summary-grid">
+      <article><small>Tabela ativa</small><strong>{{tabela_atual.nome if tabela_atual else 'Legada'}}</strong><span>Pedidos existentes nunca são recalculados.</span></article>
+      <article><small>Rascunho</small><strong>{{rascunho.nome if rascunho else 'Nenhum'}}</strong><span>{% if rascunho %}Edite sem afetar o preço público.{% else %}Crie uma cópia antes de alterar valores.{% endif %}</span></article>
+      <article><small>Regra de dificuldade</small><strong>Comum → Raro → Ultra</strong><span>HA e Zero Speed continuam como adicionais cumulativos.</span></article>
+      <article><small>Proteção</small><strong>{{(tabela_edicao.desconto_maximo_percentual if tabela_edicao else 100)}}% máx.</strong><span>Limite de desconto da tabela.</span></article>
+    </div>
+
+    {% if pricing_v2 and not rascunho and tabela_atual %}
+    <form method="post" class="bp32-create-draft">
+      <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="criar_rascunho"><input type="hidden" name="origem_id" value="{{tabela_atual.id}}">
+      <div><b>Quer alterar os preços?</b><span>Crie um rascunho. A tabela atual continua funcionando até você publicar.</span></div>
+      <input name="nome" placeholder="Ex.: Tabela Outubro HYPE"><button class="bp32-btn-gold">Criar rascunho</button>
     </form>
+    {% endif %}
+
+    {% if rascunho %}
+    <div class="bp32-draft-bar"><div><span>RASCUNHO EM EDIÇÃO</span><b>{{rascunho.nome}}</b><small>#{{rascunho.id}} · alterações ainda não afetam novos pedidos</small></div><div class="bp32-draft-actions"><button type="button" class="bp32-btn-outline" data-scroll-rules>Regras da tabela</button><button type="button" class="bp32-btn-gold" data-open-publish>Publicar / Agendar</button></div></div>
+    {% endif %}
+
+    {% if alertas_preco %}<div class="bp32-alert-list"><b>Antes de publicar, corrija:</b>{% for a in alertas_preco %}<span>⚠ {{a}}</span>{% endfor %}</div>{% endif %}
+
+    {% if componentes %}
+      {% set grupos=[('base','PREÇOS BASE','Comum < Raro (12,5% fêmea) < Ultra Raro (só com Ditto).'),('ha','HIDDEN ABILITY (HA)','HA é mais difícil e recebe adicional próprio em cada categoria.'),('zero_speed','ZERO SPEED','0 IV em Speed recebe adicional; categorias mais difíceis podem custar mais.'),('nature','NATURE','Desconto estrutural para combinações sem Nature.'),('extras','EXTRAS','Gênero e treinamento competitivo. Ditto já está embutido em Ultra Raro.')] %}
+      {% for grupo,titulo,descricao in grupos %}
+      <div class="bp32-price-section">
+        <div class="bp32-section-head"><div><span>{{titulo}}</span><p>{{descricao}}</p></div></div>
+        <div class="bp32-price-grid">
+          {% for p in componentes if p.grupo == grupo %}
+          <form method="post" class="bp32-price-card {{'locked' if not rascunho else ''}}">
+            <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_componente"><input type="hidden" name="tabela_id" value="{{tabela_edicao.id}}"><input type="hidden" name="codigo" value="{{p.codigo}}">
+            <small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3><div class="bp32-money">{{p.valor|preco}}</div>
+            <label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label>
+            <button class="bp32-btn-gold" {{'disabled' if not rascunho else ''}}>Salvar</button>
+          </form>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% elif precos_legados %}
+      <div class="bp32-price-section"><div class="bp32-section-head"><div><span>TABELA LEGADA</span><p>Ela permanece como fallback até a migração V31.2.</p></div></div><div class="bp32-price-grid">{% for p in precos_legados %}<article class="bp32-price-card locked"><small>{{p.codigo}}</small><h3>{{p.nome}}</h3><div class="bp32-money">{{p.valor|preco}}</div></article>{% endfor %}</div></div>
+    {% endif %}
+
+    {% if rascunho %}
+    <section class="bp32-rules" id="bp32Rules">
+      <div class="bp32-section-head"><div><span>REGRAS DA TABELA</span><h2>Margem, membro HYPE e limites</h2></div></div>
+      <form method="post" class="bp32-rules-form">
+        <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_regras"><input type="hidden" name="tabela_id" value="{{rascunho.id}}">
+        <label>Nome da tabela<input name="nome" value="{{rascunho.nome}}" required></label>
+        <label>Desconto membro HYPE (%)<input type="number" step="0.01" min="0" max="100" name="desconto_membro_hype_percentual" value="{{rascunho.desconto_membro_hype_percentual}}"></label>
+        <label>Desconto máximo permitido (%)<input type="number" step="0.01" min="0" max="100" name="desconto_maximo_percentual" value="{{rascunho.desconto_maximo_percentual}}"></label>
+        <label>Líquido mínimo do Breeder<input name="minimo_breeder_liquido" value="{{rascunho.minimo_breeder_liquido}}" placeholder="Ex.: 100k"></label>
+        <button class="bp32-btn-gold">Salvar regras</button>
+      </form>
+    </section>
+
+    <section class="bp32-compare">
+      <div class="bp32-section-head"><div><span>IMPACTO DA ALTERAÇÃO</span><h2>Atual × rascunho</h2><p>Exemplos sem promoção para você enxergar rapidamente o efeito da nova tabela.</p></div></div>
+      <div class="bp32-compare-grid">{% for atual in impacto_atual %}{% set novo=impacto_rascunho[loop.index0] if loop.index0 < impacto_rascunho|length else none %}<article><small>{{atual.nome}}</small><span>Atual <b>{{atual.valor|preco}}</b></span><span>Rascunho <strong>{{ (novo.valor|preco) if novo else '—' }}</strong></span>{% if novo %}<em class="{{'up' if novo.valor>atual.valor else 'down' if novo.valor<atual.valor else ''}}">{% if novo.valor>atual.valor %}+{% endif %}{{(novo.valor-atual.valor)|preco}}</em>{% endif %}</article>{% endfor %}</div>
+    </section>
+
+    <dialog class="bp32-dialog" id="publishDialog"><form method="dialog" class="bp32-dialog-close"><button>×</button></form><div><span class="bp32-kicker">PUBLICAÇÃO</span><h2>{{rascunho.nome}}</h2><p>Publicar agora substitui a tabela permanente. Agendar cria uma tabela sazonal e, quando ela terminar, a tabela normal volta automaticamente.</p>
+      <form method="post" class="bp32-publish-now"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="publicar_tabela"><input type="hidden" name="tabela_id" value="{{rascunho.id}}"><button class="bp32-btn-gold" {% if alertas_preco %}disabled{% endif %}>Publicar agora</button></form>
+      <form method="post" class="bp32-schedule"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="agendar_tabela"><input type="hidden" name="tabela_id" value="{{rascunho.id}}"><label>Início<input type="datetime-local" name="inicio_em" required></label><label>Fim (opcional)<input type="datetime-local" name="fim_em"></label><button class="bp32-btn-outline" {% if alertas_preco %}disabled{% endif %}>Agendar tabela</button></form>
+    </div></dialog>
+    {% endif %}
   </section>
-  {% if promocoes %}<section class="promo-list"><h2>Promoções cadastradas</h2><div class="promo-list-grid">{% for p in promocoes %}<article class="promo-admin-card {{p.status_calculado or ('active' if p.ativo else 'paused')}}"><div><div class="promo-card-topline"><span class="promo-badge">-{{p.percentual}}%</span><span class="promo-state promo-state-{{p.status_calculado}}">{% if p.status_calculado == 'ativa' %}ATIVA AGORA{% elif p.status_calculado == 'agendada' %}AGENDADA{% elif p.status_calculado == 'expirada' %}EXPIRADA{% else %}PAUSADA{% endif %}</span></div><h3>{{p.nome}}</h3><small>{% if p.aplicar_todos %}Todos os preços{% else %}{{(p.codigos_preco or [])|length}} preço(s) selecionado(s){% endif %}</small><p>{{p.inicio_em_local or 'Início imediato'}} → {{p.fim_em_local or 'Sem término automático'}} <small>· horário de Brasília</small></p></div><div class="promo-admin-actions"><form method="post" action="{{url_for('admin_precos')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="acao" value="toggle_promocao"><input type="hidden" name="promocao_id" value="{{p.id}}"><input type="hidden" name="ativo" value="{{'0' if p.ativo else '1'}}"><button class="btn-ranking-outline">{{'Pausar' if p.ativo else 'Ativar'}}</button></form><form method="post" action="{{url_for('admin_precos')}}" onsubmit="return confirm('Remover esta promoção? Pedidos já feitos não serão alterados.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="acao" value="excluir_promocao"><input type="hidden" name="promocao_id" value="{{p.id}}"><button class="btn-muted-hype">Excluir</button></form></div></article>{% endfor %}</div></section>{% endif %}
-  <h2 class="admin-price-section-title">Tabela oficial de preços</h2><div class="admin-price-grid">{% for p in precos %}<form method="post" class="admin-price-card"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="acao" value="preco"><input type="hidden" name="codigo" value="{{p.codigo}}"><div><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3></div><label>Valor HYPE<input name="valor" value="{{p.valor}}" inputmode="numeric" required></label><div class="admin-price-current">Atual: <b>{{p.valor|preco}}</b></div><button class="cta-gold">Salvar valor</button></form>{% else %}<div class="dash-card">Nenhum preço cadastrado.</div>{% endfor %}</div>
+
+  <section class="bp32-panel" data-bp-panel="simulador">
+    <div class="bp32-section-head"><div><span>SIMULADOR</span><h2>Monte um Breed antes de publicar</h2><p>Veja cliente paga, comissão do clã e líquido do Breeder.</p></div></div>
+    <div class="bp32-packages">{% for p in pacotes %}<button type="button" data-package='{{p|tojson}}'><b>{{p.nome}}</b><small>Aplicar preset</small></button>{% endfor %}</div>
+    <div class="bp32-simulator">
+      <form id="bp32SimulatorForm">
+        <label>Tabela<select name="tabela_id">{% for t in tabelas if t.status in ['ativa','rascunho','agendada'] %}<option value="{{t.id}}" {{'selected' if rascunho and t.id==rascunho.id else ''}}>#{{t.id}} · {{t.nome}} ({{t.status_visual|replace('_',' ')}})</option>{% endfor %}</select></label>
+        <label>Categoria<select name="categoria"><option value="comum">Comum</option><option value="raro">Raro · 12,5% fêmea</option><option value="ultra_raro">Ultra Raro · só com Ditto</option></select></label>
+        <label>Breed<select name="breed_tipo"><option>F5</option><option>F6</option></select></label>
+        <label>HA<select name="ha"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Zero Speed<select name="zero_speed"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Ditto obrigatório<select name="usa_ditto"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Nature<select name="nature"><option value="sim">Com Nature</option><option value="nao">Sem Nature</option></select></label>
+        <label>Gênero<select name="genero"><option value="indiferente">Indiferente</option><option value="macho">Macho</option><option value="femea">Fêmea</option></select></label>
+        <label>Treinado<select name="treinado"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Membro HYPE<select name="membro_hype"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Pokémon ID <small>(exceção)</small><input name="pokemon_id" inputmode="numeric" placeholder="Opcional"></label>
+        <label>Cupom<input name="cupom" placeholder="Opcional"></label>
+        <button class="bp32-btn-gold" type="submit">Simular preço</button>
+      </form>
+      <aside id="bp32SimulationResult"><small>PREÇO SIMULADO</small><strong>—</strong><div class="bp32-sim-split"><span>Clã <b>—</b></span><span>Breeder <b>—</b></span></div><ol></ol></aside>
+    </div>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="pokemon">
+    <div class="bp32-section-head"><div><span>POKÉMON E CATEGORIAS</span><h2>Classificação automática do Breed</h2><p><b>Comum</b>: reprodução padrão. <b>Raro</b>: 12,5% de chance de fêmea. <b>Ultra Raro</b>: só reproduz com Ditto. A prioridade automática é Ultra Raro &gt; Raro &gt; Comum.</p></div></div>
+    <form method="post" class="bp32-species-form bp32-classify-form"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_classificacao_pokemon">
+      <label>ID Pokédex<input name="pokemon_id" type="number" min="1" required></label>
+      <label>Pokémon<input name="pokemon_nome" required placeholder="Ex.: Magnemite"></label>
+      <label>Categoria<select name="categoria_override"><option value="">Automática</option><option value="comum">Forçar Comum</option><option value="raro">Forçar Raro</option><option value="ultra_raro">Forçar Ultra Raro</option></select></label>
+      <label>Regra de Ditto<select name="usa_ditto_override"><option value="auto">Automática</option><option value="sim">Forçar: só com Ditto</option><option value="nao">Forçar: não depende de Ditto</option></select></label>
+      <label class="wide">Motivo da exceção<input name="motivo_override" maxlength="300" placeholder="Opcional; ex.: regra específica do servidor"></label>
+      <button class="bp32-btn-gold">Salvar exceção</button>
+    </form>
+    <div class="bp32-rarity-rule-grid"><article><small>COMUM</small><b>Breed padrão</b><span>Não é 12,5% fêmea e não depende de Ditto.</span></article><article><small>RARO</small><b>12,5% fêmea</b><span>Gender rate 1/8. A dificuldade já aumenta o preço-base.</span></article><article><small>ULTRA RARO</small><b>Só com Ditto</b><span>Ditto já faz parte do preço-base e não é cobrado novamente.</span></article></div>
+    <div class="bp32-category-list">{% for x in classificacoes_pokemon %}<article><div><b>#{{x.pokemon_id}} · {{x.pokemon_nome}}</b><span class="{{x.categoria_override or x.categoria or 'comum'}}">{{(x.categoria_override or x.categoria or 'comum')|replace('_',' ')|upper}}</span>{% if x.categoria_override %}<em>OVERRIDE</em>{% endif %}{% if x.usa_ditto_override is sameas true %}<em>DITTO FORÇADO</em>{% elif x.usa_ditto_override is sameas false %}<em>SEM DITTO FORÇADO</em>{% endif %}</div>{% if x.motivo_override %}<small>{{x.motivo_override}}</small>{% endif %}</article>{% else %}<div class="bp32-empty">Nenhuma exceção manual. Todos os Pokémon serão classificados automaticamente pela regra HYPE.</div>{% endfor %}</div>
+    <div class="bp32-section-head bp32-subhead"><div><span>DIFICULDADE ESPECIAL / EXCEÇÕES</span><h2>Preço próprio, adicional ou multiplicador</h2><p>Use quando alguma espécie do seu servidor precisar de uma regra especial além de Comum, Raro ou Ultra Raro.</p></div></div>
+    {% if rascunho %}
+    <form method="post" class="bp32-species-form"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_excecao"><input type="hidden" name="tabela_id" value="{{rascunho.id}}">
+      <label>ID Pokédex<input name="pokemon_id" type="number" min="1" required></label><label>Pokémon<input name="pokemon_nome" required placeholder="Ex.: Eevee"></label><label>Categoria<select name="categoria_override"><option value="">Usar cadastro padrão</option><option value="comum">Comum</option><option value="raro">Raro</option><option value="ultra_raro">Ultra Raro</option></select></label><label>Base fixa<input name="valor_base_override" placeholder="Opcional"></label><label>Adicional fixo<input name="adicional_fixo" value="0"></label><label>Multiplicador<input name="multiplicador" type="number" min="0.1" max="10" step="0.05" value="1"></label><label class="wide">Observação<input name="observacao" placeholder="Motivo da exceção"></label><button class="bp32-btn-gold">Salvar exceção</button>
+    </form>
+    {% else %}<div class="bp32-empty">Crie um rascunho para editar regras por espécie.</div>{% endif %}
+    <div class="bp32-species-list">{% for x in excecoes %}<article><div><b>#{{x.pokemon_id}} · {{x.pokemon_nome}}</b><span>{{x.categoria_override or 'categoria padrão'}} · base {{x.valor_base_override|preco if x.valor_base_override is not none else 'padrão'}} · +{{x.adicional_fixo|preco}} · ×{{x.multiplicador}}</span>{% if x.observacao %}<small>{{x.observacao}}</small>{% endif %}</div>{% if rascunho %}<form method="post"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="excluir_excecao"><input type="hidden" name="tabela_id" value="{{rascunho.id}}"><input type="hidden" name="pokemon_id" value="{{x.pokemon_id}}"><button class="bp32-danger">Remover</button></form>{% endif %}</article>{% else %}<div class="bp32-empty">Nenhuma exceção nesta tabela. A classificação automática Comum/Raro/Ultra Raro será usada.</div>{% endfor %}</div>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="promocoes">
+    <div class="bp32-section-head"><div><span>PROMOÇÕES INTELIGENTES</span><h2>Desconto automático ou cupom</h2><p>Defina período, componentes, exclusividade para membros HYPE e limite de usos.</p></div></div>
+    <form method="post" class="bp32-promo-form"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="criar_promocao">
+      <label>Nome<input name="nome" placeholder="Ex.: Semana HYPE" required></label><label>Desconto (%)<input name="percentual" type="number" min="0.01" max="100" step="0.01" required></label><label>Cupom <small>(opcional)</small><input name="codigo_cupom" maxlength="32" placeholder="HYPE50"></label><label>Limite de usos <small>(opcional)</small><input name="limite_usos" type="number" min="1"></label><label>Início<input name="inicio_em" type="datetime-local"></label><label>Fim<input name="fim_em" type="datetime-local"></label>
+      <label class="bp32-check"><input type="checkbox" name="somente_membros_hype" value="1"> Somente membros [HYPE]</label><label class="bp32-check"><input type="checkbox" name="aplicar_todos" value="1" id="promoAll"> Aplicar em todos os componentes</label>
+      <div class="bp32-promo-options" id="promoPriceOptions">{% for p in promo_itens %}<label><input type="checkbox" name="codigos_preco" value="{{p.codigo}}"><span><b>{{p.nome}}</b><small>{{p.valor|preco}}</small></span></label>{% endfor %}</div><button class="bp32-btn-gold">Criar promoção / cupom</button>
+    </form>
+    <div class="bp32-promo-list">{% for p in promocoes %}<article><div><div class="bp32-promo-top"><b>-{{p.percentual}}%</b><span class="status {{p.status_calculado}}">{{p.status_calculado|upper}}</span></div><h3>{{p.nome}}</h3><p>{% if p.codigo_cupom %}Cupom <strong>{{p.codigo_cupom}}</strong>{% else %}Automática{% endif %}{% if p.somente_membros_hype %} · somente [HYPE]{% endif %}{% if p.limite_usos %} · {{p.usos or 0}}/{{p.limite_usos}} usos{% endif %}</p><small>{{p.inicio_em_local or 'agora'}} → {{p.fim_em_local or 'sem término'}}</small></div><div class="bp32-actions"><form method="post"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="toggle_promocao"><input type="hidden" name="promocao_id" value="{{p.id}}"><input type="hidden" name="ativo" value="{{'0' if p.ativo else '1'}}"><button class="bp32-btn-outline">{{'Pausar' if p.ativo else 'Ativar'}}</button></form><form method="post" onsubmit="return confirm('Excluir esta promoção?')"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="excluir_promocao"><input type="hidden" name="promocao_id" value="{{p.id}}"><button class="bp32-danger">Excluir</button></form></div></article>{% else %}<div class="bp32-empty">Nenhuma promoção cadastrada.</div>{% endfor %}</div>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="financeiro">
+    <div class="bp32-section-head"><div><span>FINANCEIRO DO BREED</span><h2>Comissão, margem e vendas</h2><p>Os dados abaixo usam pedidos criados nos últimos 30 dias.</p></div></div>
+    <div class="bp32-metrics"><article><small>Pedidos</small><b>{{relatorio.pedidos}}</b></article><article><small>Volume vendido</small><b>{{relatorio.faturamento|preco}}</b></article><article><small>Ticket médio</small><b>{{relatorio.ticket_medio|preco}}</b></article><article><small>Clã</small><b>{{relatorio.taxa_clan|preco}}</b></article><article><small>Breeders</small><b>{{relatorio.breeders|preco}}</b></article><article><small>Raro / Ultra / HA / Zero</small><b>{{relatorio.raros}} · {{relatorio.ultra_raros}} · {{relatorio.ha}} · {{relatorio.zero_speed}}</b></article></div>
+    <section class="bp32-finance-settings"><div><span>COMISSÃO HYPE</span><h3>Taxa atual: {{taxa_clan}}%</h3><p>A porcentagem continua congelada no momento em que cada pedido é criado.</p></div><form method="post"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="taxa_clan"><input name="taxa_clan_percentual" type="number" min="0" max="100" step="0.01" value="{{taxa_clan}}"><button class="bp32-btn-gold">Salvar comissão</button></form></section>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="versoes">
+    <div class="bp32-section-head"><div><span>VERSÕES</span><h2>Tabelas sazonais e rollback</h2><p>Cada publicação vira uma versão. Você pode restaurar uma tabela antiga sem editar preço por preço.</p></div></div>
+    <div class="bp32-version-list">{% for t in tabelas %}<article><div><span class="bp32-version-status {{t.status_visual}}">{{t.status_visual|replace('_',' ')|upper}}</span><h3>#{{t.id}} · {{t.nome}}</h3><p>Criada {{t.created_at_local or '—'}}{% if t.inicio_em_local %} · início {{t.inicio_em_local}}{% endif %}{% if t.fim_em_local %} · fim {{t.fim_em_local}}{% endif %}</p></div><div class="bp32-actions">{% if t.status in ['arquivada','agendada'] %}<form method="post" onsubmit="return confirm('Restaurar esta versão como tabela permanente ativa?')"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="restaurar_tabela"><input type="hidden" name="tabela_id" value="{{t.id}}"><button class="bp32-btn-outline">Restaurar</button></form>{% endif %}{% if t.status in ['rascunho','agendada'] and (not rascunho or t.id != rascunho.id) %}<form method="post"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="arquivar_tabela"><input type="hidden" name="tabela_id" value="{{t.id}}"><button class="bp32-danger">Arquivar</button></form>{% endif %}</div></article>{% else %}<div class="bp32-empty">Nenhuma versão disponível.</div>{% endfor %}</div>
+    <div class="bp32-section-head history"><div><span>AUDITORIA</span><h2>Alterações recentes</h2></div></div><div class="bp32-history">{% for h in historico %}<article><b>{{h.acao|replace('_',' ')|title}}</b><span>{% if h.codigo %}{{h.codigo|replace('_',' ')}} · {% endif %}{% if h.valor_anterior is not none or h.valor_novo is not none %}{{h.valor_anterior|preco}} → {{h.valor_novo|preco}} · {% endif %}{{h.usuario_email or 'sistema'}}</span><small>{{h.created_at}}</small></article>{% else %}<div class="bp32-empty">Sem alterações registradas.</div>{% endfor %}</div>
+  </section>
 </div>
-<script>const all=document.getElementById('promoAll'), box=document.getElementById('promoPriceOptions');if(all&&box)all.addEventListener('change',()=>{box.classList.toggle('promo-disabled',all.checked);box.querySelectorAll('input').forEach(x=>x.disabled=all.checked)});</script>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(() => {
+  const tabs=[...document.querySelectorAll('[data-bp-tab]')], panels=[...document.querySelectorAll('[data-bp-panel]')];
+  function show(name){tabs.forEach(b=>b.classList.toggle('active',b.dataset.bpTab===name));panels.forEach(p=>p.classList.toggle('active',p.dataset.bpPanel===name));history.replaceState(null,'','#'+name)}
+  tabs.forEach(b=>b.addEventListener('click',()=>show(b.dataset.bpTab))); const hash=location.hash.slice(1);if(tabs.some(b=>b.dataset.bpTab===hash))show(hash);
+  const dlg=document.getElementById('publishDialog');document.querySelector('[data-open-publish]')?.addEventListener('click',()=>dlg?.showModal());document.querySelector('[data-scroll-rules]')?.addEventListener('click',()=>document.getElementById('bp32Rules')?.scrollIntoView({behavior:'smooth'}));
+  const all=document.getElementById('promoAll'), opts=document.getElementById('promoPriceOptions');all?.addEventListener('change',()=>{opts?.classList.toggle('disabled',all.checked);opts?.querySelectorAll('input').forEach(x=>x.disabled=all.checked)});
+  const form=document.getElementById('bp32SimulatorForm'), out=document.getElementById('bp32SimulationResult');
+  function money(v){v=Number(v||0);if(v>=1000000)return (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2})+'kk';if(v>=1000)return (v/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+'k';return v.toLocaleString('pt-BR')}
+  async function simulate(){if(!form||!out)return;const q=new URLSearchParams(new FormData(form));out.classList.add('loading');try{const r=await fetch('{{url_for("admin_precos_simular")}}?'+q.toString(),{headers:{Accept:'application/json'},cache:'no-store'});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Falha na simulação');out.querySelector('strong').textContent=money(d.total);const bs=out.querySelectorAll('.bp32-sim-split b');bs[0].textContent=money(d.taxa_valor);bs[1].textContent=money(d.breeder_valor);const ol=out.querySelector('ol');ol.innerHTML='';(d.componentes||[]).forEach(x=>{const li=document.createElement('li');li.innerHTML='<span>'+x.nome+'</span><b>'+((x.valor||0)<0?'-':'')+money(Math.abs(x.valor||0))+'</b>';ol.appendChild(li)});if(Number(d.desconto_membro_hype_valor||0)>0){const li=document.createElement('li');li.innerHTML='<span>Desconto membro HYPE</span><b>-'+money(d.desconto_membro_hype_valor)+'</b>';ol.appendChild(li)};if(d.margem_protegida){const li=document.createElement('li');li.innerHTML='<span>Proteção de margem</span><b>aplicada</b>';ol.appendChild(li)}}catch(e){out.querySelector('strong').textContent='Erro';out.querySelector('ol').innerHTML='<li>'+e.message+'</li>'}finally{out.classList.remove('loading')}}
+  form?.addEventListener('submit',e=>{e.preventDefault();simulate()});form?.querySelectorAll('select,input').forEach(x=>x.addEventListener('change',simulate));
+  document.querySelectorAll('[data-package]').forEach(btn=>btn.addEventListener('click',()=>{if(!form)return;const p=JSON.parse(btn.dataset.package);for(const [k,v] of Object.entries(p)){const el=form.elements[k];if(!el)continue;if(typeof v==='boolean')el.value=v?'sim':'nao';else el.value=v}simulate();show('simulador')}));
+  if(form)simulate();
+})();
+</script>
 {% endblock %}

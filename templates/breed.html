@@ -1,12 +1,13 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}HYPE Breed • Fazer Pedido{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3130">{% endblock %}
 {% block body_class %}hype-breed-page hype-breed-reference-page{% endblock %}
 {% block content %}
 <div class="breed-ref-shell" id="fazer-pedido">
   <section class="breed-ref-hero">
     <div class="breed-ref-hero-copy">
       <span class="breed-ref-kicker">HYPE BREED</span>
-      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">GRANDE ATUALIZAÇÃO • V20</small>
+      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PRICING 3.0 • V31.3</small>
       <p>Monte seu Breed em etapas. Escolha o Pokémon, configure as características, revise e envie.</p>
     </div>
     <div class="breed-ref-hero-mark">HYPE</div>
@@ -117,7 +118,9 @@
       <div class="breed-stage-card">
         <div class="breed-stage-copy"><span class="breed-ref-kicker">ETAPA 4</span><h2>REVISÃO DO PEDIDO</h2><p>Confira tudo antes de enviar para a fila HYPE.</p></div>
         <div class="breed-review-card"><img class="selectedPokemonArt" alt=""><div class="breed-review-main"><small>POKÉMON</small><h3 class="selectedPokemonName">—</h3><div id="reviewTags"></div></div><dl id="reviewData"></dl></div>
+        <label class="breed-coupon-field"><span>Cupom HYPE <small>(opcional)</small></span><div><input id="cupom_breed" name="cupom_breed" maxlength="32" placeholder="Ex.: HYPE50" autocomplete="off"><button type="button" id="applyCoupon">Aplicar</button></div><small id="couponHint">Cupons e descontos de membro são validados pelo servidor.</small></label>
         <div class="breed-price-preview" id="breedPricePreview"><div><small>VALOR ESTIMADO</small><strong id="breedPriceValue">Calculando...</strong></div><span id="breedPriceDetail">O servidor usa a tabela oficial configurada no HYPE.</span></div>
+        <div class="breed-price-breakdown" id="breedPriceBreakdown" hidden><div><b>COMPOSIÇÃO DO PREÇO</b><span id="breedPricingTable"></span></div><ul id="breedPriceItems"></ul></div>
         <div class="breed-review-note">O valor exibido é uma prévia. No envio, o servidor recalcula e valida o preço novamente antes de criar o pedido.</div>
         <div class="breed-stage-actions"><button type="button" class="breed-ref-back" data-back="3">← Voltar</button><button type="button" class="breed-ref-next" data-next="5">Confirmar →</button></div>
       </div>
@@ -327,7 +330,9 @@ async function selectPokemon(id,name){
     $('#pokemonNext').disabled=false; $('#breed_special_alert').hidden=!info.breed_especial;
     renderDetail(false);
     updateExtraPriceAlerts();
-    setStatus(info.breed_especial?'Pokémon válido • Breed especial com Ditto ✓':'Pokémon válido para Breed ✓');
+    const catLabel=info.categoria_label||String(info.categoria||'comum').replace('_',' ').toUpperCase();
+    const reason=info.classificacao_motivo?' • '+info.classificacao_motivo:'';
+    setStatus(`Pokémon válido • ${catLabel}${reason} ✓`);
   }catch(e){
     if(selected&&selected.id===id){selected.validated=false;$('#pokemonNext').disabled=true;renderDetail(false)}
     setStatus((e&&e.message)||'Não foi possível validar o Pokémon.',true);
@@ -380,7 +385,7 @@ function updateIvs(){
   if(zeroSpeed.checked&&f5){const x=$('.breed-ref-ivs b[data-iv="velocidade"]');if(x){x.textContent='0';x.className='zero'}}
   updateExtraPriceAlerts();
 }
-const HYPE_BREED_BUILD = 'V20.1';
+const HYPE_BREED_BUILD = 'V31.3';
 const HYPE_BREED_PRICE_URL = '/api/breed/preco';
 function formatHypePrice(v){
   const n=Math.max(0, Math.round(Number(v)||0));
@@ -397,16 +402,15 @@ function updateExtraPriceAlerts(){
   const genderBox=$('#genderPriceAlert'), genderText=$('#genderPriceText');
   if(genderBox&&genderText){
     if(gender==='macho'||gender==='femea'){
-      const useDitto=!!info.so_com_ditto, rare=String(info.categoria||'comum').toLowerCase()==='raro';
-      const baseCode=(ha==='sim'&&!useDitto)?'ha_sem_ditto_genero':'comum_genero';
-      const candidate=priceEntry(baseCode), base=Number(candidate.valor||0)>0?candidate:priceEntry('escolher_genero');
+      const category=String(info.categoria||'comum').toLowerCase();
+      const genderCode=category==='ultra_raro'?'genero_ultra_raro':category==='raro'?'genero_raro':'comum_genero';
+      const base=priceEntry(genderCode);
       let total=Number(base.valor||0), parts=[`gênero ${priceText(base)}`];
-      if(rare&&gender==='femea'){const rareExtra=priceEntry('femea_rara');total+=Number(rareExtra.valor||0);parts.push(`fêmea rara ${priceText(rareExtra)}`);}
       genderText.textContent=`Escolher ${gender==='femea'?'Fêmea':'Macho'} adiciona ${formatHypePrice(total)} ao pedido (${parts.join(' + ')}).`;
       genderBox.hidden=false;
     }else genderBox.hidden=true;
   }
-  const zeroBox=$('#zeroSpeedPriceAlert'), zeroText=$('#zeroSpeedPriceText'), zeroLabel=$('#zeroSpeedLabel'), z=priceEntry('zero_speed');
+  const zeroBox=$('#zeroSpeedPriceAlert'), zeroText=$('#zeroSpeedPriceText'), zeroLabel=$('#zeroSpeedLabel'), cat=String(((selected&&selected.info)||{}).categoria||'comum').toLowerCase(), z=priceEntry(cat==='ultra_raro'?'zero_speed_ultra_raro':cat==='raro'?'zero_speed_raro':'zero_speed');
   if(zeroLabel)zeroLabel.textContent=`0 IV em Velocidade. Adicional atual: ${priceText(z)}.`;
   if(zeroBox&&zeroText){
     if(zeroSpeed.checked&&breedTipo.value==='F5'){zeroText.textContent=`Selecionar Zero Speed adiciona ${priceText(z)} ao pedido. Escolha também outro IV que pode ficar menor.`;zeroBox.hidden=false;}
@@ -417,7 +421,7 @@ async function refreshPrice(){
   if(!selected||!selected.validated||!breedTipo.value||!$('#ha').value||!$('#genero').value)return;
   const value=$('#breedPriceValue'), detail=$('#breedPriceDetail'), send=$('#sendPrice');
   if(value)value.textContent='Calculando...';
-  const q=new URLSearchParams({pokemon_id:String(selected.id),pokemon:selected.name,breed_tipo:breedTipo.value,ha:$('#ha').value,genero:$('#genero').value,treinado:$('#treinado').value,zero_speed:(zeroSpeed.checked?'sim':'nao'),nature:$('#nature').value||'',build:HYPE_BREED_BUILD,ts:String(Date.now())});
+  const q=new URLSearchParams({pokemon_id:String(selected.id),pokemon:selected.name,breed_tipo:breedTipo.value,ha:$('#ha').value,genero:$('#genero').value,treinado:$('#treinado').value,zero_speed:(zeroSpeed.checked?'sim':'nao'),nature:$('#nature').value||'',cupom:($('#cupom_breed')?.value||'').trim(),build:HYPE_BREED_BUILD,ts:String(Date.now())});
   try{
     const r=await fetch(HYPE_BREED_PRICE_URL+'?'+q.toString(),{headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'},cache:'no-store',credentials:'same-origin'});
     const contentType=(r.headers.get('content-type')||'').toLowerCase();
@@ -429,16 +433,22 @@ async function refreshPrice(){
     const total=Number(d.preco_total ?? d.total ?? 0);
     if(!Number.isFinite(total)||total<=0)throw new Error('Preço não configurado para esta combinação.');
     lastPrice={...d,total}; const shown=formatHypePrice(total), original=Number(d.preco_original||total), discount=Number(d.desconto_valor||0);
+    const breakdown=$('#breedPriceBreakdown'), items=$('#breedPriceItems'), tableLabel=$('#breedPricingTable');
+    if(breakdown&&items){items.innerHTML='';const rows=Array.isArray(d.componentes)?d.componentes:[];rows.forEach(x=>{const li=document.createElement('li'),v=Number(x.valor||0),orig=Number(x.valor_original||v);li.innerHTML=`<span>${x.nome||x.codigo}${x.promocao?' <em>'+x.promocao+'</em>':''}</span><b>${v<0?'-':''}${formatHypePrice(Math.abs(v))}${orig!==v&&orig>=0?' <del>'+formatHypePrice(orig)+'</del>':''}</b>`;items.appendChild(li)});if(Number(d.desconto_membro_hype_valor||0)>0){const li=document.createElement('li');li.innerHTML=`<span>Membro HYPE</span><b>-${formatHypePrice(d.desconto_membro_hype_valor)}</b>`;items.appendChild(li)};breakdown.hidden=!rows.length;if(tableLabel){const labels={comum:'COMUM',raro:'RARO',ultra_raro:'ULTRA RARO'};tableLabel.textContent=(d.tabela_preco_nome||'Tabela HYPE')+' · '+(labels[d.categoria]||String(d.categoria||'comum').toUpperCase());}}
     const banner=$('#breedPromoBanner');
     if(d.promocao_ativa&&discount>0){
       if(value)value.innerHTML=`<del>${formatHypePrice(original)}</del> <strong>${shown}</strong>`;
-      if(detail)detail.textContent=`🔥 ${d.promocao_nome||'Promoção HYPE'} · você economiza ${formatHypePrice(discount)}.`;
+      if(detail){const extra=[];if(d.cupom_codigo&&d.cupom_valido)extra.push('cupom '+d.cupom_codigo);if(Number(d.desconto_membro_hype_percentual||0)>0)extra.push('desconto membro HYPE');detail.textContent=`🔥 ${d.promocao_nome||'Promoção HYPE'} · você economiza ${formatHypePrice(discount)}${extra.length?' · '+extra.join(' + '):''}.`;}
       if(banner){banner.hidden=false;$('#breedPromoTitle').textContent=d.promocao_nome||'PROMOÇÃO HYPE';$('#breedPromoText').textContent=`Desconto aplicado automaticamente neste Breed · economia ${formatHypePrice(discount)}`;$('#breedPromoPct').textContent='-'+Number(d.promocao_percentual||0).toLocaleString('pt-BR')+'%';}
     }else{if(value)value.textContent=shown;if(detail)detail.textContent='Preço calculado pela tabela oficial HYPE.';if(banner)banner.hidden=true;}
+    const hint=$('#couponHint');if(hint){if(d.cupom_codigo&&d.cupom_valido===false){hint.textContent='Cupom inválido, expirado ou indisponível para sua conta.';hint.classList.add('invalid');}else if(d.cupom_codigo&&d.cupom_valido){hint.textContent=d.cupom_aplicado?'Cupom '+d.cupom_codigo+' aplicado ao cálculo.':'Cupom válido; outra promoção disponível oferece desconto maior.';hint.classList.remove('invalid');}else if(Number(d.desconto_membro_hype_percentual||0)>0){hint.textContent='Desconto de membro HYPE aplicado automaticamente.';hint.classList.remove('invalid');}else{hint.textContent='Cupons e descontos de membro são validados pelo servidor.';hint.classList.remove('invalid');}}
     if(send){send.textContent=(d.promocao_ativa?'🔥 Preço promocional: ':'Valor do Breed: ')+shown;send.dataset.priceReady='1';}
   }catch(e){lastPrice=null;if(value)value.textContent='Valor indisponível';if(send){send.textContent='Valor indisponível — revise antes de enviar';send.dataset.priceReady='0';}if(detail)detail.textContent=(e&&e.message&&String(e.message).indexOf('Unexpected token')<0)?e.message:'Não foi possível consultar o valor agora. Atualize a página e tente novamente.'}
 }
 function schedulePrice(){clearTimeout(priceTimer);priceTimer=setTimeout(refreshPrice,120)}
+const couponInput=$('#cupom_breed'), couponButton=$('#applyCoupon');
+if(couponInput)couponInput.addEventListener('input',()=>{couponInput.value=couponInput.value.toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,32);});
+if(couponButton)couponButton.addEventListener('click',()=>{refreshPrice();});
 const evInputs=$$('[data-ev]'), evPanel=$('#evTrainingPanel');
 function evData(){const o={};evInputs.forEach(i=>o[i.dataset.ev]=Math.max(0,Math.min(252,parseInt(i.value||0,10)||0)));return o}
 function updateEvs(){
@@ -457,7 +467,9 @@ function renderReview(){
   if(!selected)return; const nature=$('#nature').value||'Sem Nature', ha=$('#ha').value==='sim'?'Hidden Ability (HA)':'Ability normal', gender=pretty($('#genero').value), kind=breedTipo.value;
   $('#reviewTags').innerHTML=(selected.info.types||[]).map(t=>`<span class="type-${t}">${pretty(t)}</span>`).join('');
   const ev=updateEvs(), evText=$('#treinado').value==='sim'?Object.entries(ev.data).filter(([,v])=>v>0).map(([k,v])=>pretty(k.replace('sp_','sp. '))+' '+v).join(' · ')||'Personalizado (0 EV)':'Não se aplica';
-  $('#reviewData').innerHTML=`<div><dt>Nature</dt><dd>${nature}</dd></div><div><dt>Ability</dt><dd>${ha}</dd></div><div><dt>Gênero</dt><dd>${gender}</dd></div><div><dt>Breed</dt><dd>${kind}</dd></div><div><dt>IV descartado</dt><dd>${kind==='F5'?(pretty(ivSelect.value)||'—'):'Não se aplica'}</dd></div><div><dt>Zero Speed (IV)</dt><dd>${zeroSpeed.checked?'Sim':'Não'}</dd></div><div><dt>Treinado</dt><dd>${$('#treinado').value==='sim'?'Sim':'Não'}</dd></div><div><dt>EVs</dt><dd>${evText}</dd></div>`;
+  const catLabel=selected.info.categoria_label||String(selected.info.categoria||'comum').replace('_',' ').toUpperCase();
+  const catReason=selected.info.classificacao_motivo||'Classificação automática HYPE';
+  $('#reviewData').innerHTML=`<div><dt>Categoria</dt><dd>${catLabel}</dd></div><div><dt>Motivo</dt><dd>${catReason}</dd></div><div><dt>Nature</dt><dd>${nature}</dd></div><div><dt>Ability</dt><dd>${ha}</dd></div><div><dt>Gênero</dt><dd>${gender}</dd></div><div><dt>Breed</dt><dd>${kind}</dd></div><div><dt>IV descartado</dt><dd>${kind==='F5'?(pretty(ivSelect.value)||'—'):'Não se aplica'}</dd></div><div><dt>Zero Speed (IV)</dt><dd>${zeroSpeed.checked?'Sim':'Não'}</dd></div><div><dt>Treinado</dt><dd>${$('#treinado').value==='sim'?'Sim':'Não'}</dd></div><div><dt>EVs</dt><dd>${evText}</dd></div>`;
   $('#sendSummary').textContent=`${kind} • ${nature} • ${ha}`; schedulePrice();
 }
 function filterCards(){
