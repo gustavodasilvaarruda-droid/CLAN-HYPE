@@ -850,9 +850,16 @@ def _breed_v312_registrar_historico(tabela_id, acao, codigo=None, anterior=None,
 
 
 def _breed_v312_validar_tabela(tabela_id):
+    """Valida apenas a integridade da tabela de preços.
+
+    V31.3.1: o Admin tem liberdade para definir a relação de preços entre
+    Comum, Raro e Ultra Raro. Não bloqueamos mais a publicação por hierarquia
+    entre categorias, por F5/F6 ou pela diferença dos adicionais entre elas.
+    """
     c = _breed_v312_componentes(tabela_id)
     erros = []
     def v(k): return _breed_v312_valor(c, k)
+
     obrigatorios = [
         k for k in BREED_V312_COMPONENTES_META
         if k.startswith('base_') or k.startswith('adicional_ha_') or k.startswith('adicional_zero_speed_')
@@ -861,43 +868,21 @@ def _breed_v312_validar_tabela(tabela_id):
     if faltando:
         erros.append('Existem componentes obrigatórios ausentes: ' + ', '.join(faltando[:4]) + ('…' if len(faltando) > 4 else ''))
 
-    for bt in ('f5', 'f6'):
-        if v(f'base_raro_{bt}') <= v(f'base_comum_{bt}'):
-            erros.append(f'Raro {bt.upper()} precisa custar mais que Comum {bt.upper()}.')
-        if v(f'base_ultra_raro_{bt}') <= v(f'base_raro_{bt}'):
-            erros.append(f'Ultra Raro {bt.upper()} precisa custar mais que Raro {bt.upper()}.')
-
+    # Mantém somente proteções de integridade: o desconto sem Nature não pode
+    # transformar o preço-base em um valor negativo.
     for cat in BREED_CATEGORIAS_PRECO:
-        if v(f'base_{cat}_f6') < v(f'base_{cat}_f5'):
-            erros.append(f'F6 não pode ficar abaixo do F5 em {BREED_CATEGORIA_LABELS[cat]}.')
         for bt in ('f5','f6'):
             if v(f'desconto_sem_nature_{cat}_{bt}') > v(f'base_{cat}_{bt}'):
                 erros.append(f'O desconto sem Nature de {BREED_CATEGORIA_LABELS[cat]} {bt.upper()} não pode superar o preço-base.')
 
-    for bt in ('f5','f6'):
-        efetivos = {}
-        for cat in BREED_CATEGORIAS_PRECO:
-            base = v(f'base_{cat}_{bt}')
-            efetivos[cat] = base - min(v(f'desconto_sem_nature_{cat}_{bt}'), base)
-        if efetivos['raro'] <= efetivos['comum']:
-            erros.append(f'Mesmo sem Nature, Raro {bt.upper()} precisa continuar acima do Comum.')
-        if efetivos['ultra_raro'] <= efetivos['raro']:
-            erros.append(f'Mesmo sem Nature, Ultra Raro {bt.upper()} precisa continuar acima do Raro.')
-
-    for bt in ('f5','f6'):
-        if v(f'adicional_ha_comum_{bt}') <= 0:
-            erros.append(f'HA deve ter adicional positivo para Comum {bt.upper()}.')
-        if v(f'adicional_ha_raro_{bt}') < v(f'adicional_ha_comum_{bt}'):
-            erros.append(f'HA Raro {bt.upper()} deve ser igual ou mais caro que HA Comum.')
-        if v(f'adicional_ha_ultra_raro_{bt}') < v(f'adicional_ha_raro_{bt}'):
-            erros.append(f'HA Ultra Raro {bt.upper()} deve ser igual ou mais caro que HA Raro.')
-
-    if v('adicional_zero_speed_comum') <= 0:
-        erros.append('Zero Speed deve ter adicional positivo.')
-    if v('adicional_zero_speed_raro') < v('adicional_zero_speed_comum'):
-        erros.append('Zero Speed Raro deve ser igual ou mais caro que Zero Speed Comum.')
-    if v('adicional_zero_speed_ultra_raro') < v('adicional_zero_speed_raro'):
-        erros.append('Zero Speed Ultra Raro deve ser igual ou mais caro que Zero Speed Raro.')
+    # HA e Zero Speed continuam sendo serviços adicionais do Pricing 2.0,
+    # mas seus valores podem ser diferentes livremente entre as categorias.
+    for cat in BREED_CATEGORIAS_PRECO:
+        for bt in ('f5','f6'):
+            if v(f'adicional_ha_{cat}_{bt}') < 0:
+                erros.append(f'O adicional HA de {BREED_CATEGORIA_LABELS[cat]} {bt.upper()} não pode ser negativo.')
+        if v(f'adicional_zero_speed_{cat}') < 0:
+            erros.append(f'O adicional Zero Speed de {BREED_CATEGORIA_LABELS[cat]} não pode ser negativo.')
     return erros
 
 
