@@ -1,13 +1,13 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}HYPE Breed • Fazer Pedido{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3200"><link rel="stylesheet" href="{{url_for('static',filename='breed_order_v341.css')}}?v=3440">{% endblock %}
-{% block body_class %}hype-breed-page hype-breed-reference-page breed-premium-v34-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3200">{% endblock %}
+{% block body_class %}hype-breed-page hype-breed-reference-page{% endblock %}
 {% block content %}
 <div class="breed-ref-shell" id="fazer-pedido">
   <section class="breed-ref-hero">
     <div class="breed-ref-hero-copy">
       <span class="breed-ref-kicker">HYPE BREED</span>
-      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PREMIUM • V34.4</small>
+      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PRICING 4.0 • V32</small>
       <p>Monte seu Breed em etapas. Escolha o Pokémon, configure as características, revise e envie.</p>
     </div>
     <div class="breed-ref-hero-mark">HYPE</div>
@@ -48,7 +48,7 @@
           <div class="breed-ref-pokemon-grid" id="hypeQuickPokemonGrid">
             {% set populares = [(445,'garchomp','Garchomp'),(887,'dragapult','Dragapult'),(248,'tyranitar','Tyranitar'),(448,'lucario','Lucario'),(700,'sylveon','Sylveon'),(376,'metagross','Metagross'),(635,'hydreigon','Hydreigon'),(212,'scizor','Scizor'),(479,'rotom','Rotom'),(637,'volcarona','Volcarona'),(468,'togekiss','Togekiss'),(149,'dragonite','Dragonite'),(373,'salamence','Salamence'),(282,'gardevoir','Gardevoir'),(130,'gyarados','Gyarados'),(94,'gengar','Gengar'),(6,'charizard','Charizard'),(9,'blastoise','Blastoise'),(3,'venusaur','Venusaur'),(143,'snorlax','Snorlax')] %}
             {% for pid,slug,nome in populares %}
-            <button type="button" class="breed-ref-poke-card" data-id="{{pid}}" data-name="{{slug}}">
+            <button type="button" class="breed-ref-poke-card" data-id="{{pid}}" data-name="{{slug}}" data-url="https://pokeapi.co/api/v2/pokemon-species/{{pid}}/">
               <span class="breed-card-star" title="Favoritar">☆</span>
               <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{{pid}}.png" alt="{{nome}}" loading="lazy">
               <strong>{{nome}}</strong><small>#{{'%04d'|format(pid)}}</small><div class="breed-card-types"></div>
@@ -181,33 +181,6 @@ let catalogReady=false;
 let catalogLoading=null;
 let visibleLimit=40;
 let currentQuery='';
-const HYPE_BREED_BLOCKED_IDS=new Set([30, 31, 144, 145, 146, 150, 151, 172, 173, 174, 175, 201, 236, 238, 239, 240, 243, 244, 245, 249, 250, 251, 298, 360, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 406, 433, 438, 439, 440, 446, 447, 458, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 716, 717, 718, 719, 720, 721, 772, 773, 785, 786, 787, 788, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 805, 806, 807, 808, 809, 848, 880, 881, 882, 883, 888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898, 905, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1014, 1015, 1016, 1017, 1020, 1021, 1022, 1023, 1024, 1025]);
-const HYPE_BREED_RARE_IDS=new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 133, 134, 135, 136, 138, 139, 140, 141, 142, 143, 152, 153, 154, 155, 156, 157, 158, 159, 160, 176, 196, 197, 252, 253, 254, 255, 256, 257, 258, 259, 260, 345, 346, 347, 348, 369, 387, 388, 389, 390, 391, 392, 393, 394, 395, 408, 409, 410, 411, 415, 448, 468, 470, 471, 495, 496, 497, 498, 499, 500, 501, 502, 503, 511, 512, 513, 514, 515, 516, 564, 565, 566, 567, 570, 571, 650, 651, 652, 653, 654, 655, 656, 657, 658, 696, 697, 698, 699, 700, 722, 723, 724, 725, 726, 727, 728, 729, 730, 757, 810, 811, 812, 813, 814, 815, 816, 817, 818, 906, 907, 908, 909, 910, 911, 912, 913, 914]);
-const HYPE_BREED_ULTRA_IDS=new Set([81, 82, 100, 101, 120, 121, 137, 233, 292, 337, 338, 343, 344, 374, 375, 376, 436, 437, 462, 474, 479, 599, 600, 601, 615, 622, 623, 703, 774, 781, 854, 855, 870, 924, 925, 1012, 1013]);
-function localBreedMeta(id,name){
-  id=Number(id)||0; name=String(name||'').trim().toLowerCase();
-  const blocked=name==='ditto'||HYPE_BREED_BLOCKED_IDS.has(id);
-  const ultra=!blocked&&HYPE_BREED_ULTRA_IDS.has(id);
-  const rare=!blocked&&!ultra&&HYPE_BREED_RARE_IDS.has(id);
-  const categoria=ultra?'ultra_raro':rare?'raro':'comum';
-  const labels={comum:'Comum',raro:'Raro',ultra_raro:'Ultra Raro'};
-  return {
-    id,name,breedavel:!blocked,so_com_ditto:ultra,breed_especial:ultra,
-    categoria,categoria_label:labels[categoria],
-    classificacao_origem:'local_hype',
-    classificacao_motivo:ultra?'Reprodução dependente de Ditto.':rare?'Taxa de fêmea de 12,5% (1/8).':'Reprodução padrão.',
-    motivo:blocked?(name==='ditto'?'Ditto é parceiro de Breed e não pode ser solicitado como alvo.':'Esta espécie não está disponível para Breed.') : null,
-    sprite:spriteFor(id,true),types:[],abilities:[],stats:[],egg_groups:[],generation:null
-  };
-}
-async function fetchJsonTimeout(url,ms=1200){
-  const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),ms);
-  try{
-    const r=await fetch(url,{headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'},cache:'no-store',credentials:'same-origin',signal:controller.signal});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    return await r.json();
-  }finally{clearTimeout(timer)}
-}
 
 function spriteFor(id,artwork=true){
   return artwork
@@ -254,10 +227,22 @@ async function loadFullCatalog(){
     let remote=[];
     // Fonte 1: endpoint do próprio HYPE/PokéAPI.
     try{
-      const d=await fetchJsonTimeout('/api/breed/pokemon/catalogo',1500);if(Array.isArray(d.results))remote=d.results
+      const r=await fetch('/api/breed/pokemon/catalogo',{headers:{Accept:'application/json'},cache:'no-store'});
+      if(r.ok){const d=await r.json();if(Array.isArray(d.results))remote=d.results}
     }catch(_){ }
-    // V34.3: não há fallback externo no navegador. Se o catálogo completo
-    // estiver indisponível, mantemos os cards HYPE já renderizados sem travar a UI.
+    // Fonte 2: CSV oficial do projeto PokéAPI no GitHub. Os sprites já vêm deste host.
+    if(remote.length<100){
+      try{
+        const r=await fetch('https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_species.csv',{cache:'force-cache'});
+        if(r.ok){
+          const txt=await r.text();
+          remote=txt.split(/\r?\n/).slice(1).map(line=>{
+            const c=line.split(','); const id=Number(c[0]),name=(c[1]||'').trim().toLowerCase();
+            return id&&name?{id,name,display_name:pretty(name),sprite:spriteFor(id,true)}:null;
+          }).filter(Boolean);
+        }
+      }catch(_){ }
+    }
     fullCatalog=uniquePokemon([...seedCatalog,...remote]).sort((a,b)=>a.id-b.id);
     catalogReady=fullCatalog.length>seedCatalog.length;
     return fullCatalog;
@@ -289,47 +274,72 @@ async function searchPokemon(){
   let found=catalog.filter(x=>matchesQuery(x,q));
   // O endpoint HYPE complementa buscas exatas mesmo se o catálogo externo não carregar.
   try{
-    const d=await fetchJsonTimeout(`/api/breed/pokemon/buscar?q=${encodeURIComponent(q)}`,1200);found=uniquePokemon([...found,...(d.results||[])])
+    const r=await fetch(`/api/breed/pokemon/buscar?q=${encodeURIComponent(q)}`,{headers:{Accept:'application/json'},cache:'no-store'});
+    if(r.ok){const d=await r.json();found=uniquePokemon([...found,...(d.results||[])])}
   }catch(_){ }
   const count=paintPokemonGrid(found,40); paintSearchResults(found);
   setStatus(count?`${found.length} resultado${found.length!==1?'s':''}. Clique no desenho para selecionar.`:'Nenhum Pokémon encontrado.',!count);
 }
 
 async function enrichPokemonInfoClient(id,info){
-  // V34.3: o navegador não consulta PokéAPI/GitHub para validar o clique.
-  // O endpoint HYPE já valida a espécie e aplica o fallback no servidor.
-  // Isso evita requisições duplicadas/403 que faziam a tela engasgar.
+  // Último fallback: se o servidor não conseguiu os metadados, o navegador tenta
+  // as duas rotas públicas da PokéAPI em paralelo. A seleção nunca é perdida.
+  if((info.stats||[]).length && (info.types||[]).length && info.height!=null) return info;
+  try{
+    const [pr,sr]=await Promise.all([
+      fetch(`https://pokeapi.co/api/v2/pokemon/${id}/`,{cache:'force-cache'}),
+      fetch(`https://pokeapi.co/api/v2/pokemon-species/${id}/`,{cache:'force-cache'})
+    ]);
+    const p=pr.ok?await pr.json():null, sp=sr.ok?await sr.json():null;
+    if(p){
+      if(!(info.types||[]).length) info.types=(p.types||[]).map(x=>x.type&&x.type.name).filter(Boolean);
+      if(!(info.abilities||[]).length) info.abilities=(p.abilities||[]).map(x=>({name:x.ability&&x.ability.name,hidden:!!x.is_hidden})).filter(x=>x.name);
+      if(!(info.stats||[]).length) info.stats=(p.stats||[]).map(x=>({name:x.stat&&x.stat.name,value:x.base_stat})).filter(x=>x.name);
+      if(info.height==null) info.height=p.height;
+      if(info.weight==null) info.weight=p.weight;
+    }
+    if(sp){
+      if(!(info.egg_groups||[]).length) info.egg_groups=(sp.egg_groups||[]).map(x=>x.name).filter(Boolean);
+      if(!info.generation) info.generation=sp.generation&&sp.generation.name;
+    }
+  }catch(_){ }
   return info;
 }
 
 async function selectPokemon(id,name){
   id=Number(id); name=(name||'').trim().toLowerCase(); if(!id||!name)return;
-  const info=localBreedMeta(id,name);
-  selected={id,name,info,validated:!!info.breedavel};
-  idInput.value=info.breedavel?String(id):''; search.value=pretty(name); results.hidden=true;
+  selected={id,name,info:{id,name,breedavel:true,sprite:spriteFor(id,true),types:[],abilities:[],stats:[],egg_groups:[]},validated:false};
+  idInput.value=String(id); search.value=pretty(name); results.hidden=true;
   $$('.breed-ref-poke-card').forEach(c=>c.classList.toggle('selected',+c.dataset.id===id));
-  $('#pokemonNext').disabled=!info.breedavel;
-  $('#breed_special_alert').hidden=!info.breed_especial;
-  renderDetail(false);
-  window.dispatchEvent(new CustomEvent('hype:breed-pokemon-selected',{detail:{id,name,info}}));
-  updateExtraPriceAlerts();
-  if(!info.breedavel){setStatus(info.motivo||'Este Pokémon não está disponível para Breed.',true);return;}
-  setStatus(`Pokémon selecionado • ${info.categoria_label} ✓`);
-
-  // V34.4: detalhes complementares são opcionais e NUNCA bloqueiam a seleção.
-  // O endpoint rápido não consulta Supabase/PokéAPI. Se não responder em 900ms,
-  // o usuário continua normalmente com os dados locais já exibidos.
+  $('#pokemonNext').disabled=true;
+  renderDetail(true);
+  setStatus('Carregando informações e validando o Breed...');
   try{
-    const extra=await fetchJsonTimeout(`/api/breed/pokemon/${id}?nome=${encodeURIComponent(name)}&fast=1`,900);
-    if(!selected||selected.id!==id)return;
-    const merged={...selected.info,...extra,breedavel:selected.info.breedavel,categoria:extra.categoria||selected.info.categoria,categoria_label:extra.categoria_label||selected.info.categoria_label};
-    selected={id,name:extra.name||name,info:merged,validated:true};
+    const r=await fetch(`/api/breed/pokemon/${id}?nome=${encodeURIComponent(name)}`,{headers:{Accept:'application/json'},cache:'no-store'});
+    if(!r.ok){let msg='Falha ao validar o Pokémon.';try{const x=await r.json();msg=x.error||x.motivo||msg}catch(_){ }throw new Error(msg)}
+    let info=await r.json();
+    if(!info.breedavel){
+      selected={id,name:info.name||name,info,validated:false};
+      idInput.value='';
+      $$('.breed-ref-poke-card').forEach(c=>{if(+c.dataset.id===id)c.classList.add('breed-blocked-card')});
+      renderDetail(false);
+      throw new Error(info.motivo||'Este Pokémon não pode ser solicitado no Breed.');
+    }
+    info=await enrichPokemonInfoClient(id,info);
+    selected={id,name:info.name||name,info,validated:true};
+    idInput.value=String(id); search.value=pretty(selected.name);
+    $('#pokemonNext').disabled=false; $('#breed_special_alert').hidden=!info.breed_especial;
     renderDetail(false);
-    window.dispatchEvent(new CustomEvent('hype:breed-pokemon-selected',{detail:{id,name:selected.name,info:merged}}));
-  }catch(_){
-    // Silencioso de propósito: metadados visuais nunca devem travar o pedido.
+    updateExtraPriceAlerts();
+    const catLabel=info.categoria_label||String(info.categoria||'comum').replace('_',' ').toUpperCase();
+    const reason=info.classificacao_motivo?' • '+info.classificacao_motivo:'';
+    setStatus(`Pokémon válido • ${catLabel}${reason} ✓`);
+  }catch(e){
+    if(selected&&selected.id===id){selected.validated=false;$('#pokemonNext').disabled=true;renderDetail(false)}
+    setStatus((e&&e.message)||'Não foi possível validar o Pokémon.',true);
   }
 }
+
 function renderDetail(loading=false){
   if(!selected)return; const d=selected.info||{};
   const empty=$('#detailEmpty'),content=$('#detailContent');
@@ -351,7 +361,7 @@ function renderDetail(loading=false){
 }
 
 function validateStep(step){
-  if(step===1&&(!selected||!idInput.value)){setStatus('Selecione um Pokémon disponível para continuar.',true);return false}
+  if(step===1&&(!selected||!selected.validated||!idInput.value)){setStatus('Selecione e aguarde a validação do Pokémon antes de continuar.',true);return false}
   if(step===2){if(!$('#ha').value){alert('Selecione Ability/HA.');return false}if(!$('#genero').value){alert('Selecione o gênero.');return false}if(!breedTipo.value){alert('Selecione F5, F6 ou Hidden Power Ability.');return false}}
   if(step===3&&breedTipo.value==='F5'&&!ivSelect.value){alert(zeroSpeed.checked?'Com Zero Speed, escolha qual OUTRO IV pode ficar menor.':'No F5, escolha qual IV não precisa.');return false}
   if(step===3&&breedTipo.value==='F5'&&zeroSpeed.checked&&ivSelect.value==='velocidade'){alert('Zero Speed já define a Velocidade em 0 IV. Escolha outro IV que pode ficar menor.');return false}
@@ -382,7 +392,7 @@ function updateIvs(){
   if(zeroSpeed.checked&&f5){const x=$('.breed-ref-ivs b[data-iv="velocidade"]');if(x){x.textContent='0';x.className='zero'}}
   updateExtraPriceAlerts();
 }
-const HYPE_BREED_BUILD = 'V34.4';
+const HYPE_BREED_BUILD = 'V32';
 const HYPE_BREED_PRICE_URL = '/api/breed/preco';
 function formatHypePrice(v){
   const n=Math.max(0, Math.round(Number(v)||0));
@@ -431,7 +441,7 @@ async function refreshPrice(){
     if(!Number.isFinite(total)||total<=0)throw new Error('Preço não configurado para esta combinação.');
     lastPrice={...d,total}; const shown=formatHypePrice(total), original=Number(d.preco_original||total), discount=Number(d.desconto_valor||0);
     const breakdown=$('#breedPriceBreakdown'), items=$('#breedPriceItems'), tableLabel=$('#breedPricingTable');
-    if(breakdown&&items){items.innerHTML='';const rows=Array.isArray(d.componentes)?d.componentes:[];rows.forEach(x=>{const li=document.createElement('li'),v=Number(x.valor||0),orig=Number(x.valor_original||v);li.innerHTML=`<span>${x.nome||x.codigo}${x.promocao?' <em>'+x.promocao+'</em>':''}</span><b>${v<0?'-':''}${formatHypePrice(Math.abs(v))}${orig!==v&&orig>=0?' <del>'+formatHypePrice(orig)+'</del>':''}</b>`;items.appendChild(li)});if(Number(d.desconto_membro_hype_valor||0)>0){const li=document.createElement('li');li.innerHTML=`<span>Membro HYPE</span><b>-${formatHypePrice(d.desconto_membro_hype_valor)}</b>`;items.appendChild(li)};breakdown.hidden=!rows.length;if(tableLabel){const labels={comum:'COMUM',raro:'RARO',ultra_raro:'ULTRA RARO'};tableLabel.textContent=(d.tabela_preco_nome||'Tabela HYPE')+(d.tabela_preco_id?' #'+d.tabela_preco_id:'')+' · '+(labels[d.categoria]||String(d.categoria||'comum').toUpperCase());}}
+    if(breakdown&&items){items.innerHTML='';const rows=Array.isArray(d.componentes)?d.componentes:[];rows.forEach(x=>{const li=document.createElement('li'),v=Number(x.valor||0),orig=Number(x.valor_original||v);li.innerHTML=`<span>${x.nome||x.codigo}${x.promocao?' <em>'+x.promocao+'</em>':''}</span><b>${v<0?'-':''}${formatHypePrice(Math.abs(v))}${orig!==v&&orig>=0?' <del>'+formatHypePrice(orig)+'</del>':''}</b>`;items.appendChild(li)});if(Number(d.desconto_membro_hype_valor||0)>0){const li=document.createElement('li');li.innerHTML=`<span>Membro HYPE</span><b>-${formatHypePrice(d.desconto_membro_hype_valor)}</b>`;items.appendChild(li)};breakdown.hidden=!rows.length;if(tableLabel){const labels={comum:'COMUM',raro:'RARO',ultra_raro:'ULTRA RARO'};tableLabel.textContent=(d.tabela_preco_nome||'Tabela HYPE')+' · '+(labels[d.categoria]||String(d.categoria||'comum').toUpperCase());}}
     const banner=$('#breedPromoBanner');
     if(d.promocao_ativa&&discount>0){
       if(value)value.innerHTML=`<del>${formatHypePrice(original)}</del> <strong>${shown}</strong>`;
@@ -501,5 +511,4 @@ quickGrid.addEventListener('scroll',()=>{});
 window.addEventListener('scroll',()=>{if(currentQuery)return;const rect=quickGrid.getBoundingClientRect();if(rect.bottom<window.innerHeight+500&&fullCatalog.length>visibleLimit){visibleLimit+=40;paintPokemonGrid(fullCatalog,visibleLimit)}});
 })();
 </script>
-<script src="{{url_for('static',filename='breed_order_v341.js')}}?v=3440"></script>
 {% endblock %}

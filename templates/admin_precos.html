@@ -1,7 +1,7 @@
 {% extends "hype_app_base.html" %}
-{% block title %}Central de Preços Breed 3.1 · HYPE Admin{% endblock %}
+{% block title %}Central de Preços Breed 3.0 · HYPE Admin{% endblock %}
 {% block body_class %}bp33-prices-page{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3300"><link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v331.css')}}?v=3430">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3300"><link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v331.css')}}?v=3310">{% endblock %}
 {% block content %}
 <div class="bp33-admin-layout">
 <aside class="bp33-admin-sidebar" aria-label="Admin HYPE">
@@ -17,18 +17,18 @@
     <a href="{{url_for('admin_logs')}}"><span>☷</span>Logs</a>
     <a href="{{url_for('final.configuracoes')}}"><span>⚙</span>Configurações</a>
   </nav>
-  <div class="bp33-admin-sidebar-foot"><b>HYPE BREED</b><span>V34.3</span><small>● Sistema online</small><a href="{{url_for('painel')}}">← Voltar ao site</a></div>
+  <div class="bp33-admin-sidebar-foot"><b>HYPE BREED</b><span>V33.1</span><small>● Sistema online</small><a href="{{url_for('painel')}}">← Voltar ao site</a></div>
 </aside>
 <div class="bp33-admin-content">
 <div class="bp32-shell">
   <header class="bp32-hero">
-    <div><span class="bp32-kicker">ADMIN · HYPE BREED · V34.3</span><h1>Central de Preços <em>Breed 3.0</em></h1><p>Gerencie a economia do Breed por categoria, adicionais, Hidden Power Ability e exceções individuais de Pokémon.</p></div>
+    <div><span class="bp32-kicker">ADMIN · HYPE BREED · V33.1</span><h1>Central de Preços <em>Breed 3.0</em></h1><p>Gerencie a economia do Breed por categoria, adicionais, Hidden Power Ability e exceções individuais de Pokémon.</p></div>
     <div class="bp32-hero-status">
       {% if pricing_v2 and tabela_atual %}<small>TABELA EM VIGOR</small><b>{{tabela_atual.nome}}</b><span>#{{tabela_atual.id}} · {{tabela_atual.status_visual|replace('_',' ')|upper}}</span>{% else %}<small>PRICING 3.0</small><b>Migração pendente</b><span>Execute V31.2 e V31.3</span>{% endif %}
     </div>
   </header>
 
-  <nav class="bp32-tabs bp33-premium-tabs" aria-label="Central de Preços Breed 3.1">
+  <nav class="bp32-tabs bp33-premium-tabs" aria-label="Central de Preços Breed 3.0">
     <button type="button" class="active" data-bp-tab="comum"><span>◆</span>Comum</button>
     <button type="button" data-bp-tab="raro"><span>◇</span>Raro</button>
     <button type="button" data-bp-tab="ultra_raro"><span>♛</span>Ultra Raro</button>
@@ -56,10 +56,9 @@
       <input name="nome" placeholder="Ex.: Tabela Outubro HYPE"><button class="bp32-btn-gold">Criar rascunho</button>
     </form>
     {% elif rascunho %}
-    <div class="bp33-draft-premium"><div class="bp33-workflow-icon">▣</div><div class="bp33-workflow-copy"><small>RASCUNHO EM EDIÇÃO</small><b>{{rascunho.nome}}</b><span>#{{rascunho.id}} · use “Salvar e aplicar agora” para refletir imediatamente no Fazer Pedido</span></div><div class="bp33-rule-summary"><small>REGRAS PRINCIPAIS</small><b>Pedidos existentes nunca são recalculados</b><span>Comum · Raro · Ultra usam bases e adicionais próprios.</span></div><div class="bp33-draft-actions"><button type="button" class="bp32-btn-outline" data-open-rules>Regras da tabela</button><button type="button" class="bp32-btn-gold" data-open-publish>Publicar / Agendar</button></div></div>
+    <div class="bp33-draft-premium"><div class="bp33-workflow-icon">▣</div><div class="bp33-workflow-copy"><small>RASCUNHO EM EDIÇÃO</small><b>{{rascunho.nome}}</b><span>#{{rascunho.id}} · alterações ainda não afetam novos pedidos</span></div><div class="bp33-rule-summary"><small>REGRAS PRINCIPAIS</small><b>Pedidos existentes nunca são recalculados</b><span>Comum · Raro · Ultra usam bases e adicionais próprios.</span></div><div class="bp33-draft-actions"><button type="button" class="bp32-btn-outline" data-open-rules>Regras da tabela</button><button type="button" class="bp32-btn-gold" data-open-publish>Publicar / Agendar</button></div></div>
     {% endif %}
   </section>
-  {% if rascunho %}<div class="bp343-live-note"><b>⚡ Preço no Fazer Pedido</b><span><strong>Salvar no rascunho</strong> não altera o site ainda. <strong>Salvar e aplicar agora</strong> publica a versão imediatamente e cria outro rascunho para você continuar editando.</span></div>{% endif %}
 
   {% if alertas_preco %}<div class="bp32-alert-list"><b>Antes de publicar, corrija:</b>{% for a in alertas_preco %}<span>⚠ {{a}}</span>{% endfor %}</div>{% endif %}
 
@@ -72,7 +71,7 @@
         <form method="post" class="bp33-base-card {{pcat}} {{'locked' if not rascunho else ''}}">
           <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_componente"><input type="hidden" name="tabela_id" value="{{tabela_edicao.id}}"><input type="hidden" name="codigo" value="{{p.codigo}}">
           <div class="bp33-base-card-title"><span>{{'♛' if pcat=='ultra_raro' else '◆' if pcat=='raro' else '◇'}}</span><b>{{p.nome}}</b></div><small>Valor atual</small><strong>{{p.valor|preco}}</strong>
-          <label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><div class="bp343-price-actions"><button class="bp32-btn-outline" name="salvar_rascunho" value="1" {{'disabled' if not rascunho else ''}}>Salvar no rascunho</button><button class="bp32-btn-gold" name="aplicar_agora" value="1" {{'disabled' if not rascunho else ''}}>Salvar e aplicar agora</button></div>
+          <label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><button class="bp32-btn-gold" {{'disabled' if not rascunho else ''}}>▣ Salvar</button>
         </form>
         {% endfor %}
       </div>
@@ -113,7 +112,7 @@
         <form method="post" class="bp32-price-card bp33-price-card {{cat}} {{'locked' if not rascunho else ''}}">
           <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_componente"><input type="hidden" name="tabela_id" value="{{tabela_edicao.id}}"><input type="hidden" name="codigo" value="{{p.codigo}}">
           <div class="bp33-price-top"><small>{{p.codigo|replace('_',' ')|upper}}</small><span class="bp33-standard-badge">PADRÃO {{cat_label|upper}}</span></div><h3>{{p.nome}}</h3><div class="bp32-money">{{p.valor|preco}}</div>
-          <label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><div class="bp343-price-actions"><button class="bp32-btn-outline" name="salvar_rascunho" value="1" {{'disabled' if not rascunho else ''}}>Salvar no rascunho</button><button class="bp32-btn-gold" name="aplicar_agora" value="1" {{'disabled' if not rascunho else ''}}>Salvar e aplicar agora</button></div>
+          <label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><button class="bp32-btn-gold" {{'disabled' if not rascunho else ''}}>Salvar valor</button>
         </form>{% endfor %}
       </div></section>{% endif %}
       {% endfor %}
@@ -127,7 +126,7 @@
     <div class="bp32-custom-info"><article><b>COMUM</b><span>Preço próprio para Pokémon de reprodução padrão.</span></article><article><b>RARO</b><span>Preço próprio para a categoria rara configurada pelo HYPE.</span></article><article><b>ULTRA RARO</b><span>Preço próprio para espécies que dependem de Ditto.</span></article></div>
     <div class="bp32-price-grid">
       {% for p in componentes if p.grupo == 'personalizado' %}
-      <form method="post" class="bp32-price-card bp32-custom-price {{'locked' if not rascunho else ''}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_componente"><input type="hidden" name="tabela_id" value="{{tabela_edicao.id}}"><input type="hidden" name="codigo" value="{{p.codigo}}"><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3><div class="bp32-money">{{p.valor|preco}}</div><label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><div class="bp343-price-actions"><button class="bp32-btn-outline" name="salvar_rascunho" value="1" {{'disabled' if not rascunho else ''}}>Salvar no rascunho</button><button class="bp32-btn-gold" name="aplicar_agora" value="1" {{'disabled' if not rascunho else ''}}>Salvar e aplicar agora</button></div></form>
+      <form method="post" class="bp32-price-card bp32-custom-price {{'locked' if not rascunho else ''}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_componente"><input type="hidden" name="tabela_id" value="{{tabela_edicao.id}}"><input type="hidden" name="codigo" value="{{p.codigo}}"><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3><div class="bp32-money">{{p.valor|preco}}</div><label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><button class="bp32-btn-gold" {{'disabled' if not rascunho else ''}}>Salvar</button></form>
       {% else %}<div class="bp32-empty">Execute a migração V32 para habilitar os preços do modo personalizado.</div>{% endfor %}
     </div>
   </section>
@@ -169,10 +168,10 @@
     <div class="bp33-pokemon-toolbar"><label><span>Pesquisar Pokémon</span><input type="search" id="bp33PokemonSearch" placeholder="Digite nome ou número da Pokédex"></label><label><span>Filtrar categoria</span><select id="bp33PokemonCategory"><option value="todos">Todos</option><option value="comum">Comum</option><option value="raro">Raro</option><option value="ultra_raro">Ultra Raro</option><option value="override">Somente overrides</option></select></label><div><small>RESULTADOS</small><b id="bp33PokemonCount">{{classificacoes_pokemon|length}}</b></div></div>
     <div class="bp33-catalog-results" id="bp33CatalogResults" hidden></div>
     <div class="bp32-category-list bp33-category-list" id="bp33PokemonList">{% for x in classificacoes_pokemon %}<article data-pokemon-row data-name="{{(x.pokemon_nome or '')|lower}}" data-id="{{x.pokemon_id}}" data-category="{{x.categoria_override or x.categoria or 'comum'}}" data-override="{{'1' if x.categoria_override else '0'}}"><div><b>#{{x.pokemon_id}} · {{x.pokemon_nome}}</b><span class="{{x.categoria_override or x.categoria or 'comum'}}">{{(x.categoria_override or x.categoria or 'comum')|replace('_',' ')|upper}}</span>{% if x.categoria_override %}<em>OVERRIDE</em>{% endif %}{% if x.usa_ditto_override is sameas true %}<em>DITTO FORÇADO</em>{% elif x.usa_ditto_override is sameas false %}<em>SEM DITTO FORÇADO</em>{% endif %}</div>{% if x.motivo_override %}<small>{{x.motivo_override}}</small>{% endif %}</article>{% else %}<div class="bp32-empty">Nenhuma exceção manual. Todos os Pokémon serão classificados automaticamente pela regra HYPE.</div>{% endfor %}</div>
-    <div class="bp32-section-head bp32-subhead"><div><span>DIFICULDADE ESPECIAL / EXCEÇÕES</span><h2>Preço próprio, adicional ou multiplicador</h2><p>Use quando alguma espécie do seu servidor precisar de uma regra especial além de Comum, Raro ou Ultra Raro.</p></div></div><div class="bp343-live-note"><b>⚡ Exceção individual</b><span>Use <strong>Aplicar agora</strong> para o preço desse Pokémon aparecer imediatamente no Fazer Pedido.</span></div>
+    <div class="bp32-section-head bp32-subhead"><div><span>DIFICULDADE ESPECIAL / EXCEÇÕES</span><h2>Preço próprio, adicional ou multiplicador</h2><p>Use quando alguma espécie do seu servidor precisar de uma regra especial além de Comum, Raro ou Ultra Raro.</p></div></div>
     {% if rascunho %}
     <form method="post" class="bp32-species-form" id="bp33ExceptionForm"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_excecao"><input type="hidden" name="tabela_id" value="{{rascunho.id}}">
-      <label>ID Pokédex<input name="pokemon_id" type="number" min="1" required></label><label>Pokémon<input name="pokemon_nome" required placeholder="Ex.: Eevee"></label><label>Categoria<select name="categoria_override"><option value="">Usar cadastro padrão</option><option value="comum">Comum</option><option value="raro">Raro</option><option value="ultra_raro">Ultra Raro</option></select></label><label>Base fixa<input name="valor_base_override" placeholder="Opcional"></label><label>Adicional fixo<input name="adicional_fixo" value="0"></label><label>Multiplicador<input name="multiplicador" type="number" min="0.1" max="10" step="0.05" value="1"></label><label class="wide">Observação<input name="observacao" placeholder="Motivo da exceção"></label><div class="bp343-price-actions wide"><button class="bp32-btn-outline" name="salvar_rascunho" value="1">Salvar no rascunho</button><button class="bp32-btn-gold" name="aplicar_agora" value="1">Salvar e aplicar agora</button></div>
+      <label>ID Pokédex<input name="pokemon_id" type="number" min="1" required></label><label>Pokémon<input name="pokemon_nome" required placeholder="Ex.: Eevee"></label><label>Categoria<select name="categoria_override"><option value="">Usar cadastro padrão</option><option value="comum">Comum</option><option value="raro">Raro</option><option value="ultra_raro">Ultra Raro</option></select></label><label>Base fixa<input name="valor_base_override" placeholder="Opcional"></label><label>Adicional fixo<input name="adicional_fixo" value="0"></label><label>Multiplicador<input name="multiplicador" type="number" min="0.1" max="10" step="0.05" value="1"></label><label class="wide">Observação<input name="observacao" placeholder="Motivo da exceção"></label><button class="bp32-btn-gold">Salvar exceção</button>
     </form>
     {% else %}<div class="bp32-empty">Crie um rascunho para editar regras por espécie.</div>{% endif %}
     <div class="bp33-exception-toolbar"><label><span>Pesquisar exceções desta tabela</span><input type="search" id="bp33ExceptionSearch" placeholder="Ex.: Eevee, 133..."></label><span><b>{{excecoes|length}}</b> exceção(ões) cadastrada(s)</span></div>
