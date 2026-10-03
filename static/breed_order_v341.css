@@ -1,0 +1,263 @@
+/* HYPE V34.1 — Fazer Pedido Premium
+   Mantém a estrutura original e acrescenta seleção dourada, raridade por cor
+   e atmosfera elemental baseada no tipo do Pokémon. */
+
+.hype-breed-reference-page.breed-premium-v34-page{
+  --breed-gold:#f2c230;
+  --breed-gold-2:#ffdc58;
+  --breed-selected-type:#c7d0dc;
+  --breed-selected-type-soft:rgba(199,208,220,.12);
+  --breed-selected-rarity:#c4cbd4;
+  --breed-selected-bg:none;
+}
+
+/* Cards do catálogo: mantêm o desenho atual, mas ganham profundidade e raridade. */
+.hype-breed-reference-page .breed-ref-poke-card{
+  --card-type:#aeb7c3;
+  --card-type-soft:rgba(174,183,195,.10);
+  --card-rarity:#c4cbd4;
+  --card-type-bg:none;
+  isolation:isolate;
+  overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.012),0 8px 20px rgba(0,0,0,.18)!important;
+}
+.hype-breed-reference-page .breed-ref-poke-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background-image:var(--card-type-bg);
+  background-size:cover;
+  background-position:center;
+  opacity:.075;
+  filter:saturate(1.12) contrast(1.04);
+  transition:opacity .22s ease,transform .3s ease;
+}
+.hype-breed-reference-page .breed-ref-poke-card .breed-v341-card-shade{
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 35%,var(--card-type-soft),transparent 46%),
+    linear-gradient(180deg,rgba(12,17,24,.34),rgba(5,8,12,.83));
+}
+.hype-breed-reference-page .breed-ref-poke-card:hover::before{opacity:.14;transform:scale(1.035)}
+.hype-breed-reference-page .breed-ref-poke-card[data-rarity="comum"]{--card-rarity:#c8ced7}
+.hype-breed-reference-page .breed-ref-poke-card[data-rarity="raro"]{--card-rarity:#349cff}
+.hype-breed-reference-page .breed-ref-poke-card[data-rarity="ultra_raro"]{--card-rarity:#a85df6}
+.hype-breed-reference-page .breed-ref-poke-card[data-v341-ready="1"]{
+  border-color:color-mix(in srgb,var(--card-rarity) 36%,#28303b)!important;
+}
+.hype-breed-reference-page .breed-ref-poke-card[data-v341-ready="1"]:hover{
+  border-color:color-mix(in srgb,var(--card-rarity) 68%,#d6aa2d)!important;
+  box-shadow:0 10px 25px rgba(0,0,0,.36),0 0 18px color-mix(in srgb,var(--card-rarity) 18%,transparent)!important;
+}
+.hype-breed-reference-page .breed-ref-poke-card.selected{
+  border-color:#ffd43a!important;
+  background:linear-gradient(180deg,rgba(20,20,15,.82),rgba(7,9,13,.96))!important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb,var(--card-rarity) 62%,transparent),
+    0 0 0 1px rgba(163,123,12,.92),
+    0 0 20px color-mix(in srgb,var(--card-rarity) 24%,transparent),
+    0 0 32px rgba(245,193,35,.20),
+    0 14px 26px rgba(0,0,0,.35)!important;
+}
+.hype-breed-reference-page .breed-ref-poke-card.selected::before{opacity:.24;transform:scale(1.05)}
+.hype-breed-reference-page .breed-ref-poke-card.selected img{
+  filter:drop-shadow(0 11px 13px rgba(0,0,0,.55)) drop-shadow(0 0 11px color-mix(in srgb,var(--card-type) 25%,transparent));
+}
+
+.breed-v341-rarity-badge{
+  position:absolute;
+  left:7px;
+  bottom:7px;
+  z-index:3;
+  display:inline-flex;
+  align-items:center;
+  min-height:19px;
+  padding:2px 7px;
+  border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--card-rarity) 72%,transparent);
+  background:color-mix(in srgb,var(--card-rarity) 13%,rgba(4,7,11,.92));
+  color:var(--card-rarity);
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+  box-shadow:0 0 14px color-mix(in srgb,var(--card-rarity) 14%,transparent);
+}
+.hype-breed-reference-page .breed-ref-poke-card.selected .breed-v341-rarity-badge{
+  box-shadow:0 0 18px color-mix(in srgb,var(--card-rarity) 28%,transparent);
+}
+.hype-breed-reference-page .breed-card-types{min-height:16px;margin-bottom:18px}
+.hype-breed-reference-page .breed-card-types span{
+  border:1px solid color-mix(in srgb,var(--card-type) 45%,transparent);
+  background:color-mix(in srgb,var(--card-type) 21%,rgba(7,10,14,.9))!important;
+  box-shadow:0 0 10px color-mix(in srgb,var(--card-type) 9%,transparent);
+}
+
+/* Painel lateral do Pokémon selecionado. */
+.hype-breed-reference-page .breed-ref-detail[data-v341-selected="1"]{
+  --detail-type:var(--breed-selected-type);
+  --detail-type-soft:var(--breed-selected-type-soft);
+  --detail-rarity:var(--breed-selected-rarity);
+  --detail-type-bg:var(--breed-selected-bg);
+  border-left-color:rgba(255,202,56,.78)!important;
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb,var(--detail-rarity) 46%,transparent),
+    inset 18px 0 50px rgba(241,185,25,.025),
+    0 0 34px color-mix(in srgb,var(--detail-rarity) 9%,transparent)!important;
+}
+.hype-breed-reference-page .breed-ref-detail[data-v341-selected="1"]::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 55% 24%,var(--detail-type-soft),transparent 30%),
+    linear-gradient(180deg,rgba(8,11,16,.18),rgba(5,7,10,.72));
+  z-index:0;
+}
+.hype-breed-reference-page .breed-ref-detail[data-v341-selected="1"] #detailContent,
+.hype-breed-reference-page .breed-ref-detail[data-v341-selected="1"]>.breed-ref-next{position:relative;z-index:2}
+.hype-breed-reference-page .breed-detail-art[data-v341-selected="1"]{
+  min-height:205px;
+  border:1px solid color-mix(in srgb,var(--detail-rarity) 35%,rgba(255,214,67,.20));
+  border-radius:13px;
+  background-image:
+    radial-gradient(circle at 50% 46%,var(--detail-type-soft),transparent 42%),
+    linear-gradient(180deg,rgba(6,10,16,.14),rgba(5,7,10,.68)),
+    var(--detail-type-bg)!important;
+  background-size:auto,auto,cover!important;
+  background-position:center!important;
+  overflow:hidden;
+  box-shadow:
+    inset 0 0 36px rgba(0,0,0,.34),
+    0 0 22px color-mix(in srgb,var(--detail-type) 12%,transparent),
+    0 0 16px rgba(241,190,35,.07);
+}
+.hype-breed-reference-page .breed-detail-art[data-v341-selected="1"]::before{
+  width:160px!important;
+  height:34px!important;
+  background:radial-gradient(ellipse,color-mix(in srgb,var(--detail-type) 34%,transparent),transparent 70%)!important;
+}
+.hype-breed-reference-page .breed-detail-art[data-v341-selected="1"]::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  box-shadow:inset 0 0 42px rgba(0,0,0,.48),inset 0 0 0 1px rgba(255,208,55,.08);
+}
+.hype-breed-reference-page .breed-detail-art[data-v341-selected="1"] img{
+  filter:drop-shadow(0 14px 15px rgba(0,0,0,.58)) drop-shadow(0 0 13px color-mix(in srgb,var(--detail-type) 24%,transparent))!important;
+}
+.hype-breed-reference-page .breed-art-orbit{
+  border-color:color-mix(in srgb,var(--detail-rarity,#f1c232) 46%,transparent)!important;
+  box-shadow:0 0 30px color-mix(in srgb,var(--detail-type,#f1c232) 14%,transparent),inset 0 0 28px rgba(255,192,38,.035)!important;
+}
+.breed-v341-detail-rarity{
+  display:inline-flex;
+  margin:4px 0 0 34px;
+  padding:3px 8px;
+  border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--detail-rarity) 70%,transparent);
+  background:color-mix(in srgb,var(--detail-rarity) 12%,rgba(8,11,15,.86));
+  color:var(--detail-rarity);
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+/* O mesmo tema acompanha as próximas etapas sem alterar a organização. */
+.hype-breed-reference-page .breed-stage-card[data-v341-selected="1"],
+.hype-breed-reference-page .breed-review-card[data-v341-selected="1"],
+.hype-breed-reference-page .breed-send-card[data-v341-selected="1"]{
+  --detail-type:var(--breed-selected-type);
+  --detail-type-soft:var(--breed-selected-type-soft);
+  --detail-rarity:var(--breed-selected-rarity);
+  --detail-type-bg:var(--breed-selected-bg);
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  border-color:rgba(255,202,54,.62)!important;
+  box-shadow:0 18px 55px rgba(0,0,0,.46),0 0 25px color-mix(in srgb,var(--detail-rarity) 8%,transparent),0 0 18px rgba(244,192,39,.07)!important;
+}
+.hype-breed-reference-page .breed-stage-card[data-v341-selected="1"]::before,
+.hype-breed-reference-page .breed-review-card[data-v341-selected="1"]::before,
+.hype-breed-reference-page .breed-send-card[data-v341-selected="1"]::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background-image:var(--detail-type-bg);
+  background-size:cover;
+  background-position:center;
+  opacity:.055;
+  filter:saturate(1.12);
+}
+.hype-breed-reference-page .breed-stage-card[data-v341-selected="1"]::after,
+.hype-breed-reference-page .breed-review-card[data-v341-selected="1"]::after,
+.hype-breed-reference-page .breed-send-card[data-v341-selected="1"]::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:radial-gradient(circle at 82% 20%,var(--detail-type-soft),transparent 28%),linear-gradient(180deg,rgba(7,10,15,.70),rgba(4,6,9,.94));
+}
+.hype-breed-reference-page .breed-selected-mini{
+  transition:.2s ease;
+}
+.hype-breed-reference-page .breed-selected-mini[data-v341-selected="1"]{
+  border-color:color-mix(in srgb,var(--breed-selected-rarity) 46%,rgba(255,210,48,.30))!important;
+  background:radial-gradient(circle at 15% 50%,var(--breed-selected-type-soft),transparent 32%),rgba(6,9,13,.91)!important;
+  box-shadow:inset 0 0 0 1px rgba(255,208,50,.035),0 0 19px color-mix(in srgb,var(--breed-selected-type) 8%,transparent);
+}
+.hype-breed-reference-page .breed-selected-mini img{
+  filter:drop-shadow(0 6px 8px rgba(0,0,0,.44)) drop-shadow(0 0 8px color-mix(in srgb,var(--breed-selected-type) 15%,transparent));
+}
+
+/* Seleções de Nature / F5 / F6 / HPA continuam douradas como linguagem HYPE. */
+.hype-breed-reference-page .breed-mode-card.active{
+  border-color:#ffd33e!important;
+  box-shadow:0 0 0 1px rgba(138,102,10,.85),0 0 23px rgba(244,188,31,.19),inset 0 0 18px rgba(244,188,31,.045)!important;
+}
+.hype-breed-reference-page .breed-ref-fields select:focus,
+.hype-breed-reference-page .breed-custom-grid input:focus{
+  border-color:#d8aa27!important;
+  box-shadow:0 0 0 3px rgba(241,194,50,.08)!important;
+  outline:none!important;
+}
+
+/* Tipos. */
+.hype-breed-reference-page [data-poke-type="normal"]{--detail-type:#b7bdc8;--detail-type-soft:rgba(183,189,200,.13)}
+.hype-breed-reference-page [data-poke-type="fire"]{--detail-type:#ff6b2c;--detail-type-soft:rgba(255,107,44,.18)}
+.hype-breed-reference-page [data-poke-type="water"]{--detail-type:#289cff;--detail-type-soft:rgba(40,156,255,.19)}
+.hype-breed-reference-page [data-poke-type="electric"]{--detail-type:#ffd83d;--detail-type-soft:rgba(255,216,61,.17)}
+.hype-breed-reference-page [data-poke-type="grass"]{--detail-type:#5fd175;--detail-type-soft:rgba(95,209,117,.16)}
+.hype-breed-reference-page [data-poke-type="ice"]{--detail-type:#72e2f3;--detail-type-soft:rgba(114,226,243,.17)}
+.hype-breed-reference-page [data-poke-type="fighting"]{--detail-type:#ef5d59;--detail-type-soft:rgba(239,93,89,.16)}
+.hype-breed-reference-page [data-poke-type="poison"]{--detail-type:#b75ee0;--detail-type-soft:rgba(183,94,224,.16)}
+.hype-breed-reference-page [data-poke-type="ground"]{--detail-type:#c58b4a;--detail-type-soft:rgba(197,139,74,.16)}
+.hype-breed-reference-page [data-poke-type="flying"]{--detail-type:#89bdf5;--detail-type-soft:rgba(137,189,245,.16)}
+.hype-breed-reference-page [data-poke-type="psychic"]{--detail-type:#f260dd;--detail-type-soft:rgba(242,96,221,.16)}
+.hype-breed-reference-page [data-poke-type="bug"]{--detail-type:#9ccb37;--detail-type-soft:rgba(156,203,55,.16)}
+.hype-breed-reference-page [data-poke-type="rock"]{--detail-type:#ae926d;--detail-type-soft:rgba(174,146,109,.16)}
+.hype-breed-reference-page [data-poke-type="ghost"]{--detail-type:#8d71d9;--detail-type-soft:rgba(141,113,217,.17)}
+.hype-breed-reference-page [data-poke-type="dragon"]{--detail-type:#796eff;--detail-type-soft:rgba(121,110,255,.17)}
+.hype-breed-reference-page [data-poke-type="dark"]{--detail-type:#737e8e;--detail-type-soft:rgba(115,126,142,.15)}
+.hype-breed-reference-page [data-poke-type="steel"]{--detail-type:#aebdca;--detail-type-soft:rgba(174,189,202,.15)}
+.hype-breed-reference-page [data-poke-type="fairy"]{--detail-type:#ff91d0;--detail-type-soft:rgba(255,145,208,.16)}
+
+@media(max-width:800px){
+  .hype-breed-reference-page .breed-ref-detail[data-v341-selected="1"]{border-left:0!important;border-top-color:rgba(255,202,56,.68)!important}
+  .breed-v341-rarity-badge{bottom:6px;left:6px;font-size:7px;padding:2px 6px}
+}
+@media(prefers-reduced-motion:reduce){
+  .hype-breed-reference-page .breed-ref-poke-card::before,
+  .hype-breed-reference-page .breed-ref-poke-card img{transition:none!important}
+}
