@@ -7,7 +7,7 @@
   <section class="breed-ref-hero">
     <div class="breed-ref-hero-copy">
       <span class="breed-ref-kicker">HYPE BREED</span>
-      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PRICING 4.0 • V32</small>
+      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PRICING 4.1 • V34.6</small>
       <p>Monte seu Breed em etapas. Escolha o Pokémon, configure as características, revise e envie.</p>
     </div>
     <div class="breed-ref-hero-mark">HYPE</div>
@@ -392,7 +392,7 @@ function updateIvs(){
   if(zeroSpeed.checked&&f5){const x=$('.breed-ref-ivs b[data-iv="velocidade"]');if(x){x.textContent='0';x.className='zero'}}
   updateExtraPriceAlerts();
 }
-const HYPE_BREED_BUILD = 'V32';
+const HYPE_BREED_BUILD = 'V34.6';
 const HYPE_BREED_PRICE_URL = '/api/breed/preco';
 function formatHypePrice(v){
   const n=Math.max(0, Math.round(Number(v)||0));
@@ -441,7 +441,7 @@ async function refreshPrice(){
     if(!Number.isFinite(total)||total<=0)throw new Error('Preço não configurado para esta combinação.');
     lastPrice={...d,total}; const shown=formatHypePrice(total), original=Number(d.preco_original||total), discount=Number(d.desconto_valor||0);
     const breakdown=$('#breedPriceBreakdown'), items=$('#breedPriceItems'), tableLabel=$('#breedPricingTable');
-    if(breakdown&&items){items.innerHTML='';const rows=Array.isArray(d.componentes)?d.componentes:[];rows.forEach(x=>{const li=document.createElement('li'),v=Number(x.valor||0),orig=Number(x.valor_original||v);li.innerHTML=`<span>${x.nome||x.codigo}${x.promocao?' <em>'+x.promocao+'</em>':''}</span><b>${v<0?'-':''}${formatHypePrice(Math.abs(v))}${orig!==v&&orig>=0?' <del>'+formatHypePrice(orig)+'</del>':''}</b>`;items.appendChild(li)});if(Number(d.desconto_membro_hype_valor||0)>0){const li=document.createElement('li');li.innerHTML=`<span>Membro HYPE</span><b>-${formatHypePrice(d.desconto_membro_hype_valor)}</b>`;items.appendChild(li)};breakdown.hidden=!rows.length;if(tableLabel){const labels={comum:'COMUM',raro:'RARO',ultra_raro:'ULTRA RARO'};tableLabel.textContent=(d.tabela_preco_nome||'Tabela HYPE')+' · '+(labels[d.categoria]||String(d.categoria||'comum').toUpperCase());}}
+    if(breakdown&&items){items.innerHTML='';const rows=Array.isArray(d.componentes)?d.componentes:[];rows.forEach(x=>{const li=document.createElement('li'),v=Number(x.valor||0),orig=Number(x.valor_original||v);li.innerHTML=`<span>${x.nome||x.codigo}${x.promocao?' <em>'+x.promocao+'</em>':''}</span><b>${v<0?'-':''}${formatHypePrice(Math.abs(v))}${orig!==v&&orig>=0?' <del>'+formatHypePrice(orig)+'</del>':''}</b>`;items.appendChild(li)});if(Number(d.desconto_membro_hype_valor||0)>0){const li=document.createElement('li');li.innerHTML=`<span>Membro HYPE</span><b>-${formatHypePrice(d.desconto_membro_hype_valor)}</b>`;items.appendChild(li)};breakdown.hidden=!rows.length;if(tableLabel){const labels={comum:'COMUM',raro:'RARO',ultra_raro:'ULTRA RARO'};tableLabel.textContent=(d.tabela_preco_nome||'Tabela HYPE')+(d.tabela_preco_id?' #'+d.tabela_preco_id:'')+' · '+(labels[d.categoria]||String(d.categoria||'comum').toUpperCase());}}
     const banner=$('#breedPromoBanner');
     if(d.promocao_ativa&&discount>0){
       if(value)value.innerHTML=`<del>${formatHypePrice(original)}</del> <strong>${shown}</strong>`;
