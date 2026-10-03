@@ -1,0 +1,324 @@
+/* HYPE V34 — Breed Visual Premium
+   Mantém a identidade HYPE (preto/grafite + dourado), acrescenta raridade por cor
+   e atmosfera elemental baseada no tipo do Pokémon. */
+
+.breed-premium-v34-page{
+  --v34-gold:#f1c232;
+  --v34-gold-2:#ffd75a;
+  --v34-ink:#06080b;
+  --v34-panel:#0b0f14;
+  --v34-panel-2:#10151c;
+  --v34-line:rgba(255,255,255,.075);
+  --v34-rarity:#b9c1cc;
+  --v34-type:#d6dbe3;
+}
+
+.breed-premium-v34-page .hype-v6-page{
+  position:relative;
+}
+.breed-premium-v34-page .hype-v6-page::before{
+  content:"";
+  position:fixed;
+  inset:64px 0 0 250px;
+  pointer-events:none;
+  z-index:-1;
+  background:
+    radial-gradient(circle at 82% 8%,rgba(244,193,45,.08),transparent 28%),
+    radial-gradient(circle at 12% 70%,rgba(244,193,45,.035),transparent 34%);
+}
+
+/* Cabeçalhos e navegação do módulo */
+.breed-premium-v34-page .mybreed-v22-hero,
+.breed-premium-v34-page .breed-v21-hero,
+.breed-premium-v34-page .breeder-v22-hero{
+  border-color:rgba(241,194,50,.28)!important;
+  background:
+    linear-gradient(135deg,rgba(14,18,23,.96),rgba(6,8,11,.98) 65%,rgba(43,30,4,.55))!important;
+  box-shadow:0 22px 50px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.035),0 0 0 1px rgba(241,194,50,.02)!important;
+}
+.breed-premium-v34-page .mybreed-v22-hero h1,
+.breed-premium-v34-page .breed-v21-hero h1,
+.breed-premium-v34-page .breeder-v22-hero h1{
+  letter-spacing:.025em;
+  text-shadow:0 0 22px rgba(241,194,50,.13);
+}
+.breed-premium-v34-page .hype-breed-subnav{
+  border-color:rgba(241,194,50,.22)!important;
+  background:linear-gradient(180deg,rgba(11,15,20,.98),rgba(7,9,12,.98))!important;
+  box-shadow:0 12px 28px rgba(0,0,0,.18);
+}
+.breed-premium-v34-page .hype-breed-subnav a{
+  transition:.2s ease;
+}
+.breed-premium-v34-page .hype-breed-subnav a:hover{
+  color:#f4cc45!important;
+  background:rgba(241,194,50,.055);
+}
+.breed-premium-v34-page .hype-breed-subnav a.active{
+  color:#171205!important;
+  background:linear-gradient(180deg,#ffd75a,#d7a91f)!important;
+  box-shadow:0 0 24px rgba(241,194,50,.20),inset 0 1px 0 rgba(255,255,255,.34);
+}
+
+/* Tema do card de Pokémon/pedido */
+.breed-v34-themed{
+  --breed-type-bg:none;
+  --breed-type:rgba(255,255,255,.32);
+  --breed-type-soft:rgba(255,255,255,.08);
+  --breed-rarity:#b9c1cc;
+  position:relative!important;
+  isolation:isolate;
+  overflow:hidden!important;
+}
+.breed-v34-themed::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background-image:var(--breed-type-bg);
+  background-size:cover;
+  background-position:center;
+  opacity:.16;
+  filter:saturate(1.05) contrast(1.05);
+  transition:opacity .22s ease,transform .35s ease;
+}
+.breed-v34-themed::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 18% 48%,var(--breed-type-soft),transparent 28%),
+    linear-gradient(90deg,rgba(7,9,12,.76),rgba(8,10,14,.91) 58%,rgba(5,7,10,.97));
+}
+.breed-v34-themed:hover::before{opacity:.23;transform:scale(1.025)}
+.breed-v34-themed[data-rarity="comum"]{--breed-rarity:#c4cbd4}
+.breed-v34-themed[data-rarity="raro"]{--breed-rarity:#2d97ff}
+.breed-v34-themed[data-rarity="ultra_raro"]{--breed-rarity:#a855f7}
+
+/* Badge de raridade + tipo */
+.breed-v34-meta-slot{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:5px;
+  margin:4px 0 7px;
+}
+.breed-v34-rarity-badge,
+.breed-v34-type-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height:21px;
+  padding:3px 8px;
+  border-radius:999px;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+  line-height:1;
+  white-space:nowrap;
+}
+.breed-v34-rarity-badge{
+  border:1px solid color-mix(in srgb,var(--breed-rarity) 70%,transparent);
+  color:var(--breed-rarity);
+  background:color-mix(in srgb,var(--breed-rarity) 12%,rgba(9,11,15,.9));
+  box-shadow:0 0 18px color-mix(in srgb,var(--breed-rarity) 12%,transparent);
+}
+.breed-v34-type-badge{
+  border:1px solid color-mix(in srgb,var(--breed-type) 55%,transparent);
+  color:#f4f7fb;
+  background:color-mix(in srgb,var(--breed-type) 22%,rgba(8,10,14,.86));
+}
+
+/* Moldura da arte — parte mais próxima da referência aprovada */
+.breed-premium-v34-page .mybreed-v22-art,
+.breed-premium-v34-page .breed-v21-pokemon-art,
+.breed-premium-v34-page .breeder-v22-order-poke>div,
+.breed-premium-v34-page .v28-commission-poke{
+  position:relative;
+  overflow:hidden;
+  border-color:color-mix(in srgb,var(--breed-rarity) 46%,rgba(241,194,50,.25))!important;
+  background:
+    radial-gradient(circle at 50% 45%,var(--breed-type-soft),transparent 62%),
+    #0a0d12!important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.025),
+    0 0 20px color-mix(in srgb,var(--breed-type) 9%,transparent);
+}
+.breed-premium-v34-page .mybreed-v22-art::before,
+.breed-premium-v34-page .breed-v21-pokemon-art::before,
+.breed-premium-v34-page .breeder-v22-order-poke>div::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  background-image:var(--breed-type-bg);
+  background-size:cover;
+  background-position:center;
+  opacity:.34;
+  filter:saturate(1.18) contrast(1.03);
+}
+.breed-premium-v34-page .mybreed-v22-art::after,
+.breed-premium-v34-page .breed-v21-pokemon-art::after,
+.breed-premium-v34-page .breeder-v22-order-poke>div::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:1;
+  box-shadow:inset 0 0 26px rgba(0,0,0,.58),inset 0 -18px 28px rgba(0,0,0,.25);
+}
+.breed-premium-v34-page .mybreed-v22-art img,
+.breed-premium-v34-page .breed-v21-pokemon-art img,
+.breed-premium-v34-page .breeder-v22-order-poke>div img{
+  position:relative;
+  z-index:2;
+  filter:drop-shadow(0 10px 12px rgba(0,0,0,.40));
+  transition:transform .22s ease,filter .22s ease;
+}
+.breed-v34-themed:hover .mybreed-v22-art img,
+.breed-v34-themed:hover .breed-v21-pokemon-art img,
+.breed-v34-themed:hover .breeder-v22-order-poke>div img{
+  transform:translateY(-2px) scale(1.035);
+  filter:drop-shadow(0 12px 16px rgba(0,0,0,.46));
+}
+
+/* MEUS PEDIDOS */
+.breed-premium-v34-page .mybreed-v22-kpis article,
+.breed-premium-v34-page .breeder-v22-kpis article{
+  border-color:rgba(241,194,50,.14)!important;
+  background:linear-gradient(150deg,#0e1218,#090c10)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.02),0 10px 26px rgba(0,0,0,.17);
+}
+.breed-premium-v34-page .mybreed-v22-card{
+  border:1px solid color-mix(in srgb,var(--breed-rarity) 22%,rgba(255,255,255,.07))!important;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb,var(--breed-rarity) 72%,transparent),
+    0 16px 36px rgba(0,0,0,.24)!important;
+  transition:.22s ease!important;
+}
+.breed-premium-v34-page .mybreed-v22-card:hover{
+  border-color:rgba(241,194,50,.48)!important;
+  box-shadow:
+    inset 3px 0 0 var(--breed-rarity),
+    0 0 0 1px rgba(241,194,50,.10),
+    0 18px 42px rgba(0,0,0,.30),
+    0 0 28px rgba(241,194,50,.08)!important;
+  transform:translateY(-2px);
+}
+.breed-premium-v34-page .mybreed-v22-card[data-history="0"]{
+  border-top-color:rgba(241,194,50,.32)!important;
+}
+.breed-premium-v34-page .mybreed-v22-summary>strong{
+  color:#ffd65a!important;
+  text-shadow:0 0 18px rgba(241,194,50,.16);
+}
+.breed-premium-v34-page .mybreed-v22-filterbar{
+  border-color:rgba(241,194,50,.16)!important;
+  background:linear-gradient(180deg,#0d1116,#090c10)!important;
+}
+
+/* FILA DOS BREEDERS */
+.breed-premium-v34-page .breed-v21-toolbar-card,
+.breed-premium-v34-page .breed-v21-side-card{
+  border-color:rgba(241,194,50,.17)!important;
+  background:linear-gradient(160deg,#0e1218,#080b0f)!important;
+}
+.breed-premium-v34-page .breed-v21-order{
+  border:1px solid color-mix(in srgb,var(--breed-rarity) 24%,#20252c)!important;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb,var(--breed-rarity) 70%,transparent),
+    0 14px 30px rgba(0,0,0,.21)!important;
+}
+.breed-premium-v34-page .breed-v21-order:hover{
+  border-color:rgba(241,194,50,.46)!important;
+  box-shadow:
+    inset 3px 0 0 var(--breed-rarity),
+    0 0 0 1px rgba(241,194,50,.08),
+    0 18px 38px rgba(0,0,0,.28),
+    0 0 26px rgba(241,194,50,.07)!important;
+}
+.breed-premium-v34-page .breed-v21-order[data-mine="1"]{
+  border-color:rgba(241,194,50,.56)!important;
+  box-shadow:
+    inset 3px 0 0 var(--breed-rarity),
+    inset 0 0 0 1px rgba(241,194,50,.05),
+    0 0 22px rgba(241,194,50,.08),
+    0 15px 34px rgba(0,0,0,.24)!important;
+}
+.breed-premium-v34-page .breed-v21-order[data-mine="1"] .breed-v21-pokemon-art{
+  border-color:#e9bd35!important;
+  box-shadow:0 0 0 1px rgba(255,213,76,.18),0 0 24px rgba(241,194,50,.12)!important;
+}
+.breed-premium-v34-page .breed-v21-gold{
+  background:linear-gradient(180deg,#ffdf68,#d6a318)!important;
+  box-shadow:0 8px 22px rgba(232,183,38,.17),inset 0 1px 0 rgba(255,255,255,.42)!important;
+}
+
+/* PAINEL DO BREEDER */
+.breed-premium-v34-page .breeder-v22-main,
+.breed-premium-v34-page .breeder-v22-panel,
+.breed-premium-v34-page .v28-breeder-finance,
+.breed-premium-v34-page .breeder-v22-statusbar{
+  border-color:rgba(241,194,50,.16)!important;
+  background:linear-gradient(150deg,#0e1218,#080b0f)!important;
+  box-shadow:0 16px 38px rgba(0,0,0,.22)!important;
+}
+.breed-premium-v34-page .breeder-v22-order{
+  border:1px solid color-mix(in srgb,var(--breed-rarity) 24%,rgba(255,255,255,.065))!important;
+  box-shadow:inset 3px 0 0 color-mix(in srgb,var(--breed-rarity) 72%,transparent),0 10px 24px rgba(0,0,0,.17);
+}
+.breed-premium-v34-page .breeder-v22-order:hover{
+  border-color:rgba(241,194,50,.46)!important;
+  box-shadow:inset 3px 0 0 var(--breed-rarity),0 0 24px rgba(241,194,50,.07),0 16px 32px rgba(0,0,0,.24)!important;
+  transform:translateY(-2px);
+}
+.breed-premium-v34-page .breeder-v22-order.status-em_producao,
+.breed-premium-v34-page .breeder-v22-order.status-cancelamento_solicitado{
+  border-color:rgba(241,194,50,.55)!important;
+  box-shadow:inset 3px 0 0 var(--breed-rarity),0 0 26px rgba(241,194,50,.09),0 15px 30px rgba(0,0,0,.23)!important;
+}
+.breed-premium-v34-page .breeder-v22-order.status-em_producao::before{opacity:.24}
+.breed-premium-v34-page .breeder-v22-order-actions button{
+  background:linear-gradient(180deg,#ffdc62,#ce9b18)!important;
+  box-shadow:0 7px 18px rgba(241,194,50,.12);
+}
+.breed-premium-v34-page .breeder-v22-order-state>b,
+.breed-premium-v34-page .v28-commission-value b{
+  color:#f6cf4c!important;
+}
+
+/* Tipo: cores principais. O JS injeta a mesma cor em --breed-type. */
+.breed-v34-themed[data-poke-type="normal"]{--breed-type:#b7bdc8;--breed-type-soft:rgba(183,189,200,.12)}
+.breed-v34-themed[data-poke-type="fire"]{--breed-type:#ff6b2c;--breed-type-soft:rgba(255,107,44,.15)}
+.breed-v34-themed[data-poke-type="water"]{--breed-type:#289cff;--breed-type-soft:rgba(40,156,255,.17)}
+.breed-v34-themed[data-poke-type="electric"]{--breed-type:#ffd83d;--breed-type-soft:rgba(255,216,61,.15)}
+.breed-v34-themed[data-poke-type="grass"]{--breed-type:#5fd175;--breed-type-soft:rgba(95,209,117,.14)}
+.breed-v34-themed[data-poke-type="ice"]{--breed-type:#72e2f3;--breed-type-soft:rgba(114,226,243,.15)}
+.breed-v34-themed[data-poke-type="fighting"]{--breed-type:#ef5d59;--breed-type-soft:rgba(239,93,89,.14)}
+.breed-v34-themed[data-poke-type="poison"]{--breed-type:#b75ee0;--breed-type-soft:rgba(183,94,224,.14)}
+.breed-v34-themed[data-poke-type="ground"]{--breed-type:#c58b4a;--breed-type-soft:rgba(197,139,74,.14)}
+.breed-v34-themed[data-poke-type="flying"]{--breed-type:#89bdf5;--breed-type-soft:rgba(137,189,245,.14)}
+.breed-v34-themed[data-poke-type="psychic"]{--breed-type:#f260dd;--breed-type-soft:rgba(242,96,221,.14)}
+.breed-v34-themed[data-poke-type="bug"]{--breed-type:#9ccb37;--breed-type-soft:rgba(156,203,55,.14)}
+.breed-v34-themed[data-poke-type="rock"]{--breed-type:#ae926d;--breed-type-soft:rgba(174,146,109,.14)}
+.breed-v34-themed[data-poke-type="ghost"]{--breed-type:#8d71d9;--breed-type-soft:rgba(141,113,217,.15)}
+.breed-v34-themed[data-poke-type="dragon"]{--breed-type:#796eff;--breed-type-soft:rgba(121,110,255,.15)}
+.breed-v34-themed[data-poke-type="dark"]{--breed-type:#737e8e;--breed-type-soft:rgba(115,126,142,.13)}
+.breed-v34-themed[data-poke-type="steel"]{--breed-type:#aebdca;--breed-type-soft:rgba(174,189,202,.13)}
+.breed-v34-themed[data-poke-type="fairy"]{--breed-type:#ff91d0;--breed-type-soft:rgba(255,145,208,.14)}
+
+@media(max-width:900px){
+  .breed-premium-v34-page .hype-v6-page::before{inset:58px 0 0 0}
+  .breed-v34-themed::before{opacity:.12}
+  .breed-v34-meta-slot{margin-bottom:5px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .breed-v34-themed,
+  .breed-v34-themed::before,
+  .breed-premium-v34-page .mybreed-v22-art img,
+  .breed-premium-v34-page .breed-v21-pokemon-art img,
+  .breed-premium-v34-page .breeder-v22-order-poke>div img{transition:none!important}
+}

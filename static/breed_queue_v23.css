@@ -1,0 +1,29 @@
+/* HYPE V23 - Fila dos Breeders: filtros/ disponibilidade isolados do CSS legado */
+.breedq-controls{align-items:flex-end!important;gap:18px!important;padding-top:14px!important}
+.breedq-filter-wrap,.breedq-availability{display:grid;gap:8px;min-width:0}
+.breedq-filter-wrap{flex:1 1 620px}
+.breedq-availability{flex:0 1 auto;justify-items:end;margin:0}
+.breedq-control-label{display:block;color:#6f7680;font-size:9px;font-weight:950;letter-spacing:.09em;text-transform:uppercase}
+.breedq-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.breedq-filters button,.breedq-status-segments button{appearance:none;-webkit-appearance:none;border:1px solid #2a3039;outline:0;font:inherit;box-sizing:border-box;cursor:pointer;transition:border-color .16s ease,background .16s ease,color .16s ease,transform .16s ease,box-shadow .16s ease}
+.breedq-filters button{display:inline-flex;align-items:center;gap:9px;min-height:38px;padding:7px 8px 7px 13px;border-radius:10px;background:linear-gradient(180deg,#11151b,#0a0d12);color:#9da4ae;font-size:11px;font-weight:850;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
+.breedq-filters button>span{line-height:1}
+.breedq-filters button>b{display:grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:#171c23;color:#c5cad0;font-size:10px;font-weight:950}
+.breedq-filters button:hover{border-color:rgba(230,186,50,.45);color:#edc84f;transform:translateY(-1px)}
+.breedq-filters button.active{border-color:#d8aa27;background:linear-gradient(135deg,rgba(231,187,51,.2),rgba(93,66,7,.12));color:#f4cf51;box-shadow:0 0 0 1px rgba(224,177,38,.08),0 8px 20px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,220,106,.08)}
+.breedq-filters button.active>b{border-color:#e2b52d;background:#e2b52d;color:#151105}
+.breedq-status-segments{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid #262c34;border-radius:12px;background:#080b0f;box-shadow:inset 0 1px 5px rgba(0,0,0,.32)}
+.breedq-status-segments button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:32px;padding:7px 10px;border-color:transparent;border-radius:8px;background:transparent;color:#7f8791;font-size:9.5px;font-weight:900;white-space:nowrap}
+.breedq-status-segments button i{width:7px;height:7px;border-radius:50%;box-shadow:0 0 8px currentColor}
+.breedq-status-segments button i.green{background:#3ddc8d;color:#3ddc8d}.breedq-status-segments button i.gold{background:#e5b632;color:#e5b632}.breedq-status-segments button i.red{background:#ec6666;color:#ec6666}
+.breedq-status-segments button:hover{color:#d5d9de;background:#11161c}
+.breedq-status-segments button.active{border-color:rgba(226,182,49,.35);background:linear-gradient(180deg,#161a20,#101319);color:#f0ca4b;box-shadow:0 6px 15px rgba(0,0,0,.22)}
+.breedq-empty{margin-top:10px!important}
+.breedq-empty[hidden]{display:none!important}
+.breed-v21-pagination button{appearance:none;-webkit-appearance:none}
+/* ações: impede botão nativo branco caso style.css esteja em cache */
+.breed-v22-actions-card button,.breed-v22-return button,.breeder-v22-order-actions button,.breed-v21-actions button{appearance:none;-webkit-appearance:none;border-radius:9px;font-weight:900;cursor:pointer}
+.breed-v22-actions-card .btn-dourado,.breed-v22-return .btn-dourado{border:1px solid #e2b52d;background:linear-gradient(135deg,#efc84c,#bd8d1c);color:#0b0c0f;min-height:38px;padding:9px 13px;box-shadow:0 8px 18px rgba(0,0,0,.22)}
+.breed-v22-return .btn-danger-hype{border:1px solid rgba(224,85,77,.48);background:rgba(133,40,35,.18);color:#ff8b84;min-height:38px;padding:9px 13px}
+@media(max-width:980px){.breedq-controls{align-items:stretch!important;flex-direction:column}.breedq-availability{justify-items:start}.breedq-filters{overflow-x:auto;flex-wrap:nowrap;padding-bottom:3px}.breedq-status-segments{max-width:100%;overflow-x:auto}.breedq-filters button{flex:0 0 auto}}
+@media(max-width:560px){.breedq-status-segments{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}.breedq-status-segments button{padding:7px 5px;font-size:8.5px}.breedq-filter-wrap{width:100%}}
