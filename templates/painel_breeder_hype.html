@@ -1,6 +1,7 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}Central do Breeder — HYPE{% endblock %}
-{% block body_class %}hype-breeder-dashboard-page{% endblock %}
+{% block body_class %}hype-breeder-dashboard-page breed-premium-v34-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_premium_v34.css')}}?v=3401">{% endblock %}
 {% block content %}
 <div class="hype-v6-page breeder-v22-page">
   <section class="breeder-v22-hero">
@@ -88,10 +89,10 @@
       <div class="breeder-v22-section-head"><div><span class="breed-kicker">OPERAÇÃO</span><h2>Meus pedidos atuais</h2></div><a href="{{url_for('breed_fila_breeders')}}">Ver fila completa →</a></div>
       <div class="breeder-v22-orders">
         {% for p in ativos + prontos %}
-        <article class="breeder-v22-order status-{{p.status}}">
+        <article class="breeder-v22-order status-{{p.status}} breed-v34-themed" data-pokemon-id="{{p.pokemon_id or ''}}" data-pokemon-name="{{p.pokemon|e}}" data-rarity="{{p.categoria_preco or 'comum'}}">
           <div class="breeder-v22-order-poke">
             <div>{% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png" alt="">{% else %}<span>◈</span>{% endif %}</div>
-            <section><small>#{{p.id}} · {{p.cliente_nick}}</small><strong>{{p.pokemon}}</strong><p>{{p.breed_tipo or '—'}} · {{p.nature or 'Sem Nature'}} · {{'HA' if p.ha else 'Sem HA'}}</p></section>
+            <section><small>#{{p.id}} · {{p.cliente_nick}}</small><strong>{{p.pokemon}}</strong><div class="breed-v34-meta-slot"></div><p>{{'Hidden Power Ability' if p.breed_tipo == 'PERSONALIZADO' else (p.breed_tipo or '—')}} · {{p.nature or 'Sem Nature'}} · {{'HA' if p.ha else 'Sem HA'}}</p></section>
           </div>
           <div class="breeder-v22-order-state"><span>{{p.status|replace('_',' ')|title}}</span><b>{{p.preco_total|preco}}</b>{% if p.mensagens_nao_lidas %}<em>{{p.mensagens_nao_lidas}} nova(s) msg</em>{% endif %}</div>
           <div class="breeder-v22-order-actions">
@@ -138,4 +139,8 @@
     </aside>
   </div>
 </div>
+{% endblock %}
+{% block extra_scripts %}
+<script>window.HYPE_BREED_SCRIPT_ROOT={{ request.script_root|tojson }};</script>
+<script src="{{url_for('static',filename='breed_premium_v34.js')}}?v=3401"></script>
 {% endblock %}

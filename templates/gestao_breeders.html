@@ -75,7 +75,7 @@
                         <details class="breed-details">
                             <summary>Ver breeds</summary>
                             {% for p in b.pedidos %}
-                            <div><b>{{ p.pokemon }}</b> · {{ p.breed_tipo }} · {{ p.data.strftime('%d/%m %H:%M') }} · {{ "{:,.0f}".format(p.valor).replace(',', '.') }} ¥</div>
+                            <div><b>{{ p.pokemon }}</b> · {{ 'Hidden Power Ability' if p.breed_tipo == 'PERSONALIZADO' else p.breed_tipo }} · {{ p.data.strftime('%d/%m %H:%M') }} · {{ "{:,.0f}".format(p.valor).replace(',', '.') }} ¥</div>
                             {% endfor %}
                         </details>
                     </td>

@@ -1,8 +1,8 @@
 {% extends 'hype_app_base.html' %}
 {% from '_breed_v147_macros.html' import chips,timeline %}
 {% block title %}Fila dos Breeders - HYPE{% endblock %}
-{% block body_class %}hype-breed-page breed-v21-page{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_queue_v23.css')}}?v=2301">{% endblock %}
+{% block body_class %}hype-breed-page breed-v21-page breed-premium-v34-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_queue_v23.css')}}?v=2301"><link rel="stylesheet" href="{{url_for('static',filename='breed_premium_v34.css')}}?v=3401">{% endblock %}
 
 {% block content %}
 <div class="hype-v6-page breed-v21-page-shell">
@@ -68,8 +68,11 @@
 
       <section class="breed-v21-list" id="breederQueue">
         {% for p in fila_ativa %}
-        <article class="breed-v21-order breed-v15-card"
+        <article class="breed-v21-order breed-v15-card breed-v34-themed"
                  data-id="{{p.id}}"
+                 data-pokemon-id="{{p.pokemon_id or ''}}"
+                 data-pokemon-name="{{p.pokemon|e}}"
+                 data-rarity="{{p.categoria_preco or 'comum'}}"
                  data-search="#{{p.id}} {{p.player}} {{p.player_nick or ''}} {{p.pokemon}} {{p.breeder_nick or ''}} {{p.status}}"
                  data-status="{{p.status}}"
                  data-mine="{{'1' if p.breeder_responsavel == breeder_email else '0'}}">
@@ -99,6 +102,7 @@
               <div>
                 <small>POKÉMON SOLICITADO</small>
                 <h3>{{p.pokemon}}</h3>
+                <div class="breed-v34-meta-slot"></div>
                 {{chips(p, False)}}
               </div>
             </div>
@@ -149,7 +153,7 @@
                 <div class="breed-req-grid">
                   <span><b>Nature</b>{{p.nature or 'Sem Nature'}}</span>
                   <span><b>Ability</b>{{'Hidden Ability (HA)' if p.ha else (p.ability or 'Normal')}}</span>
-                  <span><b>Breed</b>{{p.breed_tipo or '—'}}</span>
+                  <span><b>Breed</b>{{'Hidden Power Ability' if p.breed_tipo == 'PERSONALIZADO' else (p.breed_tipo or '—')}}</span>
                   <span><b>Gênero</b>{{(p.genero or 'Indiferente')|replace('femea','Fêmea')|replace('macho','Macho')|title}}</span>
                   <span><b>IV descartado</b>{{(p.iv_descartado or 'Não se aplica')|replace('_',' ')|title}}</span>
                   <span><b>Zero Speed</b>{{'Sim' if p.zero_speed else 'Não'}}</span>
@@ -245,6 +249,8 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>window.HYPE_BREED_SCRIPT_ROOT={{ request.script_root|tojson }};</script>
 <script src="{{url_for('static',filename='breed_queue_v23.js')}}?v=2301"></script>
 <script src="{{url_for('static',filename='breed_v15.js')}}?v=2301"></script>
+<script src="{{url_for('static',filename='breed_premium_v34.js')}}?v=3401"></script>
 {% endblock %}

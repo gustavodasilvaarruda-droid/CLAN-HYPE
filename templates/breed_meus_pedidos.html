@@ -1,5 +1,6 @@
 {% extends 'hype_app_base.html' %}{% from '_breed_v147_macros.html' import chips,timeline %}
-{% block title %}Meus Pedidos — HYPE Breed{% endblock %}{% block body_class %}hype-breed-page hype-my-orders-v22-page{% endblock %}
+{% block title %}Meus Pedidos — HYPE Breed{% endblock %}{% block body_class %}hype-breed-page hype-my-orders-v22-page breed-premium-v34-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_premium_v34.css')}}?v=3401">{% endblock %}
 {% block content %}
 <div class="hype-v6-page mybreed-v22-page">
   <section class="mybreed-v22-hero">
@@ -24,11 +25,11 @@
 
   <section class="mybreed-v22-list breed-v15-list" id="myOrders">
     {% for p in pedidos_ativos + historico %}
-    <article class="mybreed-v22-card breed-v15-card" data-status="{{p.status}}" data-history="{{'1' if p.status in ('entregue','cancelado') else '0'}}" data-id="{{p.id}}">
+    <article class="mybreed-v22-card breed-v15-card breed-v34-themed" data-status="{{p.status}}" data-history="{{'1' if p.status in ('entregue','cancelado') else '0'}}" data-id="{{p.id}}" data-pokemon-id="{{p.pokemon_id or ''}}" data-pokemon-name="{{p.pokemon|e}}" data-rarity="{{p.categoria_preco or 'comum'}}">
       <div class="mybreed-v22-top breed-v15-main">
         <div class="mybreed-v22-poke">
           <div class="mybreed-v22-art">{% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png" alt="">{% else %}<span>◈</span>{% endif %}</div>
-          <div><small>Pedido #{{p.id}}{% if p.created_at %} · {{p.created_at|data_br('%d/%m/%Y')}}{% endif %}</small><h2>{{p.pokemon}}</h2>{{chips(p,false)}}</div>
+          <div><small>Pedido #{{p.id}}{% if p.created_at %} · {{p.created_at|data_br('%d/%m/%Y')}}{% endif %}</small><h2>{{p.pokemon}}</h2><div class="breed-v34-meta-slot"></div>{{chips(p,false)}}</div>
         </div>
         <div class="mybreed-v22-progress">{{timeline(p)}}<div><span class="status-badge status-{{p.status}}">{{p.status|replace('_',' ')|title}}</span><small class="breed-last-update" data-time="{{p.atualizado_em or p.created_at}}">Atualizando…</small></div></div>
         <div class="mybreed-v22-summary">
@@ -48,7 +49,7 @@
       </div>
 
       <div class="breed-v15-details mybreed-v22-quickdetail">
-        <div class="breed-req-grid"><span><b>Breed</b>{{p.breed_tipo or '—'}}</span><span><b>Nature</b>{{p.nature or 'Sem Nature'}}</span><span><b>Ability</b>{{'HA' if p.ha else (p.ability or 'Sem HA')}}</span><span><b>Gênero</b>{{p.genero or 'Indiferente'}}</span><span><b>IV descartado</b>{{p.iv_descartado or 'Nenhum'}}</span><span><b>Zero Speed</b>{{'Sim' if p.zero_speed else 'Não'}}</span><span><b>Treinado</b>{{'Sim' if p.treinado else 'Não'}}</span><span><b>Prioridade</b>{{p.prioridade or 'Normal'}}</span></div>
+        <div class="breed-req-grid"><span><b>Breed</b>{{'Hidden Power Ability' if p.breed_tipo == 'PERSONALIZADO' else (p.breed_tipo or '—')}}</span><span><b>Nature</b>{{p.nature or 'Sem Nature'}}</span><span><b>Ability</b>{{'HA' if p.ha else (p.ability or 'Sem HA')}}</span><span><b>Gênero</b>{{p.genero or 'Indiferente'}}</span><span><b>IV descartado</b>{{p.iv_descartado or 'Nenhum'}}</span><span><b>Zero Speed</b>{{'Sim' if p.zero_speed else 'Não'}}</span>{% if p.breed_tipo == 'PERSONALIZADO' and p.ivs_personalizados %}<span class="breed-custom-order-ivs"><b>IVs personalizados</b>HP {{p.ivs_personalizados.get('hp')}} · ATK {{p.ivs_personalizados.get('attack')}} · DEF {{p.ivs_personalizados.get('defense')}} · SPA {{p.ivs_personalizados.get('sp_attack')}} · SPD {{p.ivs_personalizados.get('sp_defense')}} · SPE {{p.ivs_personalizados.get('speed')}}</span>{% endif %}<span><b>Treinado</b>{{'Sim' if p.treinado else 'Não'}}</span><span><b>Prioridade</b>{{p.prioridade or 'Normal'}}</span></div>
         {% if p.status not in ('entregue','cancelado','concluido','aguardando_confirmacao','cancelamento_solicitado') %}<form class="mybreed-v22-cancel" method="post" action="{{url_for('cancelar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Cancelar ou solicitar cancelamento deste pedido?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" maxlength="500" placeholder="Motivo do cancelamento"><button class="btn-danger-hype" data-once>Cancelar pedido</button></form>{% endif %}
       </div>
     </article>
@@ -155,4 +156,9 @@
 })();
 </script>
 
-<script src="{{url_for('static',filename='breed_v15.js')}}"></script>{% endblock %}
+{% endblock %}
+{% block extra_scripts %}
+<script>window.HYPE_BREED_SCRIPT_ROOT={{ request.script_root|tojson }};</script>
+<script src="{{url_for('static',filename='breed_v15.js')}}"></script>
+<script src="{{url_for('static',filename='breed_premium_v34.js')}}?v=3401"></script>
+{% endblock %}

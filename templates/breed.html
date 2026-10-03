@@ -1,13 +1,13 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}HYPE Breed • Fazer Pedido{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3130">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3200">{% endblock %}
 {% block body_class %}hype-breed-page hype-breed-reference-page{% endblock %}
 {% block content %}
 <div class="breed-ref-shell" id="fazer-pedido">
   <section class="breed-ref-hero">
     <div class="breed-ref-hero-copy">
       <span class="breed-ref-kicker">HYPE BREED</span>
-      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PRICING 3.0 • V31.3</small>
+      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PRICING 4.0 • V32</small>
       <p>Monte seu Breed em etapas. Escolha o Pokémon, configure as características, revise e envie.</p>
     </div>
     <div class="breed-ref-hero-mark">HYPE</div>
@@ -79,7 +79,7 @@
           <label><span>Nature</span><select id="nature" name="nature"><option value="">Sem Nature</option>{% for n in ['Hardy','Lonely','Brave','Adamant','Naughty','Bold','Docile','Relaxed','Impish','Lax','Timid','Hasty','Serious','Jolly','Naive','Modest','Mild','Quiet','Bashful','Rash','Calm','Gentle','Sassy','Careful','Quirky'] %}<option value="{{n}}">{{n}}</option>{% endfor %}</select></label>
           <label><span>Ability / HA</span><select id="ha" name="ha" required><option value="">Selecionar...</option><option value="sim">Hidden Ability (HA)</option><option value="nao">Ability normal</option></select></label>
           <label><span>Gênero</span><select id="genero" name="genero" required><option value="indiferente">Indiferente</option><option value="femea">Fêmea</option><option value="macho">Macho</option></select></label>
-          <label><span>Breed</span><select id="breed_tipo" name="breed_tipo" required><option value="">Selecionar...</option><option value="F5">F5</option><option value="F6">F6</option></select></label>
+          <div class="breed-mode-field"><span>Modalidade do Breed</span><input type="hidden" id="breed_tipo" name="breed_tipo" required><div class="breed-mode-grid"><button type="button" class="breed-mode-card" data-breed-mode="F5"><b>F5</b><small>5 IVs perfeitos</small></button><button type="button" class="breed-mode-card" data-breed-mode="F6"><b>F6</b><small>6 IVs perfeitos</small></button><button type="button" class="breed-mode-card custom" data-breed-mode="PERSONALIZADO"><b>Hidden Power Ability</b><small>Escolha cada IV de 0 a 31</small></button></div></div>
         </div>
         <div id="genderPriceAlert" class="breed-extra-price-alert" hidden><b>ADICIONAL DE GÊNERO</b><span id="genderPriceText">Escolher Macho ou Fêmea possui valor adicional.</span></div>
         <div id="breed_special_alert" class="breed-ref-alert" hidden><b>BREED ESPECIAL</b><span>Esta espécie exige regra especial com Ditto. O servidor aplicará a tabela correta.</span></div>
@@ -91,6 +91,7 @@
       <div class="breed-stage-card">
         <div class="breed-stage-copy"><span class="breed-ref-kicker">ETAPA 3</span><h2>IVs E EXTRAS</h2><p>Escolha o IV descartável do F5 e os adicionais do pedido.</p></div>
         <div class="breed-ref-ivs"><div><small>HP</small><b data-iv="hp">31</b></div><div><small>ATK</small><b data-iv="ataque">31</b></div><div><small>DEF</small><b data-iv="defesa">31</b></div><div><small>SP.ATK</small><b data-iv="ataque_especial">31</b></div><div><small>SP.DEF</small><b data-iv="defesa_especial">31</b></div><div><small>SPD</small><b data-iv="velocidade">31</b></div></div>
+        <div class="breed-custom-ivs" id="customIvPanel" hidden><div class="breed-custom-head"><div><span class="breed-ref-kicker">HIDDEN POWER ABILITY</span><h3>IVs personalizados</h3><p>Defina exatamente como o cliente quer receber o Pokémon.</p></div><div class="breed-custom-presets"><button type="button" data-iv-preset="perfect">Tudo 31</button><button type="button" data-iv-preset="zero-speed">Zero Speed</button><button type="button" data-iv-preset="clear">Zerar</button></div></div><div class="breed-custom-grid"><label>HP<input type="number" name="custom_iv_hp" data-custom-iv="hp" min="0" max="31" value="31"></label><label>Attack<input type="number" name="custom_iv_attack" data-custom-iv="attack" min="0" max="31" value="31"></label><label>Defense<input type="number" name="custom_iv_defense" data-custom-iv="defense" min="0" max="31" value="31"></label><label>Sp. Atk<input type="number" name="custom_iv_sp_attack" data-custom-iv="sp_attack" min="0" max="31" value="31"></label><label>Sp. Def<input type="number" name="custom_iv_sp_defense" data-custom-iv="sp_defense" min="0" max="31" value="31"></label><label>Speed<input type="number" name="custom_iv_speed" data-custom-iv="speed" min="0" max="31" value="31"></label></div><small class="breed-custom-note">Cada IV aceita valores de 0 a 31. O preço usa a categoria do Pokémon: Comum, Raro ou Ultra Raro.</small></div>
         <div class="breed-ref-fields breed-ref-fields-two">
           <label id="ivDiscardField"><span>No F5, qual IV não precisa?</span><select id="iv_descartado" name="iv_descartado"><option value="">Selecionar...</option><option value="hp">HP</option><option value="ataque">Ataque</option><option value="defesa">Defesa</option><option value="ataque_especial">Ataque Especial</option><option value="defesa_especial">Defesa Especial</option><option value="velocidade">Velocidade</option></select></label>
           <label><span>Treinamento</span><select id="treinado" name="treinado"><option value="nao">Não treinado</option><option value="sim">Treinado (+ adicional)</option></select></label>
@@ -149,7 +150,7 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const form=$('#breedForm');
 if(!form) return;
 const search=$('#pokemon_search'), idInput=$('#pokemon_id'), results=$('#pokemon_results'), status=$('#pokemon_status');
-const breedTipo=$('#breed_tipo'), ivSelect=$('#iv_descartado'), zeroSpeed=$('#zero_speed');
+const breedTipo=$('#breed_tipo'), ivSelect=$('#iv_descartado'), zeroSpeed=$('#zero_speed'), customIvPanel=$('#customIvPanel'), customIvInputs=$$('[data-custom-iv]');
 const HYPE_BREED_EXTRA_PRICES={{ (precos_ui or {})|tojson }};
 let selected=null, currentStep=1, searchTimer=null, priceTimer=null, lastPrice=null;
 const favorites=new Set(JSON.parse(localStorage.getItem('hypeBreedFavorites')||'[]').map(Number));
@@ -361,9 +362,10 @@ function renderDetail(loading=false){
 
 function validateStep(step){
   if(step===1&&(!selected||!selected.validated||!idInput.value)){setStatus('Selecione e aguarde a validação do Pokémon antes de continuar.',true);return false}
-  if(step===2){if(!$('#ha').value){alert('Selecione Ability/HA.');return false}if(!$('#genero').value){alert('Selecione o gênero.');return false}if(!breedTipo.value){alert('Selecione F5 ou F6.');return false}}
+  if(step===2){if(!$('#ha').value){alert('Selecione Ability/HA.');return false}if(!$('#genero').value){alert('Selecione o gênero.');return false}if(!breedTipo.value){alert('Selecione F5, F6 ou Hidden Power Ability.');return false}}
   if(step===3&&breedTipo.value==='F5'&&!ivSelect.value){alert(zeroSpeed.checked?'Com Zero Speed, escolha qual OUTRO IV pode ficar menor.':'No F5, escolha qual IV não precisa.');return false}
   if(step===3&&breedTipo.value==='F5'&&zeroSpeed.checked&&ivSelect.value==='velocidade'){alert('Zero Speed já define a Velocidade em 0 IV. Escolha outro IV que pode ficar menor.');return false}
+  if(step===3&&breedTipo.value==='PERSONALIZADO'&&customIvInputs.some(i=>i.value===''||Number(i.value)<0||Number(i.value)>31)){alert('No Hidden Power Ability, todos os IVs precisam ficar entre 0 e 31.');return false}
   return true;
 }
 function goStep(n){
@@ -374,7 +376,12 @@ function goStep(n){
   if(n>=4)renderReview(); if(n===5){const send=$('#sendPrice');if(send&&!lastPrice){send.textContent='Calculando valor...';send.dataset.priceReady='0';}refreshPrice();} window.scrollTo({top:0,behavior:'smooth'});
 }
 function updateIvs(){
-  $$('.breed-ref-ivs b').forEach(x=>{x.textContent='31';x.className=''}); const f5=breedTipo.value==='F5'; $('#ivDiscardField').hidden=!f5; ivSelect.required=f5;
+  const custom=breedTipo.value==='PERSONALIZADO', f5=breedTipo.value==='F5';
+  $$('.breed-mode-card').forEach(b=>b.classList.toggle('active',b.dataset.breedMode===breedTipo.value));
+  $$('.breed-ref-ivs b').forEach(x=>{x.textContent='31';x.className=''});
+  $('.breed-ref-ivs').hidden=custom; customIvPanel.hidden=!custom;
+  $('#ivDiscardField').hidden=!f5; ivSelect.required=f5;
+  customIvInputs.forEach(i=>i.required=custom);
   const speedOption=ivSelect.querySelector('option[value="velocidade"]'), zeroWrap=zeroSpeed.closest('.breed-ref-check');
   if(zeroWrap)zeroWrap.hidden=!f5;
   if(!f5){ivSelect.value='';zeroSpeed.checked=false;}
@@ -385,7 +392,7 @@ function updateIvs(){
   if(zeroSpeed.checked&&f5){const x=$('.breed-ref-ivs b[data-iv="velocidade"]');if(x){x.textContent='0';x.className='zero'}}
   updateExtraPriceAlerts();
 }
-const HYPE_BREED_BUILD = 'V31.3';
+const HYPE_BREED_BUILD = 'V32';
 const HYPE_BREED_PRICE_URL = '/api/breed/preco';
 function formatHypePrice(v){
   const n=Math.max(0, Math.round(Number(v)||0));
@@ -469,8 +476,9 @@ function renderReview(){
   const ev=updateEvs(), evText=$('#treinado').value==='sim'?Object.entries(ev.data).filter(([,v])=>v>0).map(([k,v])=>pretty(k.replace('sp_','sp. '))+' '+v).join(' · ')||'Personalizado (0 EV)':'Não se aplica';
   const catLabel=selected.info.categoria_label||String(selected.info.categoria||'comum').replace('_',' ').toUpperCase();
   const catReason=selected.info.classificacao_motivo||'Classificação automática HYPE';
-  $('#reviewData').innerHTML=`<div><dt>Categoria</dt><dd>${catLabel}</dd></div><div><dt>Motivo</dt><dd>${catReason}</dd></div><div><dt>Nature</dt><dd>${nature}</dd></div><div><dt>Ability</dt><dd>${ha}</dd></div><div><dt>Gênero</dt><dd>${gender}</dd></div><div><dt>Breed</dt><dd>${kind}</dd></div><div><dt>IV descartado</dt><dd>${kind==='F5'?(pretty(ivSelect.value)||'—'):'Não se aplica'}</dd></div><div><dt>Zero Speed (IV)</dt><dd>${zeroSpeed.checked?'Sim':'Não'}</dd></div><div><dt>Treinado</dt><dd>${$('#treinado').value==='sim'?'Sim':'Não'}</dd></div><div><dt>EVs</dt><dd>${evText}</dd></div>`;
-  $('#sendSummary').textContent=`${kind} • ${nature} • ${ha}`; schedulePrice();
+  const customText=kind==='PERSONALIZADO'?customIvInputs.map(i=>`${i.dataset.customIv.replace('sp_','Sp. ').replace('attack','Atk').replace('defense','Def')}: ${i.value}`).join(' · '):'Não se aplica';
+  $('#reviewData').innerHTML=`<div><dt>Categoria</dt><dd>${catLabel}</dd></div><div><dt>Motivo</dt><dd>${catReason}</dd></div><div><dt>Nature</dt><dd>${nature}</dd></div><div><dt>Ability</dt><dd>${ha}</dd></div><div><dt>Gênero</dt><dd>${gender}</dd></div><div><dt>Breed</dt><dd>${kind==='PERSONALIZADO'?'Hidden Power Ability':kind}</dd></div><div><dt>IVs personalizados</dt><dd>${customText}</dd></div><div><dt>IV descartado</dt><dd>${kind==='F5'?(pretty(ivSelect.value)||'—'):'Não se aplica'}</dd></div><div><dt>Zero Speed (IV)</dt><dd>${zeroSpeed.checked?'Sim':'Não'}</dd></div><div><dt>Treinado</dt><dd>${$('#treinado').value==='sim'?'Sim':'Não'}</dd></div><div><dt>EVs</dt><dd>${evText}</dd></div>`;
+  $('#sendSummary').textContent=`${kind==='PERSONALIZADO'?'Hidden Power Ability':kind} • ${nature} • ${ha}`; schedulePrice();
 }
 function filterCards(){
   $$('.breed-ref-poke-card').forEach(c=>c.hidden=onlyFavorites&&!favorites.has(+c.dataset.id));
@@ -483,6 +491,9 @@ results.addEventListener('click',e=>{const b=e.target.closest('.pokemon-result')
 quickGrid.addEventListener('click',e=>{const card=e.target.closest('.breed-ref-poke-card');if(!card)return;e.preventDefault();if(e.target.closest('.breed-card-star')){toggleFav(+card.dataset.id);return}selectPokemon(card.dataset.id,card.dataset.name)});
 $('#detailFavorite').addEventListener('click',()=>selected&&toggleFav(selected.id));
 $$('[data-next]').forEach(b=>b.addEventListener('click',()=>goStep(+b.dataset.next))); $$('[data-back]').forEach(b=>b.addEventListener('click',()=>goStep(+b.dataset.back)));
+$$('.breed-mode-card').forEach(btn=>btn.addEventListener('click',()=>{breedTipo.value=btn.dataset.breedMode||'';updateIvs();schedulePrice();}));
+$$('[data-iv-preset]').forEach(btn=>btn.addEventListener('click',()=>{const preset=btn.dataset.ivPreset;customIvInputs.forEach(i=>{i.value=preset==='clear'?'0':(preset==='zero-speed'&&i.dataset.customIv==='speed'?'0':'31')});schedulePrice()}));
+customIvInputs.forEach(i=>i.addEventListener('input',()=>{let v=parseInt(i.value||0,10);if(Number.isNaN(v))return;i.value=Math.max(0,Math.min(31,v));}));
 breedTipo.addEventListener('change',()=>{updateIvs();schedulePrice()});ivSelect.addEventListener('change',updateIvs);zeroSpeed.addEventListener('change',()=>{updateIvs();schedulePrice()});['nature','ha','genero'].forEach(id=>$('#'+id).addEventListener('change',()=>{updateExtraPriceAlerts();schedulePrice()})); $('#treinado').addEventListener('change',()=>{updateEvs();schedulePrice()});
 $('#sortFilter').addEventListener('change',filterCards); $('#favoriteFilter').addEventListener('click',e=>{onlyFavorites=!onlyFavorites;e.currentTarget.classList.toggle('active',onlyFavorites);filterCards()});
 // Os filtros de tipo/Egg Group serão preenchidos visualmente quando houver dados; não bloqueiam o pedido.

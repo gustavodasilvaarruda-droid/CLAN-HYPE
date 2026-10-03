@@ -56,7 +56,7 @@
           <thead><tr><th>#</th><th>Pokémon</th><th>Tipo</th><th>Status</th></tr></thead>
           <tbody>
           {% for p in pedidos %}
-            <tr><td>#{{p.id}}</td><td><div class="hype-v7-dashboard-pokemon">{% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png" alt="">{% endif %}<b>{{p.pokemon}}</b></div></td><td>{{p.breed_tipo or '—'}}</td><td><span class="hype-v6-status {{p.status}}">{{p.status|replace('_',' ')}}</span></td></tr>
+            <tr><td>#{{p.id}}</td><td><div class="hype-v7-dashboard-pokemon">{% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png" alt="">{% endif %}<b>{{p.pokemon}}</b></div></td><td>{{'Hidden Power Ability' if p.breed_tipo == 'PERSONALIZADO' else (p.breed_tipo or '—')}}</td><td><span class="hype-v6-status {{p.status}}">{{p.status|replace('_',' ')}}</span></td></tr>
           {% else %}<tr><td colspan="4" class="hype-v6-empty">Você ainda não fez pedidos de Breed.</td></tr>{% endfor %}
           </tbody>
         </table>
