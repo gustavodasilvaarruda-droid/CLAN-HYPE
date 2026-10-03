@@ -1,0 +1,235 @@
+{% extends "hype_app_base.html" %}
+{% block title %}Central de Preços Breed 3.1 · HYPE Admin{% endblock %}
+{% block body_class %}bp33-prices-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3300"><link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v331.css')}}?v=3430">{% endblock %}
+{% block content %}
+<div class="bp33-admin-layout">
+<aside class="bp33-admin-sidebar" aria-label="Admin HYPE">
+  <a class="bp33-admin-brand" href="{{url_for('expansion.admin_dashboard')}}"><span>♛</span><b>HYPE</b><small>ADMIN PAINEL</small></a>
+  <nav>
+    <a href="{{url_for('expansion.admin_dashboard')}}"><span>⌂</span>Dashboard</a>
+    <a class="active" href="{{url_for('admin_precos')}}"><span>◆</span>Central de Preços</a>
+    <a href="#pokemon" data-sidebar-tab="pokemon"><span>◉</span>Pokémon</a>
+    <a href="{{url_for('gestao_breeders')}}"><span>▣</span>Pedidos / Breed</a>
+    <a href="{{url_for('admin_membros_hype')}}"><span>♙</span>Membros</a>
+    <a href="#promocoes" data-sidebar-tab="promocoes"><span>◇</span>Promoções / Cupons</a>
+    <a href="#financeiro" data-sidebar-tab="financeiro"><span>¤</span>Comissão</a>
+    <a href="{{url_for('admin_logs')}}"><span>☷</span>Logs</a>
+    <a href="{{url_for('final.configuracoes')}}"><span>⚙</span>Configurações</a>
+  </nav>
+  <div class="bp33-admin-sidebar-foot"><b>HYPE BREED</b><span>V34.3</span><small>● Sistema online</small><a href="{{url_for('painel')}}">← Voltar ao site</a></div>
+</aside>
+<div class="bp33-admin-content">
+<div class="bp32-shell">
+  <header class="bp32-hero">
+    <div><span class="bp32-kicker">ADMIN · HYPE BREED · V34.3</span><h1>Central de Preços <em>Breed 3.0</em></h1><p>Gerencie a economia do Breed por categoria, adicionais, Hidden Power Ability e exceções individuais de Pokémon.</p></div>
+    <div class="bp32-hero-status">
+      {% if pricing_v2 and tabela_atual %}<small>TABELA EM VIGOR</small><b>{{tabela_atual.nome}}</b><span>#{{tabela_atual.id}} · {{tabela_atual.status_visual|replace('_',' ')|upper}}</span>{% else %}<small>PRICING 3.0</small><b>Migração pendente</b><span>Execute V31.2 e V31.3</span>{% endif %}
+    </div>
+  </header>
+
+  <nav class="bp32-tabs bp33-premium-tabs" aria-label="Central de Preços Breed 3.1">
+    <button type="button" class="active" data-bp-tab="comum"><span>◆</span>Comum</button>
+    <button type="button" data-bp-tab="raro"><span>◇</span>Raro</button>
+    <button type="button" data-bp-tab="ultra_raro"><span>♛</span>Ultra Raro</button>
+    <button type="button" data-bp-tab="personalizado"><span>★</span>Hidden Power Ability</button>
+    <button type="button" data-bp-tab="pokemon"><span>◉</span>Pokémon / Exceções</button>
+    <button type="button" data-bp-tab="simulador"><span>▥</span>Simulador</button>
+    <button type="button" data-bp-tab="promocoes"><span>◇</span>Promoções e cupons</button>
+    <button type="button" data-bp-tab="financeiro"><span>¤</span>Comissão</button>
+    <button type="button" data-bp-tab="versoes"><span>◴</span>Versões / Histórico</button>
+  </nav>
+
+  {% if not pricing_v2 %}
+  <section class="bp32-warning"><b>Breed Pricing 2.0 ainda não está no banco.</b><span>Execute primeiro a migração V31.2 e depois a V31.3.</span></section>
+  {% elif not pricing_v3 %}
+  <section class="bp32-warning"><b>Breed Rarity 3.0 ainda não está no banco.</b><span>Execute <code>MIGRACAO_SEGURA_HYPE_V31_3_BREED_RARITY_3_0_2026_10_02.sql</code>. Enquanto isso, o site mantém o cálculo V31.2 como fallback.</span></section>
+  {% elif not pricing_v4 %}
+  <section class="bp32-warning"><b>Hidden Power Ability ainda não está no banco.</b><span>Execute <code>MIGRACAO_SEGURA_HYPE_V32_HIDDEN_POWER_ABILITY_2026_10_02.sql</code>. F5/F6 continuam funcionando normalmente até a migração.</span></section>
+  {% endif %}
+
+  <section class="bp33-workflow-bar">
+    {% if pricing_v2 and not rascunho and tabela_atual %}
+    <form method="post" class="bp33-create-draft">
+      <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="criar_rascunho"><input type="hidden" name="origem_id" value="{{tabela_atual.id}}">
+      <div class="bp33-workflow-icon">▣</div><div class="bp33-workflow-copy"><small>TABELA ATIVA PROTEGIDA</small><b>{{tabela_atual.nome}}</b><span>Crie um rascunho para editar sem alterar os pedidos atuais.</span></div>
+      <input name="nome" placeholder="Ex.: Tabela Outubro HYPE"><button class="bp32-btn-gold">Criar rascunho</button>
+    </form>
+    {% elif rascunho %}
+    <div class="bp33-draft-premium"><div class="bp33-workflow-icon">▣</div><div class="bp33-workflow-copy"><small>RASCUNHO EM EDIÇÃO</small><b>{{rascunho.nome}}</b><span>#{{rascunho.id}} · use “Salvar e aplicar agora” para refletir imediatamente no Fazer Pedido</span></div><div class="bp33-rule-summary"><small>REGRAS PRINCIPAIS</small><b>Pedidos existentes nunca são recalculados</b><span>Comum · Raro · Ultra usam bases e adicionais próprios.</span></div><div class="bp33-draft-actions"><button type="button" class="bp32-btn-outline" data-open-rules>Regras da tabela</button><button type="button" class="bp32-btn-gold" data-open-publish>Publicar / Agendar</button></div></div>
+    {% endif %}
+  </section>
+  {% if rascunho %}<div class="bp343-live-note"><b>⚡ Preço no Fazer Pedido</b><span><strong>Salvar no rascunho</strong> não altera o site ainda. <strong>Salvar e aplicar agora</strong> publica a versão imediatamente e cria outro rascunho para você continuar editando.</span></div>{% endif %}
+
+  {% if alertas_preco %}<div class="bp32-alert-list"><b>Antes de publicar, corrija:</b>{% for a in alertas_preco %}<span>⚠ {{a}}</span>{% endfor %}</div>{% endif %}
+
+  <section class="bp33-category-overview" id="bp33CategoryOverview">
+    <div class="bp33-overview-main">
+      <div class="bp33-premium-section-head"><div class="bp33-section-icon">◉</div><div><h2>Preços Base</h2><p>Defina os valores base por categoria e formato. Estes valores são o ponto de partida de todo cálculo do Breed.</p></div></div>
+      <div class="bp33-base-grid">
+        {% for p in componentes if p.grupo == 'base' and ('_comum_' in p.codigo or '_raro_' in p.codigo or '_ultra_raro_' in p.codigo) %}
+        {% set pcat='ultra_raro' if 'ultra_raro' in p.codigo else 'raro' if 'raro' in p.codigo else 'comum' %}
+        <form method="post" class="bp33-base-card {{pcat}} {{'locked' if not rascunho else ''}}">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_componente"><input type="hidden" name="tabela_id" value="{{tabela_edicao.id}}"><input type="hidden" name="codigo" value="{{p.codigo}}">
+          <div class="bp33-base-card-title"><span>{{'♛' if pcat=='ultra_raro' else '◆' if pcat=='raro' else '◇'}}</span><b>{{p.nome}}</b></div><small>Valor atual</small><strong>{{p.valor|preco}}</strong>
+          <label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><div class="bp343-price-actions"><button class="bp32-btn-outline" name="salvar_rascunho" value="1" {{'disabled' if not rascunho else ''}}>Salvar no rascunho</button><button class="bp32-btn-gold" name="aplicar_agora" value="1" {{'disabled' if not rascunho else ''}}>Salvar e aplicar agora</button></div>
+        </form>
+        {% endfor %}
+      </div>
+    </div>
+    <aside class="bp33-table-info">
+      <h3><span>ℹ</span>Informações da Tabela</h3>
+      <div><small>Tabela ativa</small><b>{{tabela_atual.nome if tabela_atual else 'Legada'}}</b><em class="online">● ATIVA</em></div>
+      <div><small>Modo atual</small><b>{{'Rascunho (não publicado)' if rascunho else 'Tabela ativa protegida'}}</b></div>
+      <div><small>Tabela em edição</small><b>{{tabela_edicao.nome if tabela_edicao else '—'}}</b></div>
+      <div><small>Total de exceções</small><b>{{excecoes|length}} Pokémon</b></div>
+      <div><small>Desconto máximo</small><b>{{(tabela_edicao.desconto_maximo_percentual if tabela_edicao else 100)}}%</b></div>
+      <div class="bp33-legend"><small>Legenda de categorias</small><span><i class="comum"></i><b>Comum</b></span><span><i class="raro"></i><b>Raro</b></span><span><i class="ultra"></i><b>Ultra Raro</b></span></div>
+    </aside>
+  </section>
+
+  {% if rascunho %}
+  <dialog class="bp32-dialog bp33-rules-dialog" id="rulesDialog"><form method="dialog" class="bp32-dialog-close"><button>×</button></form><div><span class="bp32-kicker">REGRAS DA TABELA</span><h2>Margem, membro HYPE e limites</h2><p>Estas regras afetam somente novos pedidos depois da publicação.</p>
+    <form method="post" class="bp32-rules-form bp33-rules-form-dialog"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_regras"><input type="hidden" name="tabela_id" value="{{rascunho.id}}"><label>Nome da tabela<input name="nome" value="{{rascunho.nome}}" required></label><label>Desconto membro HYPE (%)<input type="number" step="0.01" min="0" max="100" name="desconto_membro_hype_percentual" value="{{rascunho.desconto_membro_hype_percentual}}"></label><label>Desconto máximo permitido (%)<input type="number" step="0.01" min="0" max="100" name="desconto_maximo_percentual" value="{{rascunho.desconto_maximo_percentual}}"></label><label>Líquido mínimo do Breeder<input name="minimo_breeder_liquido" value="{{rascunho.minimo_breeder_liquido}}" placeholder="Ex.: 100k"></label><button class="bp32-btn-gold">Salvar regras</button></form>
+  </div></dialog>
+  <dialog class="bp32-dialog" id="publishDialog"><form method="dialog" class="bp32-dialog-close"><button>×</button></form><div><span class="bp32-kicker">PUBLICAÇÃO</span><h2>{{rascunho.nome}}</h2><p>Publicar agora substitui a tabela permanente. Agendar cria uma tabela sazonal e, quando ela terminar, a tabela normal volta automaticamente.</p><form method="post" class="bp32-publish-now"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="publicar_tabela"><input type="hidden" name="tabela_id" value="{{rascunho.id}}"><button class="bp32-btn-gold" {% if alertas_preco %}disabled{% endif %}>Publicar agora</button></form><form method="post" class="bp32-schedule"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="agendar_tabela"><input type="hidden" name="tabela_id" value="{{rascunho.id}}"><label>Início<input type="datetime-local" name="inicio_em" required></label><label>Fim (opcional)<input type="datetime-local" name="fim_em"></label><button class="bp32-btn-outline" {% if alertas_preco %}disabled{% endif %}>Agendar tabela</button></form></div></dialog>
+  {% endif %}
+
+
+  {% for cat, cat_label, cat_desc in [('comum','Comum','Reprodução padrão. Altere os valores gerais e todos os Pokémon Comuns sem exceção individual passam a usar a nova tabela.'),('raro','Raro','Espécies com 12,5% de chance de fêmea. HA, Zero Speed, gênero e Nature têm valores próprios desta categoria.'),('ultra_raro','Ultra Raro','Espécies que dependem de Ditto. A dificuldade do Ditto já fica embutida no preço-base.') ] %}
+  <section class="bp32-panel {{'active' if cat == 'comum' else ''}}" data-bp-panel="{{cat}}">
+    <div class="bp33-category-hero {{cat}}">
+      <div><span>{{cat_label|upper}}</span><h2>Preços {{cat_label}}</h2><p>{{cat_desc}}</p></div>
+      <div class="bp33-category-mini">
+        {% for p in componentes if p.codigo == 'base_' ~ cat ~ '_f5' or p.codigo == 'base_' ~ cat ~ '_f6' %}<article><small>{{'F5' if p.codigo.endswith('_f5') else 'F6'}}</small><b>{{p.valor|preco}}</b></article>{% endfor %}
+      </div>
+    </div>
+    <div class="bp33-help-strip"><b>Como funciona</b><span>O preço geral desta categoria vale automaticamente para todos os Pokémon classificados nela. Uma exceção individual, quando existir, tem prioridade sobre o padrão.</span></div>
+    <div class="bp33-component-groups">
+      {% for grupo,titulo,descricao in [('ha','Hidden Ability (HA)','Adicional quando o cliente pede HA.'),('zero_speed','Zero Speed','Adicional para IV 0 em Speed.'),('nature','Nature','Desconto aplicado quando o pedido não usa Nature.'),('extras','Extras','Escolha de gênero e outros serviços adicionais.')] %}
+      {% set ns=namespace(total=0) %}{% for p in componentes if p.grupo == grupo and ((cat == 'ultra_raro' and 'ultra_raro' in p.codigo) or (cat == 'raro' and '_raro' in p.codigo and 'ultra_raro' not in p.codigo) or (cat == 'comum' and '_comum' in p.codigo)) %}{% set ns.total=ns.total+1 %}{% endfor %}
+      {% if ns.total %}<section class="bp33-component-section"><header><div><small>{{titulo|upper}}</small><h3>{{titulo}}</h3><p>{{descricao}}</p></div><span>{{ns.total}} item{{'s' if ns.total != 1 else ''}}</span></header><div class="bp32-price-grid">
+        {% for p in componentes if p.grupo == grupo and ((cat == 'ultra_raro' and 'ultra_raro' in p.codigo) or (cat == 'raro' and '_raro' in p.codigo and 'ultra_raro' not in p.codigo) or (cat == 'comum' and '_comum' in p.codigo)) %}
+        <form method="post" class="bp32-price-card bp33-price-card {{cat}} {{'locked' if not rascunho else ''}}">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_componente"><input type="hidden" name="tabela_id" value="{{tabela_edicao.id}}"><input type="hidden" name="codigo" value="{{p.codigo}}">
+          <div class="bp33-price-top"><small>{{p.codigo|replace('_',' ')|upper}}</small><span class="bp33-standard-badge">PADRÃO {{cat_label|upper}}</span></div><h3>{{p.nome}}</h3><div class="bp32-money">{{p.valor|preco}}</div>
+          <label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><div class="bp343-price-actions"><button class="bp32-btn-outline" name="salvar_rascunho" value="1" {{'disabled' if not rascunho else ''}}>Salvar no rascunho</button><button class="bp32-btn-gold" name="aplicar_agora" value="1" {{'disabled' if not rascunho else ''}}>Salvar e aplicar agora</button></div>
+        </form>{% endfor %}
+      </div></section>{% endif %}
+      {% endfor %}
+    </div>
+    {% if not rascunho %}<div class="bp33-readonly"><b>Tabela ativa protegida</b><span>Crie um rascunho pela barra superior para editar estes valores sem afetar os pedidos atuais.</span></div>{% endif %}
+  </section>
+  {% endfor %}
+
+  <section class="bp32-panel" data-bp-panel="personalizado">
+    <div class="bp32-section-head"><div><span>HIDDEN POWER ABILITY</span><h2>Preço do Breed totalmente personalizado</h2><p>Configure separadamente Comum, Raro e Ultra Raro. O jogador poderá escolher os 6 IVs de 0 a 31 sem alterar o fluxo normal de F5/F6.</p></div></div>
+    <div class="bp32-custom-info"><article><b>COMUM</b><span>Preço próprio para Pokémon de reprodução padrão.</span></article><article><b>RARO</b><span>Preço próprio para a categoria rara configurada pelo HYPE.</span></article><article><b>ULTRA RARO</b><span>Preço próprio para espécies que dependem de Ditto.</span></article></div>
+    <div class="bp32-price-grid">
+      {% for p in componentes if p.grupo == 'personalizado' %}
+      <form method="post" class="bp32-price-card bp32-custom-price {{'locked' if not rascunho else ''}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_componente"><input type="hidden" name="tabela_id" value="{{tabela_edicao.id}}"><input type="hidden" name="codigo" value="{{p.codigo}}"><small>{{p.codigo|replace('_',' ')|upper}}</small><h3>{{p.nome}}</h3><div class="bp32-money">{{p.valor|preco}}</div><label>Novo valor<input name="valor" value="{{p.valor}}" inputmode="decimal" {{'disabled' if not rascunho else ''}}></label><div class="bp343-price-actions"><button class="bp32-btn-outline" name="salvar_rascunho" value="1" {{'disabled' if not rascunho else ''}}>Salvar no rascunho</button><button class="bp32-btn-gold" name="aplicar_agora" value="1" {{'disabled' if not rascunho else ''}}>Salvar e aplicar agora</button></div></form>
+      {% else %}<div class="bp32-empty">Execute a migração V32 para habilitar os preços do modo personalizado.</div>{% endfor %}
+    </div>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="simulador">
+    <div class="bp32-section-head"><div><span>SIMULADOR</span><h2>Monte um Breed antes de publicar</h2><p>Veja cliente paga, comissão do clã e líquido do Breeder.</p></div></div>
+    <div class="bp32-packages">{% for p in pacotes %}<button type="button" data-package='{{p|tojson}}'><b>{{p.nome}}</b><small>Aplicar preset</small></button>{% endfor %}</div>
+    <div class="bp32-simulator">
+      <form id="bp32SimulatorForm">
+        <label>Tabela<select name="tabela_id">{% for t in tabelas if t.status in ['ativa','rascunho','agendada'] %}<option value="{{t.id}}" {{'selected' if rascunho and t.id==rascunho.id else ''}}>#{{t.id}} · {{t.nome}} ({{t.status_visual|replace('_',' ')}})</option>{% endfor %}</select></label>
+        <label>Categoria<select name="categoria"><option value="comum">Comum</option><option value="raro">Raro · 12,5% fêmea</option><option value="ultra_raro">Ultra Raro · só com Ditto</option></select></label>
+        <label>Breed<select name="breed_tipo"><option>F5</option><option>F6</option><option value="PERSONALIZADO">Hidden Power Ability</option></select></label>
+        <label>HA<select name="ha"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Zero Speed<select name="zero_speed"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Ditto obrigatório<select name="usa_ditto"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Nature<select name="nature"><option value="sim">Com Nature</option><option value="nao">Sem Nature</option></select></label>
+        <label>Gênero<select name="genero"><option value="indiferente">Indiferente</option><option value="macho">Macho</option><option value="femea">Fêmea</option></select></label>
+        <label>Treinado<select name="treinado"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Membro HYPE<select name="membro_hype"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+        <label>Pokémon ID <small>(exceção)</small><input name="pokemon_id" inputmode="numeric" placeholder="Opcional"></label>
+        <label>Cupom<input name="cupom" placeholder="Opcional"></label>
+        <button class="bp32-btn-gold" type="submit">Simular preço</button>
+      </form>
+      <aside id="bp32SimulationResult"><small>PREÇO SIMULADO</small><strong>—</strong><div class="bp32-sim-split"><span>Clã <b>—</b></span><span>Breeder <b>—</b></span></div><ol></ol></aside>
+    </div>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="pokemon">
+    <div class="bp32-section-head"><div><span>POKÉMON E CATEGORIAS</span><h2>Classificação automática do Breed</h2><p><b>Comum</b>: reprodução padrão. <b>Raro</b>: 12,5% de chance de fêmea. <b>Ultra Raro</b>: só reproduz com Ditto. A prioridade automática é Ultra Raro &gt; Raro &gt; Comum.</p></div></div>
+    <form method="post" class="bp32-species-form bp32-classify-form" id="bp33ClassifyForm"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_classificacao_pokemon">
+      <label>ID Pokédex<input name="pokemon_id" type="number" min="1" required></label>
+      <label>Pokémon<input name="pokemon_nome" required placeholder="Ex.: Magnemite"></label>
+      <label>Categoria<select name="categoria_override"><option value="">Automática</option><option value="comum">Forçar Comum</option><option value="raro">Forçar Raro</option><option value="ultra_raro">Forçar Ultra Raro</option></select></label>
+      <label>Regra de Ditto<select name="usa_ditto_override"><option value="auto">Automática</option><option value="sim">Forçar: só com Ditto</option><option value="nao">Forçar: não depende de Ditto</option></select></label>
+      <label class="wide">Motivo da exceção<input name="motivo_override" maxlength="300" placeholder="Opcional; ex.: regra específica do servidor"></label>
+      <button class="bp32-btn-gold">Salvar exceção</button>
+    </form>
+    <div class="bp32-rarity-rule-grid"><article><small>COMUM</small><b>Breed padrão</b><span>Não é 12,5% fêmea e não depende de Ditto.</span></article><article><small>RARO</small><b>12,5% fêmea</b><span>Gender rate 1/8. A dificuldade já aumenta o preço-base.</span></article><article><small>ULTRA RARO</small><b>Só com Ditto</b><span>Ditto já faz parte do preço-base e não é cobrado novamente.</span></article></div>
+    <div class="bp33-pokemon-toolbar"><label><span>Pesquisar Pokémon</span><input type="search" id="bp33PokemonSearch" placeholder="Digite nome ou número da Pokédex"></label><label><span>Filtrar categoria</span><select id="bp33PokemonCategory"><option value="todos">Todos</option><option value="comum">Comum</option><option value="raro">Raro</option><option value="ultra_raro">Ultra Raro</option><option value="override">Somente overrides</option></select></label><div><small>RESULTADOS</small><b id="bp33PokemonCount">{{classificacoes_pokemon|length}}</b></div></div>
+    <div class="bp33-catalog-results" id="bp33CatalogResults" hidden></div>
+    <div class="bp32-category-list bp33-category-list" id="bp33PokemonList">{% for x in classificacoes_pokemon %}<article data-pokemon-row data-name="{{(x.pokemon_nome or '')|lower}}" data-id="{{x.pokemon_id}}" data-category="{{x.categoria_override or x.categoria or 'comum'}}" data-override="{{'1' if x.categoria_override else '0'}}"><div><b>#{{x.pokemon_id}} · {{x.pokemon_nome}}</b><span class="{{x.categoria_override or x.categoria or 'comum'}}">{{(x.categoria_override or x.categoria or 'comum')|replace('_',' ')|upper}}</span>{% if x.categoria_override %}<em>OVERRIDE</em>{% endif %}{% if x.usa_ditto_override is sameas true %}<em>DITTO FORÇADO</em>{% elif x.usa_ditto_override is sameas false %}<em>SEM DITTO FORÇADO</em>{% endif %}</div>{% if x.motivo_override %}<small>{{x.motivo_override}}</small>{% endif %}</article>{% else %}<div class="bp32-empty">Nenhuma exceção manual. Todos os Pokémon serão classificados automaticamente pela regra HYPE.</div>{% endfor %}</div>
+    <div class="bp32-section-head bp32-subhead"><div><span>DIFICULDADE ESPECIAL / EXCEÇÕES</span><h2>Preço próprio, adicional ou multiplicador</h2><p>Use quando alguma espécie do seu servidor precisar de uma regra especial além de Comum, Raro ou Ultra Raro.</p></div></div><div class="bp343-live-note"><b>⚡ Exceção individual</b><span>Use <strong>Aplicar agora</strong> para o preço desse Pokémon aparecer imediatamente no Fazer Pedido.</span></div>
+    {% if rascunho %}
+    <form method="post" class="bp32-species-form" id="bp33ExceptionForm"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="salvar_excecao"><input type="hidden" name="tabela_id" value="{{rascunho.id}}">
+      <label>ID Pokédex<input name="pokemon_id" type="number" min="1" required></label><label>Pokémon<input name="pokemon_nome" required placeholder="Ex.: Eevee"></label><label>Categoria<select name="categoria_override"><option value="">Usar cadastro padrão</option><option value="comum">Comum</option><option value="raro">Raro</option><option value="ultra_raro">Ultra Raro</option></select></label><label>Base fixa<input name="valor_base_override" placeholder="Opcional"></label><label>Adicional fixo<input name="adicional_fixo" value="0"></label><label>Multiplicador<input name="multiplicador" type="number" min="0.1" max="10" step="0.05" value="1"></label><label class="wide">Observação<input name="observacao" placeholder="Motivo da exceção"></label><div class="bp343-price-actions wide"><button class="bp32-btn-outline" name="salvar_rascunho" value="1">Salvar no rascunho</button><button class="bp32-btn-gold" name="aplicar_agora" value="1">Salvar e aplicar agora</button></div>
+    </form>
+    {% else %}<div class="bp32-empty">Crie um rascunho para editar regras por espécie.</div>{% endif %}
+    <div class="bp33-exception-toolbar"><label><span>Pesquisar exceções desta tabela</span><input type="search" id="bp33ExceptionSearch" placeholder="Ex.: Eevee, 133..."></label><span><b>{{excecoes|length}}</b> exceção(ões) cadastrada(s)</span></div>
+    <div class="bp32-species-list" id="bp33ExceptionList">{% for x in excecoes %}<article data-exception-row data-name="{{(x.pokemon_nome or '')|lower}}" data-id="{{x.pokemon_id}}"><div><b>#{{x.pokemon_id}} · {{x.pokemon_nome}}</b><span>{{x.categoria_override or 'categoria padrão'}} · base {{x.valor_base_override|preco if x.valor_base_override is not none else 'padrão'}} · +{{x.adicional_fixo|preco}} · ×{{x.multiplicador}}</span>{% if x.observacao %}<small>{{x.observacao}}</small>{% endif %}</div>{% if rascunho %}<form method="post"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="excluir_excecao"><input type="hidden" name="tabela_id" value="{{rascunho.id}}"><input type="hidden" name="pokemon_id" value="{{x.pokemon_id}}"><button class="bp32-danger">Remover</button></form>{% endif %}</article>{% else %}<div class="bp32-empty">Nenhuma exceção nesta tabela. A classificação automática Comum/Raro/Ultra Raro será usada.</div>{% endfor %}</div>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="promocoes">
+    <div class="bp32-section-head"><div><span>PROMOÇÕES INTELIGENTES</span><h2>Desconto automático ou cupom</h2><p>Defina período, componentes, exclusividade para membros HYPE e limite de usos.</p></div></div>
+    <form method="post" class="bp32-promo-form"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="criar_promocao">
+      <label>Nome<input name="nome" placeholder="Ex.: Semana HYPE" required></label><label>Desconto (%)<input name="percentual" type="number" min="0.01" max="100" step="0.01" required></label><label>Cupom <small>(opcional)</small><input name="codigo_cupom" maxlength="32" placeholder="HYPE50"></label><label>Limite de usos <small>(opcional)</small><input name="limite_usos" type="number" min="1"></label><label>Início<input name="inicio_em" type="datetime-local"></label><label>Fim<input name="fim_em" type="datetime-local"></label>
+      <label class="bp32-check"><input type="checkbox" name="somente_membros_hype" value="1"> Somente membros [HYPE]</label><label class="bp32-check"><input type="checkbox" name="aplicar_todos" value="1" id="promoAll"> Aplicar em todos os componentes</label>
+      <div class="bp32-promo-options" id="promoPriceOptions">{% for p in promo_itens %}<label><input type="checkbox" name="codigos_preco" value="{{p.codigo}}"><span><b>{{p.nome}}</b><small>{{p.valor|preco}}</small></span></label>{% endfor %}</div><button class="bp32-btn-gold">Criar promoção / cupom</button>
+    </form>
+    <div class="bp32-promo-list">{% for p in promocoes %}<article><div><div class="bp32-promo-top"><b>-{{p.percentual}}%</b><span class="status {{p.status_calculado}}">{{p.status_calculado|upper}}</span></div><h3>{{p.nome}}</h3><p>{% if p.codigo_cupom %}Cupom <strong>{{p.codigo_cupom}}</strong>{% else %}Automática{% endif %}{% if p.somente_membros_hype %} · somente [HYPE]{% endif %}{% if p.limite_usos %} · {{p.usos or 0}}/{{p.limite_usos}} usos{% endif %}</p><small>{{p.inicio_em_local or 'agora'}} → {{p.fim_em_local or 'sem término'}}</small></div><div class="bp32-actions"><form method="post"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="toggle_promocao"><input type="hidden" name="promocao_id" value="{{p.id}}"><input type="hidden" name="ativo" value="{{'0' if p.ativo else '1'}}"><button class="bp32-btn-outline">{{'Pausar' if p.ativo else 'Ativar'}}</button></form><form method="post" onsubmit="return confirm('Excluir esta promoção?')"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="excluir_promocao"><input type="hidden" name="promocao_id" value="{{p.id}}"><button class="bp32-danger">Excluir</button></form></div></article>{% else %}<div class="bp32-empty">Nenhuma promoção cadastrada.</div>{% endfor %}</div>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="financeiro">
+    <div class="bp32-section-head"><div><span>FINANCEIRO DO BREED</span><h2>Comissão, margem e vendas</h2><p>Os dados abaixo usam pedidos criados nos últimos 30 dias.</p></div></div>
+    <div class="bp32-metrics"><article><small>Pedidos</small><b>{{relatorio.pedidos}}</b></article><article><small>Volume vendido</small><b>{{relatorio.faturamento|preco}}</b></article><article><small>Ticket médio</small><b>{{relatorio.ticket_medio|preco}}</b></article><article><small>Clã</small><b>{{relatorio.taxa_clan|preco}}</b></article><article><small>Breeders</small><b>{{relatorio.breeders|preco}}</b></article><article><small>Raro / Ultra / HA / Personalizado</small><b>{{relatorio.raros}} · {{relatorio.ultra_raros}} · {{relatorio.ha}} · {{relatorio.personalizados}}</b></article></div>
+    <section class="bp32-finance-settings"><div><span>COMISSÃO HYPE</span><h3>Taxa atual: {{taxa_clan}}%</h3><p>A porcentagem continua congelada no momento em que cada pedido é criado.</p></div><form method="post"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="taxa_clan"><input name="taxa_clan_percentual" type="number" min="0" max="100" step="0.01" value="{{taxa_clan}}"><button class="bp32-btn-gold">Salvar comissão</button></form></section>
+  </section>
+
+  <section class="bp32-panel" data-bp-panel="versoes">
+    <div class="bp32-section-head"><div><span>VERSÕES</span><h2>Tabelas sazonais e rollback</h2><p>Cada publicação vira uma versão. Você pode restaurar uma tabela antiga sem editar preço por preço.</p></div></div>
+    <div class="bp32-version-list">{% for t in tabelas %}<article><div><span class="bp32-version-status {{t.status_visual}}">{{t.status_visual|replace('_',' ')|upper}}</span><h3>#{{t.id}} · {{t.nome}}</h3><p>Criada {{t.created_at_local or '—'}}{% if t.inicio_em_local %} · início {{t.inicio_em_local}}{% endif %}{% if t.fim_em_local %} · fim {{t.fim_em_local}}{% endif %}</p></div><div class="bp32-actions">{% if t.status in ['arquivada','agendada'] %}<form method="post" onsubmit="return confirm('Restaurar esta versão como tabela permanente ativa?')"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="restaurar_tabela"><input type="hidden" name="tabela_id" value="{{t.id}}"><button class="bp32-btn-outline">Restaurar</button></form>{% endif %}{% if t.status in ['rascunho','agendada'] and (not rascunho or t.id != rascunho.id) %}<form method="post"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="acao" value="arquivar_tabela"><input type="hidden" name="tabela_id" value="{{t.id}}"><button class="bp32-danger">Arquivar</button></form>{% endif %}</div></article>{% else %}<div class="bp32-empty">Nenhuma versão disponível.</div>{% endfor %}</div>
+    {% if rascunho %}<section class="bp32-compare bp33-impact-compare"><div class="bp32-section-head"><div><span>IMPACTO DA ALTERAÇÃO</span><h2>Atual × rascunho</h2><p>Exemplos sem promoção para comparar rapidamente as versões.</p></div></div><div class="bp32-compare-grid">{% for atual in impacto_atual %}{% set novo=impacto_rascunho[loop.index0] if loop.index0 < impacto_rascunho|length else none %}<article><small>{{atual.nome}}</small><span>Atual <b>{{atual.valor|preco}}</b></span><span>Rascunho <strong>{{ (novo.valor|preco) if novo else '—' }}</strong></span>{% if novo %}<em class="{{'up' if novo.valor>atual.valor else 'down' if novo.valor<atual.valor else ''}}">{% if novo.valor>atual.valor %}+{% endif %}{{(novo.valor-atual.valor)|preco}}</em>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+    <div class="bp32-section-head history"><div><span>AUDITORIA</span><h2>Alterações recentes</h2></div></div><div class="bp32-history">{% for h in historico %}<article><b>{{h.acao|replace('_',' ')|title}}</b><span>{% if h.codigo %}{{h.codigo|replace('_',' ')}} · {% endif %}{% if h.valor_anterior is not none or h.valor_novo is not none %}{{h.valor_anterior|preco}} → {{h.valor_novo|preco}} · {% endif %}{{h.usuario_email or 'sistema'}}</span><small>{{h.created_at}}</small></article>{% else %}<div class="bp32-empty">Sem alterações registradas.</div>{% endfor %}</div>
+  </section>
+</div>
+</div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(() => {
+  const tabs=[...document.querySelectorAll('[data-bp-tab]')], panels=[...document.querySelectorAll('[data-bp-panel]')];
+  const overview=document.getElementById('bp33CategoryOverview');
+  function show(name){if(name==='tabela')name='comum';tabs.forEach(b=>b.classList.toggle('active',b.dataset.bpTab===name));panels.forEach(p=>p.classList.toggle('active',p.dataset.bpPanel===name));if(overview)overview.hidden=!['comum','raro','ultra_raro'].includes(name);history.replaceState(null,'','#'+name)}
+  tabs.forEach(b=>b.addEventListener('click',()=>show(b.dataset.bpTab))); const hash=location.hash.slice(1);show(tabs.some(b=>b.dataset.bpTab===hash)?hash:'comum');
+  document.querySelectorAll('[data-sidebar-tab]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();show(a.dataset.sidebarTab)}));
+  const dlg=document.getElementById('publishDialog'),rulesDlg=document.getElementById('rulesDialog');document.querySelector('[data-open-publish]')?.addEventListener('click',()=>dlg?.showModal());document.querySelector('[data-open-rules]')?.addEventListener('click',()=>rulesDlg?.showModal());
+  const all=document.getElementById('promoAll'), opts=document.getElementById('promoPriceOptions');all?.addEventListener('change',()=>{opts?.classList.toggle('disabled',all.checked);opts?.querySelectorAll('input').forEach(x=>x.disabled=all.checked)});
+  const form=document.getElementById('bp32SimulatorForm'), out=document.getElementById('bp32SimulationResult');
+  function money(v){v=Number(v||0);if(v>=1000000)return (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2})+'kk';if(v>=1000)return (v/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+'k';return v.toLocaleString('pt-BR')}
+  async function simulate(){if(!form||!out)return;const q=new URLSearchParams(new FormData(form));out.classList.add('loading');try{const r=await fetch('{{url_for("admin_precos_simular")}}?'+q.toString(),{headers:{Accept:'application/json'},cache:'no-store'});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Falha na simulação');out.querySelector('strong').textContent=money(d.total);const bs=out.querySelectorAll('.bp32-sim-split b');bs[0].textContent=money(d.taxa_valor);bs[1].textContent=money(d.breeder_valor);const ol=out.querySelector('ol');ol.innerHTML='';(d.componentes||[]).forEach(x=>{const li=document.createElement('li');li.innerHTML='<span>'+x.nome+'</span><b>'+((x.valor||0)<0?'-':'')+money(Math.abs(x.valor||0))+'</b>';ol.appendChild(li)});if(Number(d.desconto_membro_hype_valor||0)>0){const li=document.createElement('li');li.innerHTML='<span>Desconto membro HYPE</span><b>-'+money(d.desconto_membro_hype_valor)+'</b>';ol.appendChild(li)};if(d.margem_protegida){const li=document.createElement('li');li.innerHTML='<span>Proteção de margem</span><b>aplicada</b>';ol.appendChild(li)}}catch(e){out.querySelector('strong').textContent='Erro';out.querySelector('ol').innerHTML='<li>'+e.message+'</li>'}finally{out.classList.remove('loading')}}
+  form?.addEventListener('submit',e=>{e.preventDefault();simulate()});form?.querySelectorAll('select,input').forEach(x=>x.addEventListener('change',simulate));
+  document.querySelectorAll('[data-package]').forEach(btn=>btn.addEventListener('click',()=>{if(!form)return;const p=JSON.parse(btn.dataset.package);for(const [k,v] of Object.entries(p)){const el=form.elements[k];if(!el)continue;if(typeof v==='boolean')el.value=v?'sim':'nao';else el.value=v}simulate();show('simulador')}));
+  if(form)simulate();
+  document.querySelectorAll('[data-go-tab]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.goTab)));
+  const pSearch=document.getElementById('bp33PokemonSearch'),pCat=document.getElementById('bp33PokemonCategory'),pRows=[...document.querySelectorAll('[data-pokemon-row]')],pCount=document.getElementById('bp33PokemonCount');
+  function filterPokemon(){const q=(pSearch?.value||'').trim().toLowerCase(),cat=pCat?.value||'todos';let n=0;pRows.forEach(row=>{const hitText=!q||row.dataset.name.includes(q)||String(row.dataset.id||'').includes(q);const hitCat=cat==='todos'||(cat==='override'?row.dataset.override==='1':row.dataset.category===cat);const ok=hitText&&hitCat;row.hidden=!ok;if(ok)n++});if(pCount)pCount.textContent=n}
+  pSearch?.addEventListener('input',filterPokemon);pCat?.addEventListener('change',filterPokemon);
+  const catalog=document.getElementById('bp33CatalogResults'),classifyForm=document.getElementById('bp33ClassifyForm'),exceptionForm=document.getElementById('bp33ExceptionForm');let catalogTimer=0,catalogSeq=0;
+  function fillPokemonForm(form,p){if(!form)return;const id=form.elements['pokemon_id'],name=form.elements['pokemon_nome'];if(id)id.value=p.id||'';if(name)name.value=p.display_name||p.name||'';form.scrollIntoView({behavior:'smooth',block:'center'})}
+  async function searchCatalog(){const q=(pSearch?.value||'').trim();if(!catalog)return;if(q.length<2){catalog.hidden=true;catalog.innerHTML='';return}const seq=++catalogSeq;catalog.hidden=false;catalog.innerHTML='<span class="bp33-searching">Buscando no catálogo HYPE…</span>';try{const r=await fetch('{{url_for("api_breed_buscar_pokemon")}}?q='+encodeURIComponent(q),{headers:{Accept:'application/json'},cache:'no-store'});const d=await r.json();if(seq!==catalogSeq)return;const items=(d.results||[]).slice(0,12);catalog.innerHTML=items.length?'':'<span class="bp33-searching">Nenhum Pokémon encontrado.</span>';items.forEach(p=>{const card=document.createElement('article');card.innerHTML='<img src="'+p.sprite+'" alt=""><div><small>#'+p.id+'</small><b>'+p.display_name+'</b><span>Carregando categoria…</span></div><div class="bp33-catalog-actions"><button type="button" data-classify>Classificar</button><button type="button" data-exception>Preço individual</button></div>';card.querySelector('[data-classify]').addEventListener('click',()=>fillPokemonForm(classifyForm,p));card.querySelector('[data-exception]').addEventListener('click',()=>fillPokemonForm(exceptionForm,p));catalog.appendChild(card);fetch('{{url_for("api_breed_pokemon",pokemon_id=999999)}}'.replace('999999',p.id)+'?nome='+encodeURIComponent(p.name),{headers:{Accept:'application/json'},cache:'no-store'}).then(x=>x.json()).then(meta=>{const sp=card.querySelector('div span');if(sp)sp.textContent=(meta.categoria_label||'Comum')+(meta.so_com_ditto?' · Ditto obrigatório':'')}).catch(()=>{})})}catch(e){if(seq===catalogSeq)catalog.innerHTML='<span class="bp33-searching">Não foi possível consultar o catálogo agora.</span>'}}
+  pSearch?.addEventListener('input',()=>{clearTimeout(catalogTimer);catalogTimer=setTimeout(searchCatalog,260)});
+  const eSearch=document.getElementById('bp33ExceptionSearch'),eRows=[...document.querySelectorAll('[data-exception-row]')];eSearch?.addEventListener('input',()=>{const q=eSearch.value.trim().toLowerCase();eRows.forEach(row=>row.hidden=!!q&&!row.dataset.name.includes(q)&&!String(row.dataset.id||'').includes(q))});
+})();
+</script>
+{% endblock %}

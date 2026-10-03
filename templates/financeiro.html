@@ -1,0 +1,46 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Financeiro Breed — HYPE{% endblock %}
+{% block body_class %}hype-finance-v28-page{% endblock %}
+{% block content %}
+<div class="hype-v6-page v28-finance-page">
+  <section class="v28-finance-hero">
+    <div><span class="hype-v6-kicker">FINANCEIRO BREED 2.0</span><h1>Comissões HYPE</h1><p>Controle real de quanto cada Breeder deve ao Clã. A dívida nasce quando o Pokémon fica pronto e só entra no Caixa após confirmação administrativa.</p></div>
+    <a class="btn-ranking-outline" href="{{url_for('expansion.admin_dashboard')}}">← Painel Admin</a>
+  </section>
+
+  <section class="v28-admin-kpis">
+    <article class="danger"><span>A receber dos Breeders</span><strong>{{total_a_receber|preco}}</strong><small>{{breeders_pendentes}} Breeder(s) com pendência</small></article>
+    <article class="warning"><span>Informado / conferir</span><strong>{{total_informado|preco}}</strong><small>Aguardando confirmação do Admin</small></article>
+    <article><span>Recebido este mês</span><strong>{{total_recebido_mes|preco}}</strong><small>Comissões confirmadas</small></article>
+    <article><span>Recebido no histórico</span><strong>{{total_recebido|preco}}</strong><small>Inclui registros migrados</small></article>
+    <article><span>Saldo do Caixa HYPE</span><strong>{{saldo_caixa|preco}}</strong><small>Entradas menos saídas registradas</small></article>
+  </section>
+
+  <section class="v28-fin-card">
+    <header><div><span class="breed-kicker">POR BREEDER</span><h2>Quem está devendo ao Clã</h2></div></header>
+    <div class="v28-debtor-grid">
+      {% for b in por_breeder %}
+      <article class="v28-debtor {% if b.total_devido %}has-debt{% endif %}">
+        <div><span class="v28-avatar-letter">{{b.nick[0]|upper}}</span><section><strong>{{b.nick}}</strong><small>{{b.email}}</small></section></div>
+        <dl><div><dt>Pendente</dt><dd>{{b.pendente|preco}}</dd></div><div><dt>Informado</dt><dd>{{b.informado|preco}}</dd></div><div><dt>Total devido</dt><dd>{{b.total_devido|preco}}</dd></div></dl>
+        <small>{{b.quantidade_aberta}} comissão(ões) aberta(s)</small>
+      </article>
+      {% else %}<p class="muted">Nenhuma comissão registrada ainda.</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="v28-fin-card">
+    <header><div><span class="breed-kicker">AUDITORIA</span><h2>Comissões por pedido</h2></div><span class="v28-legend"><i class="pendente"></i>Pendente <i class="informado"></i>Informado <i class="pago"></i>Pago</span></header>
+    <div class="v28-fin-table-wrap"><table class="v28-fin-table"><thead><tr><th>Pedido</th><th>Pokémon</th><th>Breeder</th><th>Taxa</th><th>Valor</th><th>Status</th><th>Gerada</th><th>Ações</th></tr></thead><tbody>
+      {% for c in comissoes %}<tr>
+        <td>#{{c.pedido_id}}</td><td><b>{{c.pokemon}}</b></td><td>{{c.breeder_nick}}</td><td>{{c.percentual}}%</td><td><strong>{{c.valor|preco}}</strong></td>
+        <td><span class="v28-fin-status {{c.status}}">{% if c.status=='pendente' %}Pendente{% elif c.status=='informado' %}Pagamento informado{% elif c.status=='pago' %}Pago{% else %}Cancelado{% endif %}</span></td>
+        <td>{{(c.gerada_em or c.created_at)|data_br}}</td><td><div class="v28-table-actions">
+          {% if c.status in ('pendente','informado') %}<form method="post" action="{{url_for('admin_confirmar_comissao_breed',comissao_id=c.id)}}" onsubmit="return confirm('Confirmar que o Clã recebeu {{c.valor|preco}}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="confirm" data-once>Confirmar recebimento</button></form>{% endif %}
+          {% if c.status=='informado' %}<form method="post" action="{{url_for('admin_rejeitar_comissao_breed',comissao_id=c.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" maxlength="500" placeholder="Motivo"><button class="reject" data-once>Não recebido</button></form>{% endif %}
+        </div></td>
+      </tr>{% else %}<tr><td colspan="8">Nenhuma comissão gerada ainda.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endblock %}

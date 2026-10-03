@@ -1,0 +1,40 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Central de Rankings - HYPE{% endblock %}
+{% block body_class %}hype-rankings-page{% endblock %}
+{% block content %}
+<div class="rankhub">
+  <section class="rankhub-hero">
+    <div><span class="rankhub-kicker">CENTRAL COMPETITIVA HYPE</span><h1>RANKINGS <em>HYPE</em></h1><p>Todos os rankings do clã em um só lugar, atualizados automaticamente.</p></div>
+    <div class="rankhub-season"><small>TEMPORADA ATUAL</small><b>{{mes}}</b><span>Fechamento mensal automático</span></div>
+  </section>
+  <nav class="rankhub-switch"><a class="{{'active' if escopo=='mensal' else ''}}" href="{{url_for('central_rankings',escopo='mensal')}}">Temporada atual</a><a class="{{'active' if escopo=='geral' else ''}}" href="{{url_for('central_rankings',escopo='geral')}}">Histórico geral</a><a href="{{url_for('breed_hall_fama')}}">Hall da Fama</a></nav>
+  {% set cards=[
+    ('breeders','👑','Ranking Breeders','Qualidade, produção, avaliações e valor gerado'),
+    ('pokemons','🥚','Pokémon mais breedados','Espécies mais pedidas no HYPE Breed'),
+    ('clientes','⭐','Maiores clientes','Quem mais concluiu pedidos no site'),
+    ('competitivo','🏆','Ranking competitivo','Pontos, vitórias e pódios'),
+    ('eventos','🎯','Ranking de eventos','Desempenho nos eventos HYPE'),
+    ('xp','⚡','XP & Nível','Membros mais ativos na plataforma'),
+    ('compras','♛','Compras no Reino','Participação nas lojas do Reino HYPE')
+  ] %}
+  <section class="rankhub-grid">
+  {% for key,ico,titulo,sub in cards %}
+    {% set itens=dados.get(key,[]) %}
+    <article class="rankhub-card">
+      <header><span>{{ico}}</span><div><h2>{{titulo}}</h2><p>{{sub}}</p></div></header>
+      <div class="rankhub-top5">
+        {% for x in itens[:5] %}
+        <div class="rankhub-row"><b class="pos">#{{loop.index}}</b>
+          {% if key=='pokemons' %}<span class="rank-avatar pokemon">{% if x.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{x.pokemon_id}}.png" alt="">{% else %}◈{% endif %}</span>{% else %}<span class="rank-avatar">{% if x.avatar_url %}<img src="{{x.avatar_url}}" alt="">{% else %}{{(x.nome or 'H')[:1]|upper}}{% endif %}</span>{% endif %}
+          <div class="who"><b>{{x.nome}}</b><small>{% if key=='breeders' %}{{x.total}} entregas · {{x.media or '—'}}★{% elif key=='pokemons' %}{{x.total}} pedidos{% elif key=='clientes' %}{{x.total}} pedidos{% elif key=='xp' %}Nível {{x.nivel}}{% elif key=='compras' %}{{x.total}} itens{% else %}{{x.valor}} pts{% endif %}</small></div>
+          <strong>{% if key=='xp' %}{{x.valor}} XP{% elif key=='breeders' %}{{x.valor|round(1)}}{% else %}{{x.valor|round(0)|int}}{% endif %}</strong>
+        </div>
+        {% else %}<p class="rankhub-empty">Ainda não há dados para esta categoria.</p>{% endfor %}
+      </div>
+      <a class="rankhub-open" href="{{url_for('ranking_detalhe',tipo=key,escopo=escopo)}}">Abrir ranking completo →</a>
+    </article>
+  {% endfor %}
+  </section>
+  <section class="rankhub-bottom"><div><span>🏛️</span><b>Hall da Fama</b><p>Campeões e recordes das temporadas anteriores ficam preservados.</p></div><a href="{{url_for('breed_hall_fama')}}">Explorar Hall da Fama</a></section>
+</div>
+{% endblock %}

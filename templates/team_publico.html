@@ -1,0 +1,74 @@
+{% extends 'builders_base.html' %}
+{% block title %}{{time.nome}} - Time HYPE{% endblock %}
+{% block builders_content %}
+<div class="hgb-legacy-page hgb-integrated-tool v27-public-team-page">
+  <section class="dash-welcome v27-public-team-hero">
+    <div>
+      <span class="breed-kicker">TIME COMPARTILHADO HYPE</span>
+      <h1>{{time.nome}}</h1>
+      <p>{{time.descricao or 'Composição compartilhada pela comunidade HYPE.'}}</p>
+      <div class="v27-team-author">
+        {% if autor.avatar_url %}<img src="{{autor.avatar_url}}" alt="">{% endif %}
+        <span>por <b>{{autor.nome_exibicao or autor.nick_jogo or 'Membro HYPE'}}</b> · {{time.formato or 'Formato livre'}}</span>
+      </div>
+    </div>
+    <div class="v27-share-stats">
+      <span><b>{{time.visualizacoes or 0}}</b><small>Visualizações</small></span>
+      <span><b>{{favoritos_total}}</b><small>Favoritos</small></span>
+      <span><b>{{time.duplicacoes or 0}}</b><small>Cópias</small></span>
+    </div>
+  </section>
+
+  <div class="v27-public-actions">
+    <button type="button" class="cta-gold" id="copyTeamLink">Copiar link</button>
+    {% if session.get('usuario_email') %}
+      <form method="post" action="{{url_for('expansion.team_builder_favoritar',team_id=time.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-dark">{{'★ Favoritado' if favoritado else '☆ Favoritar'}}</button></form>
+      <form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=time.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-gold">Usar como base</button></form>
+      <a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=time.id)}}">Análise completa</a>
+    {% else %}
+      <a class="cta-dark" href="{{url_for('pagina_inicial')}}">Entrar para usar como base</a>
+    {% endif %}
+  </div>
+
+  <section class="dash-card">
+    <div class="section-title-row"><div><span class="breed-kicker">COMPOSIÇÃO</span><h2>{{analise.total_pokemon}} Pokémon</h2></div><span class="status-pill {{'entrada' if time.publico else 'saida'}}">{{'PÚBLICO' if time.publico else 'PRIVADO'}}</span></div>
+    <div class="v27-public-roster">
+      {% for s in time.slots %}
+      <article class="v27-public-set">
+        <div class="v27-public-set-top">
+          <div class="v27-public-sprite">{% if s.sprite %}<img src="{{s.sprite}}" alt="{{s.pokemon}}">{% else %}<span>?</span>{% endif %}</div>
+          <div><span class="breed-kicker">{{(s.tipos or [])|join(' / ') or 'TIPO NÃO REGISTRADO'}}</span><h3>{{s.pokemon}}</h3><small>{{s.papel or 'Papel livre'}}</small></div>
+        </div>
+        <div class="v27-set-meta"><span><b>Item</b>{{s.item or '-'}}</span><span><b>Ability</b>{{s.ability or '-'}}</span><span><b>Nature</b>{{s.nature or '-'}}</span><span><b>Mecânica</b>{{s.mecanica or 'nenhuma'}}</span></div>
+        {% if s.moves %}<div class="set-moves">{% for m in s.moves if m %}<span>{{m}}</span>{% endfor %}</div>{% endif %}
+        {% if s.observacao %}<p class="muted">{{s.observacao}}</p>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="dash-grid">
+    <section class="dash-card"><span class="breed-kicker">DEFESA</span><h2>Maiores fraquezas</h2>{% for tipo,qtd in analise.fraquezas_tipos[:6] %}<div class="dash-row"><b>{{tipo|title}}</b><span>{{qtd}} vulnerável(is)</span></div>{% else %}<p class="muted">Sem dados suficientes.</p>{% endfor %}</section>
+    <section class="dash-card"><span class="breed-kicker">OFENSIVA</span><h2>Cobertura de golpes</h2>{% for tipo,qtd in analise.cobertura_ofensiva[:8] %}<div class="dash-row"><b>{{tipo|title}}</b><span>{{qtd}} golpe(s)</span></div>{% else %}<p class="muted">Abra e salve o time na V27 para registrar os tipos dos golpes.</p>{% endfor %}</section>
+  </div>
+
+  <section class="dash-card coach-card"><span class="breed-kicker">HYPE TEAM COACH</span><h2>Leitura rápida</h2>{% for x in analise.coach[:6] %}<p>◆ {{x}}</p>{% else %}<p class="muted">Sem recomendações automáticas.</p>{% endfor %}</section>
+
+  <section class="dash-card community-comments" id="comentarios">
+    <div class="community-heading"><div><span class="breed-kicker">COMUNIDADE</span><h2>Comentários sobre o time</h2></div><span>{{comentarios|length}}</span></div>
+    {% if session.get('usuario_email') %}<form class="community-comment-form" method="post" action="{{url_for('community.comentar')}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input type="hidden" name="alvo_tipo" value="time"><input type="hidden" name="alvo_id" value="{{time.id}}"><textarea name="conteudo" maxlength="800" required placeholder="Comente a composição, matchup ou uma sugestão de melhoria..."></textarea><button class="cta-gold">Comentar</button></form>{% else %}<p class="community-empty">Entre na conta para comentar.</p>{% endif %}
+    <div class="community-comment-list">{% for c in comentarios %}<article><div class="mini-avatar">{% if c.autor.avatar_url %}<img src="{{c.autor.avatar_url}}" alt="">{% else %}{{(c.autor.nick_jogo or 'H')[:1]|upper}}{% endif %}</div><div><div class="comment-head"><a href="{{url_for('perfil_publico',nick=c.autor.nick_jogo)}}">{{c.autor.nome_exibicao or c.autor.nick_jogo or 'Membro'}}</a><small>{{(c.created_at or '')[:16]|replace('T',' ')}}</small></div><p>{{c.conteudo}}</p>{% if session.get('usuario_email')==c.usuario_email %}<form method="post" action="{{url_for('community.excluir_comentario',comentario_id=c.id)}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><button class="comment-remove">Remover</button></form>{% endif %}</div></article>{% else %}<p class="community-empty">Seja o primeiro a comentar este time.</p>{% endfor %}</div>
+  </section>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(() => {
+  const btn=document.getElementById('copyTeamLink');
+  if(!btn) return;
+  btn.addEventListener('click', async()=>{
+    try{await navigator.clipboard.writeText(window.location.href);btn.textContent='Link copiado!';setTimeout(()=>btn.textContent='Copiar link',1600);}catch(e){prompt('Copie o link do time:',window.location.href);}
+  });
+})();
+</script>
+{% endblock %}

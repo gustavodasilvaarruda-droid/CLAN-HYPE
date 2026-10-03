@@ -1,0 +1,164 @@
+{% extends 'hype_app_base.html' %}{% from '_breed_v147_macros.html' import chips,timeline %}
+{% block title %}Meus Pedidos — HYPE Breed{% endblock %}{% block body_class %}hype-breed-page hype-my-orders-v22-page breed-premium-v34-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_premium_v34.css')}}?v=3401">{% endblock %}
+{% block content %}
+<div class="hype-v6-page mybreed-v22-page">
+  <section class="mybreed-v22-hero">
+    <div><span class="hype-v6-kicker">HYPE BREED · CENTRAL DO CLIENTE</span><h1>MEUS PEDIDOS</h1><p>Acompanhe cada etapa, converse com o Breeder e confirme a entrega com segurança.</p></div>
+    <a class="btn-dourado" href="{{url_for('breed')}}#fazer-pedido">+ Novo pedido</a>
+  </section>
+
+  <nav class="hype-breed-subnav"><a href="{{url_for('breed')}}">Fazer Pedido</a><a class="active" href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a><a href="{{url_for('breed_historico_geral')}}">Histórico</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}{% if 'breeder' in funcoes_usuario or permissoes.get('pode_assumir_breed') %}<a href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>{% endif %}<a href="{{url_for('team_breeders')}}">Team Breeders</a><a href="{{url_for('ranking_breed')}}">Ranking</a></nav>
+
+  <section class="mybreed-v22-kpis">
+    <article><span>Pedidos ativos</span><strong>{{resumo.ativos}}</strong><small>em acompanhamento</small></article>
+    <article><span>Pagamento</span><strong>{{resumo.pagamento}}</strong><small>aguardando confirmação</small></article>
+    <article><span>Em produção</span><strong>{{resumo.producao}}</strong><small>com Breeder</small></article>
+    <article><span>Prontos / entrega</span><strong>{{resumo.prontos}}</strong><small>fase final</small></article>
+    <article><span>Histórico</span><strong>{{resumo.historico}}</strong><small>entregues ou cancelados</small></article>
+  </section>
+
+  <div class="mybreed-v22-filterbar" id="myFilters">
+    <div><button type="button" class="active" data-filter="ativos">Ativos</button><button type="button" data-filter="aguardando_pagamento">Pagamento</button><button type="button" data-filter="em_producao">Em produção</button><button type="button" data-filter="concluido">Prontos</button><button type="button" data-filter="aguardando_confirmacao">Confirmar entrega</button><button type="button" data-filter="historico">Histórico</button></div>
+    <span>{{resumo.total}} pedido(s)</span>
+  </div>
+
+  <section class="mybreed-v22-list breed-v15-list" id="myOrders">
+    {% for p in pedidos_ativos + historico %}
+    <article class="mybreed-v22-card breed-v15-card breed-v34-themed" data-status="{{p.status}}" data-history="{{'1' if p.status in ('entregue','cancelado') else '0'}}" data-id="{{p.id}}" data-pokemon-id="{{p.pokemon_id or ''}}" data-pokemon-name="{{p.pokemon|e}}" data-rarity="{{p.categoria_preco or 'comum'}}">
+      <div class="mybreed-v22-top breed-v15-main">
+        <div class="mybreed-v22-poke">
+          <div class="mybreed-v22-art">{% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png" alt="">{% else %}<span>◈</span>{% endif %}</div>
+          <div><small>Pedido #{{p.id}}{% if p.created_at %} · {{p.created_at|data_br('%d/%m/%Y')}}{% endif %}</small><h2>{{p.pokemon}}</h2><div class="breed-v34-meta-slot"></div>{{chips(p,false)}}</div>
+        </div>
+        <div class="mybreed-v22-progress">{{timeline(p)}}<div><span class="status-badge status-{{p.status}}">{{p.status|replace('_',' ')|title}}</span><small class="breed-last-update" data-time="{{p.atualizado_em or p.created_at}}">Atualizando…</small></div></div>
+        <div class="mybreed-v22-summary">
+          {% if p.promocao_percentual %}<span class="breed-order-promo">-{{p.promocao_percentual}}% · {{p.promocao_nome or 'PROMO HYPE'}}</span>{% endif %}
+          {% if p.preco_original and p.preco_original > p.preco_total %}<del>{{p.preco_original|preco}}</del>{% endif %}<strong>{{p.preco_total|preco}}</strong>
+          <small>Breeder</small><b>{{p.breeder_nick or 'Aguardando na fila'}}</b>
+        </div>
+      </div>
+
+      {% if p.status == 'aguardando_confirmacao' %}<div class="mybreed-v22-receipt"><div><span>✓</span><p><strong>O Breeder informou a entrega.</strong><small>Confirme somente depois de receber o Pokémon dentro do jogo.</small></p></div><form method="post" action="{{url_for('confirmar_recebimento_breed',pedido_id=p.id)}}" onsubmit="return confirm('Você confirma que recebeu este Pokémon?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-dourado" data-once>Confirmar recebimento</button></form></div>{% endif %}
+
+      <div class="mybreed-v22-actions">
+        <a class="btn-dourado" href="{{url_for('breed_pedido_detalhe',pedido_id=p.id)}}">Ver detalhes</a>
+        {% if p.breeder_responsavel %}<a class="btn-ranking-outline" href="{{url_for('chat_pedido',tipo='breed',pedido_id=p.id)}}">Chat{% if p.mensagens_nao_lidas %}<b class="breed-unread">{{p.mensagens_nao_lidas}}</b>{% endif %}</a>{% endif %}
+        <button class="breed-details-toggle" type="button">▶ Requisitos rápidos</button>
+        {% if p.status=='entregue' and p.breeder_responsavel and not p.ja_avaliado %}<button type="button" class="btn-ranking-outline breed-open-rating" data-rating-id="{{p.id}}" data-rating-pokemon="{{p.pokemon|e}}" data-rating-breeder="{{(p.breeder_nick or 'Breeder HYPE')|e}}" data-rating-action="{{url_for('avaliar_pedido',tipo='breed',pedido_id=p.id)}}">★ Avaliar</button>{% elif p.ja_avaliado %}<span class="mybreed-v22-rated">✓ Avaliado</span>{% endif %}
+      </div>
+
+      <div class="breed-v15-details mybreed-v22-quickdetail">
+        <div class="breed-req-grid"><span><b>Breed</b>{{'Hidden Power Ability' if p.breed_tipo == 'PERSONALIZADO' else (p.breed_tipo or '—')}}</span><span><b>Nature</b>{{p.nature or 'Sem Nature'}}</span><span><b>Ability</b>{{'HA' if p.ha else (p.ability or 'Sem HA')}}</span><span><b>Gênero</b>{{p.genero or 'Indiferente'}}</span><span><b>IV descartado</b>{{p.iv_descartado or 'Nenhum'}}</span><span><b>Zero Speed</b>{{'Sim' if p.zero_speed else 'Não'}}</span>{% if p.breed_tipo == 'PERSONALIZADO' and p.ivs_personalizados %}<span class="breed-custom-order-ivs"><b>IVs personalizados</b>HP {{p.ivs_personalizados.get('hp')}} · ATK {{p.ivs_personalizados.get('attack')}} · DEF {{p.ivs_personalizados.get('defense')}} · SPA {{p.ivs_personalizados.get('sp_attack')}} · SPD {{p.ivs_personalizados.get('sp_defense')}} · SPE {{p.ivs_personalizados.get('speed')}}</span>{% endif %}<span><b>Treinado</b>{{'Sim' if p.treinado else 'Não'}}</span><span><b>Prioridade</b>{{p.prioridade or 'Normal'}}</span></div>
+        {% if p.status not in ('entregue','cancelado','concluido','aguardando_confirmacao','cancelamento_solicitado') %}<form class="mybreed-v22-cancel" method="post" action="{{url_for('cancelar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Cancelar ou solicitar cancelamento deste pedido?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" maxlength="500" placeholder="Motivo do cancelamento"><button class="btn-danger-hype" data-once>Cancelar pedido</button></form>{% endif %}
+      </div>
+    </article>
+    {% else %}<div class="mybreed-v22-empty"><strong>Você ainda não possui pedidos.</strong><span>Crie seu primeiro Breed para acompanhar tudo por aqui.</span><a class="btn-dourado" href="{{url_for('breed')}}#fazer-pedido">Fazer pedido</a></div>{% endfor %}
+  </section>
+</div>
+
+<div class="breed-rating-modal" id="breedRatingModal" aria-hidden="true">
+  <div class="breed-rating-backdrop" data-rating-close></div>
+  <section class="breed-rating-dialog" role="dialog" aria-modal="true" aria-labelledby="breedRatingTitle">
+    <button type="button" class="breed-rating-close" data-rating-close aria-label="Fechar">×</button>
+    <span class="breed-kicker">AVALIAÇÃO HYPE BREED</span>
+    <h2 id="breedRatingTitle">Como foi seu Breed?</h2>
+    <p id="breedRatingSubtitle">Sua avaliação ajuda a reconhecer o trabalho dos Breeders HYPE.</p>
+
+    <form id="breedRatingForm" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="nota" id="breedRatingValue" value="5">
+
+      <div class="breed-star-picker" role="radiogroup" aria-label="Nota de 1 a 5 estrelas">
+        {% for n in range(1,6) %}
+          <button type="button" class="breed-star active" data-star="{{n}}" aria-label="{{n}} estrela{{'s' if n>1 else ''}}" aria-pressed="true">★</button>
+        {% endfor %}
+      </div>
+      <div class="breed-rating-label" id="breedRatingLabel">Excelente · 5/5</div>
+
+      <label class="breed-rating-comment">
+        <span>Comentário <small>(opcional)</small></span>
+        <textarea name="comentario" maxlength="700" rows="4" placeholder="Conte como foi o atendimento, prazo e qualidade do Breed..."></textarea>
+        <small><b id="breedRatingCount">0</b>/700</small>
+      </label>
+
+      <div class="breed-rating-actions">
+        <button type="button" class="btn-ranking-outline" data-rating-close>Agora não</button>
+        <button type="submit" class="btn-dourado" data-once>Enviar avaliação</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script>
+(function(){
+  const modal = document.getElementById('breedRatingModal');
+  const form = document.getElementById('breedRatingForm');
+  const value = document.getElementById('breedRatingValue');
+  const label = document.getElementById('breedRatingLabel');
+  const subtitle = document.getElementById('breedRatingSubtitle');
+  const stars = [...document.querySelectorAll('.breed-star')];
+  const textarea = form ? form.querySelector('textarea[name="comentario"]') : null;
+  const counter = document.getElementById('breedRatingCount');
+  const labels = {1:'Pode melhorar',2:'Regular',3:'Bom',4:'Muito bom',5:'Excelente'};
+
+  function setStars(n){
+    n = Number(n || 5);
+    value.value = n;
+    stars.forEach((star, i) => {
+      const active = i < n;
+      star.classList.toggle('active', active);
+      star.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    label.textContent = (labels[n] || '') + ' · ' + n + '/5';
+  }
+
+  function openRating(btn){
+    if(!modal || !form || !btn) return;
+    form.action = btn.dataset.ratingAction || '';
+    subtitle.textContent = 'Avalie ' + (btn.dataset.ratingBreeder || 'o Breeder HYPE') +
+      ' pelo pedido de ' + (btn.dataset.ratingPokemon || 'Pokémon') + '.';
+    setStars(5);
+    if(textarea){ textarea.value=''; counter.textContent='0'; }
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.classList.add('breed-rating-open');
+  }
+
+  function closeRating(){
+    if(!modal) return;
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden','true');
+    document.body.classList.remove('breed-rating-open');
+  }
+
+  document.addEventListener('click', function(e){
+    const open = e.target.closest('.breed-open-rating');
+    if(open){ openRating(open); return; }
+    if(e.target.closest('[data-rating-close]')) closeRating();
+    const star = e.target.closest('.breed-star');
+    if(star) setStars(star.dataset.star);
+  });
+
+  if(textarea){
+    textarea.addEventListener('input', () => counter.textContent = textarea.value.length);
+  }
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') closeRating(); });
+
+  const params = new URLSearchParams(window.location.search);
+  const autoId = params.get('avaliar');
+  if(autoId){
+    const btn = document.querySelector('.breed-open-rating[data-rating-id="' + CSS.escape(autoId) + '"]');
+    if(btn){
+      setTimeout(() => openRating(btn), 250);
+      history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
+})();
+</script>
+
+{% endblock %}
+{% block extra_scripts %}
+<script>window.HYPE_BREED_SCRIPT_ROOT={{ request.script_root|tojson }};</script>
+<script src="{{url_for('static',filename='breed_v15.js')}}"></script>
+<script src="{{url_for('static',filename='breed_premium_v34.js')}}?v=3401"></script>
+{% endblock %}

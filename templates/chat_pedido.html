@@ -1,0 +1,24 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Chat do Pedido #{{pedido.id}} — HYPE{% endblock %}
+{% block body_class %}hype-order-chat-page{% endblock %}
+{% block content %}
+<div class="hype-v6-page chat-v22-page">
+  <section class="chat-v22-hero">
+    <div><span class="hype-v6-kicker">HYPE {{tipo|upper}} · CONVERSA</span><h1>{{pedido.pokemon or pedido.titulo or 'Pedido'}} <small>#{{pedido.id}}</small></h1><p>{% if tipo=='breed' %}Cliente: <b>{{cliente_nick}}</b>{% if responsavel_nick %} · Breeder: <b>{{responsavel_nick}}</b>{% endif %}{% else %}Conversa do pedido com a equipe HYPE.{% endif %}</p></div>
+    <div class="chat-v22-actions">{% if tipo=='breed' %}<a class="btn-ranking-outline" href="{{url_for('breed_pedido_detalhe',pedido_id=pedido.id)}}">Ver pedido</a>{% endif %}<a class="btn-ranking-outline" href="{{url_for('breed_meus_pedidos') if tipo=='breed' else url_for('painel')}}">Voltar</a></div>
+  </section>
+
+  <div class="chat-v22-shell">
+    <section class="chat-v22-thread" id="chatThread">
+      {% for m in mensagens %}
+      <article class="chat-v22-message {{'mine' if m.remetente_email==session.get('usuario_email') else ''}}"><div class="chat-v22-message-head"><strong>{{m.autor_nick or ('Você' if m.remetente_email==session.get('usuario_email') else 'Equipe HYPE')}}</strong><time>{{m.created_at|data_br}}</time></div><p>{{m.mensagem}}</p></article>
+      {% else %}<div class="chat-v22-empty"><strong>Nenhuma mensagem ainda.</strong><span>Use esta conversa para alinhar detalhes do pedido.</span></div>{% endfor %}
+    </section>
+
+    {% if chat_readonly %}<div class="chat-v22-readonly"><strong>Conversa arquivada</strong><span>O pedido foi finalizado. O histórico permanece disponível somente para leitura.</span></div>{% else %}
+    <form method="post" class="chat-v22-composer"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><textarea name="mensagem" maxlength="1500" required placeholder="Digite sua mensagem para {{responsavel_nick or cliente_nick or 'a equipe HYPE'}}..."></textarea><div><small><b id="chatCount">0</b>/1500</small><button class="btn-dourado" data-once>Enviar mensagem</button></div></form>
+    {% endif %}
+  </div>
+</div>
+<script>(function(){const t=document.querySelector('.chat-v22-composer textarea'),c=document.getElementById('chatCount'),box=document.getElementById('chatThread');if(box) box.scrollTop=box.scrollHeight;if(t&&c)t.addEventListener('input',()=>c.textContent=t.value.length);})();</script>
+{% endblock %}

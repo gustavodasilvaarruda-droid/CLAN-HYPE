@@ -1,0 +1,22 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}{{evento.titulo}} - Evento HYPE{% endblock %}
+{% block body_class %}hype-event-detail-page hype-v26-events{% endblock %}
+{% block content %}
+<div class="v26-event-shell">
+  <a class="v26-back" href="{{url_for('eventos')}}">← Voltar para Eventos</a>
+  <section class="v26-event-hero">
+    <div class="v26-event-cover">{% if evento.imagem_url %}<img src="{{evento.imagem_url}}" alt="{{evento.titulo}}">{% else %}<img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="">{% endif %}<span class="v26-tag">EVENTO HYPE</span></div>
+    <div class="v26-event-copy">
+      <div class="v26-status-row"><span class="v26-status {{evento.status_evento or 'agendado'}}">{{(evento.status_evento or 'agendado')|replace('_',' ')|upper}}</span>{% if evento.destaque %}<span class="v26-highlight">DESTAQUE</span>{% endif %}</div>
+      <h1>{{evento.titulo}}</h1><p>{{evento.descricao}}</p>
+      <div class="v26-meta-grid"><div><small>DATA</small><b>{{evento.data_evento|data_br if evento.data_evento else 'A definir'}}</b></div><div><small>LOCAL</small><b>{{evento.local_evento or 'HYPE'}}</b></div><div><small>PARTICIPANTES</small><b>{{evento.total_inscritos}}{% if evento.limite_participantes %}/{{evento.limite_participantes}}{% endif %}</b></div></div>
+      <div class="v26-actions">{% if session.get('usuario_email') %}{% if evento.usuario_inscrito %}<form method="post" action="{{url_for('cancelar_evento',evento_id=evento.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="v26-btn ghost">Cancelar participação</button></form>{% else %}<form method="post" action="{{url_for('inscrever_evento',evento_id=evento.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="v26-btn gold">Participar do evento</button></form>{% endif %}{% else %}<a class="v26-btn gold" href="{{url_for('pagina_inicial')}}#entrar">Entrar para participar</a>{% endif %}</div>
+    </div>
+  </section>
+  {% if replay_embed %}<section class="v26-panel"><div class="v26-section-head"><div><span>REPLAY OFICIAL</span><h2>Assista novamente</h2></div></div><div class="v26-video"><iframe src="{{replay_embed}}" title="Replay {{evento.titulo}}" allowfullscreen></iframe></div></section>{% endif %}
+  <div class="v26-detail-grid">
+    <section class="v26-panel"><div class="v26-section-head"><div><span>COMUNIDADE</span><h2>Participantes</h2></div><b>{{participantes|length}}</b></div><div class="v26-people">{% for p in participantes %}<div class="v26-person"><span>{{(p.nick_jogo or '?')[:1]|upper}}</span><b>{{p.nick_jogo}}</b></div>{% else %}<p class="v26-empty">Ainda não há participantes.</p>{% endfor %}</div></section>
+    <section class="v26-panel"><div class="v26-section-head"><div><span>RESULTADOS</span><h2>Classificação</h2></div>{% if resultados %}<a href="{{url_for('final.resultados_evento',evento_id=evento.id)}}">Ver completo</a>{% endif %}</div>{% for r in resultados[:5] %}<div class="v26-result"><strong>#{{r.colocacao}}</strong><span>{{r.usuario_email}}</span><b>{{r.premio or ''}}</b></div>{% else %}<p class="v26-empty">Resultados serão publicados após o evento.</p>{% endfor %}</section>
+  </div>
+</div>
+{% endblock %}

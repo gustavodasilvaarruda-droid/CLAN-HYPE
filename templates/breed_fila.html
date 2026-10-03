@@ -1,0 +1,256 @@
+{% extends 'hype_app_base.html' %}
+{% from '_breed_v147_macros.html' import chips,timeline %}
+{% block title %}Fila dos Breeders - HYPE{% endblock %}
+{% block body_class %}hype-breed-page breed-v21-page breed-premium-v34-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_queue_v23.css')}}?v=2301"><link rel="stylesheet" href="{{url_for('static',filename='breed_premium_v34.css')}}?v=3401">{% endblock %}
+
+{% block content %}
+<div class="hype-v6-page breed-v21-page-shell">
+  <section class="breed-v21-hero">
+    <div>
+      <span class="breed-v21-kicker">HYPE BREED · ÁREA OPERACIONAL</span>
+      <h1>FILA DOS BREEDERS</h1>
+      <p>Assuma, acompanhe e conclua pedidos com todo o fluxo registrado.</p>
+    </div>
+    <div class="breed-v21-hero-status">
+      <span>Meus ativos</span>
+      <strong>{{meus_ativos}}<small>/{{max_ativos}}</small></strong>
+      <i><em style="width:{{ ((meus_ativos / max_ativos * 100) if max_ativos else 0)|round(0) }}%"></em></i>
+    </div>
+  </section>
+
+  <nav class="hype-breed-subnav breed-v21-subnav">
+    <a href="{{url_for('breed')}}">Fazer Pedido</a>
+    <a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>
+    <a class="active" href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>
+    <a href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>
+    <a href="{{url_for('team_breeders')}}">Team Breeders</a>
+    <a href="{{url_for('ranking_breed')}}">Ranking Breed</a>
+  </nav>
+
+  <div class="breed-v21-layout">
+    <main class="breed-v21-main">
+      <section class="breed-v21-toolbar-card">
+        <div class="breed-v21-toolbar-top">
+          <div>
+            <span class="breed-v21-kicker">PEDIDOS ATIVOS</span>
+            <h2>Fila operacional</h2>
+          </div>
+          <label class="breed-v21-search">
+            <span>⌕</span>
+            <input id="queueSearch" type="search" placeholder="Buscar Pokémon, jogador, breeder ou ID..." autocomplete="off">
+          </label>
+        </div>
+
+        <div class="breed-v21-controls breedq-controls">
+          <div class="breedq-filter-wrap">
+            <span class="breedq-control-label">Filtrar pedidos</span>
+            <nav class="breedq-filters" id="queueFilters" data-initial-filter="{{filtro_atual}}" aria-label="Filtros da fila">
+              <button type="button" data-filter="todos" class="{{'active' if filtro_atual == 'todos' else ''}}"><span>Todos</span><b>{{contagens_fila.todos}}</b></button>
+              <button type="button" data-filter="pendente" class="{{'active' if filtro_atual == 'pendente' else ''}}"><span>Pendentes</span><b>{{contagens_fila.pendente}}</b></button>
+              <button type="button" data-filter="em_andamento" class="{{'active' if filtro_atual == 'em_andamento' else ''}}"><span>Em andamento</span><b>{{resumo_fila.em_andamento}}</b></button>
+              <button type="button" data-filter="concluido" class="{{'active' if filtro_atual == 'concluido' else ''}}"><span>Concluídos</span><b>{{resumo_fila.concluidos}}</b></button>
+              <button type="button" data-filter="meus" class="{{'active' if filtro_atual == 'meus' else ''}}"><span>Meus Breeds</span><b>{{contagens_fila.meus}}</b></button>
+            </nav>
+          </div>
+
+          <form class="breedq-availability" method="post" action="{{url_for('alterar_status_breeder')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="filtro" id="availabilityFilter" value="{{filtro_atual}}">
+            <span class="breedq-control-label">Minha disponibilidade</span>
+            <div class="breedq-status-segments">
+              <button type="submit" class="{{'active' if status_breeder=='disponivel' else ''}}" name="status" value="disponivel"><i class="green"></i><span>Disponível</span></button>
+              <button type="submit" class="{{'active' if status_breeder=='ocupado' else ''}}" name="status" value="ocupado"><i class="gold"></i><span>Ocupado</span></button>
+              <button type="submit" class="{{'active' if status_breeder in ('ausente','indisponivel') else ''}}" name="status" value="indisponivel"><i class="red"></i><span>Indisponível</span></button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="breed-v21-list" id="breederQueue">
+        {% for p in fila_ativa %}
+        <article class="breed-v21-order breed-v15-card breed-v34-themed"
+                 data-id="{{p.id}}"
+                 data-pokemon-id="{{p.pokemon_id or ''}}"
+                 data-pokemon-name="{{p.pokemon|e}}"
+                 data-rarity="{{p.categoria_preco or 'comum'}}"
+                 data-search="#{{p.id}} {{p.player}} {{p.player_nick or ''}} {{p.pokemon}} {{p.breeder_nick or ''}} {{p.status}}"
+                 data-status="{{p.status}}"
+                 data-mine="{{'1' if p.breeder_responsavel == breeder_email else '0'}}">
+          <div class="breed-v21-order-head">
+            <div class="breed-v21-requester">
+              <span class="breed-v21-avatar">
+                {% if p.player_avatar_url %}<img src="{{p.player_avatar_url}}" alt="">{% else %}{{(p.player_nick or p.player or 'H')[:1]|upper}}{% endif %}
+              </span>
+              <div>
+                <small>SOLICITANTE · PEDIDO #{{p.id}}</small>
+                <strong>{{p.player_nick or p.player}}</strong>
+                <time>{{p.created_at[:10] if p.created_at else '—'}}</time>
+              </div>
+            </div>
+            <div class="breed-v21-order-state">
+              {% if p.prioridade and p.prioridade != 'normal' %}<span class="breed-priority priority-{{p.prioridade}}">{{p.prioridade|upper}}</span>{% endif %}
+              {% if p.atrasado %}<span class="breed-v21-late">⚠ Prazo excedido</span>{% endif %}
+              <span class="status-badge status-{{p.status}}">{{p.status|replace('_',' ')|title}}</span>
+            </div>
+          </div>
+
+          <div class="breed-v21-order-body">
+            <div class="breed-v21-pokemon">
+              <div class="breed-v21-pokemon-art">
+                {% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{{p.pokemon_id}}.png" alt="{{p.pokemon}}" loading="lazy" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png'">{% else %}<span>◈</span>{% endif %}
+              </div>
+              <div>
+                <small>POKÉMON SOLICITADO</small>
+                <h3>{{p.pokemon}}</h3>
+                <div class="breed-v34-meta-slot"></div>
+                {{chips(p, False)}}
+              </div>
+            </div>
+
+            <div class="breed-v21-flow">
+              <small>ACOMPANHAMENTO</small>
+              {{timeline(p)}}
+            </div>
+
+            <div class="breed-v21-owner-price">
+              <div class="breed-v21-owner">
+                <small>BREEDER RESPONSÁVEL</small>
+                {% if p.breeder_responsavel %}
+                  <div><span class="breed-v21-mini-avatar">{% if p.breeder_avatar_url %}<img src="{{p.breeder_avatar_url}}" alt="">{% else %}{{(p.breeder_nick or 'B')[:1]|upper}}{% endif %}</span><b>{{p.breeder_nick}}</b></div>
+                {% else %}
+                  <strong class="breed-v21-free">● Disponível para assumir</strong>
+                {% endif %}
+                {% if p.breeder_responsavel == breeder_email %}<em>MEU BREED</em>{% endif %}
+              </div>
+              <div class="breed-v21-price">
+                <small>VALOR DO PEDIDO</small>
+                {% if p.promocao_percentual %}<span>🔥 PROMO -{{p.promocao_percentual}}%</span>{% endif %}
+                <strong>${{p.preco_total|preco}}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="breed-v21-order-actions">
+            <div class="breed-v21-primary-actions">
+              {% if p.status == 'pendente' and not p.breeder_responsavel and permissoes.get('pode_assumir_breed') %}
+                <form method="post" action="{{url_for('assumir_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="breed-v21-gold" data-once {% if meus_ativos >= max_ativos and not permissoes.get('pode_gerenciar_cargos') %}disabled title="Limite de Breeds ativos atingido"{% endif %}>Assumir pedido</button></form>
+              {% elif p.status == 'aguardando_pagamento' and p.breeder_responsavel == breeder_email %}
+                <form method="post" action="{{url_for('confirmar_pagamento_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="breed-v21-gold" data-once>Confirmar pagamento</button></form>
+              {% elif p.status == 'em_producao' and p.breeder_responsavel == breeder_email %}
+                <form method="post" action="{{url_for('concluir_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="breed-v21-gold" data-once>✨ Marcar como pronto</button></form>
+              {% elif p.status == 'concluido' and p.breeder_responsavel == breeder_email %}
+                <form method="post" action="{{url_for('entregar_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="breed-v21-gold" data-once>📦 Informar entrega</button></form>
+              {% endif %}
+              {% if p.breeder_responsavel or permissoes.get('pode_gerenciar_cargos') %}<a class="breed-v21-chat" href="{{url_for('chat_pedido',tipo='breed',pedido_id=p.id)}}">💬 Chat{% if p.mensagens_nao_lidas %}<span>{{p.mensagens_nao_lidas}}</span>{% endif %}</a>{% endif %}
+            </div>
+            <a class="breed-v21-details-link" href="{{url_for('breed_pedido_detalhe',pedido_id=p.id)}}">Abrir pedido</a><button type="button" class="breed-details-toggle breed-v21-details-btn">Resumo <span>⌄</span></button>
+          </div>
+
+          <div class="breed-v15-details breed-v21-details">
+            <div class="breed-v21-detail-grid">
+              <div class="breed-v21-detail-panel">
+                <span class="breed-v21-kicker">REQUISITOS COMPLETOS</span>
+                <div class="breed-req-grid">
+                  <span><b>Nature</b>{{p.nature or 'Sem Nature'}}</span>
+                  <span><b>Ability</b>{{'Hidden Ability (HA)' if p.ha else (p.ability or 'Normal')}}</span>
+                  <span><b>Breed</b>{{'Hidden Power Ability' if p.breed_tipo == 'PERSONALIZADO' else (p.breed_tipo or '—')}}</span>
+                  <span><b>Gênero</b>{{(p.genero or 'Indiferente')|replace('femea','Fêmea')|replace('macho','Macho')|title}}</span>
+                  <span><b>IV descartado</b>{{(p.iv_descartado or 'Não se aplica')|replace('_',' ')|title}}</span>
+                  <span><b>Zero Speed</b>{{'Sim' if p.zero_speed else 'Não'}}</span>
+                  <span><b>Ditto</b>{{'Necessário' if p.usa_ditto else 'Não'}}</span>
+                  <span><b>Treinado</b>{{'Sim' if p.treinado else 'Não'}}</span>
+                </div>
+                <button type="button" class="breed-copy-req breed-v21-copy" data-copy="{{p.pokemon}} #{{p.pokemon_id or ''}} | {{p.breed_tipo or ''}} | {{p.nature or 'Sem Nature'}} | {{'HA' if p.ha else 'Sem HA'}} | {{p.genero or 'Indiferente'}} | IV descartado: {{p.iv_descartado or 'nenhum'}} | 0 Speed: {{'sim' if p.zero_speed else 'não'}} | Treinado: {{'sim' if p.treinado else 'não'}}">📋 Copiar requisitos</button>
+              </div>
+
+              <div class="breed-v21-detail-panel">
+                <span class="breed-v21-kicker">AÇÕES DO PEDIDO</span>
+                <div class="breed-v21-detail-actions">
+                  {% if p.breeder_responsavel == breeder_email and p.status in ('aguardando_pagamento','em_producao','cancelamento_solicitado') %}
+                    <details class="breed-inline-action"><summary>↩ Devolver à fila</summary><form method="post" action="{{url_for('devolver_breed_fila',pedido_id=p.id)}}" onsubmit="return confirm('Devolver este pedido para a fila? O motivo ficará registrado.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" minlength="3" maxlength="500" placeholder="Motivo obrigatório" required><button class="btn-muted-hype btn-sm" data-once>Confirmar devolução</button></form></details>
+                  {% endif %}
+
+                  {% if permissoes.get('pode_gerenciar_cargos') %}
+                    <details class="breed-inline-action"><summary>⚙ Administração</summary><div class="breed-v21-admin-box">
+                      <form method="post" action="{{url_for('admin_prioridade_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="prioridade"><option value="normal" {{'selected' if p.prioridade=='normal' else ''}}>Prioridade normal</option><option value="alta" {{'selected' if p.prioridade=='alta' else ''}}>Alta</option><option value="urgente" {{'selected' if p.prioridade=='urgente' else ''}}>Urgente</option></select><button class="btn-muted-hype btn-sm" data-once>Salvar prioridade</button></form>
+                      {% if p.breeder_responsavel and p.status in ('aguardando_pagamento','em_producao','cancelamento_solicitado','concluido') %}
+                      <form class="breed-v21-transfer" method="post" action="{{url_for('admin_transferir_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="breeder_destino" required><option value="">Transferir para...</option>{% for b in breeders_transferencia %}{% if b.email != p.breeder_responsavel %}<option value="{{b.email}}">{{b.nick}} · {{b.status}} · limite {{b.max_ativos}}</option>{% endif %}{% endfor %}</select><input name="motivo" minlength="3" maxlength="500" placeholder="Motivo da transferência" required><label><input type="checkbox" name="forcar_limite" value="1"> Permitir exceção de limite</label><button class="btn-dourado btn-sm" data-once>Transferir</button></form>
+                      {% endif %}
+                      {% if p.status not in ('entregue','cancelado') %}
+                      <div class="breed-v21-admin-row"><form method="post" action="{{url_for('admin_resetar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Resetar este pedido para Pendente e liberar o Breeder atual?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-muted-hype btn-sm" data-once>↺ Resetar</button></form><form method="post" action="{{url_for('cancelar_breed',pedido_id=p.id)}}" onsubmit="return confirm('Cancelar este pedido? Esta ação ficará registrada.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="motivo" value="Cancelado administrativamente"><button class="btn-danger-hype btn-sm" data-once>Cancelar</button></form></div>
+                      {% endif %}
+                    </div></details>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      </section>
+      <div class="breed-v21-empty breedq-empty" id="queueEmptyState" hidden><span>◈</span><h3>Nenhum pedido encontrado</h3><p id="queueEmptyText">Quando novos pedidos chegarem, eles aparecerão aqui.</p></div>
+
+      <div class="breed-v21-pagination" id="queuePagination" hidden>
+        <span id="queuePageInfo">Mostrando 0 pedidos</span>
+        <div><button type="button" id="queuePrev">‹</button><div id="queuePages"></div><button type="button" id="queueNext">›</button></div>
+      </div>
+
+      <details class="breed-v21-cancelled">
+        <summary><span>Histórico de cancelados</span><b>{{historico_cancelados|length}}</b></summary>
+        <div class="breed-v21-cancelled-list">
+          {% for p in historico_cancelados %}
+          <article>
+            <div><strong>#{{p.id}} · {{p.pokemon}}</strong><small>{{p.player_nick or p.player}} · {{p.motivo_cancelamento or 'Sem motivo registrado'}}</small></div>
+            <span>${{p.preco_total|preco}}</span>
+            {% set pode_restaurar = permissoes.get('pode_gerenciar_cargos') or (permissoes.get('pode_assumir_breed') and (p.breeder_responsavel == breeder_email or p.cancelado_por == breeder_email)) %}
+            {% if pode_restaurar %}<form method="post" action="{{url_for('restaurar_breed_cancelado',pedido_id=p.id)}}" onsubmit="return confirm('Restaurar o pedido #{{p.id}} para Pendente?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-dourado btn-sm" data-once>↩ Restaurar</button></form>{% endif %}
+          </article>
+          {% else %}<p>Nenhum pedido cancelado.</p>{% endfor %}
+        </div>
+      </details>
+    </main>
+
+    <aside class="breed-v21-sidebar">
+      <section class="breed-v21-side-card">
+        <div class="breed-v21-side-title"><span>RESUMO DA FILA</span><b>AO VIVO</b></div>
+        <div class="breed-v21-summary-list">
+          <div><span><i class="all"></i>Total na fila</span><strong>{{resumo_fila.total}}</strong></div>
+          <div><span><i class="pending"></i>Pendentes</span><strong>{{resumo_fila.pendentes}}</strong></div>
+          <div><span><i class="working"></i>Em andamento</span><strong>{{resumo_fila.em_andamento}}</strong></div>
+          <div><span><i class="ready"></i>Concluídos</span><strong>{{resumo_fila.concluidos}}</strong></div>
+          <div><span><i class="done"></i>Entregues</span><strong>{{resumo_fila.entregues}}</strong></div>
+        </div>
+      </section>
+
+      <section class="breed-v21-side-card">
+        <div class="breed-v21-side-title"><span>REGRAS DO BREED</span></div>
+        <ol class="breed-v21-rules">
+          <li><b>1</b><span>Assuma no máximo <strong>{{max_ativos}} pedidos</strong> ativos.</span></li>
+          <li><b>2</b><span>Confirme o pagamento antes de iniciar a produção.</span></li>
+          <li><b>3</b><span>Mantenha o status do pedido atualizado.</span></li>
+          <li><b>4</b><span>Pedidos já assumidos ficam exclusivos do Breeder responsável. Outro Breeder não pode assumir, alterar ou concluir esse pedido; somente a administração pode transferi-lo.</span></li>
+          <li><b>5</b><span>Entregue com qualidade e use o chat quando necessário.</span></li>
+        </ol>
+      </section>
+
+      <section class="breed-v21-thanks"><span>♛</span><div><strong>Obrigado, Breeder!</strong><p>Seu trabalho mantém o HYPE Breed funcionando e fortalece o clã.</p></div></section>
+
+      <section class="breed-v21-side-card">
+        <div class="breed-v21-side-title"><span>ATALHOS</span></div>
+        <nav class="breed-v21-shortcuts">
+          <a href="{{url_for('breed_meus_pedidos')}}"><span>▤</span><div><b>Meus Pedidos</b><small>Acompanhar pedidos pessoais</small></div><i>›</i></a>
+          <a href="{{url_for('breed')}}"><span>＋</span><div><b>Fazer Pedido</b><small>Criar um novo Breed</small></div><i>›</i></a>
+          <a href="{{url_for('ranking_breed')}}"><span>★</span><div><b>Ranking Breed</b><small>Desempenho e Hall da Fama</small></div><i>›</i></a>
+        </nav>
+      </section>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>window.HYPE_BREED_SCRIPT_ROOT={{ request.script_root|tojson }};</script>
+<script src="{{url_for('static',filename='breed_queue_v23.js')}}?v=2301"></script>
+<script src="{{url_for('static',filename='breed_v15.js')}}?v=2301"></script>
+<script src="{{url_for('static',filename='breed_premium_v34.js')}}?v=3401"></script>
+{% endblock %}

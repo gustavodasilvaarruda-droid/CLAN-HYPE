@@ -1,0 +1,146 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Central do Breeder — HYPE{% endblock %}
+{% block body_class %}hype-breeder-dashboard-page breed-premium-v34-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_premium_v34.css')}}?v=3401">{% endblock %}
+{% block content %}
+<div class="hype-v6-page breeder-v22-page">
+  <section class="breeder-v22-hero">
+    <div class="breeder-v22-hero-main">
+      <div class="breeder-v22-avatar">
+        {% if usuario.avatar_url %}<img src="{{usuario.avatar_url}}" alt="">{% else %}<span>{{(usuario.nome_exibicao or usuario.nick_jogo or 'H')[0]|upper}}</span>{% endif %}
+      </div>
+      <div>
+        <span class="hype-v6-kicker">CENTRAL DO BREEDER</span>
+        <h1>{{usuario.nome_exibicao or usuario.nick_jogo or 'Breeder HYPE'}}</h1>
+        <p>Gerencie seus pedidos, disponibilidade, desempenho e repasses em um só lugar.</p>
+      </div>
+    </div>
+    <div class="breeder-v22-hero-actions">
+      <a class="btn-ranking-outline" href="{{url_for('breed_fila_breeders')}}">Abrir fila</a>
+      <a class="btn-dourado" href="{{url_for('perfil_breeder',nick=usuario.nick_jogo)}}">Ver minha carreira</a>
+    </div>
+  </section>
+
+  <nav class="hype-breed-subnav">
+    <a href="{{url_for('breed')}}">Fazer Pedido</a>
+    <a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>
+    <a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>
+    <a class="active" href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>
+    <a href="{{url_for('team_breeders')}}">Team Breeders</a>
+    <a href="{{url_for('ranking_breed')}}">Ranking</a>
+  </nav>
+
+  <section class="breeder-v22-statusbar">
+    <div>
+      <span>Minha disponibilidade</span>
+      <strong class="breeder-status {{disponibilidade.status or perfil.status or 'disponivel'}}">{{(disponibilidade.status or perfil.status or 'disponivel')|replace('_',' ')|title}}</strong>
+    </div>
+    <form method="post" action="{{url_for('disponibilidade_breeder')}}" class="breeder-v22-status-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button name="status" value="disponivel">Disponível</button>
+      <button name="status" value="ocupado">Ocupado</button>
+      <button name="status" value="indisponivel">Indisponível</button>
+    </form>
+    <div class="breeder-v22-capacity">
+      <span>Capacidade</span><b>{{ativos|length}}/{{max_ativos}}</b>
+      <i><em style="width:{{ ([((ativos|length) * 100 / max_ativos if max_ativos else 0),100]|min) }}%"></em></i>
+    </div>
+  </section>
+
+  <section class="breeder-v22-kpis">
+    <article><span>Pedidos ativos</span><strong>{{ativos|length}}</strong><small>de {{max_ativos}} vagas</small></article>
+    <article><span>Aguardando pagamento</span><strong>{{aguardando_pagamento|length}}</strong><small>antes de iniciar</small></article>
+    <article><span>Em produção</span><strong>{{em_producao|length}}</strong><small>em andamento</small></article>
+    <article><span>Prontos</span><strong>{{prontos|length}}</strong><small>aguardando entrega</small></article>
+    <article><span>Nota média</span><strong>{{metricas.media if metricas.media is not none else '—'}}</strong><small>{{metricas.avaliacoes}} avaliações</small></article>
+    <article><span>Repasse do mês</span><strong>{{repasse_mes|preco}}</strong><small>{{entregues_mes}} entregas</small></article>
+    <article class="v28-debt-kpi"><span>Pendente com o Clã</span><strong>{{comissao_devida|preco}}</strong><small>{{comissoes_abertas|length}} comissão(ões) aberta(s)</small></article>
+  </section>
+
+  <section class="v28-breeder-finance">
+    <div class="v28-finance-head">
+      <div><span class="breed-kicker">FINANCEIRO HYPE</span><h2>Minhas comissões com o Clã</h2><p>A comissão só vira dívida quando você marca o Pokémon como pronto. O pagamento só é baixado após confirmação da administração.</p></div>
+      <div class="v28-finance-summary"><span><small>Devo agora</small><b>{{comissao_devida|preco}}</b></span><span><small>Pagamento informado</small><b>{{comissao_aguardando|preco}}</b></span></div>
+    </div>
+    {% if comissao_pendente > 0 %}
+    <form method="post" action="{{url_for('informar_pagamento_total_comissoes_breed')}}" class="v28-pay-all" onsubmit="return confirm('Confirmar que você entregou ao Clã o valor total pendente? A administração ainda precisará confirmar o recebimento.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input name="observacao" maxlength="500" placeholder="Observação opcional (ex.: pago ao Líder no jogo)">
+      <button class="btn-dourado" data-once>Informar pagamento total · {{comissao_pendente|preco}}</button>
+    </form>
+    {% endif %}
+    <div class="v28-commission-list">
+      {% for c in comissoes %}
+      <article class="v28-commission status-{{c.status}}">
+        <div class="v28-commission-main">
+          <div class="v28-commission-poke">{% if c.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{c.pokemon_id}}.png" alt="">{% else %}◇{% endif %}</div>
+          <div><small>Breed #{{c.pedido_id}}</small><strong>{{c.pokemon}}</strong><span>Taxa HYPE {{c.percentual}}%</span></div>
+        </div>
+        <div class="v28-commission-value"><small>Comissão</small><b>{{c.valor|preco}}</b></div>
+        <div class="v28-commission-state"><span class="v28-fin-status {{c.status}}">{% if c.status=='pendente' %}Pendente{% elif c.status=='informado' %}Aguardando confirmação{% elif c.status=='pago' %}Pago{% else %}Cancelado{% endif %}</span><small>{{(c.gerada_em or c.created_at)|data_br}}</small></div>
+        <div class="v28-commission-actions">
+          {% if c.status=='pendente' %}<form method="post" action="{{url_for('informar_pagamento_comissao_breed',comissao_id=c.id)}}" onsubmit="return confirm('Você já entregou esta comissão ao Clã HYPE?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="observacao" value="Pagamento informado pelo Painel do Breeder"><button data-once>Informar pagamento</button></form>{% elif c.status=='informado' %}<span>Aguardando Admin</span>{% elif c.status=='pago' %}<span class="paid">✓ Confirmado</span>{% endif %}
+        </div>
+      </article>
+      {% else %}<div class="breeder-v22-empty"><strong>Nenhuma comissão gerada.</strong><span>Quando você marcar um Pokémon como pronto, a taxa correspondente aparecerá aqui.</span></div>{% endfor %}
+    </div>
+  </section>
+
+  <div class="breeder-v22-layout">
+    <section class="breeder-v22-main">
+      <div class="breeder-v22-section-head"><div><span class="breed-kicker">OPERAÇÃO</span><h2>Meus pedidos atuais</h2></div><a href="{{url_for('breed_fila_breeders')}}">Ver fila completa →</a></div>
+      <div class="breeder-v22-orders">
+        {% for p in ativos + prontos %}
+        <article class="breeder-v22-order status-{{p.status}} breed-v34-themed" data-pokemon-id="{{p.pokemon_id or ''}}" data-pokemon-name="{{p.pokemon|e}}" data-rarity="{{p.categoria_preco or 'comum'}}">
+          <div class="breeder-v22-order-poke">
+            <div>{% if p.pokemon_id %}<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png" alt="">{% else %}<span>◈</span>{% endif %}</div>
+            <section><small>#{{p.id}} · {{p.cliente_nick}}</small><strong>{{p.pokemon}}</strong><div class="breed-v34-meta-slot"></div><p>{{'Hidden Power Ability' if p.breed_tipo == 'PERSONALIZADO' else (p.breed_tipo or '—')}} · {{p.nature or 'Sem Nature'}} · {{'HA' if p.ha else 'Sem HA'}}</p></section>
+          </div>
+          <div class="breeder-v22-order-state"><span>{{p.status|replace('_',' ')|title}}</span><b>{{p.preco_total|preco}}</b>{% if p.mensagens_nao_lidas %}<em>{{p.mensagens_nao_lidas}} nova(s) msg</em>{% endif %}</div>
+          <div class="breeder-v22-order-actions">
+            <a href="{{url_for('breed_pedido_detalhe',pedido_id=p.id)}}">Detalhes</a>
+            <a href="{{url_for('chat_pedido',tipo='breed',pedido_id=p.id)}}">Chat{% if p.mensagens_nao_lidas %} <b>{{p.mensagens_nao_lidas}}</b>{% endif %}</a>
+            {% if p.status=='aguardando_pagamento' %}
+              <form method="post" action="{{url_for('confirmar_pagamento_breed',pedido_id=p.id)}}" onsubmit="return confirm('Confirmar que o pagamento foi recebido?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button data-once>Confirmar pagamento</button></form>
+            {% elif p.status=='em_producao' %}
+              <form method="post" action="{{url_for('concluir_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button data-once>Marcar pronto</button></form>
+            {% elif p.status=='concluido' %}
+              <form method="post" action="{{url_for('entregar_breed',pedido_id=p.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button data-once>Informar entrega</button></form>
+            {% elif p.status=='cancelamento_solicitado' %}
+              <a class="attention" href="{{url_for('breed_pedido_detalhe',pedido_id=p.id)}}">Decidir cancelamento</a>
+            {% elif p.status=='aguardando_confirmacao' %}
+              <span class="waiting">Aguardando cliente</span>
+            {% endif %}
+          </div>
+        </article>
+        {% else %}
+          <div class="breeder-v22-empty"><strong>Nenhum pedido ativo agora.</strong><span>Abra a Fila dos Breeders para assumir um novo pedido.</span><a class="btn-dourado" href="{{url_for('breed_fila_breeders')}}">Abrir fila</a></div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="breeder-v22-side">
+      <section class="breeder-v22-panel">
+        <span class="breed-kicker">DESEMPENHO</span><h3>Minha carreira</h3>
+        <div class="breeder-v22-career-grid">
+          <div><b>{{metricas.entregues}}</b><span>Entregues</span></div>
+          <div><b>{{metricas.tempo_medio_h ~ 'h' if metricas.tempo_medio_h is not none else '—'}}</b><span>Tempo médio</span></div>
+          <div><b>{{metricas.taxa_conclusao ~ '%' if metricas.taxa_conclusao is not none else '—'}}</b><span>Conclusão</span></div>
+          <div><b>{{repasse_total|preco}}</b><span>Repasse total</span></div>
+        </div>
+      </section>
+
+      <section class="breeder-v22-panel">
+        <span class="breed-kicker">AVALIAÇÕES</span><h3>Feedback recente</h3>
+        <div class="breeder-v22-reviews">
+          {% for a in avaliacoes %}
+          <article><div><strong>{{a.avaliador_nick}}</strong><span>{{'★' * (a.nota|int)}}{{'☆' * (5-(a.nota|int))}}</span></div><p>{{a.comentario or 'Avaliação sem comentário.'}}</p><small>{{a.created_at|data_br}}</small></article>
+          {% else %}<p class="muted">Você ainda não recebeu avaliações.</p>{% endfor %}
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>window.HYPE_BREED_SCRIPT_ROOT={{ request.script_root|tojson }};</script>
+<script src="{{url_for('static',filename='breed_premium_v34.js')}}?v=3401"></script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Minha Conta - Clã HYPE{% endblock %}
+{% block body_class %}hype-account-page{% endblock %}
+{% block content %}
+<div class="profile-editor-v19">
+  <header class="pe19-head"><div><span class="rankhub-kicker">PERFIL 2.0</span><h1>EDITE SEU <em>PERFIL HYPE</em></h1><p>Foto, capa e time Pokémon de um jeito visual e simples.</p></div><a href="{{url_for('perfil_publico',nick=usuario.nick_jogo)}}">Ver perfil público →</a></header>
+
+  <section class="pe19-cover" {% if usuario.banner_url %}style="background-image:linear-gradient(180deg,rgba(4,4,4,.2),rgba(4,4,4,.92)),url('{{usuario.banner_url}}')"{% endif %}>
+    <div class="pe19-avatar">{% if usuario.avatar_url %}<img src="{{usuario.avatar_url}}" alt="Avatar">{% else %}<span>{{(usuario.nick_jogo or 'H')[:1]|upper}}</span>{% endif %}</div>
+    <div class="pe19-id"><h2>{{usuario.nome_exibicao or usuario.nick_jogo}} {% if membro_hype %}<em>[HYPE]</em>{% endif %}</h2><p>@{{usuario.nick_jogo}} · {{(usuario.cargo or 'membro')|replace('_',' ')|title}} · Nível {{usuario.nivel or 1}}</p></div>
+    <div class="pe19-media-actions">
+      <form method="post" enctype="multipart/form-data" action="{{url_for('perfil_upload_midia')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="tipo" value="avatar"><label>Trocar foto<input hidden type="file" name="imagem" accept="image/png,image/jpeg,image/webp,image/gif" onchange="this.form.submit()"></label></form>
+      <form method="post" enctype="multipart/form-data" action="{{url_for('perfil_upload_midia')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="tipo" value="banner"><label>Trocar capa<input hidden type="file" name="imagem" accept="image/png,image/jpeg,image/webp,image/gif" onchange="this.form.submit()"></label></form>
+    </div>
+  </section>
+
+  <form class="pe19-form" method="post" action="{{url_for('editar_perfil')}}" id="perfilForm"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <section class="pe19-card"><div class="pe19-card-title"><span>01</span><div><h2>Identidade</h2><p>Como você aparece dentro da comunidade HYPE.</p></div></div><div class="pe19-fields"><label>Nome de exibição<input name="nome_exibicao" value="{{usuario.nome_exibicao or ''}}" placeholder="Como quer aparecer"></label><label>Discord público<input name="discord" value="{{(usuario.links_perfil or {}).get('discord','')}}" placeholder="Seu nome no Discord"></label><label>YouTube<input name="youtube" value="{{(usuario.links_perfil or {}).get('youtube','')}}" placeholder="Link do canal"></label><label class="wide">Bio<textarea name="bio" maxlength="500" placeholder="Conte um pouco sobre você">{{usuario.bio or ''}}</textarea></label></div></section>
+
+    <section class="pe19-card"><div class="pe19-card-title"><span>02</span><div><h2>Pokémon favorito</h2><p>Escolha pelo catálogo, sem precisar digitar URL.</p></div></div><button type="button" class="pe19-favorite" data-pick-favorite>{% if usuario.pokemon_favorito %}<b>{{usuario.pokemon_favorito}}</b><small>Clique para trocar</small>{% else %}<b>+ Escolher Pokémon favorito</b><small>Pesquisar no catálogo</small>{% endif %}</button><input type="hidden" name="pokemon_favorito" id="favoritePokemon" value="{{usuario.pokemon_favorito or ''}}"></section>
+
+    <section class="pe19-card"><div class="pe19-card-title"><span>03</span><div><h2>Meu Time</h2><p>Monte os 6 Pokémon que representam você. Clique em qualquer slot para escolher.</p></div></div><div class="pe19-team" id="profileTeam">
+      {% for i in range(6) %}{% set p=(usuario.pokemon_time[i] if usuario.pokemon_time and usuario.pokemon_time|length > i else '') %}<button type="button" class="pe19-slot {{'filled' if p else ''}}" data-slot="{{i}}"><span class="slot-num">0{{i+1}}</span><span class="slot-sprite"></span><b>{{p or '+ Escolher Pokémon'}}</b><small>{{'Clique para trocar' if p else 'Slot vazio'}}</small></button><input type="hidden" name="pokemon_time" id="teamInput{{i}}" value="{{p}}">{% endfor %}
+    </div><p class="pe19-tip">Dica: você pode trocar qualquer Pokémon a qualquer momento. A ordem dos slots é salva no perfil.</p></section>
+
+    <section class="pe19-card"><div class="pe19-card-title"><span>04</span><div><h2>Privacidade</h2><p>Você decide o que aparece no perfil público.</p></div></div>{% set priv=usuario.privacidade_perfil or {} %}<div class="pe19-privacy"><label><input type="checkbox" name="mostrar_times" value="1" {{'checked' if priv.get('mostrar_times',true) else ''}}><span><b>Mostrar meus times</b><small>Permite exibir seu time e times públicos.</small></span></label><label><input type="checkbox" name="mostrar_atividade" value="1" {{'checked' if priv.get('mostrar_atividade',true) else ''}}><span><b>Mostrar atividade recente</b><small>Exibe conquistas e atividades do site.</small></span></label></div></section>
+
+    <div class="pe19-save"><button type="submit">Salvar Perfil</button><span>As alterações aparecem imediatamente no seu perfil público.</span></div>
+  </form>
+
+  <section class="pe19-card pe19-account"><div class="pe19-card-title"><span>05</span><div><h2>Discord e Segurança</h2><p>Integração da conta e sessão.</p></div></div><div class="pe19-account-row"><div>{% if usuario.discord_id %}<b>Discord conectado: {{usuario.discord_username or 'Conta vinculada'}}</b><small>Notificações {{'ativadas' if usuario.discord_notificacoes else 'desativadas'}}.</small>{% else %}<b>Discord não conectado</b><small>Conecte para receber avisos do HYPE.</small>{% endif %}</div>{% if usuario.discord_id %}<form method="post" action="{{url_for('discord_desconectar')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="danger">Desconectar</button></form>{% else %}<a href="{{url_for('discord_conectar')}}">Conectar Discord</a>{% endif %}</div><div class="pe19-account-row"><div><b>{{usuario.email}}</b><small>Conta atual · {{usuario.nick_jogo}}</small></div><button class="danger" type="button" data-open-logout>Sair da conta</button></div></section>
+</div>
+
+<div class="pokemon-picker" id="pokemonPicker" hidden><div class="pokemon-picker-dialog"><header><div><span class="rankhub-kicker">CATÁLOGO HYPE</span><h2>Escolher Pokémon</h2></div><button type="button" data-close-picker>×</button></header><div class="pokemon-picker-search"><span>⌕</span><input id="pokemonPickerSearch" autocomplete="off" placeholder="Digite pelo menos 2 letras..."></div><div class="pokemon-picker-results" id="pokemonPickerResults"><p>Pesquise um Pokémon para começar.</p></div></div></div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(()=>{
+ const modal=document.getElementById('pokemonPicker'), search=document.getElementById('pokemonPickerSearch'), results=document.getElementById('pokemonPickerResults');
+ let target={type:null,index:null}, timer=null;
+ const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+ function openPicker(type,index=null){target={type,index}; modal.hidden=false; search.value=''; results.innerHTML='<p>Pesquise um Pokémon para começar.</p>'; setTimeout(()=>search.focus(),50)}
+ function close(){modal.hidden=true}
+ document.querySelector('[data-pick-favorite]')?.addEventListener('click',()=>openPicker('favorite'));
+ document.querySelectorAll('.pe19-slot').forEach(b=>b.addEventListener('click',()=>openPicker('slot',Number(b.dataset.slot))));
+ document.querySelector('[data-close-picker]')?.addEventListener('click',close); modal?.addEventListener('click',e=>{if(e.target===modal)close()});
+ async function query(q){if(q.length<2){results.innerHTML='<p>Digite pelo menos 2 letras.</p>';return} results.innerHTML='<p>Buscando...</p>'; try{const r=await fetch('/api/breed/pokemon/buscar?q='+encodeURIComponent(q)); const j=await r.json(); const arr=j.results||[]; results.innerHTML=arr.length?arr.map(x=>`<button type="button" data-name="${esc(x.display_name||x.name)}" data-id="${x.id}" data-sprite="${esc(x.sprite||'')}"><img src="${esc(x.sprite||'')}" alt=""><span><b>${esc(x.display_name||x.name)}</b><small>#${String(x.id).padStart(4,'0')}</small></span></button>`).join(''):'<p>Nenhum Pokémon encontrado.</p>'; results.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>choose(b)));}catch(e){results.innerHTML='<p>Não foi possível consultar o catálogo agora.</p>'}}
+ function choose(b){const name=b.dataset.name, sprite=b.dataset.sprite; if(target.type==='favorite'){document.getElementById('favoritePokemon').value=name; const btn=document.querySelector('[data-pick-favorite]'); btn.innerHTML=`<span class="fav-poke"><img src="${sprite}" alt=""><span><b>${esc(name)}</b><small>Clique para trocar</small></span></span>`;}else{const i=target.index, input=document.getElementById('teamInput'+i), btn=document.querySelector(`.pe19-slot[data-slot="${i}"]`); input.value=name; btn.classList.add('filled'); btn.querySelector('.slot-sprite').innerHTML=`<img src="${sprite}" alt="">`; btn.querySelector('b').textContent=name; btn.querySelector('small').textContent='Clique para trocar';} close()}
+ search?.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>query(search.value.trim()),250)});
+ // resolve sprites of saved team names lazily
+ document.querySelectorAll('.pe19-slot.filled').forEach((btn,i)=>{const name=document.getElementById('teamInput'+btn.dataset.slot)?.value; if(name) fetch('/api/breed/pokemon/buscar?q='+encodeURIComponent(name)).then(r=>r.json()).then(j=>{const x=(j.results||[]).find(x=>(x.display_name||x.name).toLowerCase()===name.toLowerCase())||(j.results||[])[0]; if(x) btn.querySelector('.slot-sprite').innerHTML=`<img src="${x.sprite}" alt="">`}).catch(()=>{})});
+})();
+</script>
+{% endblock %}

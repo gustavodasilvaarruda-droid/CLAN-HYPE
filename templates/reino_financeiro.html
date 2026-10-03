@@ -1,0 +1,44 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Meu Aluguel — Reino HYPE{% endblock %}
+{% block body_class %}reino-v31-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='reino_v31.css')}}?v=3101">{% endblock %}
+{% block content %}
+<div class="reino-v31-shell">
+  <section class="reino-v31-hero">
+    <div><span class="hype-v6-kicker">REINO HYPE 2.0</span><h1>Meu aluguel</h1><p>Acompanhe casas e lojas vinculadas ao seu perfil, vencimentos e pagamentos. O pagamento acontece dentro do jogo; no site você informa e o Admin confirma.</p></div>
+    <a class="reino-v31-outline" href="{{url_for('painel_reino')}}">← Voltar ao Reino</a>
+  </section>
+
+  <section class="reino-v31-kpis">
+    <article class="{% if resumo.divida %}danger{% endif %}"><span>Total em aberto</span><strong>{{resumo.divida|preco}}</strong><small>{{resumo.quantidade_aberta}} cobrança(s)</small></article>
+    <article class="warning"><span>Pagamento informado</span><strong>{{resumo.informado|preco}}</strong><small>Aguardando confirmação</small></article>
+    <article><span>Já confirmado</span><strong>{{resumo.pago|preco}}</strong><small>Histórico V31</small></article>
+    <article><span>Próximo vencimento</span><strong>{{resumo.proximo_vencimento|default('—', true)}}</strong><small>{{resumo.contratos_ativos}} contrato(s) ativo(s)</small></article>
+  </section>
+
+  {% if resumo.pendente > 0 %}
+  <section class="reino-v31-callout danger">
+    <div><span>⚠</span><div><b>Você possui aluguel pendente</b><p>Depois de entregar o valor ao responsável do Clã dentro do jogo, informe o pagamento aqui.</p></div></div>
+    <form method="post" action="{{url_for('reino_informar_todas')}}" onsubmit="return confirm('Informar que você pagou todas as cobranças pendentes?')"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><button>Informar pagamento total · {{resumo.pendente|preco}}</button></form>
+  </section>
+  {% endif %}
+
+  <section class="reino-v31-card">
+    <header><div><span class="hype-v6-kicker">MEUS CONTRATOS</span><h2>Moradias e lojas vinculadas</h2></div></header>
+    <div class="reino-v31-contract-grid">
+      {% for c in contratos %}
+      <article><span class="reino-v31-contract-icon">{{'⌂' if c.tipo=='Casa' else '▣'}}</span><div><small>{{c.tipo}} · {{c.unidade_codigo}}</small><h3>{{c.unidade_nome}}</h3><dl><div><dt>Valor semanal</dt><dd>{{c.valor_semanal|preco}}</dd></div><div><dt>Próximo vencimento</dt><dd>{{c.proximo_vencimento or '—'}}</dd></div><div><dt>Status</dt><dd>{{c.status}}</dd></div></dl></div></article>
+      {% else %}<p class="reino-v31-empty">Você não possui casa ou loja alugada no momento.</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="reino-v31-card">
+    <header><div><span class="hype-v6-kicker">COBRANÇAS</span><h2>Histórico de aluguel</h2></div><div class="reino-v31-legend"><i class="pendente"></i>Pendente <i class="informado"></i>Informado <i class="pago"></i>Pago</div></header>
+    <div class="reino-v31-table-wrap"><table class="reino-v31-table"><thead><tr><th>Unidade</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Confirmação</th><th>Ação</th></tr></thead><tbody>
+      {% for c in cobrancas %}<tr class="{{c.status}}"><td><b>{{c.unidade_codigo}}</b><small>{{c.unidade_nome}}</small></td><td>{{c.referencia_vencimento}}</td><td><strong>{{c.valor|preco}}</strong></td><td><span class="reino-v31-status {{c.status}}">{% if c.status=='pendente' %}Pendente{% elif c.status=='informado' %}Pagamento informado{% elif c.status=='pago' %}Pago{% else %}Cancelado{% endif %}</span></td><td>{% if c.status=='pago' %}{{c.confirmado_em|data_br}}{% elif c.status=='informado' %}Aguardando Admin{% elif c.status=='cancelado' %}Cancelado{% else %}—{% endif %}</td><td>
+        {% if c.status=='pendente' %}<form class="reino-v31-pay-form" method="post" action="{{url_for('reino_informar_pagamento',cobranca_id=c.id)}}"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><input name="observacao" maxlength="500" placeholder="Observação (opcional)"><button data-once>Informar pagamento</button></form>{% elif c.status=='informado' %}<span class="reino-v31-wait">Em conferência</span>{% else %}—{% endif %}
+      </td></tr>{% else %}<tr><td colspan="6" class="reino-v31-empty">Nenhuma cobrança registrada ainda.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endblock %}

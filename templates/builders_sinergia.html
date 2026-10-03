@@ -1,0 +1,102 @@
+{% extends 'builders_base.html' %}
+{% block title %}Sinergia de Times - HYPE Builders{% endblock %}
+{% block builders_content %}
+<div class="hgb-legacy-page builders-shell synergy-page">
+<section class="dash-welcome builders-compact-hero">
+    <div><span class="breed-kicker">HYPE TEAM SYNERGY</span><h1>Sinergia de Times</h1><p>Matriz defensiva completa dos 18 tipos, riscos coletivos, funções do time e sugestões da Pokédex HYPE para corrigir fraquezas.</p></div>
+    <a class="cta-gold" href="{{url_for('expansion.team_builder')}}">Abrir Team Builder</a>
+  </section>
+
+  {% if times %}
+  <section class="dash-card synergy-selector-card">
+    <form method="get" class="synergy-team-selector">
+      <label>Time analisado
+        <select name="team_id" onchange="this.form.submit()">
+          {% for t in times %}<option value="{{t.id}}" {{'selected' if selected and selected.id==t.id else ''}}>{{t.nome}} · {{t.formato or t.formato_codigo or 'Formato livre'}}</option>{% endfor %}
+        </select>
+      </label>
+      {% if selected %}<a class="cta-secondary" href="{{url_for('competitive.analisar_team',team_id=selected.id)}}">Validação do formato</a>{% endif %}
+    </form>
+  </section>
+
+  {% if selected and analysis %}
+  <section class="synergy-overview-grid">
+    <article class="dash-card synergy-team-card">
+      <span class="breed-kicker">COMPOSIÇÃO</span><h2>{{selected.nome}}</h2>
+      <div class="synergy-roster">
+        {% for row in analysis.matrix %}
+        <div class="synergy-mon">
+          {% if row.sprite %}<img src="{{row.sprite}}" alt="{{row.pokemon}}">{% else %}<div class="synergy-sprite-fallback">◉</div>{% endif %}
+          <div><b>{{row.pokemon}}</b><small>{% for t in row.types %}<span class="type-chip type-{{t}}">{{type_labels[t]}}</span>{% else %}Tipo não salvo{% endfor %}</small><em>{{row.item or 'Sem item'}}{% if row.role %} · {{row.role}}{% endif %}</em></div>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="dash-card synergy-radar-card">
+      <span class="breed-kicker">DIAGNÓSTICO</span><h2>Resumo rápido</h2>
+      <div class="synergy-role-pills">
+        <span class="validation-pill {{'ok' if analysis.detected.hazards else 'warn'}}">Hazards {{'✓' if analysis.detected.hazards else '—'}}</span>
+        <span class="validation-pill {{'ok' if analysis.detected.remocao else 'warn'}}">Remoção {{'✓' if analysis.detected.remocao else '—'}}</span>
+        <span class="validation-pill {{'ok' if analysis.detected.speed else 'warn'}}">Speed control {{'✓' if analysis.detected.speed else '—'}}</span>
+        <span class="validation-pill {{'ok' if analysis.detected.pivot else 'warn'}}">Pivot {{'✓' if analysis.detected.pivot else '—'}}</span>
+        <span class="validation-pill {{'ok' if analysis.detected.recovery else 'warn'}}">Recovery {{'✓' if analysis.detected.recovery else '—'}}</span>
+        <span class="validation-pill {{'ok' if analysis.detected.priority else 'warn'}}">Priority {{'✓' if analysis.detected.priority else '—'}}</span>
+        <span class="validation-pill {{'ok' if analysis.detected.setup else 'warn'}}">Setup {{'✓' if analysis.detected.setup else '—'}}</span>
+      </div>
+      <div class="synergy-notes">{% for note in analysis.notes %}<p>◆ {{note}}</p>{% endfor %}</div>
+    </article>
+  </section>
+
+  <section class="dash-card synergy-matrix-card">
+    <div class="section-title-row"><div><span class="breed-kicker">18 TIPOS</span><h2>Matriz defensiva</h2></div><p class="muted">0× imune · ½× resiste · 2× fraco · 4× muito fraco</p></div>
+    <div class="synergy-table-wrap">
+      <table class="synergy-table">
+        <thead><tr><th>Pokémon</th>{% for t in analysis.types %}<th title="{{type_labels[t]}}"><span class="type-mini type-{{t}}">{{type_labels[t][:3]}}</span></th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in analysis.matrix %}
+          <tr><th><span class="matrix-mon-name">{{row.pokemon}}</span></th>{% for cell in row.cells %}<td class="mult-{{cell.state}}" title="{{type_labels[cell.type]}}: {{cell.label}}">{{cell.label}}</td>{% endfor %}</tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="dash-grid synergy-summary-grid">
+    <section class="dash-card">
+      <span class="breed-kicker">AMEAÇAS</span><h2>Fraquezas coletivas</h2>
+      {% for x in analysis.threats[:10] %}
+      <div class="synergy-summary-row"><span><b>{{x.label}}</b><small>{{x.weak}} fraco(s){% if x.severe %} · {{x.severe}} em 4×{% endif %}</small></span><span class="synergy-responses">{{x.resist}} resist. · {{x.immune}} imune</span></div>
+      {% else %}<p class="muted">Nenhuma fraqueza foi calculada; confira se os tipos dos Pokémon estão salvos.</p>{% endfor %}
+    </section>
+    <section class="dash-card">
+      <span class="breed-kicker">RESPOSTAS</span><h2>Melhores coberturas defensivas</h2>
+      {% for x in analysis.answers[:10] %}
+      <div class="synergy-summary-row"><span><b>{{x.label}}</b><small>{{x.resist}} resistência(s)</small></span><span class="synergy-responses">{{x.immune}} imunidade(s)</span></div>
+      {% else %}<p class="muted">Nenhuma resistência foi calculada.</p>{% endfor %}
+    </section>
+  </div>
+
+  {% for group in analysis.suggestions %}
+  <section class="dash-card synergy-suggestions-card">
+    <div class="section-title-row"><div><span class="breed-kicker">CORRIGIR FRAQUEZA</span><h2>Respostas contra {{group.label}}</h2><p class="muted">{{group.weak}} membro(s) do time recebem dano super efetivo desse tipo.</p></div><a class="cta-secondary" href="{{url_for('competitive.pokedex_competitiva')}}?q=&tier=">Abrir Pokédex</a></div>
+    <div class="synergy-suggestion-grid">
+      {% for p in group.candidates %}
+      <article class="synergy-suggestion">
+        {% if p.image %}<img src="{{p.image}}" alt="{{p.pokemon}}">{% else %}<div class="synergy-suggestion-placeholder">◉</div>{% endif %}
+        <div><h3>{{p.pokemon}}</h3><p>{% for t in p.types %}<span class="type-chip type-{{t}}">{{type_labels[t]}}</span>{% endfor %}</p><small>{{p.mult_label}} contra {{group.label}} · {{p.tier}}</small></div>
+        <div class="synergy-suggestion-actions"><a href="{{url_for('competitive.pokedex_detalhe',registro_id=p.id)}}">Detalhes</a><a href="{{url_for('expansion.team_builder')}}?pokemon={{p.pokemon|urlencode}}">+ Team Builder</a></div>
+      </article>
+      {% endfor %}
+    </div>
+    <p class="muted">Sugestões são baseadas em resistência/imunidade por tipo e nos dados cadastrados na Pokédex HYPE. Elas não substituem a análise de moves, stats e matchups do formato.</p>
+  </section>
+  {% endfor %}
+
+  {% else %}<section class="dash-card"><p class="muted">Não foi possível analisar o time selecionado.</p></section>{% endif %}
+
+  {% else %}
+  <section class="dash-card"><h2>Nenhum time salvo</h2><p class="muted">Monte e salve seu primeiro time para liberar a matriz de sinergia.</p><a class="cta-gold" href="{{url_for('expansion.team_builder')}}">Montar meu time</a></section>
+  {% endif %}
+</div>
+{% endblock %}

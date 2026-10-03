@@ -1,0 +1,50 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}{{item.nome}} | Tesouro HYPE{% endblock %}
+{% block content %}
+<section class="asset-page">
+  <div class="asset-back"><a href="{{url_for('tesouro_hype')}}">← Voltar ao Tesouro</a>{% if pode_gerenciar %}<a href="{{url_for('admin_tesouro')}}">Gerenciar</a>{% endif %}</div>
+  <div class="asset-layout">
+    <div class="asset-visual">
+      <div class="asset-code">{{item.codigo}}</div>
+      <div class="asset-image">{% if item.imagem_url %}<img src="{{item.imagem_url}}" alt="{{item.nome}}">{% else %}<span>{{'◈' if item.tipo=='pokemon' else '✦'}}</span>{% endif %}</div>
+      <div class="asset-stock"><strong>{{item.disponivel}}</strong><span>disponível{{'' if item.disponivel == 1 else 'is'}} de {{item.quantidade_total}}</span></div>
+    </div>
+    <div class="asset-info">
+      <div class="asset-tags"><span class="kind kind-{{item.tipo}}">{{'POKÉMON' if item.tipo=='pokemon' else 'MEGA'}}</span><span class="state state-{{item.situacao}}">{{item.situacao|title}}</span>{% if item.destaque %}<span class="highlight">DESTAQUE</span>{% endif %}</div>
+      <h1>{{item.nome}}</h1>
+      <p class="asset-desc">{{item.descricao or 'Patrimônio competitivo do Clã HYPE.'}}</p>
+      {% if item.metadata %}
+      <div class="asset-specs">
+        {% for key,label in [('pokemon','Pokémon'),('nature','Nature'),('ability','Ability'),('ivs','IVs'),('evs','EVs'),('level','Nível'),('genero','Gênero'),('item','Item'),('moves','Moves'),('compatibilidade','Compatibilidade')] %}
+          {% if item.metadata.get(key) %}<div><span>{{label}}</span><strong>{{item.metadata.get(key)}}</strong></div>{% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="asset-history-mini"><div><b>{{resumo_item.emprestimos_total}}</b><span>solicitações registradas</span></div><div><b>{{resumo_item.devolvidos}}</b><span>devoluções concluídas</span></div><div><b>{{resumo_item.em_uso}}</b><span>em uso/reservado</span></div></div>
+      <form class="asset-request" method="post" action="{{url_for('tesouro_solicitar',item_id=item.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div><label>Quantidade</label><input type="number" name="quantidade" min="1" max="{{item.disponivel}}" value="1" {{'disabled' if item.disponivel <= 0 else ''}}></div>
+        <div class="wide"><label>Motivo / uso</label><textarea name="observacao" maxlength="800" rows="3" placeholder="Ex.: torneio, treino competitivo, evento interno..."></textarea></div>
+        <button type="submit" {{'disabled' if item.disponivel <= 0 or item.situacao != 'disponivel' else ''}}>{{'Indisponível para empréstimo' if item.disponivel <= 0 or item.situacao != 'disponivel' else 'Solicitar empréstimo'}}</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="my-asset-history">
+    <div class="section-title"><span>MEU HISTÓRICO</span><h2>{{item.nome}}</h2></div>
+    <div class="history-list">
+      {% for e in meus_emprestimos %}
+      <article>
+        <div><small>Solicitado</small><b>{{e.solicitado_em|data_br if e.solicitado_em else '—'}}</b></div>
+        <div><small>Status</small><span class="loan loan-{{e.status}}">{{'Devolução solicitada' if e.status == 'devolucao_solicitada' else e.status|replace('_',' ')|title}}</span></div>
+        <div><small>Prazo</small><b>{{e.prazo_devolucao or '—'}}</b></div>
+        {% if e.status == 'solicitado' %}<form method="post" action="{{url_for('tesouro_cancelar_solicitacao',emprestimo_id=e.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="danger">Cancelar solicitação</button></form>{% endif %}
+        {% if e.status in ['retirado','atrasado'] %}<form method="post" action="{{url_for('tesouro_solicitar_devolucao',emprestimo_id=e.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><textarea name="observacao" rows="2" maxlength="800" placeholder="Observação da devolução (opcional)"></textarea><button class="ok">Solicitar devolução</button></form>{% endif %}
+      </article>
+      {% else %}<div class="asset-empty">Você ainda não possui histórico com este patrimônio.</div>{% endfor %}
+    </div>
+  </section>
+</section>
+<style>
+.asset-page{max-width:1380px;margin:0 auto;padding:14px 2px 70px}.asset-back{display:flex;justify-content:space-between;margin-bottom:12px}.asset-back a{color:#c9a84a;text-decoration:none;font-size:11px;font-weight:900}.asset-layout{display:grid;grid-template-columns:minmax(320px,460px) 1fr;gap:18px}.asset-visual,.asset-info,.my-asset-history{border:1px solid #292419;border-radius:22px;background:linear-gradient(155deg,#11110f,#080808)}.asset-visual{padding:18px;display:flex;flex-direction:column}.asset-code{font:11px monospace;color:#7d6b38}.asset-image{flex:1;min-height:360px;display:grid;place-items:center;margin:14px 0;border-radius:17px;background:radial-gradient(circle,rgba(218,171,49,.14),transparent 58%),#090909;border:1px solid #211d15}.asset-image img{max-width:80%;max-height:310px;object-fit:contain}.asset-image span{font-size:100px;color:#d9ad36}.asset-stock{display:flex;align-items:baseline;gap:8px;padding:13px;border:1px solid rgba(73,183,104,.17);background:rgba(46,125,67,.09);border-radius:12px}.asset-stock strong{font-size:26px;color:#7bd797}.asset-stock span{font-size:11px;color:#6f8776}.asset-info{padding:28px}.asset-tags{display:flex;gap:7px;flex-wrap:wrap}.asset-tags span{padding:6px 8px;border-radius:999px;font-size:9px;font-weight:900}.kind-pokemon{color:#86bfff;background:rgba(56,112,183,.12)}.kind-mega,.highlight{color:#f1c650;background:rgba(184,142,39,.12)}.state-disponivel{color:#75d693;background:rgba(48,133,72,.1)}.state-manutencao{color:#e3b84a;background:rgba(151,114,31,.1)}.state-indisponivel{color:#df7d7d;background:rgba(147,48,48,.1)}.asset-info h1{font-size:44px;margin:10px 0;color:#fff;letter-spacing:-.04em}.asset-desc{color:#888;line-height:1.65;max-width:760px}.asset-specs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:20px 0}.asset-specs div{padding:11px;border:1px solid #242017;border-radius:10px;background:#0a0a0a}.asset-specs span{display:block;color:#5f5f5f;font-size:9px;text-transform:uppercase;font-weight:900}.asset-specs strong{color:#d7b34e;font-size:12px;white-space:pre-wrap}.asset-history-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0}.asset-history-mini div{padding:12px;border-radius:11px;background:#0b0b0b;border:1px solid #242018}.asset-history-mini b{display:block;color:#e3b83f;font-size:21px}.asset-history-mini span{font-size:9px;color:#626262}.asset-request{display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:end;padding-top:18px;border-top:1px solid #211e17}.asset-request label{display:block;color:#676767;font-size:9px;font-weight:900;margin-bottom:5px}.asset-request input,.asset-request textarea{width:100%;box-sizing:border-box;background:#080808;border:1px solid #29251b;border-radius:9px;color:#ddd;padding:10px;outline:0}.asset-request button{border:0;border-radius:10px;padding:12px 15px;background:linear-gradient(135deg,#e7bd49,#aa7415);font-weight:900;color:#130f05;cursor:pointer}.asset-request button:disabled{background:#171717;color:#555}.my-asset-history{margin-top:18px;padding:20px}.section-title span{font-size:9px;letter-spacing:.18em;color:#d9ac37;font-weight:900}.section-title h2{margin:4px 0 14px;color:#eee}.history-list{display:grid;gap:8px}.history-list article{display:grid;grid-template-columns:1fr 1fr 1fr minmax(200px,1.2fr);gap:10px;align-items:center;padding:12px;border:1px solid #232018;border-radius:12px;background:#0a0a0a}.history-list small{display:block;color:#555;font-size:9px}.history-list b{color:#aaa;font-size:11px}.loan{display:inline-block;padding:5px 7px;border-radius:999px;background:#171717;color:#999;font-size:9px;font-weight:900}.loan-atrasado{color:#f17c7c;background:#211010}.loan-devolvido{color:#75d693}.loan-devolucao_solicitada{color:#7fb8ff}.history-list form{display:flex;gap:6px;align-items:center}.history-list textarea{flex:1;min-width:0;background:#080808;border:1px solid #2b261b;border-radius:8px;color:#ddd;padding:8px}.history-list button{border-radius:8px;padding:8px 10px;font-size:9px;font-weight:900;cursor:pointer}.history-list .ok{background:#14261a;color:#83d99a;border:1px solid #285c36}.history-list .danger{background:#251313;color:#dd8585;border:1px solid #572828}.asset-empty{padding:25px;text-align:center;color:#5d5d5d;border:1px dashed #2d281d;border-radius:12px}@media(max-width:900px){.asset-layout{grid-template-columns:1fr}.asset-image{min-height:270px}.asset-request{grid-template-columns:1fr}.history-list article{grid-template-columns:1fr 1fr}.history-list form{grid-column:1/-1}}@media(max-width:560px){.asset-specs,.asset-history-mini{grid-template-columns:1fr}.history-list article{grid-template-columns:1fr}.asset-info h1{font-size:34px}}
+</style>
+{% endblock %}
