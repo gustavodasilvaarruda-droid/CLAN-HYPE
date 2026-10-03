@@ -4422,6 +4422,76 @@ def _breed_v312_clonar_tabela(origem_id, nome=None):
     return nova
 
 
+def _breed_v346_aplicar_componente_agora(codigo, valor):
+    """Publica imediatamente UMA alteração de preço sem vazar outras mudanças do rascunho.
+
+    A nova versão nasce da tabela atualmente em vigor, recebe somente o componente
+    informado e substitui a versão publicada correspondente. Pedidos antigos continuam
+    com o valor congelado em pedidos_breed.preco_total/preco_detalhes.
+    """
+    if codigo not in BREED_V312_COMPONENTES_META:
+        raise ValueError('Componente de preço inválido.')
+    atual = _breed_v312_tabela_atual()
+    if not atual:
+        raise ValueError('Nenhuma tabela de preço ativa foi encontrada.')
+
+    valor = max(0, int(valor or 0))
+    agora = agora_iso()
+    carimbo = datetime.now(HYPE_TZ).strftime('%d/%m %H:%M')
+    nova = _breed_v312_clonar_tabela(
+        atual.get('id'),
+        f"{atual.get('nome') or 'Tabela HYPE'} · ajuste {carimbo}"
+    )
+    nova_id = int(nova.get('id'))
+    nome, grupo, ordem = BREED_V312_COMPONENTES_META[codigo]
+    anterior = int((_breed_v312_componentes(atual.get('id')).get(codigo) or {}).get('valor') or 0)
+
+    supabase.table('breed_tabela_componentes').upsert({
+        'tabela_id': nova_id, 'codigo': codigo, 'nome': nome, 'grupo': grupo,
+        'valor': valor, 'ativo': True, 'ordem': ordem, 'updated_at': agora
+    }, on_conflict='tabela_id,codigo').execute()
+
+    erros = _breed_v312_validar_tabela(nova_id)
+    if erros:
+        # Não deixa um rascunho automático inválido poluindo a Central de Preços.
+        try:
+            supabase.table('breed_tabelas_preco').update({
+                'status':'arquivada','updated_at':agora
+            }).eq('id',nova_id).execute()
+        except Exception:
+            pass
+        raise ValueError('Não foi possível aplicar agora: ' + ' '.join(erros))
+
+    status_atual = str(atual.get('status') or '').lower()
+    if status_atual == 'agendada':
+        # Mantém a mesma janela da tabela sazonal que está em vigor.
+        supabase.table('breed_tabelas_preco').update({
+            'status':'arquivada','updated_at':agora
+        }).eq('id',atual.get('id')).execute()
+        supabase.table('breed_tabelas_preco').update({
+            'status':'agendada', 'inicio_em':atual.get('inicio_em') or agora,
+            'fim_em':atual.get('fim_em'), 'publicado_por':session.get('usuario_email'),
+            'publicado_em':agora, 'updated_at':agora
+        }).eq('id',nova_id).execute()
+    else:
+        # Arquiva apenas a versão permanente ativa. Tabelas futuras agendadas continuam intactas.
+        for row in _breed_v312_tabelas():
+            if str(row.get('status') or '').lower() == 'ativa' and int(row.get('id') or 0) != nova_id:
+                supabase.table('breed_tabelas_preco').update({
+                    'status':'arquivada','updated_at':agora
+                }).eq('id',row.get('id')).execute()
+        supabase.table('breed_tabelas_preco').update({
+            'status':'ativa','inicio_em':agora,'fim_em':None,
+            'publicado_por':session.get('usuario_email'),'publicado_em':agora,'updated_at':agora
+        }).eq('id',nova_id).execute()
+
+    _breed_v312_registrar_historico(
+        nova_id, 'aplicar_componente_agora', codigo, anterior, valor,
+        detalhes={'origem_id': atual.get('id'), 'modo':'aplicacao_imediata'}
+    )
+    return _breed_v312_tabela_por_id(nova_id) or nova
+
+
 def _breed_v312_status_visual(tabela):
     status = str(tabela.get('status') or '').lower()
     agora = datetime.now(timezone.utc)
@@ -4481,6 +4551,9 @@ def admin_precos():
         return redirect(url_for('painel'))
     if request.method == 'POST':
         acao = request.form.get('acao','').strip() or 'preco'
+        # V34.6: pressionar Enter dentro de um card de preço equivale a Aplicar agora.
+        if acao == 'preco' and request.form.get('codigo'):
+            acao = 'aplicar_componente_agora'
         try:
             if acao == 'criar_rascunho':
                 origem_id = int(request.form.get('origem_id') or (_breed_v312_tabela_atual() or {}).get('id') or 0)
@@ -4506,6 +4579,29 @@ def admin_precos():
                 }, on_conflict='tabela_id,codigo').execute()
                 _breed_v312_registrar_historico(tabela_id,'alterar_componente',codigo,anterior,valor)
                 flash(f'{nome} atualizado no rascunho.', 'sucesso')
+
+            elif acao == 'aplicar_componente_agora':
+                codigo = request.form.get('codigo','').strip()
+                if codigo not in BREED_V312_COMPONENTES_META:
+                    raise ValueError('Componente de preço inválido.')
+                valor = parse_valor_moeda(request.form.get('valor',0))
+                nova = _breed_v346_aplicar_componente_agora(codigo, valor)
+
+                # Se o Admin já tinha um rascunho aberto, sincroniza SOMENTE este componente
+                # nele para a tela não continuar mostrando um valor antigo após a aplicação.
+                rascunho_id = int(request.form.get('rascunho_id') or 0)
+                rasc = _breed_v312_tabela_por_id(rascunho_id) if rascunho_id else None
+                if rasc and rasc.get('status') == 'rascunho':
+                    nome, grupo, ordem = BREED_V312_COMPONENTES_META[codigo]
+                    supabase.table('breed_tabela_componentes').upsert({
+                        'tabela_id':rascunho_id,'codigo':codigo,'nome':nome,'grupo':grupo,
+                        'valor':valor,'ativo':True,'ordem':ordem,'updated_at':agora_iso()
+                    }, on_conflict='tabela_id,codigo').execute()
+                    _breed_v312_registrar_historico(
+                        rascunho_id,'sincronizar_com_aplicacao_imediata',codigo,None,valor,
+                        detalhes={'tabela_publicada_id':nova.get('id')}
+                    )
+                flash(f"{BREED_V312_COMPONENTES_META[codigo][0]} aplicado agora. O Fazer Pedido já usa a tabela #{nova.get('id')}.", 'sucesso')
 
             elif acao == 'salvar_regras':
                 tabela_id = int(request.form.get('tabela_id') or 0)
