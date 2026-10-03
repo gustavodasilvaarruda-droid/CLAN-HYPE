@@ -5,7 +5,6 @@ import io
 import hashlib
 import hmac
 import secrets
-import time
 from functools import wraps, lru_cache
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -14,8 +13,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from uuid import uuid4
-from urllib.request import urlopen, Request
-from urllib.error import HTTPError
+from urllib.request import urlopen
 from urllib.parse import quote, urlencode, urlparse
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -1227,152 +1225,22 @@ def notificar_admins_financeiro(titulo, mensagem):
         print(f'[V28 comissao] Falha ao notificar administracao: {e}')
 
 
-# V34.3 — regras locais essenciais de Breed.
-# Mantemos o fluxo de pedido independente de serviços externos. Estes conjuntos
-# cobrem as espécies não-reprodutíveis (Undiscovered/bebês/legends/mythicals),
-# as espécies 12,5% fêmea e as genderless reprodutíveis que dependem de Ditto.
-# Overrides do Admin e dados já persistidos em pokemon_precificacao continuam
-# tendo prioridade sobre estas regras-base.
-BREED_NAO_REPRODUZ_DEX = frozenset({
-    30,31,144,145,146,150,151,172,173,174,175,201,236,238,239,240,243,244,245,249,250,251,
-    298,360,377,378,379,380,381,382,383,384,385,386,406,433,438,439,440,446,447,458,
-    480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,
-    638,639,640,641,642,643,644,645,646,647,648,649,
-    716,717,718,719,720,721,772,773,785,786,787,788,789,790,791,792,793,794,795,796,797,798,799,800,801,802,803,804,805,806,807,808,809,
-    848,880,881,882,883,888,889,890,891,892,893,894,895,896,897,898,905,
-    984,985,986,987,988,989,990,991,992,993,994,995,
-    999,1000,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,
-    1014,1015,1016,1017,1020,1021,1022,1023,1024,1025,
-})
-
-BREED_RARO_12_5_DEX = frozenset({
-    1,2,3,4,5,6,7,8,9,
-    133,134,135,136,138,139,140,141,142,143,
-    152,153,154,155,156,157,158,159,160,176,196,197,
-    252,253,254,255,256,257,258,259,260,345,346,347,348,369,
-    387,388,389,390,391,392,393,394,395,408,409,410,411,415,448,468,470,471,
-    495,496,497,498,499,500,501,502,503,511,512,513,514,515,516,564,565,566,567,570,571,
-    650,651,652,653,654,655,656,657,658,696,697,698,699,700,
-    722,723,724,725,726,727,728,729,730,757,
-    810,811,812,813,814,815,816,817,818,
-    906,907,908,909,910,911,912,913,914,
-})
-
-BREED_DITTO_ONLY_DEX = frozenset({
-    81,82,100,101,120,121,137,233,292,337,338,343,344,374,375,376,436,437,462,474,479,
-    599,600,601,615,622,623,703,774,781,854,855,870,924,925,1012,1013,
-})
-
-
-@lru_cache(maxsize=2048)
-def _breed_precificacao_row_cached(pokemon_id):
-    try:
-        pid = int(pokemon_id)
-    except (TypeError, ValueError):
-        return {}
-    rows = _safe_table('pokemon_precificacao', '*', pokemon_id=pid)
-    return dict(rows[0]) if rows else {}
-
-
-@lru_cache(maxsize=1)
-def _breed_bloqueados_ativos_cached():
-    itens = []
-    for row in _safe_table('pokemon_bloqueados', '*', ativo=True):
-        nome = str(row.get('pokemon') or '').strip().lower()
-        if nome:
-            itens.append((nome, row.get('motivo')))
-    return tuple(itens)
-
-
-def _breed_species_rule_local(pokemon_id):
-    """Regra local usada por clique, preview e envio; nunca acessa a internet."""
-    try:
-        pid = int(pokemon_id)
-    except (TypeError, ValueError):
-        pid = 0
-    row = dict(_breed_precificacao_row_cached(pid)) if pid > 0 else {}
-    gender_rate = row.get('gender_rate')
-    try:
-        gender_rate = int(gender_rate) if gender_rate is not None else None
-    except (TypeError, ValueError):
-        gender_rate = None
-    if gender_rate is None:
-        if pid in BREED_DITTO_ONLY_DEX:
-            gender_rate = -1
-        elif pid in BREED_RARO_12_5_DEX:
-            gender_rate = 1
-    ditto_override = row.get('usa_ditto_override')
-    if isinstance(ditto_override, bool):
-        so_com_ditto = ditto_override
-    elif str(row.get('categoria_override') or '').strip().lower() == 'ultra_raro':
-        so_com_ditto = True
-    else:
-        so_com_ditto = bool(row.get('usa_ditto_padrao')) or pid in BREED_DITTO_ONLY_DEX or gender_rate == -1
-    bloqueado = pid in BREED_NAO_REPRODUZ_DEX
-    return {
-        'breedavel': not bloqueado,
-        'so_com_ditto': bool(so_com_ditto) if not bloqueado else False,
-        'gender_rate': gender_rate,
-        'egg_groups': ['no-eggs'] if bloqueado else [],
-        'nome': row.get('pokemon_nome'),
-        'is_baby': False,
-        'is_legendary': False,
-        'is_mythical': False,
-        'no_eggs': bloqueado,
-        'fonte': 'regras_locais_hype',
-    }
-
-_POKEAPI_BLOQUEADA_ATE = 0.0
-
-
-def _pokeapi_urlopen(url, timeout=4):
-    """V34.3: compatibilidade externa com User-Agent e circuit breaker para 403/429.
-
-    Se o host bloquear a aplicação, o backend para de insistir por 10 minutos e
-    cai imediatamente nas regras locais HYPE. Isso evita travamento e rajadas
-    de erros ao selecionar Pokémon.
-    """
-    global _POKEAPI_BLOQUEADA_ATE
-    agora = time.monotonic()
-    eh_pokeapi = '://pokeapi.co/' in str(url).lower()
-    if eh_pokeapi and agora < _POKEAPI_BLOQUEADA_ATE:
-        raise RuntimeError('PokéAPI temporariamente em cooldown; usando fallback local/remoto.')
-    req = Request(
-        url,
-        headers={
-            'User-Agent': 'HYPE-Breed/34.3 (+https://clan-hype.onrender.com)',
-            'Accept': 'application/json,text/plain;q=0.9,*/*;q=0.8',
-            'Cache-Control': 'no-cache',
-        },
-    )
-    try:
-        return urlopen(req, timeout=timeout)
-    except HTTPError as exc:
-        if eh_pokeapi and exc.code in (403, 429):
-            _POKEAPI_BLOQUEADA_ATE = time.monotonic() + 600
-        raise
-
-
-def classificar_pokemon_preco(pokemon_id, permitir_externo=True):
+def classificar_pokemon_preco(pokemon_id):
     """V31.3: classificação automática por regra objetiva de breeding.
 
     Prioridade automática: Ultra Raro (só com Ditto) > Raro (12,5% fêmea) > Comum.
     O Admin pode criar override explícito para a economia/regra do servidor.
     """
-    meta_db = dict(_breed_precificacao_row_cached(int(pokemon_id or 0)))
-    externa = _pokeapi_species_rule(pokemon_id) if permitir_externo else None
+    rows = _safe_table('pokemon_precificacao', '*', pokemon_id=pokemon_id)
+    meta_db = dict(rows[0]) if rows else {}
+    externa = _pokeapi_species_rule(pokemon_id)
 
     gender_rate = meta_db.get('gender_rate')
     try:
         gender_rate = int(gender_rate) if gender_rate is not None else None
     except (TypeError, ValueError):
         gender_rate = None
-    if gender_rate is None:
-        if int(pokemon_id or 0) in BREED_DITTO_ONLY_DEX:
-            gender_rate = -1
-        elif int(pokemon_id or 0) in BREED_RARO_12_5_DEX:
-            gender_rate = 1
-    so_com_ditto_auto = bool(meta_db.get('usa_ditto_padrao')) or int(pokemon_id or 0) in BREED_DITTO_ONLY_DEX or gender_rate == -1
+    so_com_ditto_auto = bool(meta_db.get('usa_ditto_padrao'))
     if externa:
         if externa.get('gender_rate') is not None:
             gender_rate = externa.get('gender_rate')
@@ -1438,9 +1306,9 @@ def classificar_pokemon_preco(pokemon_id, permitir_externo=True):
 
 @lru_cache(maxsize=2048)
 def _pokeapi_species_rule(pokemon_id):
-    """Valida Breed com uma tentativa curta da PokéAPI e fallback para regras locais HYPE."""
+    """Valida se a espécie pode ser alvo de Breed. PokéAPI + fallback CSV oficial."""
     try:
-        with _pokeapi_urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{int(pokemon_id)}/", timeout=1.2) as resp:
+        with urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{int(pokemon_id)}/", timeout=4) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         egg_groups = [g.get("name") for g in (data.get("egg_groups") or []) if g.get("name")]
         is_baby = bool(data.get("is_baby"))
@@ -1461,14 +1329,44 @@ def _pokeapi_species_rule(pokemon_id):
             "no_eggs": no_eggs,
         }
     except Exception as e:
-        if 'cooldown' not in str(e).lower():
-            print(f"PokeAPI indisponível para regra de Breed #{pokemon_id}: {e}")
+        print(f"PokeAPI indisponível para regra de Breed #{pokemon_id}: {e}")
 
-    # V34.3: fallback LOCAL. Nunca baixa CSVs nem faz novas chamadas externas.
-    return _breed_species_rule_local(pokemon_id)
+    # Fallback oficial do projeto PokéAPI. Evita que uma indisponibilidade da API
+    # transforme a validação em permissiva.
+    try:
+        pid = str(int(pokemon_id))
+        species = next((r for r in _pokeapi_csv('pokemon_species.csv') if r.get('id') == pid), None)
+        if not species:
+            return None
+        egg_names = {r.get('id'): r.get('identifier') for r in _pokeapi_csv('egg_groups.csv')}
+        egg_rows = [r for r in _pokeapi_csv('pokemon_egg_groups.csv') if r.get('species_id') == pid]
+        egg_groups = [egg_names.get(r.get('egg_group_id')) for r in egg_rows if egg_names.get(r.get('egg_group_id'))]
+        is_baby = species.get('is_baby') == '1'
+        is_legendary = species.get('is_legendary') == '1'
+        is_mythical = species.get('is_mythical') == '1'
+        no_eggs = 'no-eggs' in egg_groups
+        breedavel = not (is_baby or is_legendary or is_mythical or no_eggs)
+        try:
+            gender_rate = int(species.get('gender_rate', '0'))
+        except (TypeError, ValueError):
+            gender_rate = 0
+        return {
+            'breedavel': breedavel,
+            'so_com_ditto': breedavel and gender_rate == -1,
+            'gender_rate': gender_rate,
+            'egg_groups': egg_groups,
+            'nome': species.get('identifier'),
+            'is_baby': is_baby,
+            'is_legendary': is_legendary,
+            'is_mythical': is_mythical,
+            'no_eggs': no_eggs,
+        }
+    except Exception as e:
+        print(f"Fallback de regra Breed indisponível para #{pokemon_id}: {e}")
+        return None
 
 
-def regra_breed_pokemon(pokemon_id, pokemon_nome, permitir_externo=True):
+def regra_breed_pokemon(pokemon_id, pokemon_nome):
     nome = (pokemon_nome or "").strip().lower()
     if nome == "ditto":
         return {
@@ -1477,20 +1375,24 @@ def regra_breed_pokemon(pokemon_id, pokemon_nome, permitir_externo=True):
             "egg_groups": ["ditto"], "categoria_bloqueio": "ditto"
         }
 
-    bloqueio = next(((n, motivo) for n, motivo in _breed_bloqueados_ativos_cached() if n == nome), None)
+    bloqueados = _safe_table("pokemon_bloqueados", "*", ativo=True)
+    bloqueio = next((x for x in bloqueados if (x.get("pokemon") or "").strip().lower() == nome), None)
     if bloqueio:
         return {
             "breedavel": False, "so_com_ditto": False, "breed_especial": False,
-            "motivo": bloqueio[1] or "Este Pokémon não está disponível para Breed.",
+            "motivo": bloqueio.get("motivo") or "Este Pokémon não está disponível para Breed.",
             "egg_groups": [], "categoria_bloqueio": "manual"
         }
 
-    meta = classificar_pokemon_preco(pokemon_id, permitir_externo=permitir_externo)
-    externa = _pokeapi_species_rule(pokemon_id) if permitir_externo else _breed_species_rule_local(pokemon_id)
+    meta = classificar_pokemon_preco(pokemon_id)
+    externa = _pokeapi_species_rule(pokemon_id)
     if not externa:
-        externa = {'breedavel': True, 'so_com_ditto': bool(meta.get('so_com_ditto')), 'egg_groups': [],
-                   'is_baby': False, 'is_legendary': False, 'is_mythical': False, 'no_eggs': False,
-                   'fonte': 'fallback_minimo'}
+        # Fail closed: um pedido nunca passa sem a espécie ter sido validada.
+        return {
+            "breedavel": False, "so_com_ditto": False, "breed_especial": False,
+            "motivo": "Não foi possível validar esta espécie agora. Tente novamente em instantes.",
+            "egg_groups": [], "categoria_bloqueio": "validacao_indisponivel"
+        }
 
     motivo = None
     categoria = None
@@ -2410,8 +2312,8 @@ def breed():
             iv_descartado = None
             zero_speed = False
 
-        # V34.3: validação local e determinística; o envio não depende de PokéAPI/GitHub.
-        regra = regra_breed_pokemon(pokemon_id, pokemon, permitir_externo=False)
+        # Validação real do Pokémon + anti-spam.
+        regra = regra_breed_pokemon(pokemon_id, pokemon)
         if not regra.get('breedavel'):
             flash(regra.get('motivo') or 'Este Pokémon não está disponível para Breed.', 'erro')
             return redirect(url_for('breed'))
@@ -2452,7 +2354,7 @@ def breed():
             flash('Você já possui um pedido idêntico pendente ou em andamento.', 'erro')
             return redirect(url_for('breed'))
 
-        meta = classificar_pokemon_preco(pokemon_id, permitir_externo=False)
+        meta = classificar_pokemon_preco(pokemon_id)
         categoria = (meta.get('categoria') or 'comum').lower()
         if categoria not in BREED_CATEGORIAS_PRECO:
             categoria = 'comum'
@@ -2940,44 +2842,21 @@ def admin_prioridade_breed(pedido_id):
 
 @lru_cache(maxsize=1)
 def _pokeapi_species_index():
-    """Índice do catálogo HYPE: banco local primeiro; rede nunca é necessária no clique."""
-    itens = {}
-    for row in _safe_table('pokemon_precificacao', 'pokemon_id,pokemon_nome'):
-        try:
-            pid = int(row.get('pokemon_id') or 0)
-        except (TypeError, ValueError):
-            continue
-        nome = str(row.get('pokemon_nome') or '').strip().lower()
-        if pid > 0 and nome:
-            itens[pid] = {'id': pid, 'name': nome}
-    for row in _safe_table('pokedex_competitiva', 'dex_id,pokemon'):
-        try:
-            pid = int(row.get('dex_id') or 0)
-        except (TypeError, ValueError):
-            continue
-        nome = str(row.get('pokemon') or '').strip().lower().replace(' ', '-')
-        if pid > 0 and nome and pid not in itens:
-            itens[pid] = {'id': pid, 'name': nome}
-    if itens:
-        return [itens[k] for k in sorted(itens)]
-
-    # Compatibilidade com bases antigas ainda sem catálogo local completo.
-    # É uma única tentativa curta no carregamento/pesquisa, nunca por card/clique.
+    """Índice central do catálogo. O navegador nunca depende diretamente da PokéAPI."""
     try:
-        with _pokeapi_urlopen("https://pokeapi.co/api/v2/pokemon-species?limit=2000", timeout=1.2) as resp:
+        with urlopen("https://pokeapi.co/api/v2/pokemon-species?limit=2000", timeout=6) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        remoto = []
+        itens = []
         for item in data.get("results") or []:
             partes = (item.get("url") or "").rstrip("/").split("/")
             try:
                 pid = int(partes[-1])
             except (TypeError, ValueError):
                 continue
-            remoto.append({'id': pid, 'name': item.get('name') or ''})
-        return remoto
+            itens.append({"id": pid, "name": item.get("name") or ""})
+        return itens
     except Exception as e:
-        if 'cooldown' not in str(e).lower():
-            print(f"Catálogo HYPE externo indisponível: {e}")
+        print(f"PokeAPI indisponível ao carregar catálogo Breed: {e}")
         return []
 
 
@@ -3005,10 +2884,10 @@ def api_breed_preco():
             return jsonify({'ok': False, 'error': 'Complete as características para calcular o preço.'}), 400
         if nature and nature not in NATURES_VALIDAS:
             return jsonify({'ok': False, 'error': 'Nature inválida.'}), 400
-        regra = regra_breed_pokemon(pokemon_id, pokemon, permitir_externo=False)
+        regra = regra_breed_pokemon(pokemon_id, pokemon)
         if not regra.get('breedavel'):
             return jsonify({'ok': False, 'error': regra.get('motivo') or 'Pokémon indisponível para Breed.'}), 400
-        meta = classificar_pokemon_preco(pokemon_id, permitir_externo=False)
+        meta = classificar_pokemon_preco(pokemon_id)
         categoria = (meta.get('categoria') or 'comum').lower()
         if categoria not in BREED_CATEGORIAS_PRECO:
             categoria = 'comum'
@@ -3021,13 +2900,8 @@ def api_breed_preco():
         if total <= 0:
             return jsonify({'ok': False, 'error': 'Tabela de preços ainda não configurada para esta combinação.'}), 422
         preco_formatado = ('$' + f'{int(total):,}').replace(',', '.')
-        resp = jsonify({'ok': True, 'total': int(total), 'preco_total': int(total),
+        return jsonify({'ok': True, 'total': int(total), 'preco_total': int(total),
                         'preco_formatado': preco_formatado, **detalhes})
-        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        resp.headers['Pragma'] = 'no-cache'
-        if detalhes.get('tabela_preco_id') is not None:
-            resp.headers['X-HYPE-Price-Table'] = str(detalhes.get('tabela_preco_id'))
-        return resp
     except Exception as e:
         print(f'[api/breed/preco] {type(e).__name__}: {e}')
         return jsonify({'ok': False, 'error': 'Falha temporária ao calcular o preço.'}), 500
@@ -3073,7 +2947,7 @@ def api_breed_buscar_pokemon():
     # nome exato ainda funciona e devolve o card com sprite.
     if not encontrados and len(q) >= 3:
         try:
-            with _pokeapi_urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{quote(q)}/", timeout=3) as resp:
+            with urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{quote(q)}/", timeout=4) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
             pid = int(data.get('id'))
             nome = data.get('name') or q
@@ -3092,7 +2966,7 @@ def _pokeapi_csv(nome_arquivo):
     """Fallback leve usando os CSVs oficiais do projeto PokéAPI no GitHub."""
     url = f"https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/{nome_arquivo}"
     try:
-        with _pokeapi_urlopen(url, timeout=6) as resp:
+        with urlopen(url, timeout=8) as resp:
             texto = resp.read().decode("utf-8-sig")
         return list(csv.DictReader(io.StringIO(texto)))
     except Exception as e:
@@ -3100,7 +2974,6 @@ def _pokeapi_csv(nome_arquivo):
         return []
 
 
-@lru_cache(maxsize=2048)
 def _pokeapi_github_details(pokemon_id):
     """Monta os dados visuais do painel mesmo quando pokeapi.co estiver indisponível."""
     pid = str(int(pokemon_id))
@@ -3148,96 +3021,74 @@ def _pokeapi_github_details(pokemon_id):
     return out
 
 
-def _breed_geracao_por_dex(pokemon_id):
-    try:
-        pid = int(pokemon_id)
-    except (TypeError, ValueError):
-        return None
-    limites = ((151,1),(251,2),(386,3),(493,4),(649,5),(721,6),(809,7),(905,8),(1025,9))
-    for limite, geracao in limites:
-        if pid <= limite:
-            return f'generation-{geracao}'
-    return None
-
-
-def _breed_metadata_local(pokemon_id, nome=''):
-    """V34.3: metadados locais/DB para o clique nunca depender da internet."""
-    out = {'types': [], 'abilities': [], 'stats': [], 'height': None, 'weight': None,
-           'generation': _breed_geracao_por_dex(pokemon_id), 'egg_groups': [], 'imagem_url': None}
-    try:
-        rows = _safe_table('pokedex_competitiva', '*', dex_id=int(pokemon_id))
-        if rows:
-            row = rows[0]
-            out['types'] = [str(x).strip().lower() for x in (row.get('tipo1'), row.get('tipo2')) if x]
-            out['imagem_url'] = row.get('imagem_url')
-    except Exception as exc:
-        print(f'[V34.3 metadata local #{pokemon_id}] {exc}')
-    return out
-
-
-def _breed_fast_meta_no_db(pokemon_id, nome=''):
-    """V34.4: metadados mínimos 100% em memória para o clique nunca depender do banco/rede."""
-    try:
-        pid = int(pokemon_id)
-    except (TypeError, ValueError):
-        pid = 0
-    clean_name = str(nome or '').strip().lower()
-    blocked = clean_name == 'ditto' or pid in BREED_NAO_REPRODUZ_DEX
-    ultra = (not blocked) and pid in BREED_DITTO_ONLY_DEX
-    raro = (not blocked) and (not ultra) and pid in BREED_RARO_12_5_DEX
-    categoria = 'ultra_raro' if ultra else 'raro' if raro else 'comum'
-    motivo = None
-    if blocked:
-        motivo = 'Ditto é parceiro de Breed e não pode ser solicitado como Pokémon alvo.' if clean_name == 'ditto' else 'Esta espécie não está disponível para Breed.'
-    return {
-        'id': pid, 'name': clean_name, 'breedavel': not blocked,
-        'so_com_ditto': ultra, 'breed_especial': ultra, 'motivo': motivo,
-        'egg_groups': ['no-eggs'] if blocked else [],
-        'categoria': categoria, 'categoria_label': BREED_CATEGORIA_LABELS.get(categoria, 'Comum'),
-        'classificacao_origem': 'local_hype_fast',
-        'classificacao_motivo': ('Reprodução dependente de Ditto.' if ultra else
-                                 'Taxa de fêmea de 12,5% (1/8).' if raro else
-                                 'Reprodução padrão.'),
-        'sprite': f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{pid}.png",
-        'types': [], 'abilities': [], 'stats': [], 'height': None, 'weight': None,
-        'generation': _breed_geracao_por_dex(pid), 'metadata_source': 'local_hype_fast'
-    }
-
-
 @app.route('/api/breed/pokemon/<int:pokemon_id>')
 @login_required
 def api_breed_pokemon(pokemon_id):
-    """V34.4: seleção local-first; fast=1 não consulta banco nem internet."""
     nome = request.args.get('nome', '').strip()
-    if request.args.get('fast') == '1':
-        resp = jsonify(_breed_fast_meta_no_db(pokemon_id, nome))
-        resp.headers['Cache-Control'] = 'private, max-age=300'
-        return resp
-    regra = regra_breed_pokemon(pokemon_id, nome, permitir_externo=False)
-    meta = classificar_pokemon_preco(pokemon_id, permitir_externo=False)
-    visual = _breed_metadata_local(pokemon_id, nome)
+    regra = regra_breed_pokemon(pokemon_id, nome)
+    meta = classificar_pokemon_preco(pokemon_id)
+
     resposta = {
-        'id': pokemon_id, 'name': nome or visual.get('name') or '',
+        'id': pokemon_id,
+        'name': nome,
         'breedavel': bool(regra.get('breedavel')),
         'so_com_ditto': bool(regra.get('so_com_ditto')),
         'breed_especial': bool(regra.get('breed_especial')),
-        'motivo': regra.get('motivo'), 'categoria_bloqueio': regra.get('categoria_bloqueio'),
-        'is_baby': bool(regra.get('is_baby')), 'is_legendary': bool(regra.get('is_legendary')),
+        'motivo': regra.get('motivo'),
+        'categoria_bloqueio': regra.get('categoria_bloqueio'),
+        'is_baby': bool(regra.get('is_baby')),
+        'is_legendary': bool(regra.get('is_legendary')),
         'is_mythical': bool(regra.get('is_mythical')),
-        'egg_groups': regra.get('egg_groups') or visual.get('egg_groups') or [],
-        'categoria': meta.get('categoria') or 'comum',
+        'egg_groups': regra.get('egg_groups') or [],
+        'categoria': (meta.get('categoria') or 'comum'),
         'categoria_label': meta.get('categoria_label') or 'Comum',
         'classificacao_motivo': meta.get('classificacao_motivo'),
         'classificacao_origem': meta.get('classificacao_origem'),
         'taxa_femea_percentual': meta.get('taxa_femea_percentual'),
-        'sprite': visual.get('imagem_url') or f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{pokemon_id}.png",
-        'types': visual.get('types') or [], 'abilities': visual.get('abilities') or [],
-        'stats': visual.get('stats') or [], 'height': visual.get('height'), 'weight': visual.get('weight'),
-        'generation': visual.get('generation'), 'metadata_source': 'local_hype'
+        'sprite': f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{pokemon_id}.png",
+        'types': [], 'abilities': [], 'stats': [], 'height': None, 'weight': None,
+        'generation': None
     }
-    resp = jsonify(resposta)
-    resp.headers['Cache-Control'] = 'private, no-store, max-age=0'
-    return resp
+
+    # Metadados enriquecem a tela, mas nunca são requisito para criar o pedido.
+    try:
+        with urlopen(f"https://pokeapi.co/api/v2/pokemon/{pokemon_id}/", timeout=4) as resp:
+            pdata = json.loads(resp.read().decode('utf-8'))
+        resposta['name'] = resposta['name'] or pdata.get('name') or ''
+        resposta['types'] = [x.get('type', {}).get('name') for x in pdata.get('types', []) if x.get('type', {}).get('name')]
+        resposta['abilities'] = [
+            {'name': x.get('ability', {}).get('name'), 'hidden': bool(x.get('is_hidden'))}
+            for x in pdata.get('abilities', []) if x.get('ability', {}).get('name')
+        ]
+        resposta['stats'] = [
+            {'name': x.get('stat', {}).get('name'), 'value': x.get('base_stat')}
+            for x in pdata.get('stats', []) if x.get('stat', {}).get('name')
+        ]
+        resposta['height'] = pdata.get('height')
+        resposta['weight'] = pdata.get('weight')
+    except Exception as e:
+        print(f"Metadados Pokémon #{pokemon_id} indisponíveis: {e}")
+
+    try:
+        with urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{pokemon_id}/", timeout=4) as resp:
+            sdata = json.loads(resp.read().decode('utf-8'))
+        resposta['generation'] = (sdata.get('generation') or {}).get('name')
+        if not resposta['egg_groups']:
+            resposta['egg_groups'] = [x.get('name') for x in sdata.get('egg_groups', []) if x.get('name')]
+    except Exception as e:
+        print(f"Metadados de espécie #{pokemon_id} indisponíveis: {e}")
+
+    # Se pokeapi.co falhar no host, completa o painel pelos CSVs oficiais no GitHub.
+    if not resposta['stats'] or not resposta['types'] or resposta['height'] is None:
+        fallback = _pokeapi_github_details(pokemon_id)
+        for campo in ('types', 'abilities', 'stats', 'egg_groups'):
+            if not resposta.get(campo) and fallback.get(campo):
+                resposta[campo] = fallback[campo]
+        for campo in ('height', 'weight', 'generation'):
+            if resposta.get(campo) is None and fallback.get(campo) is not None:
+                resposta[campo] = fallback[campo]
+
+    return resposta
 
 
 @app.route('/breed/ranking')
@@ -4607,15 +4458,6 @@ def _breed_v312_relatorio():
 
 
 def _breed_v312_impacto(tabela_id):
-    """V34.4: comparação rápida sem dezenas de consultas repetidas ao Supabase.
-
-    A seção do Admin é apenas uma prévia sem promoção, então calculamos direto
-    com os componentes já carregados da tabela. O simulador continua usando o
-    cálculo oficial completo.
-    """
-    componentes = _breed_v312_componentes(tabela_id)
-    if not componentes:
-        return []
     cenarios = [
         ('Comum F5','F5',False,False,'comum'), ('Comum F5 + HA','F5',True,False,'comum'),
         ('Comum F5 + Zero','F5',False,True,'comum'), ('Comum HA + Zero','F5',True,True,'comum'),
@@ -4627,43 +4469,10 @@ def _breed_v312_impacto(tabela_id):
     ]
     saida=[]
     for nome, bt, ha, zero, cat in cenarios:
-        key_bt = bt.lower()
-        base = _breed_v312_valor(componentes, f'base_{cat}_{key_bt}')
-        total = base
-        if ha:
-            total += _breed_v312_valor(componentes, f'adicional_ha_{cat}_{key_bt}')
-        if zero and key_bt in ('f5','f6'):
-            total += _breed_v312_valor(componentes, f'adicional_zero_speed_{cat}')
-        saida.append({'nome':nome,'valor':int(total or 0)})
+        calc = _calcular_preco_breed_v312(bt, ha=ha, zero_speed=zero, categoria=cat, nature='Adamant', tabela_id_override=tabela_id)
+        if calc is not None:
+            saida.append({'nome':nome,'valor':int(calc[0] or 0)})
     return saida
-
-def _breed_v343_publicar_rascunho_agora(tabela_id):
-    """Publica um rascunho imediatamente, preservando a versão anterior no histórico."""
-    tabela = _breed_v312_tabela_por_id(tabela_id)
-    if not tabela or tabela.get('status') != 'rascunho':
-        raise ValueError('Selecione um rascunho válido para aplicar agora.')
-    erros = _breed_v312_validar_tabela(tabela_id)
-    if erros:
-        raise ValueError('Não é possível aplicar agora: ' + ' '.join(erros))
-    agora = datetime.now(timezone.utc)
-    for atual in _breed_v312_tabelas():
-        if int(atual.get('id') or 0) == int(tabela_id):
-            continue
-        status = str(atual.get('status') or '').lower()
-        inicio = parse_data_supabase(atual.get('inicio_em'))
-        fim = parse_data_supabase(atual.get('fim_em'))
-        agendada_em_vigor = status == 'agendada' and (not inicio or inicio <= agora) and (not fim or agora < fim)
-        if status == 'ativa' or agendada_em_vigor:
-            supabase.table('breed_tabelas_preco').update({
-                'status':'arquivada','updated_at':agora_iso()
-            }).eq('id',atual.get('id')).execute()
-    supabase.table('breed_tabelas_preco').update({
-        'status':'ativa','inicio_em':agora_iso(),'fim_em':None,
-        'publicado_por':session.get('usuario_email'),'publicado_em':agora_iso(),'updated_at':agora_iso()
-    }).eq('id',tabela_id).execute()
-    _breed_v312_registrar_historico(tabela_id,'aplicar_imediatamente')
-    return _breed_v312_tabela_por_id(tabela_id)
-
 
 @app.route('/admin/precos', methods=['GET','POST'])
 @login_required
@@ -4696,13 +4505,7 @@ def admin_precos():
                     'ativo':True,'ordem':ordem,'updated_at':agora_iso()
                 }, on_conflict='tabela_id,codigo').execute()
                 _breed_v312_registrar_historico(tabela_id,'alterar_componente',codigo,anterior,valor)
-                if request.form.get('salvar_rascunho') != '1':
-                    ativa = _breed_v343_publicar_rascunho_agora(tabela_id)
-                    # Mantém o painel pronto para a próxima edição sem alterar a tabela ativa diretamente.
-                    nova = _breed_v312_clonar_tabela(ativa.get('id'), f"{ativa.get('nome') or 'Tabela HYPE'} · edição")
-                    flash(f'{nome} atualizado e aplicado agora. O Fazer Pedido já usa a tabela #{ativa.get("id")}. Novo rascunho #{nova.get("id")} criado para continuar editando.', 'sucesso')
-                else:
-                    flash(f'{nome} salvo somente no rascunho. O Fazer Pedido continua usando a tabela ativa.', 'sucesso')
+                flash(f'{nome} atualizado no rascunho.', 'sucesso')
 
             elif acao == 'salvar_regras':
                 tabela_id = int(request.form.get('tabela_id') or 0)
@@ -4732,9 +4535,15 @@ def admin_precos():
                 if erros:
                     raise ValueError('Não é possível publicar: ' + ' '.join(erros))
                 if acao == 'publicar_tabela':
-                    _breed_v343_publicar_rascunho_agora(tabela_id)
+                    for atual in _breed_v312_tabelas():
+                        if atual.get('status') == 'ativa' and int(atual.get('id') or 0) != tabela_id:
+                            supabase.table('breed_tabelas_preco').update({'status':'arquivada','updated_at':agora_iso()}).eq('id',atual.get('id')).execute()
+                    supabase.table('breed_tabelas_preco').update({
+                        'status':'ativa','inicio_em':agora_iso(),'fim_em':None,
+                        'publicado_por':session.get('usuario_email'),'publicado_em':agora_iso(),'updated_at':agora_iso()
+                    }).eq('id',tabela_id).execute()
                     _breed_v312_registrar_historico(tabela_id,'publicar_tabela')
-                    flash('Nova tabela publicada. O Fazer Pedido já usa estes valores para novos pedidos.', 'sucesso')
+                    flash('Nova tabela publicada. Somente novos pedidos usarão esses valores.', 'sucesso')
                 else:
                     inicio = _promo_datetime_form_para_utc(request.form.get('inicio_em') or '')
                     fim = _promo_datetime_form_para_utc(request.form.get('fim_em') or '') if request.form.get('fim_em') else None
@@ -4768,15 +4577,8 @@ def admin_precos():
                 erros = _breed_v312_validar_tabela(tabela_id)
                 if erros:
                     raise ValueError('Esta versão não pode ser restaurada: ' + ' '.join(erros))
-                agora_restauro = datetime.now(timezone.utc)
                 for atual in _breed_v312_tabelas():
-                    if int(atual.get('id') or 0) == tabela_id:
-                        continue
-                    status_atual = str(atual.get('status') or '').lower()
-                    inicio_atual = parse_data_supabase(atual.get('inicio_em'))
-                    fim_atual = parse_data_supabase(atual.get('fim_em'))
-                    agendada_em_vigor = status_atual == 'agendada' and (not inicio_atual or inicio_atual <= agora_restauro) and (not fim_atual or agora_restauro < fim_atual)
-                    if status_atual == 'ativa' or agendada_em_vigor:
+                    if atual.get('status') == 'ativa' and int(atual.get('id') or 0) != tabela_id:
                         supabase.table('breed_tabelas_preco').update({'status':'arquivada','updated_at':agora_iso()}).eq('id',atual.get('id')).execute()
                 supabase.table('breed_tabelas_preco').update({
                     'status':'ativa','inicio_em':agora_iso(),'fim_em':None,
@@ -4816,14 +4618,6 @@ def admin_precos():
                     'updated_at':agora_iso()
                 }
                 supabase.table('pokemon_precificacao').upsert(payload, on_conflict='pokemon_id').execute()
-                try:
-                    _breed_precificacao_row_cached.cache_clear()
-                except Exception:
-                    pass
-                try:
-                    _pokeapi_species_rule.cache_clear()
-                except Exception:
-                    pass
                 novo = classificar_pokemon_preco(pokemon_id)
                 registrar_log('classificar_pokemon_preco','breed_pricing','pokemon',pokemon_id,{
                     'categoria_override':categoria_override,'usa_ditto_override':ditto_override,'motivo':motivo_override
@@ -4858,12 +4652,7 @@ def admin_precos():
                     'updated_at':agora_iso()
                 }, on_conflict='tabela_id,pokemon_id').execute()
                 _breed_v312_registrar_historico(tabela_id,'salvar_excecao',detalhes={'pokemon_id':pokemon_id,'pokemon':pokemon_nome})
-                if request.form.get('salvar_rascunho') != '1':
-                    ativa = _breed_v343_publicar_rascunho_agora(tabela_id)
-                    nova = _breed_v312_clonar_tabela(ativa.get('id'), f"{ativa.get('nome') or 'Tabela HYPE'} · edição")
-                    flash(f'Preço individual de {pokemon_nome} salvo e aplicado agora. Novos pedidos usam a tabela #{ativa.get("id")}. Novo rascunho #{nova.get("id")} criado.', 'sucesso')
-                else:
-                    flash('Regra especial do Pokémon salva somente no rascunho. O Fazer Pedido continua usando a tabela ativa.', 'sucesso')
+                flash('Regra especial do Pokémon salva.', 'sucesso')
 
             elif acao == 'excluir_excecao':
                 tabela_id = int(request.form.get('tabela_id') or 0)
@@ -4948,34 +4737,16 @@ def admin_precos():
     componentes.sort(key=lambda x:(int(x.get('ordem') or 0), str(x.get('nome') or '')))
     excecoes = _safe_table('breed_preco_especie_excecoes','*',tabela_id=tabela_edicao.get('id')) if tabela_edicao else []
     classificacoes_pokemon = []
-    # V34.4: a consulta acima já trouxe todas as linhas. Não fazemos uma nova
-    # ida ao Supabase para cada Pokémon só para montar a tela do Admin.
     for row in _safe_table('pokemon_precificacao','*'):
         try:
+            calculada = classificar_pokemon_preco(int(row.get('pokemon_id') or 0))
             exibicao = dict(row)
-            pid = int(row.get('pokemon_id') or 0)
-            gender_rate = row.get('gender_rate')
-            try: gender_rate = int(gender_rate) if gender_rate is not None else None
-            except (TypeError, ValueError): gender_rate = None
-            if gender_rate is None:
-                gender_rate = -1 if pid in BREED_DITTO_ONLY_DEX else 1 if pid in BREED_RARO_12_5_DEX else None
-            override = str(row.get('categoria_override') or '').strip().lower()
-            ditto_override = row.get('usa_ditto_override')
-            if isinstance(ditto_override, bool):
-                so_ditto = ditto_override
-            elif override == 'ultra_raro':
-                so_ditto = True
-            else:
-                so_ditto = bool(row.get('usa_ditto_padrao')) or pid in BREED_DITTO_ONLY_DEX or gender_rate == -1
-            auto = 'ultra_raro' if so_ditto else 'raro' if gender_rate == 1 else 'comum'
-            categoria = 'ultra_raro' if so_ditto else override if override in BREED_CATEGORIAS_PRECO else auto
-            motivo = row.get('motivo_override') or ('Reprodução dependente de Ditto.' if so_ditto else 'Taxa de fêmea de 12,5% (1/8).' if gender_rate == 1 else 'Reprodução padrão.')
             exibicao.update({
-                'categoria': categoria,
-                'categoria_automatica': auto,
-                'classificacao_motivo': motivo,
-                'taxa_femea_percentual': round((gender_rate/8)*100,2) if isinstance(gender_rate,int) and gender_rate >= 0 else None,
-                'so_com_ditto': so_ditto,
+                'categoria': calculada.get('categoria') or row.get('categoria') or 'comum',
+                'categoria_automatica': calculada.get('categoria_automatica'),
+                'classificacao_motivo': calculada.get('classificacao_motivo'),
+                'taxa_femea_percentual': calculada.get('taxa_femea_percentual'),
+                'so_com_ditto': calculada.get('so_com_ditto'),
             })
             classificacoes_pokemon.append(exibicao)
         except Exception:
@@ -5668,8 +5439,6 @@ def admin_pokemon_bloqueados():
         if nome:
             if acao=='adicionar': supabase.table('pokemon_bloqueados').upsert({'pokemon':nome,'motivo':request.form.get('motivo','').strip() or None,'ativo':True}).execute()
             else: supabase.table('pokemon_bloqueados').delete().eq('pokemon',nome).execute()
-            try: _breed_bloqueados_ativos_cached.cache_clear()
-            except Exception: pass
             registrar_log(acao,'breed','pokemon',nome)
         return redirect(url_for('admin_pokemon_bloqueados'))
     return render_template('admin_pokemon_bloqueados.html',itens=_safe_table('pokemon_bloqueados'))
