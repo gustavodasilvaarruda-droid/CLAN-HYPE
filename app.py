@@ -727,7 +727,7 @@ def _precos_breed_interface_legacy():
 
 
 # ============================================================================
-# HYPE V31.2 / V31.3 - BREED PRICING + RARITY 3.0
+# HYPE V33 - CENTRAL DE PRECOS BREED 3.0 (base V31.2/V31.3/V32)
 # Tabelas versionadas, raridade automática, HA, Zero Speed, exceções por espécie,
 # desconto de membro, margem mínima e simulador administrativo.
 # ============================================================================
@@ -759,6 +759,16 @@ BREED_V312_COMPONENTES_META = {
     'adicional_genero_raro': ('Escolher gênero · Raro', 'extras', 230),
     'adicional_genero_ultra_raro': ('Escolher gênero · Ultra Raro', 'extras', 240),
     'adicional_treinado': ('Pokémon treinado', 'extras', 250),
+    # V32: Hidden Power Ability = pedido totalmente personalizado por IV.
+    'base_comum_personalizado': ('Personalizado · Comum', 'personalizado', 300),
+    'base_raro_personalizado': ('Personalizado · Raro', 'personalizado', 310),
+    'base_ultra_raro_personalizado': ('Personalizado · Ultra Raro', 'personalizado', 320),
+    'desconto_sem_nature_comum_personalizado': ('Sem Nature · Personalizado Comum', 'personalizado', 330),
+    'desconto_sem_nature_raro_personalizado': ('Sem Nature · Personalizado Raro', 'personalizado', 340),
+    'desconto_sem_nature_ultra_raro_personalizado': ('Sem Nature · Personalizado Ultra Raro', 'personalizado', 350),
+    'adicional_ha_comum_personalizado': ('HA · Personalizado Comum', 'personalizado', 360),
+    'adicional_ha_raro_personalizado': ('HA · Personalizado Raro', 'personalizado', 370),
+    'adicional_ha_ultra_raro_personalizado': ('HA · Personalizado Ultra Raro', 'personalizado', 380),
 }
 
 BREED_V312_PACOTES = [
@@ -767,6 +777,7 @@ BREED_V312_PACOTES = [
     {'codigo':'f5_zero','nome':'F5 Zero Speed','breed_tipo':'F5','ha':False,'zero_speed':True,'categoria':'comum','usa_ditto':False},
     {'codigo':'raro_comp','nome':'Raro Competitivo','breed_tipo':'F5','ha':True,'zero_speed':True,'categoria':'raro','usa_ditto':False},
     {'codigo':'ultra_comp','nome':'Ultra Raro Competitivo','breed_tipo':'F5','ha':True,'zero_speed':True,'categoria':'ultra_raro','usa_ditto':True},
+    {'codigo':'personalizado','nome':'Hidden Power Ability','breed_tipo':'PERSONALIZADO','ha':False,'zero_speed':False,'categoria':'comum','usa_ditto':False},
 ]
 
 BREED_CATEGORIAS_PRECO = ('comum', 'raro', 'ultra_raro')
@@ -908,7 +919,7 @@ def _calcular_preco_breed_v312(breed_tipo, ha=False, genero='indiferente', categ
         return None
 
     bt = str(breed_tipo or '').lower()
-    if bt not in ('f5','f6'):
+    if bt not in ('f5','f6','personalizado'):
         return 0, {'erro':'Breed inválido.'}
     categoria = str(categoria or 'comum').lower()
     if categoria not in BREED_CATEGORIAS_PRECO:
@@ -969,7 +980,7 @@ def _calcular_preco_breed_v312(breed_tipo, ha=False, genero='indiferente', categ
 
     codigos_extras = []
     if ha: codigos_extras.append(f'adicional_ha_{categoria}_{bt}')
-    if zero_speed: codigos_extras.append(f'adicional_zero_speed_{categoria}')
+    if zero_speed and bt in ('f5','f6'): codigos_extras.append(f'adicional_zero_speed_{categoria}')
     if usa_ditto and ultra_fallback_legado:
         codigos_extras.append(f'adicional_ditto_{categoria}_{bt}')
     if genero in ('macho','femea'): codigos_extras.append(f'adicional_genero_{categoria}')
@@ -2222,6 +2233,25 @@ def breed():
         zero_speed = request.form.get('zero_speed') == 'sim'
         treinado = request.form.get('treinado') == 'sim'
         cupom_breed = request.form.get('cupom_breed', '').strip().upper()
+        modo_pedido = 'personalizado' if breed_tipo == 'PERSONALIZADO' else 'normal'
+        ivs_personalizados = {}
+        if modo_pedido == 'personalizado':
+            iv_map = {
+                'hp':'custom_iv_hp','attack':'custom_iv_attack','defense':'custom_iv_defense',
+                'sp_attack':'custom_iv_sp_attack','sp_defense':'custom_iv_sp_defense','speed':'custom_iv_speed'
+            }
+            try:
+                for iv_key, field in iv_map.items():
+                    raw = (request.form.get(field, '') or '').strip()
+                    if raw == '':
+                        raise ValueError
+                    value = int(raw)
+                    if value < 0 or value > 31:
+                        raise ValueError
+                    ivs_personalizados[iv_key] = value
+            except (TypeError, ValueError):
+                flash('No modo Hidden Power Ability, informe todos os 6 IVs entre 0 e 31.', 'erro')
+                return redirect(url_for('breed'))
 
         ev_keys = ('hp', 'attack', 'defense', 'sp_attack', 'sp_defense', 'speed')
         evs_treinamento = {}
@@ -2264,8 +2294,8 @@ def breed():
             flash('Selecione Macho, Fêmea ou Indiferente.', 'erro')
             return redirect(url_for('breed'))
 
-        if breed_tipo not in ('F5', 'F6'):
-            flash('Selecione F5 ou F6.', 'erro')
+        if breed_tipo not in ('F5', 'F6', 'PERSONALIZADO'):
+            flash('Selecione F5, F6 ou Hidden Power Ability.', 'erro')
             return redirect(url_for('breed'))
 
         if breed_tipo == 'F5':
@@ -2275,6 +2305,9 @@ def breed():
             if zero_speed and iv_descartado == 'velocidade':
                 flash('Com Zero Speed, a Velocidade já ficará em 0 IV. Escolha outro IV que pode ficar menor.', 'erro')
                 return redirect(url_for('breed'))
+        elif breed_tipo == 'PERSONALIZADO':
+            iv_descartado = None
+            zero_speed = False
         else:
             iv_descartado = None
             zero_speed = False
@@ -2314,6 +2347,7 @@ def breed():
             and bool(x.get('zero_speed')) == bool(zero_speed)
             and bool(x.get('treinado')) == bool(treinado)
             and (x.get('evs_treinamento') or {}) == (evs_treinamento if treinado else {})
+            and (x.get('ivs_personalizados') or {}) == (ivs_personalizados if modo_pedido == 'personalizado' else {})
             for x in ativos_usuario
         )
         if duplicado:
@@ -2370,6 +2404,8 @@ def breed():
                 'ha': ha == 'sim',
                 'genero': genero,
                 'breed_tipo': breed_tipo,
+                'modo_pedido': modo_pedido,
+                'ivs_personalizados': ivs_personalizados if modo_pedido == 'personalizado' else {},
                 'iv_descartado': iv_descartado,
                 'zero_speed': zero_speed,
                 'categoria_preco': categoria,
@@ -2403,7 +2439,7 @@ def breed():
                 resultado_insert = supabase.table('pedidos_breed').insert(dados_pedido).execute()
             except Exception as insert_error:
                 erro_txt = str(insert_error)
-                opcionais = ('evs_treinamento','tabela_preco_id','cupom_codigo')
+                opcionais = ('evs_treinamento','tabela_preco_id','cupom_codigo','modo_pedido','ivs_personalizados')
                 if ('PGRST204' in erro_txt or 'schema cache' in erro_txt.lower()) and any(c in erro_txt for c in opcionais):
                     dados_compat = dict(dados_pedido)
                     for coluna in opcionais:
@@ -2844,7 +2880,7 @@ def api_breed_preco():
         zero_speed = request.args.get('zero_speed', 'nao').strip().lower() == 'sim'
         nature = request.args.get('nature', '').strip()
         cupom_breed = request.args.get('cupom', '').strip().upper()
-        if pokemon_id <= 0 or not pokemon or breed_tipo not in ('F5','F6') or ha not in ('sim','nao') or genero not in ('macho','femea','indiferente'):
+        if pokemon_id <= 0 or not pokemon or breed_tipo not in ('F5','F6','PERSONALIZADO') or ha not in ('sim','nao') or genero not in ('macho','femea','indiferente'):
             return jsonify({'ok': False, 'error': 'Complete as características para calcular o preço.'}), 400
         if nature and nature not in NATURES_VALIDAS:
             return jsonify({'ok': False, 'error': 'Nature inválida.'}), 400
@@ -4402,7 +4438,7 @@ def _breed_v312_relatorio():
     inicio = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     try:
         pedidos = supabase.table('pedidos_breed').select(
-            'id,preco_total,taxa_clan_valor,valor_breeder,categoria_preco,ha,zero_speed,status,created_at'
+            'id,preco_total,taxa_clan_valor,valor_breeder,categoria_preco,breed_tipo,ha,zero_speed,status,created_at'
         ).gte('created_at', inicio).order('created_at', desc=True).limit(1000).execute().data or []
     except Exception as exc:
         print(f'[V31.2 relatorio] {exc}')
@@ -4417,6 +4453,7 @@ def _breed_v312_relatorio():
         'ultra_raros': sum(1 for x in pedidos if str(x.get('categoria_preco') or '').lower() == 'ultra_raro'),
         'ha': sum(1 for x in pedidos if x.get('ha')),
         'zero_speed': sum(1 for x in pedidos if x.get('zero_speed')),
+        'personalizados': sum(1 for x in pedidos if str(x.get('breed_tipo') or '').upper() == 'PERSONALIZADO' or x.get('modo_pedido') == 'personalizado'),
     }
 
 
@@ -4427,6 +4464,8 @@ def _breed_v312_impacto(tabela_id):
         ('Raro F5','F5',False,False,'raro'), ('Raro F5 + HA','F5',True,False,'raro'),
         ('Raro HA + Zero','F5',True,True,'raro'), ('Raro F6 + HA','F6',True,False,'raro'),
         ('Ultra Raro F5','F5',False,False,'ultra_raro'), ('Ultra Raro + HA + Zero','F5',True,True,'ultra_raro'),
+        ('Personalizado Comum','PERSONALIZADO',False,False,'comum'), ('Personalizado Raro + HA','PERSONALIZADO',True,False,'raro'),
+        ('Personalizado Ultra Raro + HA','PERSONALIZADO',True,False,'ultra_raro'),
     ]
     saida=[]
     for nome, bt, ha, zero, cat in cenarios:
@@ -4688,6 +4727,7 @@ def admin_precos():
     pricing_v2 = bool(tabelas)
     tabela_atual = _breed_v312_tabela_atual() if pricing_v2 else None
     pricing_v3 = bool(tabela_atual and 'base_ultra_raro_f5' in _breed_v312_componentes(tabela_atual.get('id')))
+    pricing_v4 = bool(tabela_atual and 'base_comum_personalizado' in _breed_v312_componentes(tabela_atual.get('id')))
     if tabela_atual:
         tabela_atual['status_visual'] = _breed_v312_status_visual(tabela_atual)
     rascunhos = sorted([x for x in tabelas if x.get('status') == 'rascunho'], key=lambda x:int(x.get('id') or 0), reverse=True)
@@ -4736,7 +4776,7 @@ def admin_precos():
     impacto_rascunho = _breed_v312_impacto(rascunho.get('id')) if rascunho else []
     promo_itens = [x for x in componentes if x.get('codigo') in BREED_V312_COMPONENTES_META] if componentes else _safe_table('precos_breed','*')
     return render_template(
-        'admin_precos.html', pricing_v2=pricing_v2, pricing_v3=pricing_v3, tabela_atual=tabela_atual, rascunho=rascunho,
+        'admin_precos.html', pricing_v2=pricing_v2, pricing_v3=pricing_v3, pricing_v4=pricing_v4, tabela_atual=tabela_atual, rascunho=rascunho,
         tabela_edicao=tabela_edicao, tabelas=tabelas, componentes=componentes, excecoes=excecoes,
         classificacoes_pokemon=classificacoes_pokemon,
         historico=historico, promocoes=promos, taxa_clan=obter_taxa_clan_breed(),
