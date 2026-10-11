@@ -1739,3 +1739,66 @@ body.breed-rating-open{overflow:hidden}
 
 /* HYPE V29 SECURITY/UI */
 .hgb-logout-inline{display:inline-flex;margin:0}.hgb-logout-inline button{font-family:inherit}.hgb-side-nav .hgb-logout-inline{display:block;width:100%}.hgb-side-nav .hgb-logout-inline .hgb-account-logout{width:100%}
+
+
+/* HYPE V35 — catálogo contido: Android / iOS / WebView, sem rolagem infinita */
+@media(max-width:800px){
+  .hype-breed-reference-page .breed-ref-picker-layout{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+  .hype-breed-reference-page .breed-ref-catalog{
+    min-height:0!important;
+    height:auto!important;
+    min-width:0!important;
+    overflow:visible!important;
+  }
+  .hype-breed-reference-page .breed-ref-pokemon-grid{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    grid-auto-rows:max-content!important;
+    align-content:start!important;
+    min-height:0!important;
+    height:auto!important;
+    max-height:min(58dvh,500px)!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    overscroll-behavior-y:contain!important;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    touch-action:pan-y;
+    padding-bottom:8px;
+  }
+  .hype-breed-reference-page .breed-ref-detail{
+    min-height:0!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+    position:static!important;
+    border-left:0!important;
+    border-top:1px solid rgba(255,196,37,.55)!important;
+  }
+  .hype-breed-reference-page .breed-ref-poke-card{
+    height:auto!important;
+    min-height:125px!important;
+    min-width:0!important;
+  }
+  .hype-breed-reference-page .breed-ref-poke-card strong{
+    overflow-wrap:anywhere;
+    max-width:100%;
+  }
+}
+@media(max-width:560px){
+  .hype-breed-reference-page .breed-ref-pokemon-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    max-height:min(55dvh,430px)!important;
+    gap:8px!important;
+  }
+  .hype-breed-reference-page .breed-ref-catalog{padding:10px!important}
+  .hype-breed-reference-page .breed-ref-poke-card{min-height:132px!important}
+  .hype-breed-reference-page .breed-ref-search input{min-width:0!important;font-size:16px!important}
+  .hype-breed-reference-page .breed-ref-shell{padding:10px!important}
+}

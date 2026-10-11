@@ -1,0 +1,123 @@
+/* ================================================================
+   HYPE V36 — Responsividade unificada Android / iPhone / WebView
+   CSS adicional no fim do HEAD; não modifica regras de negócio.
+   Desktop permanece com layout anterior.
+   ================================================================ */
+:root { --hype-touch: 44px; --hype-mobile-gold: #e8bd42; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { overflow-wrap: break-word; }
+img, video, iframe, svg { max-width: 100%; }
+iframe { border: 0; }
+:where(.hgb-main,.dashboard-shell,.hype-core-main,.hype-v6-home-main,.hype-v7-home-main,.content-hub,.builders-shell) { min-width: 0; }
+:where(.hgb-main,.dashboard-shell,.hype-core-main,.hype-v6-home-main,.hype-v7-home-main,.content-hub,.builders-shell) > * { max-width: 100%; }
+.hype-mobile-table-scroll { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; border-radius: 10px; }
+.hype-mobile-table-scroll > table { width: max-content; min-width: 100%; }
+.hype-mobile-table-scroll:focus-visible { outline: 2px solid var(--hype-mobile-gold); outline-offset: 2px; }
+.hype-mobile-nav-backdrop { position: fixed; inset: 0; z-index: 89; background: rgba(0,0,0,.64); backdrop-filter: blur(3px); }
+.hype-mobile-nav-backdrop[hidden] { display: none !important; }
+.hype-mobile-home-toggle { display:none; align-items:center; justify-content:center; min-height:44px; min-width:44px; background:#12151b; color:var(--hype-mobile-gold); border:1px solid rgba(245,200,69,.4); border-radius:10px; font-size:24px; cursor:pointer; }
+@media (max-width: 900px) {
+  html, body { max-width:100%; overflow-x:clip; }
+  html { scroll-padding-top: 78px; }
+  body { min-height: 100dvh; }
+  h1 { font-size: clamp(1.35rem, 5.8vw, 2.25rem); line-height: 1.14; overflow-wrap:anywhere; }
+  h2 { font-size: clamp(1.12rem, 4.8vw, 1.7rem); overflow-wrap:anywhere; }
+  p, small, label, td, th { overflow-wrap: anywhere; }
+  button, [type=button], [type=submit], a { -webkit-tap-highlight-color: rgba(232,189,66,.18); }
+  button, select, input, textarea { max-width:100%; font-family:inherit; }
+  :where(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea) { font-size: 16px !important; min-width:0; }
+  :where(button,.cta-gold,.cta-dark,.hype-v6-btn,.btn-menu,.btn-dourado,.btn-sm,.bp32-btn-gold,.bp32-btn-outline) { min-height:var(--hype-touch); touch-action: manipulation; }
+  :where(.dashboard-shell,.content-hub,.hype-v6-page,.hype-v7-page,.builders-shell) { padding-left: 14px !important; padding-right: 14px !important; width:100%; min-width:0; }
+  .dashboard-shell { padding-top:16px !important; padding-bottom: 30px !important; }
+  :where(.dash-card,.v26-panel,.admin2-card,.bp32-panel,.hype-v6-panel,.hype-v6-action-card) { min-width: 0; padding: clamp(12px, 3.5vw, 18px) !important; }
+  :where(.admin-form-grid,.hype-form,.dash-form-grid,.v26-form-grid) { grid-template-columns: minmax(0,1fr) !important; }
+  :where(.admin-form-grid,.hype-form,.dash-form-grid) > * { min-width: 0; max-width: 100%; }
+  :where(.admin-form-grid,.dash-form-grid) .wide { grid-column: 1/-1; }
+  :where(.dash-welcome,.section-heading,.page-topline,.card-actions,.hype-v6-panel-head,.v26-section-head) { min-width:0; flex-wrap:wrap; }
+  :where(.card-actions,.dash-welcome .card-actions,.page-topline) > * { max-width:100%; }
+  .card-actions > a, .card-actions > button { display:inline-flex; align-items:center; justify-content:center; text-align:center; }
+  :where(.dash-grid,.build-grid,.build-card-grid,.admin-shortcuts,.hype-v6-home-shortcuts) { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  :where(.dash-grid,.build-grid,.build-card-grid,.admin-shortcuts) > * { min-width:0; }
+  .page-topline { gap:8px; margin-bottom:12px; }
+  .smart-back { min-height:40px; display:inline-flex; align-items:center; }
+  .hgb-topbar { grid-template-columns: minmax(85px,1fr) auto !important; padding: 0 10px; }
+  .hgb-topbar .hgb-brand { min-width:0; }
+  .hgb-topbar .hgb-topnav { display:none; }
+  .hgb-topbar .hgb-top-actions { justify-self:end; min-width:0; }
+  .hgb-topbar .hgb-global-search { display:none; }
+  .hgb-topbar .hgb-user-name { display:none; }
+  .hgb-topbar .hgb-mobile-menu { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; }
+  .hgb-sidebar { width:min(82vw,320px) !important; max-width:320px; overflow-y:auto; overscroll-behavior:contain; }
+  .hgb-sidebar.open { transform:translateX(0) !important; }
+  .hgb-main { width:100%; padding:12px 11px 30px !important; min-width:0; }
+  .hgb-sidebar .hgb-side-nav a { min-height:45px; display:flex; align-items:center; }
+  .admin-v29-nav { width:100%; min-width:0; gap:8px; }
+  .admin-v29-links { display:flex; flex-wrap:nowrap !important; overflow-x:auto; max-width:100%; scrollbar-width:thin; padding-bottom:8px; }
+  .admin-v29-links a { white-space:nowrap; min-height:40px; }
+  .admin-table th, .admin-table td { white-space:normal; }
+  .hype-mobile-table-scroll .admin-table th, .hype-mobile-table-scroll .admin-table td { min-width:85px; }
+  .hype-v6-homebar { grid-template-columns: minmax(88px,1fr) auto !important; padding:0 12px !important; min-height:58px; }
+  .hype-v6-homebar .hype-v6-home-actions { grid-column:2; display:flex; align-items:center; gap:8px; }
+  .hype-v6-homebar .hype-v6-home-actions form { display:none; }
+  .hype-v6-homebar .hype-mobile-home-toggle { display:inline-flex; order:100; }
+  .hype-v6-homebar > nav { display:none !important; }
+  .hype-v6-homebar.hype-home-nav-open > nav { display:flex !important; position:fixed; top:58px; right:9px; left:9px; max-height: min(75dvh,550px); overflow-y:auto; z-index:120; flex-direction:column; align-items:stretch; gap:2px; padding:10px; border:1px solid rgba(230,183,55,.46); border-radius:14px; background:#0b0e14; box-shadow:0 18px 65px rgba(0,0,0,.72); }
+  .hype-v6-homebar.hype-home-nav-open > nav a { display:flex; align-items:center; min-height:44px; padding:10px 13px; text-align:left; }
+  .hype-v7-home-layout { display:block !important; width:100% !important; margin:0 auto !important; }
+  .hype-v7-home-sidebar { display:none !important; }
+  .hype-v6-home-main,.hype-v7-home-main { width:100% !important; padding:10px 12px 26px !important; }
+  .hype-v6-home-hero { min-width:0; padding:18px 12px !important; }
+  .hype-v6-home-hero .hype-v6-home-copy { min-width:0; }
+  .hype-v6-home-hero .hype-v6-home-art { max-width:100%; }
+  .hype-v6-home-cta { display:flex; flex-wrap:wrap; gap:8px; }
+  .hype-v6-home-cta > * { flex:1 1 150px; text-align:center; }
+  .hype-v18-slider-shell, .hype-v18-slider { min-width:0; }
+  .hype-v18-slider { scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
+  .hype-v18-slider > * { scroll-snap-align:start; }
+  .hype-v18-arrow { min-width:36px; min-height:44px; }
+  .modal-fundo .caixa-login, .hype-v6-login-box, .onboarding-card, .hgb-logout-dialog { width:min(94vw,480px) !important; max-width:calc(100vw - 20px) !important; max-height:calc(100dvh - 25px); overflow-y:auto; }
+  .breed-ref-picker-layout { min-width:0; }
+  .hype-breed-reference-page .breed-ref-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .hype-breed-reference-page #hypeQuickPokemonGrid { min-width:0; max-height:min(52dvh,480px) !important; overflow-y:auto !important; overscroll-behavior-y:contain; }
+  .hype-breed-reference-page #pokemon_results { max-height:min(42dvh,350px); overflow-y:auto; }
+  .breed-ref-search input { width:100%; min-width:0; }
+  .reino-v31-hero,.v28-finance-hero { min-width:0; }
+  .v28-fin-table-wrap { max-width:100%; -webkit-overflow-scrolling:touch; }
+  .v28-fin-table { min-width:950px; }
+  :where(.hype-v18-slider,.hgb-sidebar,.hype-mobile-table-scroll) { touch-action:pan-x pan-y; }
+  :where(.v26-panel,.hgb-main,.hype-v6-home-main,.dashboard-shell) pre { max-width:100%; white-space:pre-wrap; overflow-wrap:anywhere; }
+  :where(.hgb-main,.dashboard-shell,.hype-v6-home-main) iframe { max-width:100%; aspect-ratio:16/9; height:auto; }
+}
+@media (max-width: 600px) {
+  :root { --hype-touch:46px; }
+  .hgb-main { padding:10px 9px 22px !important; }
+  .dashboard-shell,.content-hub { padding-left:11px !important; padding-right:11px !important; }
+  :where(.dash-grid,.build-grid,.build-card-grid,.admin-shortcuts,.hype-v6-home-shortcuts) { grid-template-columns: minmax(0,1fr) !important; }
+  :where(.dash-welcome,.hype-v6-home-hero,.v28-finance-hero,.reino-v31-hero) { flex-direction:column; align-items:stretch; }
+  .hype-v6-home-art { max-height:230px; }
+  .hype-v6-home-art img { max-height:220px; object-fit:contain; }
+  .hype-v6-home-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+  .hype-v6-home-stats > * { min-width:0; }
+  .hype-v18-slider-shell .hype-v18-arrow { display:none; }
+  .hype-v18-slider { padding-bottom:12px; }
+  .hype-v18-slider > * { max-width:85vw; }
+  .hype-breed-reference-page #hypeQuickPokemonGrid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; max-height:min(49dvh,395px) !important; }
+  .hype-breed-reference-page .breed-ref-filters { grid-template-columns:minmax(0,1fr) !important; }
+  .hype-breed-reference-page .breed-ref-filters :where(select,button) { width:100%; }
+  .hype-breed-reference-page .breed-ref-poke-card { min-height:125px; }
+  .card-actions { display:flex; flex-wrap:wrap; gap:7px; }
+  .card-actions > a, .card-actions > button { flex:1 1 150px; }
+  .v28-commission { grid-template-columns:minmax(0,1fr) !important; }
+  .v28-commission-actions { grid-column:auto !important; }
+  .v28-finance-summary > span { min-width:0; }
+  .v28-fin-card,.v28-breeder-finance { padding:12px; }
+  .admin-v29-nav { padding:6px 8px; }
+}
+@media (hover:none) and (pointer:coarse) {
+  :where(button,select,a,input[type=checkbox],input[type=radio]) { touch-action:manipulation; }
+  button:active, a:active { filter:brightness(1.12); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .hgb-sidebar { transition:none !important; }
+  .hype-v18-slider { scroll-behavior:auto !important; }
+}
