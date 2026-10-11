@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciamento de Cargos - Clã</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3001">
-<link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3001"></head>
+<link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3001">  <link rel="stylesheet" href="{{url_for('static',filename='mobile_v36.css')}}?v=3601">
+</head>
 <body>{% include 'admin_v29_nav.html' %}
 
     <!-- CABEÇALHO DA PÁGINA -->
@@ -95,7 +96,7 @@
             </div>
 
             <!-- TABELA DE GERENCIAMENTO DE MEMBROS -->
-            <h2 style="color: #d4af37; font-size: 1.3rem; margin-top: 30px;">👥 Gerenciar Cargos dos Membros</h2>
+            <h2 style="color: #d4af37; font-size: 1.3rem; margin-top: 30px;">👥 Gerenciar Cargos e Aprovação de Membros</h2>
             
             <div class="tabela-responsive">
                 <table class="tabela-pedidos">
@@ -135,7 +136,7 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="4" class="tabela-vazia">Nenhum guerreiro cadastrado no clã ainda.</td>
+                                <td colspan="4" class="tabela-vazia">Nenhum usuário cadastrado ainda.</td>
                             </tr>
                         {% endif %}
                     </tbody>
@@ -148,5 +149,6 @@
         </div>
     </main>
 
+  <script src="{{url_for('static',filename='mobile_v36.js')}}?v=3601" defer></script>
 </body>
 </html>

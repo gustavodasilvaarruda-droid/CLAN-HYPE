@@ -27,7 +27,7 @@
     <button type="button" data-step="5"><b>5</b><span>Envio</span></button>
   </div>
 
-  {% if permissoes.get('pode_fazer_pedido_breed', True) %}
+  {% if permissoes.get('pode_fazer_pedido_breed', False) %}
   <form method="POST" id="breedForm" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="pokemon_id" id="pokemon_id">
 
@@ -135,7 +135,7 @@
       </div>
     </section>
   </form>
-  {% else %}<div class="breed-stage-card"><h2>Breed indisponível</h2><p>Seu cargo não possui permissão para fazer pedidos.</p></div>{% endif %}
+  {% else %}<div class="breed-stage-card"><h2>Breed indisponível</h2><p>Esta função requer permissão do clã. Se você acabou de se cadastrar, aguarde a aprovação de um administrador.</p></div>{% endif %}
 
   <nav class="hype-breed-subnav breed-ref-subnav"><a class="active" href="{{url_for('breed')}}">Fazer Pedido</a><a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}{% if 'breeder' in funcoes_usuario or permissoes.get('pode_assumir_breed') %}<a href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>{% endif %}<a href="{{url_for('team_breeders')}}">Team Breeders</a><a href="{{url_for('ranking_breed')}}">Ranking</a></nav>
 </div>
@@ -179,7 +179,7 @@ const seedCatalog=localCatalog();
 let fullCatalog=[...seedCatalog];
 let catalogReady=false;
 let catalogLoading=null;
-let visibleLimit=40;
+let visibleLimit=20;
 let currentQuery='';
 
 function spriteFor(id,artwork=true){
@@ -208,10 +208,12 @@ function attachImageFallbacks(root=document){
   root.querySelectorAll('img[data-fallback]').forEach(img=>{img.addEventListener('error',()=>{if(img.dataset.fallback&&img.src!==img.dataset.fallback){img.src=img.dataset.fallback;img.dataset.fallback=''}},{once:true})});
 }
 function paintPokemonGrid(found,limit=visibleLimit){
+  const previousScroll=quickGrid.scrollTop;
   const unique=uniquePokemon(found);
   if(!unique.length){quickGrid.innerHTML='<div class="breed-search-empty">Nenhum Pokémon encontrado.</div>';return 0}
   quickGrid.innerHTML=unique.slice(0,limit).map(cardHTML).join('');
   attachImageFallbacks(quickGrid); renderFavs();
+  quickGrid.scrollTop=previousScroll;
   return Math.min(unique.length,limit);
 }
 function paintSearchResults(found){
@@ -255,7 +257,7 @@ function matchesQuery(x,q){
   return clean(x.name).includes(clean(q))||clean(x.display_name).includes(clean(q));
 }
 async function searchPokemon(){
-  const q=search.value.trim(); currentQuery=q; visibleLimit=40;
+  const q=search.value.trim(); currentQuery=q; visibleLimit=q?40:20; quickGrid.scrollTop=0;
   if(!q){
     results.hidden=true;
     const catalog=await loadFullCatalog();
@@ -506,9 +508,16 @@ form.addEventListener('submit',e=>{
   search.value=selected.name; idInput.value=String(selected.id);
   const btn=form.querySelector('.breed-submit-final'); if(btn){btn.disabled=true;btn.textContent='Enviando pedido...'}
 });
-renderFavs(); updateIvs(); updateEvs(); updateExtraPriceAlerts(); loadFullCatalog().then(c=>{if(!search.value.trim()){paintPokemonGrid(c.length?c:seedCatalog,visibleLimit);setStatus(catalogReady?'Catálogo HYPE carregado. Role para ver mais Pokémon.':'Catálogo inicial carregado. Use a busca para encontrar Pokémon.')}});
-quickGrid.addEventListener('scroll',()=>{});
-window.addEventListener('scroll',()=>{if(currentQuery)return;const rect=quickGrid.getBoundingClientRect();if(rect.bottom<window.innerHeight+500&&fullCatalog.length>visibleLimit){visibleLimit+=40;paintPokemonGrid(fullCatalog,visibleLimit)}});
+renderFavs(); updateIvs(); updateEvs(); updateExtraPriceAlerts(); loadFullCatalog().then(c=>{if(!search.value.trim()){paintPokemonGrid(c.length?c:seedCatalog,visibleLimit);setStatus(catalogReady?'Catálogo HYPE carregado. Role DENTRO da lista para ver mais Pokémon.':'Catálogo inicial carregado. Use a busca para encontrar Pokémon.')}});
+// Paginação SOMENTE dentro do catálogo, nunca pela rolagem da página inteira.
+// Evita scroll infinito no Android, iPhone e WebView do aplicativo.
+quickGrid.addEventListener('scroll',()=>{
+  if(currentQuery || onlyFavorites || quickGrid.scrollHeight<=quickGrid.clientHeight)return;
+  if(quickGrid.scrollTop + quickGrid.clientHeight >= quickGrid.scrollHeight - 130 && fullCatalog.length > visibleLimit){
+    visibleLimit=Math.min(visibleLimit+20,fullCatalog.length);
+    paintPokemonGrid(fullCatalog,visibleLimit);
+  }
+},{passive:true});
 })();
 </script>
 {% endblock %}

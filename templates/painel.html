@@ -5,8 +5,8 @@
 <div class="hype-v6-page hype-v7-page">
   <section class="hype-v6-banner hype-v6-member-banner hype-v7-cinematic-banner">
     <div class="hype-v6-banner-copy">
-      <span class="hype-v6-kicker">CENTRAL DO MEMBRO</span>
-      <h1>PAINEL DO MEMBRO</h1>
+      <span class="hype-v6-kicker">{{"CENTRAL DO MEMBRO" if membro_hype else "CENTRAL DO VISITANTE"}}</span>
+      <h1>{{"PAINEL DO MEMBRO" if membro_hype else "PAINEL DO VISITANTE"}}</h1>
       <p>Bem-vindo de volta, <strong>{{nick_jogo}}</strong>. Acompanhe seus pedidos, eventos e tudo que acontece no Clã HYPE.</p>
     </div>
     <img src="{{url_for('static',filename='imagens/emblema_hype_novo.png')}}" alt="Emblema HYPE" aria-hidden="true">
@@ -20,7 +20,7 @@
       <div class="hype-v6-profile-copy">
         <span class="hype-v6-kicker">SEU PERFIL</span>
         <h2>{{nick_jogo}} {% if membro_hype %}<em>[HYPE]</em>{% endif %}</h2>
-        <p>{{usuario.bio or 'Guerreiro do Clã HYPE'}}</p>
+        <p>{{usuario.bio or ('Membro do Clã HYPE' if membro_hype else 'Visitante da comunidade HYPE • Aguardando aprovação do clã')}}</p>
         <div class="hype-v6-profile-meta"><span>{{cargo|replace('_',' ')|title}}</span>{% if usuario.pokemon_favorito %}<span>★ {{usuario.pokemon_favorito}}</span>{% endif %}</div>
       </div>
       <a class="hype-v6-btn secondary" href="{{url_for('perfil_publico',nick=nick_jogo)}}">Ver perfil</a>

@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070707">
 <title>Clã HYPE</title>
 <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3001"><link rel="manifest" href="{{url_for('expansion.manifest')}}">
+  <link rel="stylesheet" href="{{url_for('static',filename='mobile_v36.css')}}?v=3601">
 </head>
 <body class="builders-gold-ui hype-v6-home">
 <header class="hype-v6-homebar">
@@ -123,9 +124,10 @@
 let modoAtual='login';
 function abrirModal(modo='login'){document.getElementById('modalLogin').style.display='block';if(modo==='cadastro'&&modoAtual!=='cadastro')alternarModoModal();if(modo==='login'&&modoAtual!=='login')alternarModoModal();}
 function fecharModal(){document.getElementById('modalLogin').style.display='none';}
-function alternarModoModal(){const titulo=document.getElementById('tituloModal'),grupoNick=document.getElementById('grupoNick'),inputNick=document.getElementById('nick_jogo'),btn=document.getElementById('btnSubmitModal'),acao=document.getElementById('campoAcao'),texto=document.getElementById('textoAlternar'),link=document.getElementById('linkAlternar');if(modoAtual==='login'){modoAtual='cadastro';titulo.innerText='Criar Conta no Clã';grupoNick.style.display='block';inputNick.required=true;btn.innerText='Cadastrar Guerreiro';acao.value='cadastro';texto.innerText='Já possui uma conta?';link.innerText='Fazer Login';}else{modoAtual='login';titulo.innerText='Acesso ao Clã';grupoNick.style.display='none';inputNick.required=false;btn.innerText='Entrar';acao.value='login';texto.innerText='Não tem conta ainda?';link.innerText='Cadastre-se';}}
+function alternarModoModal(){const titulo=document.getElementById('tituloModal'),grupoNick=document.getElementById('grupoNick'),inputNick=document.getElementById('nick_jogo'),btn=document.getElementById('btnSubmitModal'),acao=document.getElementById('campoAcao'),texto=document.getElementById('textoAlternar'),link=document.getElementById('linkAlternar');if(modoAtual==='login'){modoAtual='cadastro';titulo.innerText='Criar conta HYPE (Visitante)';grupoNick.style.display='block';inputNick.required=true;btn.innerText='Criar Conta';acao.value='cadastro';texto.innerText='Já possui uma conta?';link.innerText='Fazer Login';}else{modoAtual='login';titulo.innerText='Acesso ao Clã';grupoNick.style.display='none';inputNick.required=false;btn.innerText='Entrar';acao.value='login';texto.innerText='Não tem conta ainda?';link.innerText='Cadastre-se';}}
 window.onclick=function(event){const modal=document.getElementById('modalLogin');if(event.target===modal)fecharModal();}
 (function(){const box=document.getElementById('guestOnboarding');if(box&&!localStorage.getItem('hype_guest_onboarding_v1'))box.style.display='flex';const close=()=>{if(box)box.style.display='none';localStorage.setItem('hype_guest_onboarding_v1','1');};const create=document.getElementById('guestCreate'),login=document.getElementById('guestLogin'),explore=document.getElementById('guestExplore');if(create)create.addEventListener('click',()=>{close();abrirModal('cadastro');});if(login)login.addEventListener('click',()=>{close();abrirModal('login');});if(explore)explore.addEventListener('click',close);if('serviceWorker' in navigator){navigator.serviceWorker.register('{{url_for('expansion.service_worker')}}').catch(()=>{});}})();
 document.querySelectorAll('.hype-v18-slider-shell').forEach((shell)=>{const track=shell.querySelector('[data-hype-slider]');const move=(dir)=>track.scrollBy({left:dir*Math.max(280,track.clientWidth*.78),behavior:'smooth'});shell.querySelector('.prev')?.addEventListener('click',()=>move(-1));shell.querySelector('.next')?.addEventListener('click',()=>move(1));});
 </script>
+  <script src="{{url_for('static',filename='mobile_v36.js')}}?v=3601" defer></script>
 </body></html>

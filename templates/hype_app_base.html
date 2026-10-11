@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#070707">
   <title>{% block title %}Clã HYPE{% endblock %}</title>
-  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3130">
+  <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3501">
   <link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3130">
   <link rel="stylesheet" href="{{url_for('static',filename='community_v30.css')}}?v=3130">
   <link rel="stylesheet" href="{{url_for('static',filename='reino_v31.css')}}?v=3130">
   <link rel="manifest" href="{{url_for('expansion.manifest')}}">
   {% block extra_head %}{% endblock %}
+  <link rel="stylesheet" href="{{url_for('static',filename='mobile_v36.css')}}?v=3601">
 </head>
 <body class="builders-gold-ui hype-core-ui {% block body_class %}{% endblock %}">
 <header class="hgb-topbar hype-core-topbar">
@@ -39,11 +40,11 @@
       <div class="hgb-account" id="hgbAccount">
         <button class="hgb-user" id="hgbAccountButton" type="button" aria-expanded="false" aria-haspopup="menu">
           <span class="hgb-avatar">{% if hype_header_user.avatar_url %}<img src="{{hype_header_user.avatar_url}}" alt="">{% else %}{{(session.get('nick_jogo') or 'H')[:1]|upper}}{% endif %}</span>
-          <span class="hgb-user-name">{{hype_header_user.nome_exibicao or session.get('nick_jogo') or 'Membro HYPE'}}</span>
+          <span class="hgb-user-name">{{hype_header_user.nome_exibicao or session.get('nick_jogo') or 'Visitante HYPE'}}</span>
           <span class="hgb-chevron">⌄</span>
         </button>
         <div class="hgb-account-menu" id="hgbAccountMenu" role="menu">
-          <div class="hgb-account-head"><b>{{session.get('nick_jogo') or 'Membro HYPE'}}</b><small>{{(hype_header_user.cargo or session.get('cargo') or 'membro')|replace('_',' ')|title}}</small></div>
+          <div class="hgb-account-head"><b>{{session.get('nick_jogo') or 'Visitante HYPE'}}</b><small>{{(hype_header_user.cargo or session.get('cargo') or 'visitante')|replace('_',' ')|title}}</small></div>
           <a href="{{url_for('perfil_publico',nick=session.get('nick_jogo'))}}"><span>♙</span>Meu Perfil</a>
           <a href="{{url_for('central_notificacoes')}}"><span>♢</span>Notificações{% if hype_notificacoes_nao_lidas %}<em>{{hype_notificacoes_nao_lidas}}</em>{% endif %}</a>
           <a href="{{url_for('conta_hype')}}"><span>⚙</span>Configurações</a>
@@ -137,5 +138,6 @@
 })();
 </script>
 {% block extra_scripts %}{% endblock %}
+  <script src="{{url_for('static',filename='mobile_v36.js')}}?v=3601" defer></script>
 </body>
 </html>

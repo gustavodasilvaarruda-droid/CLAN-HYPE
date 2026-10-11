@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3001">
   <link rel="stylesheet" href="{{url_for('static',filename='community_v30.css')}}?v=3001">
   {% block extra_head %}{% endblock %}
+  <link rel="stylesheet" href="{{url_for('static',filename='mobile_v36.css')}}?v=3601">
 </head>
 <body class="builders-gold-ui hype-core-ui">
 <header class="hgb-topbar hype-core-topbar">
@@ -63,4 +64,5 @@
 </div>
 <script>(()=>{const btn=document.getElementById('hgbMobileMenu'),side=document.getElementById('hgbSidebar');if(btn&&side)btn.addEventListener('click',()=>side.classList.toggle('open'));})();</script>
 {% block extra_scripts %}{% endblock %}
+  <script src="{{url_for('static',filename='mobile_v36.js')}}?v=3601" defer></script>
 </body></html>

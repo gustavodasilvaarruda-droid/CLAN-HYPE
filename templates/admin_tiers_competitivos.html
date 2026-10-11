@@ -4,7 +4,8 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin Tier List - HYPE</title>
   <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3001">
-<link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3001"></head>
+<link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3001">  <link rel="stylesheet" href="{{url_for('static',filename='mobile_v36.css')}}?v=3601">
+</head>
 <body class="hype-home builders-hub-page">{% include 'admin_v29_nav.html' %}
 <main class="dashboard-shell builders-shell">
   <div class="page-topline"><a class="smart-back" href="{{url_for('competitive.admin_pokedex_competitiva')}}">← Pokédex Competitiva</a><span>Admin › Tiers por formato</span></div>
@@ -59,4 +60,5 @@
     </div>
   </section>
 </main>
+  <script src="{{url_for('static',filename='mobile_v36.js')}}?v=3601" defer></script>
 </body></html>
