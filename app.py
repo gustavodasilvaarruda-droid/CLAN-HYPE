@@ -164,9 +164,16 @@ def obter_permissoes_usuario(email):
         if not res_usr.data:
             return {}
         
-        # Coleta o cargo com segurança do primeiro registro da lista
+        # O cargo, sozinho, NÃO comprova participação no Clã HYPE.
+        # Contas visitantes e usuários removidos não herdam permissões de membros.
         cargo_id = res_usr.data[0].get('cargo')
-        
+        if cargo_id == 'visitante':
+            # Visitantes podem comprar/solicitar Breed, mas não recebem
+            # nenhum privilégio exclusivo dos membros HYPE.
+            return {'pode_fazer_pedido_breed': True}
+        if not membro_hype_ativo(email):
+            return {}
+
         # CORREÇÃO: Removeu .single() para evitar falhas de cache
         res_perm = supabase.table('permissoes_cargos').select('*').eq('cargo_id', cargo_id).execute()
         return res_perm.data[0] if res_perm.data else {}
@@ -192,6 +199,9 @@ def membro_hype_ativo(email=None):
     if not email:
         return False
     try:
+        role_rows = supabase.table('usuarios_clan').select('cargo').eq('email',email).limit(1).execute().data or []
+        if not role_rows or role_rows[0].get('cargo') == 'visitante':
+            return False
         rows = supabase.table('membros_hype').select('ativo').eq('usuario_email', email).limit(1).execute().data or []
         return bool(rows and rows[0].get('ativo'))
     except Exception as e:
@@ -1826,16 +1836,23 @@ def login_membro():
                 'email': email,
                 'senha': senha_hash,
                 'nick_jogo': nick_jogo,
-                'cargo': 'membro'
+                'cargo': 'visitante'
+            }).execute()
+
+            # Registro explícito inativo: nem mesmo uma eventual reexecução do
+            # SQL antigo pode aprovar este visitante por um backfill histórico.
+            supabase.table('membros_hype').upsert({
+                'usuario_email': email, 'ativo': False,
+                'observacao': 'Cadastro público: aguardando aprovação do clã'
             }).execute()
 
             session.clear()
             session.permanent = True
             session['usuario_email'] = email
             session['nick_jogo'] = nick_jogo
-            session['cargo'] = 'membro'
+            session['cargo'] = 'visitante'
 
-            flash(f'Bem-vindo ao Clã, {nick_jogo}!', 'sucesso')
+            flash(f'Bem-vindo ao HYPE, {nick_jogo}! Sua conta é de visitante até a aprovação pelo clã.', 'sucesso')
             return redirect(url_for('painel'))
         except Exception as e:
             print(f'[cadastro] {e}')
@@ -1914,7 +1931,7 @@ def painel():
     notificacoes_nao_lidas = sum(not bool(n.get('lida')) for n in _safe_table('notificacoes', '*', usuario_email=email))
 
     membro_hype_rows = _safe_table('membros_hype', '*', usuario_email=email)
-    membro_hype = membro_hype_rows[0] if membro_hype_rows and membro_hype_rows[0].get('ativo') else None
+    membro_hype = membro_hype_rows[0] if usr.get('cargo') != 'visitante' and membro_hype_rows and membro_hype_rows[0].get('ativo') else None
 
     return render_template('painel.html', usuario=usr, nick_jogo=usr.get('nick_jogo', session.get('nick_jogo')),
         cargo=usr.get('cargo','membro'), pode_gerenciar=pode_gerenciar, permissoes=permissoes,
@@ -2001,7 +2018,7 @@ def perfil_publico(nick):
             links['youtube'] = ''
         membro['links_perfil'] = links
         mh = _safe_table('membros_hype', '*', usuario_email=email)
-        membro['membro_hype'] = bool(mh and mh[0].get('ativo'))
+        membro['membro_hype'] = bool(membro.get('cargo') != 'visitante' and mh and mh[0].get('ativo'))
         membro['membro_hype_desde'] = mh[0].get('entrou_em') if membro['membro_hype'] else None
         seguidores = _safe_table('comunidade_seguidores', 'seguidor_email', seguido_email=email)
         seguindo = _safe_table('comunidade_seguidores', 'seguido_email', seguidor_email=email)
@@ -3942,24 +3959,50 @@ def criar_novo_cargo():
 @app.route('/alterar-cargo/<path:email_usuario>', methods=['POST'])
 @login_required
 def alterar_cargo(email_usuario):
-    """Altera o cargo de um determinado membro do clã."""
+    """Somente um administrador pode promover visitantes a membros HYPE."""
     email = session.get('usuario_email')
-    permissoes = obter_permissoes_usuario(email)
-
-    if not permissoes or not permissoes.get('pode_gerenciar_cargos', False):
+    if not obter_permissoes_usuario(email).get('pode_gerenciar_cargos', False):
         flash('Acesso negado.', 'erro')
         return redirect(url_for('painel'))
 
-    novo_cargo = request.form.get('novo_cargo')
+    novo_cargo = (request.form.get('novo_cargo') or '').strip()
+    # Não confiar em IDs de cargos enviados pelo navegador.
+    if not novo_cargo or not _safe_table('cargos', 'id', id=novo_cargo):
+        flash('Cargo selecionado inválido.', 'erro')
+        return redirect(url_for('admin_cargos'))
+    if email_usuario == email and novo_cargo == 'visitante':
+        flash('Você não pode retirar suas próprias permissões administrativas.', 'erro')
+        return redirect(url_for('admin_cargos'))
 
+    existentes = _safe_table('usuarios_clan', 'email,cargo', email=email_usuario)
+    if not existentes:
+        flash('Usuário não encontrado.', 'erro')
+        return redirect(url_for('admin_cargos'))
+    cargo_anterior = existentes[0].get('cargo')
     try:
-        supabase.table('usuarios_clan').update({
-            'cargo': novo_cargo
-        }).eq('email', email_usuario).execute()
-
-        flash(f'Cargo do usuário atualizado para {novo_cargo.upper()}!', 'sucesso')
+        # Atualização coordenada das duas tabelas. Caso a segunda etapa falhe,
+        # restauramos o cargo para evitar promoção parcial e acesso acidental.
+        supabase.table('usuarios_clan').update({'cargo': novo_cargo}).eq('email', email_usuario).execute()
+        try:
+            hoje = datetime.now(timezone.utc).date().isoformat()
+            ativo = novo_cargo != 'visitante'
+            dados = {'usuario_email': email_usuario, 'ativo': ativo,
+                     'saiu_em': None if ativo else hoje,
+                     'observacao': f'Alteração administrativa de cargo: {cargo_anterior} → {novo_cargo}'}
+            mh_existente = _safe_table('membros_hype', 'usuario_email,ativo', usuario_email=email_usuario)
+            if ativo and (not mh_existente or not mh_existente[0].get('ativo')):
+                dados['entrou_em'] = hoje
+            supabase.table('membros_hype').upsert(dados).execute()
+        except Exception:
+            supabase.table('usuarios_clan').update({'cargo': cargo_anterior}).eq('email', email_usuario).execute()
+            raise
+        registrar_log('alterar_cargo', 'usuarios', 'usuario', email_usuario, {
+            'anterior': cargo_anterior, 'novo': novo_cargo, 'membro_hype': ativo})
+        flash(('Usuário confirmado como membro HYPE.' if ativo else 'Usuário alterado para visitante.') +
+              f' Cargo: {novo_cargo.replace("_", " ")}.', 'sucesso')
     except Exception as e:
-        flash(f'Erro ao atualizar cargo: {e}', 'erro')
+        print(f'[alterar_cargo] {e}')
+        flash('Não foi possível alterar o cargo. Verifique a configuração do banco.', 'erro')
 
     return redirect(url_for('admin_cargos'))
 
@@ -6874,9 +6917,12 @@ def admin_membros_hype():
         alvo = request.form.get('usuario_email','').strip()
         acao = request.form.get('acao','ativar')
         observacao = request.form.get('observacao','').strip()[:500] or None
-        usuarios = _safe_table('usuarios_clan','email,nick_jogo',email=alvo)
+        usuarios = _safe_table('usuarios_clan','email,nick_jogo,cargo',email=alvo)
         if not usuarios:
             flash('Usuário não encontrado.', 'erro')
+            return redirect(url_for('admin_membros_hype'))
+        if alvo == email and acao == 'desativar':
+            flash('Você não pode remover a própria conta administrativa do clã.', 'erro')
             return redirect(url_for('admin_membros_hype'))
         try:
             existente = _safe_table('membros_hype','*',usuario_email=alvo)
@@ -6892,6 +6938,7 @@ def admin_membros_hype():
                     supabase.table('contratos_lojas').update({'status':'encerrado','fim':hoje}).eq('usuario_email',alvo).eq('status','ativo').execute()
                     supabase.table('casas_reino').update({'ocupante_email':None,'status':'disponivel'}).eq('ocupante_email',alvo).execute()
                     supabase.table('lojas_reino').update({'dono_email':None,'status':'disponivel'}).eq('dono_email',alvo).execute()
+                supabase.table('usuarios_clan').update({'cargo':'visitante'}).eq('email',alvo).execute()
                 registrar_log('remover_membro_hype','membros','usuario',alvo,{'observacao':observacao})
                 registrar_atividade_reino('membro_hype_removido', email, f'Membro removido do clã: {usuarios[0].get("nick_jogo")}', 'membro')
                 flash('Membro removido do Clã HYPE. Moradias e lojas vinculadas foram liberadas sem apagar o histórico.', 'sucesso')
@@ -6900,8 +6947,11 @@ def admin_membros_hype():
                     'usuario_email': alvo, 'ativo': True,
                     'saiu_em': None, 'observacao': observacao
                 }
-                if not existente:
+                if not existente or not existente[0].get('ativo'):
                     dados['entrou_em'] = datetime.now(timezone.utc).date().isoformat()
+                # Aprovar um visitante também lhe dá o cargo inicial de membro.
+                if usuarios[0].get('cargo') == 'visitante':
+                    supabase.table('usuarios_clan').update({'cargo':'membro'}).eq('email',alvo).execute()
                 supabase.table('membros_hype').upsert(dados).execute()
                 registrar_log('adicionar_membro_hype','membros','usuario',alvo,{'observacao':observacao})
                 flash('Usuário confirmado como membro HYPE.', 'sucesso')
