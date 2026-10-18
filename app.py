@@ -73,6 +73,9 @@ def _destino_seguro_csrf():
 
 @app.before_request
 def proteger_csrf_global():
+    # API JSON autenticada por token, nao usa cookies/sessao web nem CSRF.
+    if request.path.startswith('/api/hype/v1/'):
+        return None
     if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
         return None
 
@@ -7450,6 +7453,14 @@ app.register_blueprint(create_community_blueprint(
     supabase, login_required, _safe_table, _is_admin, registrar_log, criar_notificacao
 ))
 
+
+# API HYPE Client R7 - leitura inicial, sem alterar fluxos do site.
+from modules.hype_client_api import create_hype_client_api_blueprint
+app.register_blueprint(create_hype_client_api_blueprint(
+    supabase, app.secret_key, obter_permissoes_usuario,
+    membro_hype_ativo, _login_guard_bloqueado,
+    _login_guard_falha, _login_guard_limpar
+))
 
 # ============================================================================
 # INICIALIZADOR DO SERVIDOR
