@@ -7454,6 +7454,12 @@ app.register_blueprint(create_community_blueprint(
 ))
 
 
+# HYPE Mods 2.0 - painel web de permissões, isolado do Breed.
+from modules.hype_mod_admin import create_hype_mod_admin_blueprint
+app.register_blueprint(create_hype_mod_admin_blueprint(
+    supabase, login_required, _is_admin, registrar_log
+))
+
 # API HYPE Client R7 - leitura inicial, sem alterar fluxos do site.
 from modules.hype_client_api import create_hype_client_api_blueprint
 app.register_blueprint(create_hype_client_api_blueprint(
