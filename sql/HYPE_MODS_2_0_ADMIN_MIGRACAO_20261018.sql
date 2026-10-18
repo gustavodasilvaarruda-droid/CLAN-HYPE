@@ -5,9 +5,10 @@
 -- Requer backend Flask usando uma chave Supabase PRIVADA (service role/secret);
 -- nunca inclua a chave de serviço no mod .jar ou no front-end.
 --
--- Nota de segurança: mantenha estas tabelas inacessíveis aos clientes anon.
--- Para bancos já configurados, não alteramos RLS/policies existentes
--- automaticamente para evitar interrupções não previstas.
+-- Segurança: as tabelas serão acessíveis APENAS ao backend com chave
+-- service_role/secret. Anon e authenticated não devem ler nem editar diretamente.
+-- IMPORTANTE: confirme antes que SUPABASE_KEY do Render é uma chave de serviço.
+-- A migração não modifica policies de outros sistemas nem tabelas de Breed.
 
 BEGIN;
 
@@ -67,6 +68,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS hype_modulos_acessos_modulo_usuario_uidx
     ON public.hype_modulos_acessos (modulo_codigo, usuario_email);
 CREATE INDEX IF NOT EXISTS hype_modulos_acessos_fim_idx
     ON public.hype_modulos_acessos (fim_em);
+
+-- O mod Minecraft usa a API Flask com token, NUNCA o Supabase diretamente.
+-- RLS + revogação de privilégios protegem permissões e e-mails.
+ALTER TABLE public.hype_modulos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hype_modulos_grupos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hype_modulos_acessos ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.hype_modulos FROM anon, authenticated;
+REVOKE ALL ON TABLE public.hype_modulos_grupos FROM anon, authenticated;
+REVOKE ALL ON TABLE public.hype_modulos_acessos FROM anon, authenticated;
 
 INSERT INTO public.hype_modulos
     (codigo, nome, descricao, icone, categoria, versao, estado, visivel, ordem)
