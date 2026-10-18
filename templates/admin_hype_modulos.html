@@ -1,0 +1,157 @@
+{% extends "hype_app_base.html" %}
+{% block title %}Gerenciador de Módulos | HYPE Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='hype_mod_admin.css') }}?v=1">
+<main class="hmod-wrap">
+  <header class="hmod-hero">
+    <div>
+      <span class="hmod-eyebrow">HYPE ADMIN • CONTROLE REMOTO</span>
+      <h1>Gerenciador de Módulos</h1>
+      <p>Controle global, permissões por cargo e concessões individuais com prazo configurável.</p>
+    </div>
+    <a class="hmod-link" href="{{ url_for('expansion.admin_dashboard') }}">← Voltar ao Admin</a>
+  </header>
+  <nav class="hmod-quick" aria-label="Navegação administrativa">
+    <a href="{{ url_for('admin_cargos') }}">Cargos do clã</a>
+    <a href="{{ url_for('admin_logs') }}">Auditoria</a>
+  </nav>
+  {% if erro %}
+  <div class="hmod-alert" role="alert">{{ erro }}</div>
+  {% endif %}
+  <div class="hmod-info">
+    <strong>Prioridade das regras:</strong> manutenção ou desligamento global sempre bloqueia o módulo.
+    Em um módulo ativo, o bloqueio ou liberação individual prevalece sobre o cargo enquanto estiver válido.
+    Sem permissão, o acesso fica negado. O cliente Minecraft precisa consultar a API para receber mudanças remotas.
+  </div>
+  {% if not modulos and not erro %}
+  <p class="hmod-empty">Nenhum módulo cadastrado. Execute a migração SQL ou cadastre um módulo na base.</p>
+  {% endif %}
+  <div class="hmod-list">
+  {% for m in modulos %}
+    {% set roles = grupos | selectattr('modulo_codigo', 'equalto', m.codigo) | map(attribute='cargo_id') | list %}
+    {% set overrides = acessos | selectattr('modulo_codigo', 'equalto', m.codigo) | list %}
+    <article class="hmod-card" id="modulo-{{ m.codigo }}">
+      <div class="hmod-heading">
+        <div>
+          <div class="hmod-kicker">{{ m.codigo }} {% if m.versao %}• v{{ m.versao }}{% endif %}</div>
+          <h2>{{ m.nome }}</h2>
+          <p>{{ m.descricao or 'Módulo HYPE' }}</p>
+        </div>
+        {% if m.estado == 'ativo' %}
+          <span class="hmod-state on">Ativo</span>
+        {% elif m.estado == 'manutencao' %}
+          <span class="hmod-state maintenance">Manutenção</span>
+        {% else %}
+          <span class="hmod-state off">Desativado</span>
+        {% endif %}
+      </div>
+
+      <form class="hmod-row hmod-state-form" method="post" action="{{ url_for('hype_mod_admin.estado', codigo=m.codigo) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Controle global
+          <select name="estado" aria-label="Estado de {{ m.nome }}">
+            <option value="ativo" {{ 'selected' if m.estado == 'ativo' }}>Ativo</option>
+            <option value="manutencao" {{ 'selected' if m.estado == 'manutencao' }}>Manutenção</option>
+            <option value="desativado" {{ 'selected' if m.estado == 'desativado' }}>Desativado</option>
+          </select>
+        </label>
+        <button class="hmod-btn primary" type="submit">Salvar estado</button>
+      </form>
+
+      <div class="hmod-columns">
+        <section class="hmod-section">
+          <h3>Permissões por cargo</h3>
+          <p>Permita ou remova o acesso de um grupo inteiro.</p>
+          <form method="post" class="hmod-role-form" action="{{ url_for('hype_mod_admin.cargo', codigo=m.codigo) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>Grupo ou cargo
+              <select name="cargo_id" required>
+                {% for c in grupos_virtuais + cargos %}
+                  <option value="{{ c.id }}">{{ c.nome_cargo or c.id }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="hmod-actions">
+              <button class="hmod-btn" type="submit" name="acao" value="permitir">Permitir</button>
+              <button class="hmod-btn ghost" type="submit" name="acao" value="remover">Remover</button>
+            </div>
+          </form>
+          <div class="hmod-chips">
+          {% for cargo in grupos_virtuais + cargos %}
+            {% if cargo.id in roles %}<span class="hmod-chip">{{ cargo.nome_cargo or cargo.id }}</span>{% endif %}
+          {% endfor %}
+          {% if not roles %}<span class="hmod-muted">Nenhum cargo liberado.</span>{% endif %}
+          </div>
+        </section>
+
+        <section class="hmod-section">
+          <h3>Permissão individual ou temporária</h3>
+          <p>Conceda ou bloqueie o acesso de um jogador. Uma nova definição renova ou substitui a anterior.</p>
+          <form method="post" class="hmod-access-form" action="{{ url_for('hype_mod_admin.usuario', codigo=m.codigo) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>E-mail da conta HYPE
+              <input type="email" name="usuario_email" required maxlength="254" placeholder="jogador@exemplo.com" autocomplete="off">
+            </label>
+            <label>Decisão
+              <select name="decisao">
+                <option value="permitir">Liberar acesso</option>
+                <option value="bloquear">Bloquear acesso</option>
+              </select>
+            </label>
+            <label>Começa em (Brasília, opcional)
+              <input type="datetime-local" name="inicio_em">
+            </label>
+            <div class="hmod-duration">
+              <label>Duração
+                <select name="duracao" class="hmod-duration-select">
+                  <option value="sem_prazo">Sem prazo final</option>
+                  <option value="horas">Horas</option>
+                  <option value="dias">Dias</option>
+                  <option value="semanas">Semanas</option>
+                  <option value="meses">Meses de calendário</option>
+                  <option value="intervalo">Data de término exata</option>
+                </select>
+              </label>
+              <label>Quantidade
+                <input type="number" min="1" max="87600" step="1" name="quantidade" placeholder="Ex.: 7">
+              </label>
+            </div>
+            <label>Termina em (Brasília, para término exato)
+              <input type="datetime-local" name="fim_em">
+            </label>
+            <button class="hmod-btn primary" type="submit">Salvar permissão</button>
+          </form>
+        </section>
+      </div>
+      <details class="hmod-current">
+        <summary>Ver permissões individuais cadastradas ({{ overrides|length }})</summary>
+        <div class="hmod-table-wrap">
+          <table>
+            <thead><tr><th>Usuário</th><th>Decisão</th><th>Início</th><th>Término</th><th>Ação</th></tr></thead>
+            <tbody>
+              {% for a in overrides %}
+              <tr>
+                <td>{{ a.usuario_email }}</td>
+                <td>{{ 'Liberado' if a.decisao == 'permitir' else 'Bloqueado' }}{% if a.expirado %} • Expirado{% endif %}</td>
+                <td>{{ a.inicio_em|data_br if a.inicio_em else '—' }}</td>
+                <td>{{ a.fim_em|data_br if a.fim_em else 'Sem prazo' }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('hype_mod_admin.remover_usuario', codigo=m.codigo) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="usuario_email" value="{{ a.usuario_email }}">
+                    <button class="hmod-btn danger" type="submit">Encerrar</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5">Nenhuma permissão individual.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </article>
+  {% endfor %}
+  </div>
+</main>
+{% endblock %}
