@@ -1,12 +1,34 @@
-"""HYPE Client R7 read-only API. Never pass Supabase keys to Minecraft."""
+"""HYPE Client R7 API: account data and revocable persistent login.
+
+Never send Supabase keys to Minecraft. Only return public profile details.
+"""
 from datetime import datetime, timezone, timedelta
 from functools import wraps
+import hashlib
+import logging
+import secrets
 from flask import Blueprint, jsonify, request, g
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash
 
 SALT = 'hype-client-api-v1'
-TOKEN_TTL = 60 * 60 * 4
+TOKEN_TTL = 60 * 60 * 4  # Tokens antigos do R7 continuam aceitos por 4 horas.
+SESSION_IDLE_DAYS = 180  # Sessao persistente renovada enquanto o jogador usa o mod.
+SESSION_RENEW_AFTER = timedelta(hours=24)
+LOGGER = logging.getLogger(__name__)
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
+
+
+def _date_from_db(value):
+    dt = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def _session_hash(token):
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
 
 
 def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
@@ -22,7 +44,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         member = bool(is_member(email))
         perms = get_permissions(email) or {}
         return {'nick': user.get('nick_jogo') or '', 'cargo': user.get('cargo') or '',
-                'membro_hype': member,
+                'avatar_url': user.get('avatar_url') or '', 'membro_hype': member,
                 'permissoes': {k: bool(v) for k, v in perms.items() if k.startswith('pode_')}}
 
     def secure(fn):
@@ -31,18 +53,58 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             header = request.headers.get('Authorization', '')
             if not header.startswith('Bearer '):
                 return fail('Autenticacao necessaria.', 401)
+            token = header[7:].strip()
+            if not token or len(token) > 512:
+                return fail('Token invalido.', 401)
+
+            g.hype_session_id = None
             try:
-                identity = serializer.loads(header[7:].strip(), max_age=TOKEN_TTL)
-                email = identity.get('email') if isinstance(identity, dict) else None
-                if not email:
-                    return fail('Token invalido.', 401)
-                users = db.table('usuarios_clan').select('email,nick_jogo,cargo').eq('email', email).limit(1).execute().data or []
+                if token.startswith('hcs_'):
+                    # Token aleatorio persistente: apenas SHA-256 fica no banco.
+                    sessions = (db.table('hype_client_sessoes')
+                                .select('id,usuario_email,ultimo_uso_em,expira_em')
+                                .eq('token_hash', _session_hash(token))
+                                .is_('revogado_em', 'null')
+                                .limit(1).execute().data or [])
+                    if not sessions:
+                        return fail('Sessao encerrada ou invalida.', 401)
+                    entry = sessions[0]
+                    now = _utcnow()
+                    if _date_from_db(entry['expira_em']) <= now:
+                        return fail('Sessao expirada por inatividade. Entre novamente.', 401)
+                    email = entry['usuario_email']
+                    g.hype_session_id = entry['id']
+                else:
+                    # Compatibilidade com os .jar R7 antigos (4 horas).
+                    identity = serializer.loads(token, max_age=TOKEN_TTL)
+                    email = identity.get('email') if isinstance(identity, dict) else None
+                    if not email:
+                        return fail('Token invalido.', 401)
+
+                users = (db.table('usuarios_clan')
+                         .select('email,nick_jogo,cargo,avatar_url')
+                         .eq('email', email).limit(1).execute().data or [])
                 if not users:
                     return fail('Conta indisponivel.', 401)
                 g.hype_user = users[0]
+
+                if g.hype_session_id:
+                    # Prorroga a sessao no servidor no maximo uma vez por dia.
+                    last_used = _date_from_db(entry['ultimo_uso_em'])
+                    if now - last_used >= SESSION_RENEW_AFTER:
+                        try:
+                            (db.table('hype_client_sessoes')
+                             .update({'ultimo_uso_em': now.isoformat(),
+                                      'expira_em': (now + timedelta(days=SESSION_IDLE_DAYS)).isoformat()})
+                             .eq('id', g.hype_session_id).execute())
+                        except Exception:
+                            LOGGER.exception('Nao foi possivel renovar sessao do HYPE Client.')
             except (BadSignature, SignatureExpired):
                 return fail('Sessao expirada ou invalida.', 401)
+            except (ValueError, TypeError, KeyError):
+                return fail('Sessao invalida.', 401)
             except Exception:
+                LOGGER.exception('Erro de autenticacao na API HYPE Client.')
                 return fail('Falha ao consultar conta.', 503)
             return fn(*args, **kwargs)
         return decorated
@@ -69,14 +131,30 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         try:
             if login_blocked(email):
                 return fail('Muitas tentativas. Aguarde e tente novamente.', 429)
-            rows = db.table('usuarios_clan').select('email,senha,nick_jogo,cargo').eq('email', email).limit(1).execute().data or []
+            rows = db.table('usuarios_clan').select('email,senha,nick_jogo,cargo,avatar_url').eq('email', email).limit(1).execute().data or []
             if not rows or not check_password_hash(rows[0]['senha'], password):
                 login_fail(email)
                 return fail('Email ou senha incorretos.', 401)
             login_clear(email)
             user = rows[0]
             token = serializer.dumps({'email': user['email']})
+            session_token = None
+            try:
+                # Token persistente e revogavel para clientes novos.
+                # Se a migracao ainda nao foi executada, o login R7 legado continua funcionando.
+                generated = 'hcs_' + secrets.token_urlsafe(48)
+                (db.table('hype_client_sessoes')
+                 .insert({'usuario_email': user['email'],
+                          'token_hash': _session_hash(generated),
+                          'expira_em': (_utcnow() + timedelta(days=SESSION_IDLE_DAYS)).isoformat()})
+                 .execute())
+                session_token = generated
+            except Exception:
+                LOGGER.warning('Sessao persistente indisponivel; verificar migracao SQL HYPE Client R7.')
             return jsonify({'ok': True, 'token': token, 'expira_em_segundos': TOKEN_TTL,
+                            'session_token': session_token,
+                            'sessao_persistente': bool(session_token),
+                            'expira_por_inatividade_em_dias': SESSION_IDLE_DAYS if session_token else None,
                             'usuario': safe_profile(user)})
         except Exception:
             return fail('Servico de autenticacao temporariamente indisponivel.', 503)
@@ -84,7 +162,25 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
     @api.get('/me')
     @secure
     def me():
-        return jsonify({'ok': True, 'usuario': safe_profile(g.hype_user)})
+        return jsonify({'ok': True, 'usuario': safe_profile(g.hype_user),
+                        'sessao_persistente': bool(g.hype_session_id)})
+
+    @api.post('/logout')
+    @secure
+    def logout():
+        # O logout revoga o token persistente no servidor.
+        # Tokens legados de 4 horas nao possuem id revogavel.
+        if not g.hype_session_id:
+            return fail('Atualize o HYPE Client para encerrar a sessao persistente.', 400)
+        try:
+            (db.table('hype_client_sessoes')
+             .update({'revogado_em': _utcnow().isoformat()})
+             .eq('id', g.hype_session_id)
+             .eq('usuario_email', g.hype_user['email']).execute())
+            return jsonify({'ok': True, 'mensagem': 'Sessao encerrada.'})
+        except Exception:
+            LOGGER.exception('Falha ao revogar sessao HYPE Client.')
+            return fail('Nao foi possivel sair da conta no momento.', 503)
 
     FIELDS = ('id','pokemon','pokemon_id','nature','ha','genero','breed_tipo','iv_descartado',
               'status','preco_total','created_at','assumido_em','concluido_em','entregue_em',
