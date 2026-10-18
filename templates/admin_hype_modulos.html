@@ -67,7 +67,9 @@
             <label>Grupo ou cargo
               <select name="cargo_id" required>
                 {% for c in grupos_virtuais + cargos %}
+                  {% if c in grupos_virtuais or c.id not in ['membro', 'membro_hype'] %}
                   <option value="{{ c.id }}">{{ c.nome_cargo or c.id }}</option>
+                  {% endif %}
                 {% endfor %}
               </select>
             </label>
