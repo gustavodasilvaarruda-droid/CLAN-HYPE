@@ -4,6 +4,7 @@ from functools import wraps
 from flask import Blueprint, jsonify, request, g
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash
+from modules.hype_mod_access import visible_modules_for_user
 
 SALT = 'hype-client-api-v1'
 TOKEN_TTL = 60 * 60 * 4
@@ -168,5 +169,26 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             return jsonify({'ok':True,'mes':month.strftime('%Y-%m'),'ranking':result[:50]})
         except Exception:
             return fail('Nao foi possivel calcular o ranking.',503)
+
+    @api.get('/modulos')
+    @secure
+    def modulos():
+        try:
+            modules = (db.table('hype_modulos')
+                       .select('codigo,nome,descricao,icone,categoria,versao,estado,visivel,ordem')
+                       .order('ordem').limit(200).execute().data or [])
+            groups = (db.table('hype_modulos_grupos')
+                      .select('modulo_codigo,cargo_id').limit(2000).execute().data or [])
+            overrides = (db.table('hype_modulos_acessos')
+                         .select('modulo_codigo,decisao,inicio_em,fim_em')
+                         .eq('usuario_email', g.hype_user['email'])
+                         .limit(1000).execute().data or [])
+            result = visible_modules_for_user(
+                modules, groups, overrides,
+                g.hype_user.get('cargo'), bool(is_member(g.hype_user['email']))
+            )
+            return jsonify({'ok': True, 'modulos': result})
+        except Exception:
+            return fail('Nao foi possivel validar o acesso aos modulos.', 503)
 
     return api
