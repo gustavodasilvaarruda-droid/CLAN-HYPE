@@ -89,4 +89,23 @@ class TestPermissions(unittest.TestCase):
         self.assertEqual(user_groups('breeder', False), {'membro'})
         self.assertEqual(user_groups('breeder', True), {'membro','membro_hype','breeder'})
 
+
+    def test_clan_only_cannot_be_granted_to_basic_member_by_override(self):
+        access = [{'modulo_codigo':'clan','decisao':'permitir',
+                   'inicio_em':'2026-10-01T00:00:00Z'}]
+        rows = visible_modules_for_user(
+            [{'codigo':'clan','estado':'ativo'}],
+            [{'modulo_codigo':'clan','cargo_id':'membro_hype'}],
+            access, 'membro', False, NOW)
+        self.assertEqual(rows[0]['motivo'], 'exclusivo_cla')
+        self.assertFalse(rows[0]['permitido'])
+
+    def test_member_only_override_can_apply_to_approved_member(self):
+        access = [{'modulo_codigo':'basic','decisao':'permitir',
+                   'inicio_em':'2026-10-01T00:00:00Z'}]
+        rows = visible_modules_for_user(
+            [{'codigo':'basic','estado':'ativo'}],
+            [], access, 'membro', False, NOW)
+        self.assertTrue(rows[0]['permitido'])
+
 if __name__=='__main__': unittest.main()
