@@ -48,6 +48,37 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             return fn(*args, **kwargs)
         return decorated
 
+    def require_module(module_code):
+        """Check access on the server for each protected read, never trust the GUI."""
+        def decorator(fn):
+            @wraps(fn)
+            def decorated(*args, **kwargs):
+                try:
+                    modules = (db.table('hype_modulos')
+                               .select('codigo,nome,estado,visivel')
+                               .eq('codigo', module_code).limit(1).execute().data or [])
+                    if not modules:
+                        return fail('Modulo nao disponivel.', 403)
+                    assignments = (db.table('hype_modulos_grupos')
+                                   .select('modulo_codigo,cargo_id')
+                                   .eq('modulo_codigo', module_code).limit(500).execute().data or [])
+                    overrides = (db.table('hype_modulos_acessos')
+                                 .select('modulo_codigo,decisao,inicio_em,fim_em')
+                                 .eq('modulo_codigo', module_code)
+                                 .eq('usuario_email', g.hype_user['email'])
+                                 .limit(1).execute().data or [])
+                    decisions = visible_modules_for_user(
+                        modules, assignments, overrides,
+                        g.hype_user.get('cargo'), bool(is_member(g.hype_user['email']))
+                    )
+                    if not decisions or not decisions[0]['permitido']:
+                        return fail('Modulo bloqueado ou sem permissao.', 403)
+                except Exception:
+                    return fail('Nao foi possivel validar o acesso ao modulo.', 503)
+                return fn(*args, **kwargs)
+            return decorated
+        return decorator
+
     @api.after_request
     def no_store(response):
         response.headers['Cache-Control'] = 'no-store, private'
@@ -98,6 +129,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     @api.get('/meus-pedidos')
     @secure
+    @require_module('breeder')
     def mine():
         try:
             rows = db.table('pedidos_breed').select(','.join(FIELDS)).eq('usuario_email',g.hype_user['email']).order('created_at',desc=True).limit(100).execute().data or []
@@ -107,6 +139,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     @api.get('/fila')
     @secure
+    @require_module('breeder')
     def queue():
         perms = get_permissions(g.hype_user['email']) or {}
         if not (perms.get('pode_ver_fila_breed') or perms.get('pode_assumir_breed')):
@@ -119,6 +152,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     @api.get('/painel-breeder')
     @secure
+    @require_module('breeder')
     def breeder():
         perms = get_permissions(g.hype_user['email']) or {}
         if not (perms.get('pode_assumir_breed') or perms.get('pode_concluir_breed')):
@@ -131,6 +165,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     @api.get('/team-breeders')
     @secure
+    @require_module('breeder')
     def team():
         try:
             members = db.table('usuarios_funcoes').select('usuario_email').eq('funcao','breeder').limit(500).execute().data or []
@@ -148,6 +183,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     @api.get('/ranking')
     @secure
+    @require_module('breeder')
     def ranking():
         try:
             now=datetime.now(timezone.utc)
