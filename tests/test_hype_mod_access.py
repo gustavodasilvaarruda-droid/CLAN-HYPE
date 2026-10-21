@@ -46,4 +46,47 @@ class TestPermissions(unittest.TestCase):
         rows=visible_modules_for_user([{'codigo':'ai','estado':'ativo'}],[{'modulo_codigo':'ai','cargo_id':'membro_hype'}],[], 'membro',True,NOW)
         self.assertTrue(rows[0]['permitido'])
 
+
+    def test_signup_visitor_has_no_groups(self):
+        self.assertEqual(user_groups('visitante', False), set())
+        self.assertEqual(user_groups(None, True), set())
+
+    def test_visitor_cannot_use_module_even_with_individual_grant(self):
+        rows = visible_modules_for_user(
+            [{'codigo':'breeder','estado':'ativo','visivel':True}],
+            [{'modulo_codigo':'breeder','cargo_id':'membro'}],
+            [{'modulo_codigo':'breeder','decisao':'permitir','inicio_em':'2026-10-01T00:00:00Z'}],
+            'visitante', False, NOW)
+        self.assertFalse(rows[0]['permitido'])
+        self.assertEqual(rows[0]['motivo'], 'conta_sem_aprovacao')
+
+    def test_basic_member_only_uses_basic_modules(self):
+        modules = [
+            {'codigo':'basico','estado':'ativo'},
+            {'codigo':'clan','estado':'ativo'}
+        ]
+        assignments = [
+            {'modulo_codigo':'basico','cargo_id':'membro'},
+            {'modulo_codigo':'clan','cargo_id':'membro_hype'}
+        ]
+        decisions = visible_modules_for_user(modules, assignments, [], 'membro', False, NOW)
+        self.assertTrue(decisions[0]['permitido'])
+        self.assertFalse(decisions[1]['permitido'])
+
+    def test_hype_member_uses_basic_and_clan_modules(self):
+        modules = [
+            {'codigo':'basico','estado':'ativo'},
+            {'codigo':'clan','estado':'ativo'}
+        ]
+        assignments = [
+            {'modulo_codigo':'basico','cargo_id':'membro'},
+            {'modulo_codigo':'clan','cargo_id':'membro_hype'}
+        ]
+        decisions = visible_modules_for_user(modules, assignments, [], 'membro', True, NOW)
+        self.assertTrue(all(d['permitido'] for d in decisions))
+
+    def test_specialty_cargo_needs_clan_membership(self):
+        self.assertEqual(user_groups('breeder', False), {'membro'})
+        self.assertEqual(user_groups('breeder', True), {'membro','membro_hype','breeder'})
+
 if __name__=='__main__': unittest.main()
