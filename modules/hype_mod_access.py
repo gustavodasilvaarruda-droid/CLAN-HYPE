@@ -34,12 +34,17 @@ def _active_override(override, now):
 
 
 def user_groups(cargo, member):
-    """All registered accounts are 'membro'; specialty roles need active clan membership."""
+    """Separate basic members from active members of the HYPE clan.
+
+    A public signup has cargo='visitante' and cannot use HYPE modules.
+    The basic 'membro' grant requires a non-visitor role. The exclusive
+    'membro_hype' group (and specialty roles) requires active clan status.
+    """
+    if not cargo or str(cargo) == 'visitante':
+        return set()
     groups = {'membro'}
     if member:
-        groups.add('membro_hype')
-        if cargo:
-            groups.add(str(cargo))
+        groups.update(('membro_hype', str(cargo)))
     return groups
 
 
@@ -74,7 +79,9 @@ def visible_modules_for_user(modules, assignments, overrides, cargo, member, now
         code = row.get('codigo')
         if not code:
             continue
-        decision = evaluate_module(row, groups, by_mod.get(code, ()), by_override.get(code), now)
+        # Individual overrides never approve a public visitor implicitly.
+        decision = (evaluate_module(row, groups, by_mod.get(code, ()), by_override.get(code), now)
+                    if groups else {'permitido': False, 'motivo': 'conta_sem_aprovacao'})
         response.append({
             'codigo': code, 'nome': row.get('nome') or code,
             'descricao': row.get('descricao') or '',
