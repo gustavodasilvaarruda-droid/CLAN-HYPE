@@ -79,9 +79,17 @@ def visible_modules_for_user(modules, assignments, overrides, cargo, member, now
         code = row.get('codigo')
         if not code:
             continue
-        # Individual overrides never approve a public visitor implicitly.
-        decision = (evaluate_module(row, groups, by_mod.get(code, ()), by_override.get(code), now)
-                    if groups else {'permitido': False, 'motivo': 'conta_sem_aprovacao'})
+        # Public visitors do not obtain module permissions, even through a
+        # manual override. Modules granted only to membro_hype cannot be
+        # accessed by basic members, including via individual overrides.
+        roles = by_mod.get(code, ())
+        clan_only = 'membro_hype' in roles and 'membro' not in roles
+        if not groups:
+            decision = {'permitido': False, 'motivo': 'conta_sem_aprovacao'}
+        elif clan_only and not member:
+            decision = {'permitido': False, 'motivo': 'exclusivo_cla'}
+        else:
+            decision = evaluate_module(row, groups, roles, by_override.get(code), now)
         response.append({
             'codigo': code, 'nome': row.get('nome') or code,
             'descricao': row.get('descricao') or '',
