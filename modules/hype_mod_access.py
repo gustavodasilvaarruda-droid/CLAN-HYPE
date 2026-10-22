@@ -34,17 +34,16 @@ def _active_override(override, now):
 
 
 def user_groups(cargo, member):
-    """Separate basic members from active members of the HYPE clan.
+    """Any registered account inherits basic virtual group 'membro'.
 
-    A public signup has cargo='visitante' and cannot use HYPE modules.
-    The basic 'membro' grant requires a non-visitor role. The exclusive
-    'membro_hype' group (and specialty roles) requires active clan status.
+    Clan-only group membro_hype and specialty roles require active membership.
+    The database cargo 'visitante' does NOT restrict basic modules.
     """
-    if not cargo or str(cargo) == 'visitante':
-        return set()
     groups = {'membro'}
     if member:
-        groups.update(('membro_hype', str(cargo)))
+        groups.add('membro_hype')
+        if cargo and str(cargo) != 'visitante':
+            groups.add(str(cargo))
     return groups
 
 
@@ -79,14 +78,11 @@ def visible_modules_for_user(modules, assignments, overrides, cargo, member, now
         code = row.get('codigo')
         if not code:
             continue
-        # Public visitors do not obtain module permissions, even through a
-        # manual override. Modules granted only to membro_hype cannot be
-        # accessed by basic members, including via individual overrides.
+        # Clan-exclusive modules require active HYPE membership, independent
+        # from the user's virtual basic 'membro' group.
         roles = by_mod.get(code, ())
         clan_only = 'membro_hype' in roles and 'membro' not in roles
-        if not groups:
-            decision = {'permitido': False, 'motivo': 'conta_sem_aprovacao'}
-        elif clan_only and not member:
+        if clan_only and not member:
             decision = {'permitido': False, 'motivo': 'exclusivo_cla'}
         else:
             decision = evaluate_module(row, groups, roles, by_override.get(code), now)
