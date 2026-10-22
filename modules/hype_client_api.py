@@ -129,7 +129,6 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     @api.get('/meus-pedidos')
     @secure
-    @require_module('breeder')
     def mine():
         try:
             rows = db.table('pedidos_breed').select(','.join(FIELDS)).eq('usuario_email',g.hype_user['email']).order('created_at',desc=True).limit(100).execute().data or []
@@ -165,7 +164,6 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     @api.get('/team-breeders')
     @secure
-    @require_module('breeder')
     def team():
         try:
             members = db.table('usuarios_funcoes').select('usuario_email').eq('funcao','breeder').limit(500).execute().data or []
@@ -183,7 +181,6 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     @api.get('/ranking')
     @secure
-    @require_module('breeder')
     def ranking():
         try:
             now=datetime.now(timezone.utc)
