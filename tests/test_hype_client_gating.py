@@ -65,7 +65,8 @@ class TestApiModuleGate(unittest.TestCase):
         self.db = Database()
         self.app = Flask(__name__)
         self.app.register_blueprint(create_hype_client_api_blueprint(
-            self.db, 'test-secret', lambda _: {},
+            self.db, 'test-secret', lambda email: {'pode_ver_fila_breed': email == 'hype@example.com',
+                           'pode_assumir_breed': email == 'hype@example.com'},
             lambda email: email == 'hype@example.com',
             lambda _: False, lambda _: None, lambda _: None))
         self.client = self.app.test_client()
@@ -80,8 +81,13 @@ class TestApiModuleGate(unittest.TestCase):
         response = self.client.get('/api/hype/v1/meus-pedidos')
         self.assertEqual(response.status_code, 401)
 
-    def test_visitor_denied_even_if_basic_group_is_allowed(self):
+    def test_visitor_can_read_own_orders_even_without_module(self):
         response = self.client.get('/api/hype/v1/meus-pedidos',
+                                   headers=self.bearer('visitor@example.com'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_visitor_queue_is_denied(self):
+        response = self.client.get('/api/hype/v1/fila',
                                    headers=self.bearer('visitor@example.com'))
         self.assertEqual(response.status_code, 403)
 
@@ -92,13 +98,13 @@ class TestApiModuleGate(unittest.TestCase):
 
     def test_basic_member_cannot_access_hype_exclusive_module(self):
         self.db.grants = [{'modulo_codigo':'breeder','cargo_id':'membro_hype'}]
-        response = self.client.get('/api/hype/v1/meus-pedidos',
+        response = self.client.get('/api/hype/v1/fila',
                                    headers=self.bearer('member@example.com'))
         self.assertEqual(response.status_code, 403)
 
     def test_hype_member_can_access_hype_exclusive_module(self):
         self.db.grants = [{'modulo_codigo':'breeder','cargo_id':'membro_hype'}]
-        response = self.client.get('/api/hype/v1/meus-pedidos',
+        response = self.client.get('/api/hype/v1/fila',
                                    headers=self.bearer('hype@example.com'))
         self.assertEqual(response.status_code, 200)
 
@@ -110,7 +116,7 @@ class TestApiModuleGate(unittest.TestCase):
                 return Query([{'codigo':'breeder','estado':'desativado','visivel':True}])
             return original(name)
         self.db.table = disabled_table
-        response = self.client.get('/api/hype/v1/meus-pedidos',
+        response = self.client.get('/api/hype/v1/fila',
                                    headers=self.bearer('hype@example.com'))
         self.assertEqual(response.status_code, 403)
 
@@ -121,7 +127,7 @@ class TestApiModuleGate(unittest.TestCase):
                 return Query([{'codigo':'breeder','estado':'manutencao','visivel':True}])
             return original(name)
         self.db.table = maintenance_table
-        response = self.client.get('/api/hype/v1/meus-pedidos',
+        response = self.client.get('/api/hype/v1/fila',
                                    headers=self.bearer('hype@example.com'))
         self.assertEqual(response.status_code, 403)
 
