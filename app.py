@@ -175,7 +175,9 @@ def obter_permissoes_usuario(email):
             # nenhum privilégio exclusivo dos membros HYPE.
             return {'pode_fazer_pedido_breed': True}
         if not membro_hype_ativo(email):
-            return {}
+            # Contas aprovadas como membros basicos tambem podem comprar Breed.
+            # A autorizacao HYPE nao e requisito para solicitar um pedido.
+            return {'pode_fazer_pedido_breed': True}
 
         # CORREÇÃO: Removeu .single() para evitar falhas de cache
         res_perm = supabase.table('permissoes_cargos').select('*').eq('cargo_id', cargo_id).execute()
