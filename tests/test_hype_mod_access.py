@@ -47,18 +47,18 @@ class TestPermissions(unittest.TestCase):
         self.assertTrue(rows[0]['permitido'])
 
 
-    def test_signup_visitor_has_no_groups(self):
-        self.assertEqual(user_groups('visitante', False), set())
-        self.assertEqual(user_groups(None, True), set())
+    def test_registered_visitor_inherits_member_group(self):
+        self.assertEqual(user_groups('visitante', False), {'membro'})
+        self.assertEqual(user_groups(None, False), {'membro'})
 
-    def test_visitor_cannot_use_module_even_with_individual_grant(self):
+    def test_registered_visitor_can_use_member_module(self):
         rows = visible_modules_for_user(
             [{'codigo':'breeder','estado':'ativo','visivel':True}],
             [{'modulo_codigo':'breeder','cargo_id':'membro'}],
             [{'modulo_codigo':'breeder','decisao':'permitir','inicio_em':'2026-10-01T00:00:00Z'}],
             'visitante', False, NOW)
-        self.assertFalse(rows[0]['permitido'])
-        self.assertEqual(rows[0]['motivo'], 'conta_sem_aprovacao')
+        self.assertTrue(rows[0]['permitido'])
+        self.assertEqual(rows[0]['motivo'], 'liberacao_individual')
 
     def test_basic_member_only_uses_basic_modules(self):
         modules = [
