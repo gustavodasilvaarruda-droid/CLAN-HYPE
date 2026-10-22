@@ -6,7 +6,7 @@ Esta atualização separa **cadastro**, **membro básico** e **integrante do Cl�
 
 | Conta | Cargo em usuarios_clan | membros_hype.ativo | Grupos disponíveis |
 |---|---|---|---|
-| Cadastro novo | visitante | false | nenhum |
+| Cadastro novo | visitante | false | nenhum módulo exclusivo; Breed pedido e Meus Pedidos disponíveis após login |
 | Membro básico aprovado | membro | false | membro |
 | Integrante ativo do clã | membro ou cargo interno | true | membro, membro_hype, e o próprio cargo (quando aplicável) |
 
@@ -15,7 +15,7 @@ Esta atualização separa **cadastro**, **membro básico** e **integrante do Cl�
 - Módulos atribuídos apenas ao grupo `membro` são acessíveis a membros básicos e membros HYPE.
 - Módulos atribuídos ao grupo `membro_hype` (mas **não** `membro`) são exclusivos do clã; liberação individual não contorna a exigência de pertencer ao clã.
 - Módulos concedidos a ambos os grupos são compartilhados.
-- Um visitante permanece sem acesso a módulos, inclusive com liberação individual.
+- Um visitante permanece sem acesso aos módulos exclusivos, inclusive com liberação individual. Entretanto, **qualquer conta autenticada pode criar pedidos de Breed e consultar seus próprios pedidos**, assim como no site.
 - Permissões individuais temporárias continuam disponíveis a contas aprovadas, respeitando exclusividade do clã e desligamento global.
 - O site nunca passa chaves Supabase ao cliente Minecraft.
 
@@ -31,6 +31,6 @@ Esta atualização separa **cadastro**, **membro básico** e **integrante do Cl�
 
 ## Segurança do servidor
 
-O endpoint /api/hype/v1/modulos informa a decisão de acesso de cada conta. Os endpoints de leitura de Breed (/meus-pedidos, /fila, /painel-breeder, /team-breeders e /ranking) agora validam **também** a permissão do módulo `breeder` no servidor antes de retornar dados.
+O endpoint /api/hype/v1/modulos informa a decisão de acesso de cada conta. A leitura de **Meus Pedidos**, do **Team** e do **Ranking** exige login. Já a **Fila** e o **Painel Breeder** exigem login, módulo `breeder` autorizado e as permissões operacionais do cargo; nenhuma rota de escrita foi implementada nesta etapa.
 
 **Pendente no Minecraft:** os recursos puramente locais (Pokédex offline, Detector de Ovos etc.) ainda precisam de verificação própria no código do .jar. Mudar só o site não impede que um cliente antigo execute funcionalidades locais. Para garantir bloqueio efetivo das ferramentas locais, atualizar o HYPE Client 2.0 para usar /modulos e falhar fechado, incluindo rechecagem periódica e saída segura dos módulos.
