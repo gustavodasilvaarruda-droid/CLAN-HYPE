@@ -34,11 +34,15 @@ def _active_override(override, now):
 
 
 def user_groups(cargo, member):
-    """All registered accounts are 'membro'; specialty roles need active clan membership."""
+    """Any registered account inherits basic virtual group 'membro'.
+
+    Clan-only group membro_hype and specialty roles require active membership.
+    The database cargo 'visitante' does NOT restrict basic modules.
+    """
     groups = {'membro'}
     if member:
         groups.add('membro_hype')
-        if cargo:
+        if cargo and str(cargo) != 'visitante':
             groups.add(str(cargo))
     return groups
 
@@ -74,7 +78,14 @@ def visible_modules_for_user(modules, assignments, overrides, cargo, member, now
         code = row.get('codigo')
         if not code:
             continue
-        decision = evaluate_module(row, groups, by_mod.get(code, ()), by_override.get(code), now)
+        # Clan-exclusive modules require active HYPE membership, independent
+        # from the user's virtual basic 'membro' group.
+        roles = by_mod.get(code, ())
+        clan_only = 'membro_hype' in roles and 'membro' not in roles
+        if clan_only and not member:
+            decision = {'permitido': False, 'motivo': 'exclusivo_cla'}
+        else:
+            decision = evaluate_module(row, groups, roles, by_override.get(code), now)
         response.append({
             'codigo': code, 'nome': row.get('nome') or code,
             'descricao': row.get('descricao') or '',

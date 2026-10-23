@@ -135,7 +135,7 @@
       </div>
     </section>
   </form>
-  {% else %}<div class="breed-stage-card"><h2>Breed indisponível</h2><p>Esta função requer permissão do clã. Se você acabou de se cadastrar, aguarde a aprovação de um administrador.</p></div>{% endif %}
+  {% else %}<div class="breed-stage-card"><h2>Breed temporariamente indisponível</h2><p>Não foi possível validar sua conta. Entre novamente ou tente recarregar a página. Contas cadastradas podem fazer pedidos mesmo sem pertencer ao Clã HYPE.</p></div>{% endif %}
 
   <nav class="hype-breed-subnav breed-ref-subnav"><a class="active" href="{{url_for('breed')}}">Fazer Pedido</a><a href="{{url_for('breed_meus_pedidos')}}">Meus Pedidos</a>{% if permissoes.get('pode_ver_fila_breed') %}<a href="{{url_for('breed_fila_breeders')}}">Fila dos Breeders</a>{% endif %}{% if 'breeder' in funcoes_usuario or permissoes.get('pode_assumir_breed') %}<a href="{{ request.script_root }}/breed/painel-breeder">Painel do Breeder</a>{% endif %}<a href="{{url_for('team_breeders')}}">Team Breeders</a><a href="{{url_for('ranking_breed')}}">Ranking</a></nav>
 </div>

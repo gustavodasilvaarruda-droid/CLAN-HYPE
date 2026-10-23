@@ -175,11 +175,19 @@ def obter_permissoes_usuario(email):
             # nenhum privilégio exclusivo dos membros HYPE.
             return {'pode_fazer_pedido_breed': True}
         if not membro_hype_ativo(email):
-            return {}
+            # Contas aprovadas como membros basicos tambem podem comprar Breed.
+            # A autorizacao HYPE nao e requisito para solicitar um pedido.
+            return {'pode_fazer_pedido_breed': True}
 
         # CORREÇÃO: Removeu .single() para evitar falhas de cache
         res_perm = supabase.table('permissoes_cargos').select('*').eq('cargo_id', cargo_id).execute()
-        return res_perm.data[0] if res_perm.data else {}
+        permissoes = dict(res_perm.data[0]) if res_perm.data else {}
+        # Qualquer conta autenticada pode fazer pedidos Breed. A filiação HYPE
+        # e os cargos continuam controlando fila, assumir e administração.
+        # Mesmo que uma configuração antiga do cargo marque False, pedidos
+        # seguem liberados para todos os usuários cadastrados no site.
+        permissoes['pode_fazer_pedido_breed'] = True
+        return permissoes
     except Exception as e:
         print(f"Erro ao buscar permissões: {e}")
         return {}
@@ -3962,7 +3970,7 @@ def criar_novo_cargo():
 @app.route('/alterar-cargo/<path:email_usuario>', methods=['POST'])
 @login_required
 def alterar_cargo(email_usuario):
-    """Somente um administrador pode promover visitantes a membros HYPE."""
+    """Altera cargo; entrada no Clã HYPE é uma aprovação separada."""
     email = session.get('usuario_email')
     if not obter_permissoes_usuario(email).get('pode_gerenciar_cargos', False):
         flash('Acesso negado.', 'erro')
@@ -3988,21 +3996,27 @@ def alterar_cargo(email_usuario):
         supabase.table('usuarios_clan').update({'cargo': novo_cargo}).eq('email', email_usuario).execute()
         try:
             hoje = datetime.now(timezone.utc).date().isoformat()
-            ativo = novo_cargo != 'visitante'
+            mh_existente = _safe_table('membros_hype', 'usuario_email,ativo', usuario_email=email_usuario)
+            # Promover visitante a 'membro' libera apenas o grupo básico.
+            # Somente /admin/membros confirma entrada no Clã HYPE.
+            ativo = bool(cargo_anterior != 'visitante' and novo_cargo != 'visitante'
+                         and mh_existente and mh_existente[0].get('ativo'))
             dados = {'usuario_email': email_usuario, 'ativo': ativo,
                      'saiu_em': None if ativo else hoje,
                      'observacao': f'Alteração administrativa de cargo: {cargo_anterior} → {novo_cargo}'}
-            mh_existente = _safe_table('membros_hype', 'usuario_email,ativo', usuario_email=email_usuario)
-            if ativo and (not mh_existente or not mh_existente[0].get('ativo')):
-                dados['entrou_em'] = hoje
             supabase.table('membros_hype').upsert(dados).execute()
         except Exception:
             supabase.table('usuarios_clan').update({'cargo': cargo_anterior}).eq('email', email_usuario).execute()
             raise
         registrar_log('alterar_cargo', 'usuarios', 'usuario', email_usuario, {
             'anterior': cargo_anterior, 'novo': novo_cargo, 'membro_hype': ativo})
-        flash(('Usuário confirmado como membro HYPE.' if ativo else 'Usuário alterado para visitante.') +
-              f' Cargo: {novo_cargo.replace("_", " ")}.', 'sucesso')
+        if novo_cargo == 'visitante':
+            aviso = 'Usuário alterado para visitante.'
+        elif ativo:
+            aviso = 'Cargo do integrante HYPE atualizado.'
+        else:
+            aviso = 'Cargo básico atualizado. Entrada no clã exige aprovação em Gerenciar membros HYPE.'
+        flash(aviso + f' Cargo: {novo_cargo.replace("_", " ")}.', 'sucesso')
     except Exception as e:
         print(f'[alterar_cargo] {e}')
         flash('Não foi possível alterar o cargo. Verifique a configuração do banco.', 'erro')
@@ -6941,10 +6955,13 @@ def admin_membros_hype():
                     supabase.table('contratos_lojas').update({'status':'encerrado','fim':hoje}).eq('usuario_email',alvo).eq('status','ativo').execute()
                     supabase.table('casas_reino').update({'ocupante_email':None,'status':'disponivel'}).eq('ocupante_email',alvo).execute()
                     supabase.table('lojas_reino').update({'dono_email':None,'status':'disponivel'}).eq('dono_email',alvo).execute()
-                supabase.table('usuarios_clan').update({'cargo':'visitante'}).eq('email',alvo).execute()
+                # Ao sair do clã, mantém a conta aprovada como membro básico.
+                # Para bloquear todos os mods, alterar o cargo para visitante.
+                if usuarios[0].get('cargo') != 'visitante':
+                    supabase.table('usuarios_clan').update({'cargo':'membro'}).eq('email',alvo).execute()
                 registrar_log('remover_membro_hype','membros','usuario',alvo,{'observacao':observacao})
                 registrar_atividade_reino('membro_hype_removido', email, f'Membro removido do clã: {usuarios[0].get("nick_jogo")}', 'membro')
-                flash('Membro removido do Clã HYPE. Moradias e lojas vinculadas foram liberadas sem apagar o histórico.', 'sucesso')
+                flash('Removido do Clã HYPE. A conta permanece como membro básico; moradias e lojas foram liberadas.', 'sucesso')
             else:
                 dados = {
                     'usuario_email': alvo, 'ativo': True,

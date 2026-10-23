@@ -114,7 +114,7 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
             "admin_hype_modulos.html", modulos=modulos, cargos=cargos,
             grupos=grupos, acessos=acessos, erro=erro,
             grupos_virtuais=[
-                {"id": "membro", "nome_cargo": "Conta cadastrada (inclui visitantes)"},
+                {"id": "membro", "nome_cargo": "Membro (qualquer conta cadastrada)"},
                 {"id": "membro_hype", "nome_cargo": "Membro HYPE ativo"},
             ],
         )
