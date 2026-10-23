@@ -181,7 +181,13 @@ def obter_permissoes_usuario(email):
 
         # CORREÇÃO: Removeu .single() para evitar falhas de cache
         res_perm = supabase.table('permissoes_cargos').select('*').eq('cargo_id', cargo_id).execute()
-        return res_perm.data[0] if res_perm.data else {}
+        permissoes = dict(res_perm.data[0]) if res_perm.data else {}
+        # Qualquer conta autenticada pode fazer pedidos Breed. A filiação HYPE
+        # e os cargos continuam controlando fila, assumir e administração.
+        # Mesmo que uma configuração antiga do cargo marque False, pedidos
+        # seguem liberados para todos os usuários cadastrados no site.
+        permissoes['pode_fazer_pedido_breed'] = True
+        return permissoes
     except Exception as e:
         print(f"Erro ao buscar permissões: {e}")
         return {}
