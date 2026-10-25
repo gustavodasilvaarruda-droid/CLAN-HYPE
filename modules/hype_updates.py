@@ -6,8 +6,9 @@ must be signed OFFLINE and explicitly staged before a manifest is published.
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from flask import Blueprint, abort, current_app, jsonify, make_response, send_file
+from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, send_file
 
 hype_updates_bp = Blueprint('hype_updates', __name__)
 _RELEASE_NAME = re.compile(r'hypeclient-r[1-9][0-9]{0,8}\.jar\Z', re.ASCII)
@@ -41,12 +42,46 @@ def updates_manifest():
     return _deliver(path, 'text/plain; charset=utf-8', 'no-store, max-age=0')
 
 
+def _external_release_url(filename):
+    """Optional persistent GitHub Release/object-store URL; never accepts user URLs."""
+    base = os.environ.get('HYPE_UPDATES_RELEASE_BASE_URL', '').strip()
+    if not base:
+        return None
+    parsed = urlsplit(base)
+    # Avoid accidentally exposing a release through HTTP or unsafe redirect URLs.
+    if (
+        parsed.scheme != 'https'
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or any(c.isspace() for c in base)
+        or '\\' in base
+    ):
+        abort(503)
+    return f"{base.rstrip('/')}/{filename}"
+
+
 @hype_updates_bp.get('/hype-updates/releases/<filename>')
 def updates_release(filename):
     if not _RELEASE_NAME.fullmatch(filename):
         abort(404)
-    path = _safe_regular_file(_root() / 'releases', filename)
-    return _deliver(path, 'application/java-archive', 'public, max-age=31536000, immutable')
+
+    # Prefer a local release for compatibility with existing deployments.
+    directory = (_root() / 'releases').resolve()
+    candidate = (directory / filename).resolve()
+    if candidate.is_relative_to(directory) and candidate.is_file():
+        return _deliver(candidate, 'application/java-archive', 'public, max-age=31536000, immutable')
+
+    # Render's ephemeral disk must not be the sole place where releases live.
+    url = _external_release_url(filename)
+    if not url:
+        abort(404)
+    response = redirect(url, code=302)
+    response.headers['Cache-Control'] = 'no-store, max-age=0'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 @hype_updates_bp.get('/hype-updates/health')
