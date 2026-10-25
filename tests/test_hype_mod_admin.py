@@ -132,5 +132,70 @@ class TestCliqueModulo(unittest.TestCase):
         self.assertTrue(response.location.endswith("#modulo-battle_ai"))
         self.assertEqual(fake.updated, {"estado": "manutencao"})
 
+
+class TestRenderizacaoModulos(unittest.TestCase):
+    """Exercita GET administrativo de verdade (nao apenas a checagem de permissao)."""
+
+    def _criar_app(self, dados, falhar=False):
+        from pathlib import Path
+        from types import SimpleNamespace
+        from jinja2 import ChoiceLoader, DictLoader, FileSystemLoader
+
+        class Query:
+            def __init__(self, tabela):
+                self.tabela = tabela
+            def select(self, *args): return self
+            def limit(self, *args): return self
+            def execute(self):
+                if falhar:
+                    raise RuntimeError("Tabela ausente no Supabase")
+                return SimpleNamespace(data=list(dados.get(self.tabela, [])))
+
+        class DB:
+            def table(self, tabela):
+                return Query(tabela)
+
+        app = Flask(__name__)
+        app.secret_key = "teste"
+        templates = Path(__file__).resolve().parents[1] / "templates"
+        app.jinja_loader = ChoiceLoader([
+            DictLoader({"hype_app_base.html": "{% block content %}{% endblock %}"}),
+            FileSystemLoader(str(templates)),
+        ])
+        app.jinja_env.globals["url_for"] = lambda *args, **kwargs: "/teste"
+        app.jinja_env.globals["csrf_token"] = lambda: "teste-csrf"
+        app.jinja_env.filters["data_br"] = lambda v: str(v)
+        app.register_blueprint(create_hype_mod_admin_blueprint(
+            DB(), login_required=lambda fn: fn,
+            is_admin=lambda: True, registrar_log=lambda *args, **kwargs: None,
+        ))
+        return app
+
+    def test_get_sem_tabelas_exibe_aviso_sem_error500(self):
+        client = self._criar_app({}, falhar=True).test_client()
+        resp = client.get("/admin/modulos")
+        self.assertEqual(resp.status_code, 200, resp.get_data(as_text=True)[:400])
+        self.assertIn("migra", resp.get_data(as_text=True).lower())
+
+    def test_get_com_modulo_real_e_formularios_sem_error500(self):
+        dados = {
+            "hype_modulos": [{
+                "codigo": "hype_pokedex",
+                "nome": "Pokédex",
+                "descricao": "Atributos e formas",
+                "estado": "ativo",
+                "versao": "1.0",
+                "visivel": True,
+                "ordem": 1,
+            }],
+            "cargos": [{"id": "lider", "nome_cargo": "Líder"}],
+            "hype_modulos_grupos": [{"modulo_codigo": "hype_pokedex", "cargo_id": "lider"}],
+            "hype_modulos_acessos": [],
+        }
+        resp = self._criar_app(dados).test_client().get("/admin/modulos")
+        self.assertEqual(resp.status_code, 200, resp.get_data(as_text=True)[:400])
+        self.assertIn("Pokédex", resp.get_data(as_text=True))
+        self.assertIn("modulo-hype_pokedex", resp.get_data(as_text=True))
+
 if __name__ == "__main__":
     unittest.main()
