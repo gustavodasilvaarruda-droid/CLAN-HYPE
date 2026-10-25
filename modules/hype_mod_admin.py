@@ -81,8 +81,10 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
             abort(404)
         return itens[0]
 
-    def voltar():
-        return redirect(url_for("hype_mod_admin.painel"))
+    def voltar(codigo=None):
+        # Reabra o módulo alterado após o POST sem perder a posição do usuário.
+        anchor = f"modulo-{codigo}" if codigo else None
+        return redirect(url_for("hype_mod_admin.painel", _anchor=anchor))
 
     @bp.get("/admin/modulos")
     @login_required
@@ -127,7 +129,7 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
         novo = (request.form.get("estado") or "").strip()
         if novo not in ESTADOS:
             flash("Estado de módulo inválido.", "erro")
-            return voltar()
+            return voltar(codigo)
         try:
             db.table("hype_modulos").update({"estado": novo}).eq("codigo", codigo).execute()
             registrar_log("alterar_estado_modulo", "hype_modulos", "modulo", codigo,
@@ -135,7 +137,7 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
             flash("Estado do módulo atualizado.", "sucesso")
         except Exception:
             flash("Não foi possível alterar o estado do módulo.", "erro")
-        return voltar()
+        return voltar(codigo)
 
     @bp.post("/admin/modulos/<codigo>/cargo")
     @login_required
@@ -146,12 +148,12 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
         acao = (request.form.get("acao") or "").strip()
         if acao not in {"permitir", "remover"}:
             flash("Ação inválida.", "erro")
-            return voltar()
+            return voltar(codigo)
         if cargo_id not in {"membro", "membro_hype"}:
             ids = {str(c.get("id")) for c in consultar("cargos", "id")}
             if cargo_id not in ids:
                 flash("Cargo desconhecido.", "erro")
-                return voltar()
+                return voltar(codigo)
         try:
             if acao == "permitir":
                 db.table("hype_modulos_grupos").upsert(
@@ -166,7 +168,7 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
             flash("Permissão do cargo atualizada.", "sucesso")
         except Exception:
             flash("Não foi possível salvar a permissão do cargo.", "erro")
-        return voltar()
+        return voltar(codigo)
 
     @bp.post("/admin/modulos/<codigo>/usuario")
     @login_required
@@ -177,13 +179,13 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
         decisao = (request.form.get("decisao") or "").strip()
         if not email or len(email) > 254 or "@" not in email or decisao not in DECISOES:
             flash("Informe um e-mail cadastrado e uma decisão válida.", "erro")
-            return voltar()
+            return voltar(codigo)
         try:
             usuario_existe = (db.table("usuarios_clan").select("email")
                               .eq("email", email).limit(1).execute().data or [])
             if not usuario_existe:
                 flash("Esse usuário não está cadastrado no site.", "erro")
-                return voltar()
+                return voltar(codigo)
             inicio, fim = calcular_periodo(
                 request.form.get("inicio_em"), request.form.get("duracao"),
                 request.form.get("quantidade"), request.form.get("fim_em")
@@ -200,7 +202,7 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
             flash(str(exc), "erro")
         except Exception:
             flash("Não foi possível salvar o acesso. Confira a migração SQL.", "erro")
-        return voltar()
+        return voltar(codigo)
 
     @bp.post("/admin/modulos/<codigo>/usuario/remover")
     @login_required
@@ -210,7 +212,7 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
         email = (request.form.get("usuario_email") or "").strip().lower()
         if not email:
             flash("Usuário inválido.", "erro")
-            return voltar()
+            return voltar(codigo)
         try:
             (db.table("hype_modulos_acessos").delete()
              .eq("modulo_codigo", codigo).eq("usuario_email", email).execute())
@@ -218,6 +220,6 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
             flash("Permissão individual encerrada.", "sucesso")
         except Exception:
             flash("Não foi possível encerrar a permissão.", "erro")
-        return voltar()
+        return voltar(codigo)
 
     return bp
