@@ -7485,6 +7485,10 @@ app.register_blueprint(create_hype_client_api_blueprint(
     _login_guard_falha, _login_guard_limpar
 ))
 
+# HYPE Auto Update - somente distribuicao de versoes assinadas, sem banco de dados.
+from modules.hype_updates import hype_updates_bp
+app.register_blueprint(hype_updates_bp)
+
 # ============================================================================
 # INICIALIZADOR DO SERVIDOR
 # ============================================================================
