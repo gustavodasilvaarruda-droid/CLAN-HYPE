@@ -87,5 +87,72 @@ class HypeUpdatesTest(unittest.TestCase):
     def test_read_only(self):
         self.assertEqual(self.client.post('/hype-updates/manifest.properties').status_code, 405)
 
+
+    def test_auto_ovo_channel_disabled_by_default(self):
+        with patch.dict(os.environ, {'HYPE_AUTO_OVO_RELEASE_BASE_URL': ''}):
+            health = self.client.get('/hype-updates/auto-ovo/health')
+            manifest = self.client.get('/hype-updates/auto-ovo/manifest.properties')
+            jar = self.client.get('/hype-updates/auto-ovo/releases/hype-auto-ovo-h20.jar')
+        self.assertEqual(health.status_code, 200)
+        self.assertFalse(health.json['manifest_present'])
+        self.assertEqual(health.json['service'], 'hype-auto-ovo-updates')
+        self.assertEqual(manifest.status_code, 404)
+        self.assertEqual(jar.status_code, 404)
+
+    def test_auto_ovo_manifest_is_independent_of_r717(self):
+        folder = self.directory / 'auto-ovo'
+        folder.mkdir()
+        (folder / 'manifest.properties').write_text('test-only', encoding='utf-8')
+        r = self.client.get('/hype-updates/auto-ovo/manifest.properties')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data, b'test-only')
+        self.assertIn('no-store', r.headers['Cache-Control'])
+        self.assertTrue(self.client.get('/hype-updates/auto-ovo/health').json['manifest_present'])
+        self.assertEqual(self.client.get('/hype-updates/manifest.properties').status_code, 404)
+
+    def test_auto_ovo_releases_allowlist_and_local_file(self):
+        folder = self.directory / 'auto-ovo' / 'releases'
+        folder.mkdir(parents=True)
+        (folder / 'hype-auto-ovo-h20.jar').write_bytes(b'test-only')
+        r = self.client.get('/hype-updates/auto-ovo/releases/hype-auto-ovo-h20.jar')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data, b'test-only')
+        for name in ('hypeclient-r20.jar', 'latest.jar', 'hype-auto-ovo-h0.jar', 'hype-auto-ovo-h20.zip'):
+            with self.subTest(name=name):
+                self.assertEqual(
+                    self.client.get('/hype-updates/auto-ovo/releases/' + name).status_code, 404
+                )
+
+    def test_auto_ovo_redirect_requires_own_https_storage_variable(self):
+        with patch.dict(os.environ, {
+            'HYPE_AUTO_OVO_RELEASE_BASE_URL': '',
+            'HYPE_UPDATES_RELEASE_BASE_URL': 'https://github.com/example/client-updates'
+        }):
+            self.assertEqual(
+                self.client.get('/hype-updates/auto-ovo/releases/hype-auto-ovo-h21.jar').status_code, 404
+            )
+        with patch.dict(os.environ, {
+            'HYPE_AUTO_OVO_RELEASE_BASE_URL': 'https://github.com/example/releases/download/auto-ovo'
+        }):
+            r = self.client.get('/hype-updates/auto-ovo/releases/hype-auto-ovo-h21.jar')
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            r.headers['Location'],
+            'https://github.com/example/releases/download/auto-ovo/hype-auto-ovo-h21.jar'
+        )
+
+    def test_auto_ovo_bad_external_urls_rejected(self):
+        for base in ('http://github.com/demo', 'https://u:pw@github.com/demo',
+                     'https://github.com/demo?token=x', 'https://github.com/demo#x'):
+            with self.subTest(base=base):
+                with patch.dict(os.environ, {'HYPE_AUTO_OVO_RELEASE_BASE_URL': base}):
+                    r = self.client.get('/hype-updates/auto-ovo/releases/hype-auto-ovo-h20.jar')
+                self.assertEqual(r.status_code, 503)
+
+    def test_auto_ovo_endpoints_are_read_only(self):
+        self.assertEqual(
+            self.client.post('/hype-updates/auto-ovo/manifest.properties').status_code, 405
+        )
+
 if __name__ == '__main__':
     unittest.main()
