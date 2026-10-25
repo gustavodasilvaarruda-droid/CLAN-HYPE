@@ -82,5 +82,55 @@ class TestPainelAdmin(unittest.TestCase):
         self.assertEqual(resp.status_code, 403)
 
 
+
+class TestCliqueModulo(unittest.TestCase):
+    def test_painel_admin_tem_link_para_modulos(self):
+        from pathlib import Path
+        base = Path(__file__).resolve().parents[1]
+        page = (base / "templates/admin_dashboard_geral.html").read_text(encoding="utf-8")
+        self.assertIn("url_for('hype_mod_admin.painel')", page)
+
+    def test_cabecalho_do_modulo_abre_formularios(self):
+        from pathlib import Path
+        base = Path(__file__).resolve().parents[1]
+        page = (base / "templates/admin_hype_modulos.html").read_text(encoding="utf-8")
+        self.assertIn('<details class="hmod-card" id="modulo-{{ m.codigo }}">', page)
+        self.assertIn('<summary class="hmod-heading">', page)
+        self.assertIn('alvo.open = true', page)
+
+    def test_salvar_retorna_ao_modulo_editado(self):
+        from types import SimpleNamespace
+
+        class FakeQuery:
+            def __init__(self):
+                self.updated = None
+            def select(self, *_args): return self
+            def eq(self, *_args): return self
+            def limit(self, *_args): return self
+            def update(self, value):
+                self.updated = value
+                return self
+            def execute(self):
+                return SimpleNamespace(data=[{"codigo": "battle_ai", "nome": "IA", "estado": "ativo"}])
+
+        fake = FakeQuery()
+        class FakeDB:
+            def table(self, name):
+                self.name = name
+                return fake
+
+        app = Flask(__name__)
+        app.secret_key = "teste"
+        app.register_blueprint(create_hype_mod_admin_blueprint(
+            db=FakeDB(), login_required=lambda fn: fn,
+            is_admin=lambda: True, registrar_log=lambda *args, **kwargs: None,
+        ))
+        response = app.test_client().post(
+            "/admin/modulos/battle_ai/estado", data={"estado": "manutencao"}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith("#modulo-battle_ai"))
+        self.assertEqual(fake.updated, {"estado": "manutencao"})
+
 if __name__ == "__main__":
     unittest.main()
