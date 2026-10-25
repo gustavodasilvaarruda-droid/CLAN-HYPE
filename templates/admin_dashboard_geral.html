@@ -9,6 +9,7 @@
       <a class="active" href="{{ url_for('expansion.admin_dashboard') }}">⌂ <span>Visão Geral</span></a>
       <a href="{{ url_for('admin_membros_hype') }}">♙ <span>Gerenciar Membros</span></a>
       <a href="{{ url_for('admin_cargos') }}">♜ <span>Cargos e Permissões</span></a>
+      <a href="{{ url_for('hype_mod_admin.painel') }}">▦ <span>Módulos HYPE</span></a>
       <a href="{{ url_for('admin_reino') }}">⌂ <span>Casas e Lojas</span></a>
       {% if hype_membro_hype %}<a href="{{ url_for('admin_tesouro') }}">◆ <span>Tesouro do Clã</span></a>{% endif %}
       <a href="{{ url_for('expansion.admin_economia') }}">◉ <span>Preços e Economia</span></a>
@@ -39,6 +40,7 @@
 
     <section class="admin2-quick" aria-label="Atalhos administrativos">
       <a href="{{url_for('admin_membros_hype')}}"><b>♙ MEMBROS</b><span>Gerenciar membros HYPE</span></a>
+      <a href="{{url_for('hype_mod_admin.painel')}}"><b>▦ MÓDULOS HYPE</b><span>Abrir controles e permissões dos módulos</span></a>
       <a href="{{url_for('gestao_breeders')}}"><b>☷ BREED</b><span>Acompanhar pedidos e breeders</span></a>
       <a href="{{url_for('admin_conteudo')}}"><b>♛ EVENTOS</b><span>Torneios e eventos do clã</span></a>
       <a href="{{url_for('admin_reino')}}"><b>⌂ REINO</b><span>Casas e lojas HYPE</span></a>
