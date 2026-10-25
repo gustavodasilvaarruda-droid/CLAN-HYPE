@@ -23,6 +23,7 @@
     Toda conta cadastrada e autenticada pertence ao grupo virtual "membro" dos módulos. Apenas integrantes HYPE ativos recebem também "membro_hype".
     Em um módulo ativo, o bloqueio ou liberação individual prevalece sobre o cargo enquanto estiver válido para contas aprovadas.
     Sem permissão, o acesso fica negado. O cliente Minecraft precisa consultar a API para receber mudanças remotas.
+    Esta tela controla estados e permissões; não publica arquivos .jar nem ativa atualizações automáticas.
   </div>
   {% if not modulos and not erro %}
   <p class="hmod-empty">Nenhum módulo cadastrado. Execute a migração SQL ou cadastre um módulo na base.</p>
@@ -31,11 +32,12 @@
   {% for m in modulos %}
     {% set roles = grupos | selectattr('modulo_codigo', 'equalto', m.codigo) | map(attribute='cargo_id') | list %}
     {% set overrides = acessos | selectattr('modulo_codigo', 'equalto', m.codigo) | list %}
-    <article class="hmod-card" id="modulo-{{ m.codigo }}">
-      <div class="hmod-heading">
+    <details class="hmod-card" id="modulo-{{ m.codigo }}">
+      <summary class="hmod-heading">
         <div>
           <div class="hmod-kicker">{{ m.codigo }} {% if m.versao %}• v{{ m.versao }}{% endif %}</div>
           <h2>{{ m.nome }}</h2>
+          <span class="hmod-open-hint">Clique para abrir ou fechar as configurações</span>
           <p>{{ m.descricao or 'Módulo HYPE' }}</p>
         </div>
         {% if m.estado == 'ativo' %}
@@ -45,7 +47,7 @@
         {% else %}
           <span class="hmod-state off">Desativado</span>
         {% endif %}
-      </div>
+      </summary>
 
       <form class="hmod-row hmod-state-form" method="post" action="{{ url_for('hype_mod_admin.estado', codigo=m.codigo) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -153,8 +155,13 @@
           </table>
         </div>
       </details>
-    </article>
+    </details>
   {% endfor %}
   </div>
 </main>
-{% endblock %}
+<script>
+  // Retorna ao módulo editado depois de salvar uma configuração.
+  const alvo = window.location.hash && document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+  if (alvo && alvo.tagName === 'DETAILS') alvo.open = true;
+</script>
+{% endblock %>
