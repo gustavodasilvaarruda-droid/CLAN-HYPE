@@ -12,6 +12,14 @@
 .hmod-list{display:grid;gap:20px}
 .hmod-card{background:linear-gradient(145deg,#191b22,#121419);border:1px solid #39332a;border-radius:17px;padding:24px;box-shadow:0 12px 36px #0004}
 .hmod-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.hmod-card>summary{cursor:pointer;list-style:none}
+.hmod-card>summary::-webkit-details-marker{display:none}
+.hmod-card>summary:focus-visible{outline:2px solid #d6af55;outline-offset:5px;border-radius:8px}
+.hmod-card>summary:hover h2{text-decoration:underline;text-decoration-color:#c9a457}
+.hmod-open-hint{display:inline-block;color:#e7c676;font-size:.85rem;margin:0 0 9px}
+.hmod-card[open] .hmod-open-hint{color:#c4c1ba}
+.hmod-card[open] .hmod-state-form{margin-top:14px}
+
 .hmod-heading h2{margin:6px 0;font-size:1.35rem;color:#f7eed8}
 .hmod-heading p{margin:0 0 18px}
 .hmod-state{border-radius:100px;padding:6px 13px;font-size:.76rem;font-weight:800;white-space:nowrap}
