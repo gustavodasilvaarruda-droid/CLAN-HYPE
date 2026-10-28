@@ -1,0 +1,33 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Economia do Cla | HYPE{% endblock %}
+{% block content %}
+<div class="hype-v6-page">
+  <section class="hype-v6-panel">
+    <a href="{{url_for('tesouro_hype')}}">← Voltar ao Tesouro</a>
+    <span class="hype-v6-kicker">PRESTACAO DE CONTAS • MEMBROS HYPE</span>
+    <h1>Economia do Cla</h1>
+    <p>Valores de entradas e saidas efetivamente confirmadas no caixa do Cla. Depositos pessoais e repasses devidos a breeders nao entram aqui como patrimonio.</p>
+    <div class="v28-admin-kpis">
+      <article><span>Saldo registrado</span><strong>{{resumo.saldo|preco}}</strong></article>
+      <article><span>Total de entradas</span><strong>{{resumo.entradas|preco}}</strong></article>
+      <article><span>Total de saidas</span><strong>{{resumo.saidas|preco}}</strong></article>
+    </div>
+  </section>
+  <section class="hype-v6-panel">
+    <h2>Origem do dinheiro e despesas</h2>
+    <div class="table-wrap"><table class="admin-table"><thead><tr><th>Categoria</th><th>Entradas</th><th>Saidas</th></tr></thead><tbody>
+      {% for cat in resumo.categorias %}<tr><td>{{cat.nome|replace('_',' ')|title}}</td><td>{{cat.entradas|preco}}</td><td>{{cat.saidas|preco}}</td></tr>
+      {% else %}<tr><td colspan="3">Ainda nao ha movimentacoes confirmadas.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <section class="hype-v6-panel">
+    <h2>Ultimas 100 movimentacoes confirmadas</h2>
+    <p>Exibimos apenas categoria, data e valor para preservar a privacidade dos pagadores. O Admin conserva o extrato detalhado para auditoria.</p>
+    <div class="table-wrap"><table class="admin-table"><thead><tr><th>Data</th><th>Tipo</th><th>Origem</th><th>Valor</th></tr></thead><tbody>
+      {% for r in registros %}
+      <tr><td>{{r.created_at|data_br}}</td><td>{{'Entrada' if r.tipo=='entrada' else 'Saida'}}</td><td>{{(r.categoria or 'Geral')|replace('_',' ')|title}}</td><td>{{r.valor|preco}}</td></tr>
+      {% else %}<tr><td colspan="4">Nenhuma movimentacao confirmada.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endblock %}
