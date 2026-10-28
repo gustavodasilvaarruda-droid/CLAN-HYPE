@@ -86,7 +86,8 @@ def carteira():
         saldo=1_250_000,
         depositos=[
             {"amount": 500_000, "status": "confirmed", "created_at": "2026-10-27T15:20:00"},
-            {"amount": 150_000, "status": "pending", "created_at": "2026-10-28T10:45:00"},
+            {"id": "00000000-0000-4000-8000-000000000002", "amount": 150_000, "status": "pending", "created_at": "2026-10-28T10:45:00"},
+            {"id": "00000000-0000-4000-8000-000000000003", "amount": 250_000, "status": "reported", "created_at": "2026-10-28T11:15:00"},
         ],
         movimentos=[
             {"kind": "deposit", "delta": 500_000, "created_at": "2026-10-27T15:30:00"},
@@ -103,7 +104,10 @@ def admin_carteira():
         pendentes=[
             {"id": "00000000-0000-4000-8000-000000000001",
              "owner_id": "jogador.exemplo@hype.invalid",
-             "amount": 150_000, "created_at": "2026-10-28T10:45:00", "status": "pending"},
+             "amount": 150_000, "created_at": "2026-10-28T10:45:00", "status": "reported", "payment_note": "Pago no jogo, JogadorDemo"},
+            {"id": "00000000-0000-4000-8000-000000000004",
+             "owner_id": "outro.jogador@hype.invalid",
+             "amount": 200_000, "created_at": "2026-10-28T10:15:00", "status": "pending"},
         ],
     )
 
