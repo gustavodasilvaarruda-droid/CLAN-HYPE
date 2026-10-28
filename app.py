@@ -7468,6 +7468,11 @@ app.register_blueprint(create_builders_hub_blueprint(
 
 
 # Financeiro HYPE: isencao de comissoes anteriores a nova cobranca.
+from modules.hype_finance_public import create_finance_public_blueprint
+app.register_blueprint(create_finance_public_blueprint(
+    supabase, login_required, membro_hype_ativo, _is_admin
+))
+
 from modules.hype_finance_amnesty import create_finance_amnesty_blueprint
 app.register_blueprint(create_finance_amnesty_blueprint(
     supabase, login_required, _is_admin, registrar_log
