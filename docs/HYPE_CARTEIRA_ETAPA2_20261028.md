@@ -15,6 +15,16 @@
 - Cálculo do saldo e extrato isolados das `transacoes_hype` antigas.
 - Testes unitários isolados com cliente Supabase simulado e workflow dedicado do GitHub Actions.
 
+## Etapa de reporte de pagamento — aplicada ao Supabase
+- Migração incremental `hype_wallet_reporte_pagamento_20261028` aplicada.
+- Após solicitar o depósito, membro usa **Já paguei no jogo**. A solicitação passa de `pending` para `reported`.
+- O administrador confere o pagamento **no Minecraft** e só então confirma e credita.
+- Confirmação de `pending` agora é recusada pelo próprio banco (independente da tela).
+- Solicitações em `reported` contam para o limite de pedidos ainda não conciliados.
+- O navegador nunca envia diretamente SQL nem a chave service-role. A rota usa o e-mail da sessão autenticada.
+- A demonstração no Render continua usando dados fictícios e sem qualquer acesso ao Supabase.
+- Fluxos financeiros não devem ser habilitados antes dos testes ponta a ponta com credencial protegida e conta de homologação.
+
 ## Ativação gradual no Render (ainda NÃO realizada)
 1. Verificar que a PR da carteira está revisada e que os testes passam antes de qualquer merge.
 2. Criar variável de ambiente **secreta** `SUPABASE_SERVICE_ROLE_KEY` no painel do servidor Render. Não inserir no Git, HTML, logs nem nesta conversa; ela confere acesso administrativo ao banco.
@@ -25,6 +35,8 @@
 ## Testes mínimos antes de usar
 - [ ] Entrar como membro ativo, visitante e administrador e testar permissão.
 - [ ] Verificar POST sem token CSRF usando o Flask real (não apenas Blueprint isolado).
+- [ ] Solicitar depósito, informar pagamento, verificar que o líder não consegue confirmar um `pending`.
+- [ ] Garantir que outra conta não consegue informar pagamento alheio.
 - [ ] Enviar dois pedidos do mesmo jogador; confirmar apenas o recebido.
 - [ ] Tentar confirmar o mesmo depósito duas vezes e verificar crédito único.
 - [ ] Simular confirmações concorrentes em ambiente de testes.
