@@ -18,7 +18,11 @@ def _service_client():
     if not url or not key:
         return None
     # Separado do cliente existente para nunca depender da anon key.
-    return create_client(url, key)
+    try:
+        return create_client(url, key)
+    except Exception:
+        # Falha fechada: nenhum botao de deposito deve funcionar sem credencial valida.
+        return None
 
 
 def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
@@ -51,7 +55,7 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
             try:
                 contas = db.table('hype_wallet_accounts').select('balance').eq('owner_id',email).limit(1).execute().data or []
                 saldo = int(contas[0]['balance']) if contas else 0
-                movimentos = db.table('hype_wallet_entries').select('kind,delta,reference,created_at').eq('owner_id',email).order('created_at',desc=True).limit(30).execute().data or []
+                movimentos = db.table('hype_wallet_entries').select('kind,delta,created_at').eq('owner_id',email).order('created_at',desc=True).limit(30).execute().data or []
                 depositos = db.table('hype_wallet_deposit_requests').select('id,amount,status,created_at,note').eq('owner_id',email).order('created_at',desc=True).limit(15).execute().data or []
             except Exception:
                 flash('A carteira está temporariamente indisponível. Tente mais tarde.', 'erro')
