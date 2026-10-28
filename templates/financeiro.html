@@ -17,6 +17,20 @@
   </section>
 
   <section class="v28-fin-card">
+    <header><div><span class="breed-kicker">INICIO DA COBRANCA</span><h2>Isentar comissoes antigas</h2></div></header>
+    <p>Somente comissoes <b>pendentes</b> geradas antes da data informada serao isentas. Pagas e pagamentos informados serao preservados. Nenhum valor sera adicionado ao Caixa HYPE.</p>
+    <form method="post" action="{{url_for('finance_amnesty.isentar_antigas')}}" onsubmit="return confirm('Confirmar a isencao de todas as comissoes pendentes anteriores a data escolhida? Esta acao sera auditada.')">
+      <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin:14px 0">
+        <label>Data de inicio da cobranca<br><input type="date" name="data_inicio_cobranca" required></label>
+        <label style="flex:1;min-width:220px">Justificativa (obrigatoria)<br><input name="motivo" minlength="10" maxlength="500" required placeholder="Isencao de taxas anteriores ao inicio da cobranca" style="width:100%"></label>
+      </div>
+      <label><input type="checkbox" name="confirmar_isencao" value="sim" required> Confirmo que somente as comissoes pendentes anteriores a data serao isentas.</label>
+      <div style="margin-top:12px"><button type="submit" class="v26-btn gold">Isentar comissoes antigas</button></div>
+    </form>
+  </section>
+
+  <section class="v28-fin-card">
     <header><div><span class="breed-kicker">POR BREEDER</span><h2>Quem está devendo ao Clã</h2></div></header>
     <div class="v28-debtor-grid">
       {% for b in por_breeder %}
@@ -34,7 +48,7 @@
     <div class="v28-fin-table-wrap"><table class="v28-fin-table"><thead><tr><th>Pedido</th><th>Pokémon</th><th>Breeder</th><th>Taxa</th><th>Valor</th><th>Status</th><th>Gerada</th><th>Ações</th></tr></thead><tbody>
       {% for c in comissoes %}<tr>
         <td>#{{c.pedido_id}}</td><td><b>{{c.pokemon}}</b></td><td>{{c.breeder_nick}}</td><td>{{c.percentual}}%</td><td><strong>{{c.valor|preco}}</strong></td>
-        <td><span class="v28-fin-status {{c.status}}">{% if c.status=='pendente' %}Pendente{% elif c.status=='informado' %}Pagamento informado{% elif c.status=='pago' %}Pago{% else %}Cancelado{% endif %}</span></td>
+        <td><span class="v28-fin-status {{c.status}}">{% if c.status=='pendente' %}Pendente{% elif c.status=='informado' %}Pagamento informado{% elif c.status=='pago' %}Pago{% elif c.status=='isento' %}Isento pelo lider{% else %}Cancelado{% endif %}</span></td>
         <td>{{(c.gerada_em or c.created_at)|data_br}}</td><td><div class="v28-table-actions">
           {% if c.status in ('pendente','informado') %}<form method="post" action="{{url_for('admin_confirmar_comissao_breed',comissao_id=c.id)}}" onsubmit="return confirm('Confirmar que o Clã recebeu {{c.valor|preco}}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="confirm" data-once>Confirmar recebimento</button></form>{% endif %}
           {% if c.status=='informado' %}<form method="post" action="{{url_for('admin_rejeitar_comissao_breed',comissao_id=c.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="motivo" maxlength="500" placeholder="Motivo"><button class="reject" data-once>Não recebido</button></form>{% endif %}
