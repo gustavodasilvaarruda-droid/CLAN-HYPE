@@ -14,6 +14,7 @@
   {% if not carteira_ativa %}
     <div class="wallet-alert">A Carteira HYPE ainda está indisponível neste servidor. Nenhum depósito pode ser confirmado agora.</div>
   {% endif %}
+  {% if carteira_ativa and not depositos_ativos %}<div class="wallet-alert">Modo de consulta: depósitos e confirmações ainda não estão habilitados.</div>{% endif %}
   {% if administrador %}
     <div class="wallet-panel">
       <h2>Solicitações aguardando pagamento</h2>
@@ -25,12 +26,12 @@
           <div class="wallet-value positive">{{d.amount|preco}}</div>
           <form method="post" action="{{url_for('hype_wallet.admin_decidir_deposito',request_id=d.id,acao='confirmar')}}" onsubmit="return confirm('Você recebeu este valor no Minecraft e deseja creditar na carteira?')">
             <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
-            <button type="submit" class="wallet-submit" {{'disabled' if not carteira_ativa else ''}}>Confirmar recebimento</button>
+            <button type="submit" class="wallet-submit" {{'disabled' if not depositos_ativos else ''}}>Confirmar recebimento</button>
           </form>
           <form method="post" action="{{url_for('hype_wallet.admin_decidir_deposito',request_id=d.id,acao='recusar')}}" onsubmit="return confirm('Recusar a solicitação sem creditar moedas?')">
             <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
             <input name="motivo" maxlength="500" placeholder="Motivo (opcional)" aria-label="Motivo da recusa">
-            <button type="submit" class="wallet-secondary" {{'disabled' if not carteira_ativa else ''}}>Recusar</button>
+            <button type="submit" class="wallet-secondary" {{'disabled' if not depositos_ativos else ''}}>Recusar</button>
           </form>
         </article>
       {% else %}
@@ -47,8 +48,8 @@
         <form method="post" action="{{url_for('hype_wallet.solicitar_deposito')}}" class="wallet-form">
           <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
           <label for="wallet-value">Valor em moedas</label>
-          <input id="wallet-value" name="valor" type="number" inputmode="numeric" min="1" max="1000000000000" placeholder="150000" required {{'disabled' if not carteira_ativa else ''}}>
-          <button class="wallet-submit" type="submit" {{'disabled' if not carteira_ativa else ''}}>Solicitar depósito</button>
+          <input id="wallet-value" name="valor" type="number" inputmode="numeric" min="1" max="1000000000000" placeholder="150000" required {{'disabled' if not depositos_ativos else ''}}>
+          <button class="wallet-submit" type="submit" {{'disabled' if not depositos_ativos else ''}}>Solicitar depósito</button>
         </form>
       </article>
     </div>
