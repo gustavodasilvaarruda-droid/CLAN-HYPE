@@ -88,6 +88,8 @@
       <a class="{{'active' if request.endpoint in ['painel_reino','casas_reino','lojas','loja_detalhe','reino_financeiro_usuario'] else ''}}" href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a>
       <a class="{{'active' if request.endpoint=='reino_financeiro_usuario' else ''}}" href="{{url_for('reino_financeiro_usuario')}}"><span>¤</span>Meu Aluguel</a>
       {% if hype_membro_hype %}<a class="{{'active' if request.endpoint in ['tesouro_hype','tesouro_item','admin_tesouro'] else ''}}" href="{{url_for('tesouro_hype')}}"><span>◆</span>Tesouro do Clã</a>{% endif %}
+      {% if hype_membro_hype %}<a class="{{'active' if request.endpoint=='hype_wallet.carteira' else ''}}" href="{{url_for('hype_wallet.carteira')}}"><span>¤</span>Minha Carteira</a>{% endif %}
+      {% if hype_permissoes.get('pode_gerenciar_cargos') %}<a class="{{'active' if request.endpoint=='hype_wallet.admin_depositos' else ''}}" href="{{url_for('hype_wallet.admin_depositos')}}"><span>◇</span>Depósitos HYPE</a>{% endif %}
       <a class="{{'active' if request.endpoint=='expansion.hype_live' else ''}}" href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>
       <a class="{{'active' if request.endpoint in ['central_rankings','ranking_detalhe','ranking_pokemon_detalhe','ranking_breed','ranking_breeders','final.ranking_competitivo'] else ''}}" href="{{url_for('central_rankings')}}"><span>▥</span>Rankings</a>
       <a class="{{'active' if request.endpoint and request.endpoint.startswith('community.') else ''}}" href="{{url_for('community.home')}}"><span>✣</span>Comunidade</a>
