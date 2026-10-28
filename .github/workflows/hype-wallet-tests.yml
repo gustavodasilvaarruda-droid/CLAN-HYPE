@@ -23,5 +23,17 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Check wallet syntax
         run: python -m compileall -q modules/hype_wallet.py hype_finance_core.py tests/test_hype_wallet_routes.py
+      - name: Compile Flask entrypoint and wallet modules without starting server
+        run: python -m py_compile app.py modules/hype_wallet.py
+      - name: Validate Jinja wallet templates
+        run: |
+          python - <<'PY'
+          from jinja2 import Environment
+          from pathlib import Path
+          env = Environment()
+          for path in ('templates/hype_wallet.html','templates/hype_app_base.html'):
+              env.parse(Path(path).read_text(encoding='utf-8'))
+              print('Jinja OK:',path)
+          PY
       - name: Run isolated wallet route tests
         run: python -m unittest discover -s tests -p "test_hype_wallet_routes.py" -v
