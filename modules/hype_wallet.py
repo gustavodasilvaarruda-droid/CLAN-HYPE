@@ -65,7 +65,7 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
                 contas = db.table('hype_wallet_accounts').select('balance').eq('owner_id',email).limit(1).execute().data or []
                 saldo = int(contas[0]['balance']) if contas else 0
                 movimentos = db.table('hype_wallet_entries').select('kind,delta,created_at').eq('owner_id',email).order('created_at',desc=True).limit(30).execute().data or []
-                depositos = db.table('hype_wallet_deposit_requests').select('id,amount,status,created_at,note').eq('owner_id',email).order('created_at',desc=True).limit(15).execute().data or []
+                depositos = db.table('hype_wallet_deposit_requests').select('id,amount,status,created_at,note,reported_at').eq('owner_id',email).order('created_at',desc=True).limit(15).execute().data or []
             except Exception:
                 flash('A carteira está temporariamente indisponível. Tente mais tarde.', 'erro')
                 db = None
@@ -96,6 +96,26 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
             flash('Não foi possível solicitar o depósito. Confira se já existem pedidos pendentes.', 'erro')
         return redirect(url_for('hype_wallet.carteira'))
 
+
+    @bp.route('/carteira-hype/deposito/<uuid:request_id>/informar-pagamento', methods=['POST'])
+    @login_required
+    def informar_pagamento(request_id):
+        email = _member_email()
+        db = _service_client()
+        if not _deposits_enabled(db):
+            flash('Depósitos desativados até a conclusão dos testes.', 'erro')
+            return redirect(url_for('hype_wallet.carteira'))
+        try:
+            db.rpc('hype_wallet_report_deposit',{
+                'p_request_id': str(request_id),
+                'p_owner_id': email,
+                'p_note': (request.form.get('referencia') or '').strip()[:180]
+            }).execute()
+            flash('Pagamento informado. Aguarde o líder conferir o recebimento no jogo.', 'sucesso')
+        except Exception:
+            flash('Não foi possível informar o pagamento. Atualize sua carteira e confira o pedido.', 'erro')
+        return redirect(url_for('hype_wallet.carteira'))
+
     @bp.route('/admin/carteira-hype', methods=['GET'])
     @login_required
     def admin_depositos():
@@ -104,7 +124,7 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
         pendentes = []
         if db:
             try:
-                pendentes = db.table('hype_wallet_deposit_requests').select('id,owner_id,amount,created_at,status').eq('status','pending').order('created_at').limit(100).execute().data or []
+                pendentes = db.table('hype_wallet_deposit_requests').select('id,owner_id,amount,created_at,status,payment_note,reported_at').in_('status',['pending','reported']).order('created_at').limit(100).execute().data or []
             except Exception:
                 flash('Não foi possível carregar os depósitos pendentes.', 'erro')
         return render_template('hype_wallet.html', administrador=True, carteira_ativa=bool(db),
