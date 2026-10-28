@@ -19,6 +19,9 @@ class FakeQuery:
     def eq(self, *args, **kwargs):
         return self
 
+    def in_(self, *args, **kwargs):
+        return self
+
     def order(self, *args, **kwargs):
         return self
 
@@ -128,6 +131,40 @@ class WalletRoutesTest(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.db.calls, [])
 
+
+    def test_member_reported_payment_calls_rpc(self):
+        self.login('member@test.invalid')
+        with patch('modules.hype_wallet._service_client', return_value=self.db):
+            with patch('modules.hype_wallet._flag_enabled', return_value=True):
+                response = self.client.post(
+                    '/carteira-hype/deposito/25f29cf8-8ff9-459d-80d0-e760e5e5edc0/informar-pagamento',
+                    data={'referencia': 'Pagamento enviado no Minecraft'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.db.calls[0][0], 'hype_wallet_report_deposit')
+        self.assertEqual(self.db.calls[0][1]['p_owner_id'], 'member@test.invalid')
+
+    def test_disabled_member_report_never_calls_rpc(self):
+        self.login('member@test.invalid')
+        with patch('modules.hype_wallet._service_client', return_value=self.db):
+            with patch('modules.hype_wallet._flag_enabled', return_value=False):
+                response = self.client.post(
+                    '/carteira-hype/deposito/25f29cf8-8ff9-459d-80d0-e760e5e5edc0/informar-pagamento')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.db.calls, [])
+
+    def test_unauthorized_member_cannot_report_payment(self):
+        self.login('guest@test.invalid')
+        response = self.client.post(
+            '/carteira-hype/deposito/25f29cf8-8ff9-459d-80d0-e760e5e5edc0/informar-pagamento')
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_queue_is_readable(self):
+        self.login('leader@test.invalid')
+        with patch('modules.hype_wallet._service_client', return_value=self.db):
+            with patch('modules.hype_wallet._flag_enabled', return_value=False):
+                response = self.client.get('/admin/carteira-hype')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Admin=True', response.data)
 
 if __name__ == '__main__':
     unittest.main()
