@@ -4325,25 +4325,32 @@ def gerar_chave_torneio(torneio_id):
     if len(inscritos)<2:
         flash('São necessários pelo menos 2 participantes.','erro'); return redirect(url_for('admin_conteudo'))
     try:
-        supabase.table('partidas_torneio').delete().eq('torneio_id',torneio_id).execute()
-        # Chave inicial determinística pela ordem de inscrição.
-        inscritos=sorted(inscritos,key=lambda x:(x.get('created_at') or '',x.get('id') or 0))
+        # Nao apagar resultados de um torneio que ja teve sorteio.
+        if _safe_table('partidas_torneio', 'id', torneio_id=torneio_id):
+            flash('Este torneio ja possui chaveamento. Os resultados foram preservados.', 'info')
+            return redirect(url_for('admin_chave_torneio', torneio_id=torneio_id))
+        jogadores=[{'email':x.get('usuario_email'),'nick':x.get('nick_jogo')} for x in inscritos]
+        rng=secrets.SystemRandom()
+        rng.shuffle(jogadores)
         potencia=1
-        while potencia<len(inscritos): potencia*=2
-        jogadores=[{'email':x.get('usuario_email'),'nick':x.get('nick_jogo')} for x in inscritos]+[None]*(potencia-len(inscritos))
-        ordem=1
-        for i in range(0,potencia,2):
-            a,b=jogadores[i],jogadores[i+1]
-            vencedor=a or b
-            payload={'torneio_id':torneio_id,'rodada':1,'ordem':ordem,
-                     'jogador1_email':a.get('email') if a else None,'jogador1_nick':a.get('nick') if a else 'BYE',
+        while potencia<len(jogadores): potencia*=2
+        # Distribuir BYEs individuais: nunca criar confronto BYE x BYE.
+        confrontos_diretos=len(jogadores)-potencia//2
+        pares=[(jogadores[i],jogadores[i+1]) for i in range(0,confrontos_diretos*2,2)]
+        pares.extend((j,None) for j in jogadores[confrontos_diretos*2:])
+        rng.shuffle(pares)
+        payloads=[]
+        for ordem,(a,b) in enumerate(pares,1):
+            vencedor=a if b is None else None
+            payloads.append({'torneio_id':torneio_id,'rodada':1,'ordem':ordem,
+                     'jogador1_email':a.get('email'),'jogador1_nick':a.get('nick'),
                      'jogador2_email':b.get('email') if b else None,'jogador2_nick':b.get('nick') if b else 'BYE',
-                     'status':'finalizada' if vencedor and (not a or not b) else 'pendente',
-                     'vencedor_email':vencedor.get('email') if vencedor and (not a or not b) else None,
-                     'vencedor_nick':vencedor.get('nick') if vencedor and (not a or not b) else None}
-            supabase.table('partidas_torneio').insert(payload).execute(); ordem+=1
+                     'status':'finalizada' if vencedor else 'pendente',
+                     'vencedor_email':vencedor.get('email') if vencedor else None,
+                     'vencedor_nick':vencedor.get('nick') if vencedor else None})
+        supabase.table('partidas_torneio').insert(payloads).execute()
         supabase.table('torneios').update({'inscricoes_abertas':False,'status_torneio':'em_andamento'}).eq('id',torneio_id).execute()
-        flash('Chaveamento criado e inscrições fechadas.','sucesso')
+        flash('Confrontos sorteados aleatoriamente, com BYEs distribuidos sem jogos vazios.', 'sucesso')
     except Exception as e: flash(f'Erro ao gerar chave: {e}','erro')
     return redirect(url_for('admin_conteudo'))
 
@@ -7459,6 +7466,12 @@ app.register_blueprint(create_builders_hub_blueprint(
     supabase, login_required, _safe_table, _is_admin
 ))
 
+
+# Financeiro HYPE: isencao de comissoes anteriores a nova cobranca.
+from modules.hype_finance_amnesty import create_finance_amnesty_blueprint
+app.register_blueprint(create_finance_amnesty_blueprint(
+    supabase, login_required, _is_admin, registrar_log
+))
 
 from modules.events_v26 import create_events_v26_blueprint
 app.register_blueprint(create_events_v26_blueprint(
