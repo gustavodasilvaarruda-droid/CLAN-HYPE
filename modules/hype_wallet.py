@@ -11,8 +11,14 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, s
 from supabase import create_client
 
 
+def _flag_enabled(name):
+    return os.environ.get(name, '').strip().lower() in ('1', 'true', 'yes', 'on', 'sim')
+
+
 @lru_cache(maxsize=1)
 def _service_client():
+    if not _flag_enabled('HYPE_WALLET_ENABLED'):
+        return None
     url = os.environ.get('SUPABASE_URL', '').strip()
     key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
     if not url or not key:
@@ -27,6 +33,9 @@ def _service_client():
 
 def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
     bp = Blueprint('hype_wallet', __name__)
+
+    def _deposits_enabled(db):
+        return bool(db) and _flag_enabled('HYPE_WALLET_DEPOSITS_ENABLED')
 
     @bp.after_request
     def private_cache(response):
@@ -61,15 +70,16 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
                 flash('A carteira está temporariamente indisponível. Tente mais tarde.', 'erro')
                 db = None
         return render_template('hype_wallet.html', saldo=saldo, movimentos=movimentos,
-                               depositos=depositos, carteira_ativa=bool(db), administrador=False)
+                               depositos=depositos, carteira_ativa=bool(db),
+                               depositos_ativos=_deposits_enabled(db), administrador=False)
 
     @bp.route('/carteira-hype/depositar', methods=['POST'])
     @login_required
     def solicitar_deposito():
         email = _member_email()
         db = _service_client()
-        if not db:
-            flash('Carteira ainda não habilitada no servidor.', 'erro')
+        if not _deposits_enabled(db):
+            flash('Depósitos desativados até a conclusão dos testes.', 'erro')
             return redirect(url_for('hype_wallet.carteira'))
         entrada = (request.form.get('valor') or '').strip()
         if not re.fullmatch(r'[0-9]{1,13}', entrada):
@@ -98,6 +108,7 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
             except Exception:
                 flash('Não foi possível carregar os depósitos pendentes.', 'erro')
         return render_template('hype_wallet.html', administrador=True, carteira_ativa=bool(db),
+                               depositos_ativos=_deposits_enabled(db),
                                pendentes=pendentes, saldo=0, depositos=[], movimentos=[])
 
     @bp.route('/admin/carteira-hype/<uuid:request_id>/<acao>', methods=['POST'])
@@ -105,8 +116,8 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
     def admin_decidir_deposito(request_id, acao):
         actor = _admin_email()
         db = _service_client()
-        if not db:
-            flash('Configure a conexão administrativa da carteira.', 'erro')
+        if not _deposits_enabled(db):
+            flash('Confirmações bloqueadas enquanto os depósitos estiverem desativados.', 'erro')
             return redirect(url_for('hype_wallet.admin_depositos'))
         if acao not in ('confirmar','recusar'):
             abort(404)
