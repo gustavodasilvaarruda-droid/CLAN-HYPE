@@ -1,0 +1,27 @@
+name: HYPE Wallet tests
+on:
+  pull_request:
+    paths:
+      - "modules/hype_wallet.py"
+      - "templates/hype_wallet.html"
+      - "tests/test_hype_wallet_routes.py"
+      - ".github/workflows/hype-wallet-tests.yml"
+  push:
+    branches:
+      - "feature/hype-wallet-*"
+jobs:
+  wallet-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Check wallet syntax
+        run: python -m compileall -q modules/hype_wallet.py hype_finance_core.py tests/test_hype_wallet_routes.py
+      - name: Run isolated wallet route tests
+        run: python -m unittest discover -s tests -p "test_hype_wallet_routes.py" -v
