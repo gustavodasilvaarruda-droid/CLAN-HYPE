@@ -1,0 +1,93 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Carteira HYPE | Economia do Clã{% endblock %}
+{% block body_class %}carteira-hype-page{% endblock %}
+{% block content %}
+<section class="wallet-wrap">
+  <header class="wallet-hero">
+    <div>
+      <span class="wallet-eyebrow">ECONOMIA • MOEDAS DO MINECRAFT</span>
+      <h1>{{ 'Confirmação de Depósitos' if administrador else 'Minha Carteira HYPE' }}</h1>
+      <p>{{ 'Confirme somente depois de receber as moedas dentro do jogo.' if administrador else 'Acompanhe seus créditos, depósitos e movimentações do HYPE.' }}</p>
+    </div>
+    <a class="wallet-back" href="{{url_for('painel')}}">Voltar ao painel</a>
+  </header>
+  {% if not carteira_ativa %}
+    <div class="wallet-alert">A Carteira HYPE ainda está indisponível neste servidor. Nenhum depósito pode ser confirmado agora.</div>
+  {% endif %}
+  {% if carteira_ativa and not depositos_ativos %}<div class="wallet-alert">Modo de consulta: depósitos e confirmações ainda não estão habilitados.</div>{% endif %}
+  {% if administrador %}
+    <div class="wallet-panel">
+      <h2>Solicitações de depósito</h2>
+      <p class="wallet-muted">O jogador deve primeiro informar que pagou. Confirme somente após verificar o recebimento das moedas no Minecraft.</p>
+      <div class="wallet-list">
+      {% for d in pendentes %}
+        <article class="wallet-item">
+          <div><strong>{{ d.owner_id }}</strong><small>{{d.created_at[:16]|replace('T',' ')}}</small><span class="wallet-status wallet-{{d.status}}">{{'Pagamento informado' if d.status=='reported' else 'Aguardando jogador'}}</span>{% if d.payment_note %}<small>Referência: {{d.payment_note}}</small>{% endif %}</div>
+          <div class="wallet-value positive">{{d.amount|preco}}</div>
+          <form method="post" action="{{url_for('hype_wallet.admin_decidir_deposito',request_id=d.id,acao='confirmar')}}" onsubmit="return confirm('Você recebeu este valor no Minecraft e deseja creditar na carteira?')">
+            <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+            <button type="submit" class="wallet-submit" {{'disabled' if not depositos_ativos or d.status!='reported' else ''}}>Confirmar recebimento</button>
+          </form>
+          <form method="post" action="{{url_for('hype_wallet.admin_decidir_deposito',request_id=d.id,acao='recusar')}}" onsubmit="return confirm('Recusar a solicitação sem creditar moedas?')">
+            <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+            <input name="motivo" maxlength="500" placeholder="Motivo (opcional)" aria-label="Motivo da recusa">
+            <button type="submit" class="wallet-secondary" {{'disabled' if not depositos_ativos else ''}}>Recusar</button>
+          </form>
+        </article>
+      {% else %}
+        <div class="wallet-empty">Nenhum depósito aguardando confirmação.</div>
+      {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <div class="wallet-summary">
+      <article class="wallet-balance"><span>Saldo disponível</span><strong>{{saldo|preco}}</strong><small>Moedas internas do jogo — não é dinheiro real</small></article>
+      <article class="wallet-panel">
+        <h2>Solicitar depósito</h2>
+        <p class="wallet-muted">Solicite o crédito e pague ao responsável dentro do Minecraft. O saldo só aparece após a confirmação do líder.</p>
+        <form method="post" action="{{url_for('hype_wallet.solicitar_deposito')}}" class="wallet-form">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+          <label for="wallet-value">Valor em moedas</label>
+          <input id="wallet-value" name="valor" type="number" inputmode="numeric" min="1" max="1000000000000" placeholder="150000" required {{'disabled' if not depositos_ativos else ''}}>
+          <button class="wallet-submit" type="submit" {{'disabled' if not depositos_ativos else ''}}>Solicitar depósito</button>
+        </form>
+      </article>
+    </div>
+    <div class="wallet-panels">
+      <section class="wallet-panel">
+        <h2>Meus depósitos</h2>
+        <div class="wallet-list">
+        {% for d in depositos %}
+          <div class="wallet-item">
+            <div><strong>{{d.amount|preco}}</strong><small>{{d.created_at[:16]|replace('T',' ')}}</small></div>
+            <span class="wallet-status wallet-{{d.status}}">{{'Aguardando pagamento' if d.status=='pending' else 'Aguardando conferência do líder' if d.status=='reported' else 'Confirmado' if d.status=='confirmed' else 'Recusado'}}</span>
+            {% if d.status=='pending' %}
+            <form method="post" action="{{url_for('hype_wallet.informar_pagamento',request_id=d.id)}}" onsubmit="return confirm('Você realmente enviou as moedas para o responsável no Minecraft?')">
+              <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+              <input name="referencia" maxlength="180" placeholder="Referência do pagamento (opcional)" aria-label="Referência do pagamento no jogo">
+              <button type="submit" class="wallet-submit" {{'disabled' if not depositos_ativos else ''}}>Já paguei no jogo</button>
+            </form>
+            {% endif %}
+          </div>
+        {% else %}<div class="wallet-empty">Você ainda não solicitou depósitos.</div>{% endfor %}
+        </div>
+      </section>
+      <section class="wallet-panel">
+        <h2>Meu extrato</h2>
+        <div class="wallet-list">
+        {% for m in movimentos %}
+          <div class="wallet-item">
+            <div><strong>{{ 'Depósito' if m.kind=='deposit' else 'Compra' if m.kind=='purchase' else 'Estorno' if m.kind=='refund' else 'Ajuste' }}</strong><small>{{m.created_at[:16]|replace('T',' ')}}</small></div>
+            <strong class="wallet-value {{'positive' if m.delta > 0 else 'negative'}}">{{'+' if m.delta>0 else '-'}}{{(m.delta|abs)|preco}}</strong>
+          </div>
+        {% else %}<div class="wallet-empty">Nenhuma movimentação confirmada.</div>{% endfor %}
+        </div>
+      </section>
+    </div>
+    <p class="wallet-disclaimer">Pagamento de Breed com carteira e repasses automáticos serão habilitados somente após a conclusão dos testes de integração.</p>
+  {% endif %}
+</section>
+<style>
+.wallet-wrap{max-width:1220px;margin:0 auto;padding:20px 4px 64px}.wallet-hero{display:flex;justify-content:space-between;gap:20px;align-items:center;background:radial-gradient(circle at right,rgba(223,172,45,.16),transparent 45%),linear-gradient(125deg,#19170f,#090909);border:1px solid #4c3a1b;border-radius:24px;padding:30px;margin-bottom:16px}.wallet-eyebrow{font-size:10px;font-weight:900;letter-spacing:.15em;color:#e2bc53}.wallet-hero h1{font-size:clamp(28px,4vw,46px);color:#f6e2ab;margin:7px 0}.wallet-hero p,.wallet-muted{color:#999;font-size:13px;line-height:1.5}.wallet-back{color:#e4bd59;text-decoration:none;padding:10px 14px;border:1px solid #6c5428;border-radius:10px;white-space:nowrap}.wallet-summary{display:grid;grid-template-columns:1fr 1fr;gap:16px}.wallet-balance,.wallet-panel{background:#101010;border:1px solid #342d1c;border-radius:18px;padding:24px}.wallet-balance{display:flex;flex-direction:column;justify-content:center;background:linear-gradient(140deg,#161914,#0d0c09)}.wallet-balance>span{font-size:13px;color:#aaa;font-weight:700}.wallet-balance strong{color:#f1c75b;font-size:clamp(40px,6vw,65px);line-height:1.2}.wallet-balance small{color:#777}.wallet-panel h2{font-size:19px;color:#f0d182;margin:0 0 9px}.wallet-form{display:grid;gap:10px;margin-top:18px}.wallet-form label{color:#bbb;font-size:12px}.wallet-form input,.wallet-item input{width:100%;background:#0a0a0a;color:#fff;border:1px solid #3a3426;border-radius:9px;padding:12px}.wallet-submit,.wallet-secondary{cursor:pointer;font-weight:900;border:0;border-radius:10px;padding:11px 14px;background:#d8ac39;color:#151007}.wallet-secondary{background:#242424;color:#e6a1a1;border:1px solid #5a3737}.wallet-submit:disabled,.wallet-secondary:disabled{opacity:.5;cursor:not-allowed}.wallet-panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.wallet-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid #27231a}.wallet-item:last-child{border-bottom:0}.wallet-item strong{color:#eee;overflow-wrap:anywhere}.wallet-item small{display:block;color:#686868;font-size:10px;margin-top:3px}.wallet-status{font-size:10px;font-weight:900;border:1px solid #383021;color:#deb65e;padding:7px 10px;border-radius:999px;text-align:center}.wallet-reported{color:#8fb8ff}.wallet-confirmed{color:#79cf8f}.wallet-rejected{color:#ed8585}.wallet-value{font-size:17px;white-space:nowrap}.wallet-value.positive{color:#89d99b}.wallet-value.negative{color:#ef9191}.wallet-empty{padding:18px 0;color:#777;font-size:13px}.wallet-disclaimer,.wallet-alert{margin-top:16px;color:#dbb45d;font-size:12px}.wallet-alert{padding:14px;border:1px solid #714a2b;background:#24180d;border-radius:11px}@media(max-width:850px){.wallet-summary,.wallet-panels{grid-template-columns:1fr}.wallet-hero{align-items:flex-start;flex-direction:column}.wallet-item{flex-wrap:wrap}}
+</style>
+{% endblock %}
