@@ -37,6 +37,22 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
     def _deposits_enabled(db):
         return bool(db) and _flag_enabled('HYPE_WALLET_DEPOSITS_ENABLED')
 
+    def _audit_consistent(db):
+        """Não confirmar depósitos quando o livro-razão estiver indisponível/divergente."""
+        try:
+            rows = db.rpc('hype_wallet_integrity_report', {}).execute().data or []
+            if len(rows) != 1:
+                return False
+            r = rows[0]
+            fields = ('mismatched_accounts', 'confirmed_without_entry',
+                      'entries_without_confirmation')
+            return (all(type(r.get(k)) is int and r[k] == 0 for k in fields)
+                    and type(r.get('ledger_sum')) is int
+                    and type(r.get('balances_sum')) is int
+                    and r['ledger_sum'] == r['balances_sum'])
+        except Exception:
+            return False
+
     @bp.after_request
     def private_cache(response):
         response.headers['Cache-Control'] = 'no-store, private'
@@ -151,6 +167,9 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
         # A equipe confere a transferência no servidor de Minecraft antes de confirmar.
         try:
             if acao == 'confirmar':
+                if not _audit_consistent(db):
+                    flash('Conferência financeira pendente ou divergente. Depósito não aprovado.', 'erro')
+                    return redirect(url_for('hype_wallet.admin_depositos'))
                 db.rpc('hype_wallet_confirm_deposit',{'p_request_id':str(request_id),'p_actor_id':actor}).execute()
                 flash('Depósito confirmado e saldo creditado uma única vez.', 'sucesso')
             else:

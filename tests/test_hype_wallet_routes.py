@@ -127,8 +127,40 @@ class WalletRoutesTest(unittest.TestCase):
             with patch('modules.hype_wallet._flag_enabled', return_value=True):
                 response = self.client.post('/admin/carteira-hype/25f29cf8-8ff9-459d-80d0-e760e5e5edc0/confirmar')
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(self.db.calls[0][0], 'hype_wallet_confirm_deposit')
-        self.assertEqual(self.db.calls[0][1]['p_actor_id'], 'leader@test.invalid')
+        self.assertEqual([name for name, _ in self.db.calls],
+                         ['hype_wallet_integrity_report', 'hype_wallet_confirm_deposit'])
+        self.assertEqual(self.db.calls[1][1]['p_actor_id'], 'leader@test.invalid')
+
+    def test_admin_confirmation_fails_closed_if_audit_is_unavailable(self):
+        self.login('leader@test.invalid')
+        self.db.rpc = lambda name, payload: (
+            (_ for _ in ()).throw(RuntimeError('audit unavailable'))
+            if name == 'hype_wallet_integrity_report' else FakeQuery([])
+        )
+        with patch('modules.hype_wallet._service_client', return_value=self.db):
+            with patch('modules.hype_wallet._flag_enabled', return_value=True):
+                response = self.client.post('/admin/carteira-hype/25f29cf8-8ff9-459d-80d0-e760e5e5edc0/confirmar')
+        self.assertEqual(response.status_code, 302)
+
+    def test_admin_confirmation_fails_closed_on_mismatched_balances(self):
+        self.login('leader@test.invalid')
+        old_rpc = self.db.rpc
+        def mismatched_rpc(name, payload):
+            if name == 'hype_wallet_integrity_report':
+                return FakeQuery([{
+                    'accounts': 1, 'pending': 0, 'reported': 1, 'confirmed': 1,
+                    'ledger_sum': 150000, 'balances_sum': 160000,
+                    'mismatched_accounts': 1, 'confirmed_without_entry': 0,
+                    'entries_without_confirmation': 0
+                }])
+            return old_rpc(name, payload)
+        with patch.object(self.db, 'rpc', side_effect=mismatched_rpc) as rpc_mock:
+            with patch('modules.hype_wallet._service_client', return_value=self.db):
+                with patch('modules.hype_wallet._flag_enabled', return_value=True):
+                    response = self.client.post('/admin/carteira-hype/25f29cf8-8ff9-459d-80d0-e760e5e5edc0/confirmar')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual([c.args[0] for c in rpc_mock.call_args_list],
+                         ['hype_wallet_integrity_report'])
 
     def test_admin_disabled_confirmation_does_not_call_rpc(self):
         self.login('leader@test.invalid')
