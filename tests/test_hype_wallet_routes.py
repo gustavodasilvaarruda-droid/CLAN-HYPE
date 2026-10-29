@@ -46,6 +46,13 @@ class FakeDB:
 
     def rpc(self, name, payload):
         self.calls.append((name, payload))
+        if name == 'hype_wallet_integrity_report':
+            return FakeQuery([{
+                'accounts': 1, 'pending': 0, 'reported': 0, 'confirmed': 1,
+                'ledger_sum': 150000, 'balances_sum': 150000,
+                'mismatched_accounts': 0, 'confirmed_without_entry': 0,
+                'entries_without_confirmation': 0
+            }])
         return FakeQuery([])
 
 
@@ -55,7 +62,7 @@ class WalletRoutesTest(unittest.TestCase):
         self.app.secret_key = 'only-for-unit-tests'
         self.app.testing = True
         self.app.jinja_loader = DictLoader({
-            'hype_wallet.html': 'Saldo={{saldo}},Ativa={{carteira_ativa}},Depositos={{depositos_ativos}},Admin={{administrador}}'
+            'hype_wallet.html': 'Saldo={{saldo}},Ativa={{carteira_ativa}},Depositos={{depositos_ativos}},Admin={{administrador}},Integridade={{relatorio.accounts if relatorio else "indisponivel"}}'
         })
         self.app.register_blueprint(create_hype_wallet_blueprint(
             login_required=lambda f: f,
@@ -158,6 +165,13 @@ class WalletRoutesTest(unittest.TestCase):
             '/carteira-hype/deposito/25f29cf8-8ff9-459d-80d0-e760e5e5edc0/informar-pagamento')
         self.assertEqual(response.status_code, 403)
 
+    def test_non_admin_cannot_view_integrity_report(self):
+        self.login('member@test.invalid')
+        with patch('modules.hype_wallet._service_client', return_value=self.db):
+            response = self.client.get('/admin/carteira-hype')
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(any(name=='hype_wallet_integrity_report' for name,_ in self.db.calls))
+
     def test_admin_queue_is_readable(self):
         self.login('leader@test.invalid')
         with patch('modules.hype_wallet._service_client', return_value=self.db):
@@ -165,6 +179,8 @@ class WalletRoutesTest(unittest.TestCase):
                 response = self.client.get('/admin/carteira-hype')
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Admin=True', response.data)
+        self.assertIn(b'Integridade=1', response.data)
+        self.assertIn(('hype_wallet_integrity_report', {}), self.db.calls)
 
 if __name__ == '__main__':
     unittest.main()
