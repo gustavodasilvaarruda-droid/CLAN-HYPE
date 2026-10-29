@@ -122,13 +122,20 @@ def create_hype_wallet_blueprint(login_required, membro_ativo, is_admin):
         _admin_email()
         db = _service_client()
         pendentes = []
+        relatorio = None
         if db:
             try:
                 pendentes = db.table('hype_wallet_deposit_requests').select('id,owner_id,amount,created_at,status,payment_note,reported_at').in_('status',['pending','reported']).order('created_at').limit(100).execute().data or []
             except Exception:
                 flash('Não foi possível carregar os depósitos pendentes.', 'erro')
+            try:
+                dados = db.rpc('hype_wallet_integrity_report', {}).execute().data or []
+                if dados:
+                    relatorio = dados[0]
+            except Exception:
+                flash('Auditoria financeira indisponível. Não libere depósitos sem conferir a configuração.', 'erro')
         return render_template('hype_wallet.html', administrador=True, carteira_ativa=bool(db),
-                               depositos_ativos=_deposits_enabled(db),
+                               depositos_ativos=_deposits_enabled(db), relatorio=relatorio,
                                pendentes=pendentes, saldo=0, depositos=[], movimentos=[])
 
     @bp.route('/admin/carteira-hype/<uuid:request_id>/<acao>', methods=['POST'])
