@@ -1,0 +1,27 @@
+/* Seleção regional HYPE: um filtro extra, mantendo o visual preto/dourado. */
+@media (min-width: 900px) {
+  .hype-breed-reference-page .breed-ref-filters {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  }
+}
+@media (min-width: 561px) and (max-width: 899px) {
+  .hype-breed-reference-page .breed-ref-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.hype-breed-reference-page .breed-ref-poke-card[data-region]:not([data-region="normal"])::after {
+  content: attr(data-region);
+  position: absolute;
+  top: 6px;
+  left: 7px;
+  font-size: .52rem;
+  letter-spacing: .05em;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #f1d385;
+  background: rgba(32, 24, 7, .86);
+  padding: 2px 4px;
+  border: 1px solid rgba(235, 185, 63, .40);
+  border-radius: 4px;
+  pointer-events: none;
+}
