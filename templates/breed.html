@@ -371,7 +371,7 @@ function renderDetail(loading=false){
   $('#detailTypes').innerHTML=(d.types||[]).map(t=>`<span class="type-${t}">${pretty(t)}</span>`).join('')||(loading?'<span class="breed-loading-chip">Carregando...</span>':'<span>—</span>');
   $('#detailHeight').textContent=d.height!=null?(d.height/10).toFixed(1)+' m':(loading?'...':'—');
   $('#detailWeight').textContent=d.weight!=null?(d.weight/10).toFixed(1)+' kg':(loading?'...':'—');
-  $('#detailEgg').textContent=(d.egg_groups||[]).map(pretty).join(' / ')||(loading?'Carregando...':'—');
+  $('#detailEgg').textContent=d.is_baby?'Filhote: reprodução dos pais evoluídos':((d.egg_groups||[]).map(pretty).join(' / ')||(loading?'Carregando...':'—'));
   $('#detailGeneration').textContent=d.generation?romanGen(d.generation):(loading?'...':'—');
   $('#detailAbilities').textContent=(d.abilities||[]).map(a=>pretty(a.name)+(a.hidden?' (HA)':'')).join(', ')||(loading?'Carregando...':'—');
   const stats=d.stats||[], total=stats.reduce((n,x)=>n+(Number(x.value)||0),0); $('#detailTotal').textContent=stats.length?total:(loading?'...':'—');
