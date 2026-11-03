@@ -345,7 +345,9 @@ async function selectPokemon(id,name){
       renderDetail(false);
       throw new Error(info.motivo||'Este Pokémon não pode ser solicitado no Breed.');
     }
-    info=await enrichPokemonInfoClient(id,info);
+    // Libera a próxima etapa assim que a API HYPE confirma a espécie.
+    // Dados visuais externos (stats/tipos) são opcionais e nunca podem travar o pedido.
+    if(!selected||selected.id!==id)return;
     selected={id,name:info.name||name,info,validated:true};
     idInput.value=String(id); search.value=info.display_name||pretty(selected.name);
     $('#pokemonNext').disabled=false; $('#breed_special_alert').hidden=!info.breed_especial;
@@ -354,6 +356,9 @@ async function selectPokemon(id,name){
     const catLabel=info.categoria_label||String(info.categoria||'comum').replace('_',' ').toUpperCase();
     const reason=info.classificacao_motivo?' • '+info.classificacao_motivo:'';
     setStatus(`Pokémon válido • ${catLabel}${reason}${info.nota_bebe?' • Filhote disponível por reprodução da evolução':''} ✓`);
+    enrichPokemonInfoClient(id,info).then(()=>{
+      if(selected&&selected.id===id&&selected.info===info&&selected.validated)renderDetail(false);
+    }).catch(()=>{});
   }catch(e){
     if(selected&&selected.id===id){selected.validated=false;$('#pokemonNext').disabled=true;renderDetail(false)}
     setStatus((e&&e.message)||'Não foi possível validar o Pokémon.',true);
@@ -367,7 +372,7 @@ function renderDetail(loading=false){
   $('#detailName').textContent=d.display_name||pretty(selected.name); $('#detailNumber').textContent='#'+String(selected.id).padStart(4,'0');
   const art=d.sprite||spriteFor(selected.id,true), preview=$('#pokemon_preview');
   preview.src=art; preview.onerror=()=>{preview.onerror=null;preview.src=spriteFor(selected.id,false)};
-  $('.selectedPokemonArt').forEach(x=>x.src=art); $('.selectedPokemonName').forEach(x=>x.textContent=d.display_name||pretty(selected.name));
+  $$('.selectedPokemonArt').forEach(x=>x.src=art); $$('.selectedPokemonName').forEach(x=>x.textContent=d.display_name||pretty(selected.name));
   $('#detailTypes').innerHTML=(d.types||[]).map(t=>`<span class="type-${t}">${pretty(t)}</span>`).join('')||(loading?'<span class="breed-loading-chip">Carregando...</span>':'<span>—</span>');
   $('#detailHeight').textContent=d.height!=null?(d.height/10).toFixed(1)+' m':(loading?'...':'—');
   $('#detailWeight').textContent=d.weight!=null?(d.weight/10).toFixed(1)+' kg':(loading?'...':'—');
