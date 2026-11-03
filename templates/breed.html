@@ -1,13 +1,16 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}HYPE Breed • Fazer Pedido{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3200">{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{url_for('static',filename='breed_pricing_v313.css')}}?v=3200">
+<link rel="stylesheet" href="{{url_for('static',filename='breed_regional_v1.css')}}?v=1">
+{% endblock %}
 {% block body_class %}hype-breed-page hype-breed-reference-page{% endblock %}
 {% block content %}
 <div class="breed-ref-shell" id="fazer-pedido">
   <section class="breed-ref-hero">
     <div class="breed-ref-hero-copy">
       <span class="breed-ref-kicker">HYPE BREED</span>
-      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PRICING 4.1 • V34.6</small>
+      <h1>FAZER PEDIDO</h1><small class="breed-build-marker">BREED PRICING 4.1 • V34.7</small>
       <p>Monte seu Breed em etapas. Escolha o Pokémon, configure as características, revise e envie.</p>
     </div>
     <div class="breed-ref-hero-mark">HYPE</div>
@@ -39,6 +42,7 @@
             <kbd>ESC</kbd><div id="pokemon_results" class="pokemon-results" hidden></div>
           </div>
           <div class="breed-ref-filters">
+            <select id="regionFilter" aria-label="Filtrar formas regionais"><option value="">Todas as regiões</option><option value="normal">Formas normais</option><option value="alola">Alola</option><option value="galar">Galar</option><option value="hisui">Hisui</option><option value="paldea">Paldea</option></select>
             <select id="typeFilter"><option value="">Todos os Tipos</option></select>
             <select id="eggFilter"><option value="">Todos os Egg Groups</option></select>
             <select id="sortFilter"><option value="name">Ordenar por Nome</option><option value="number">Número da Pokédex</option></select>
@@ -156,6 +160,7 @@ let selected=null, currentStep=1, searchTimer=null, priceTimer=null, lastPrice=n
 const favorites=new Set(JSON.parse(localStorage.getItem('hypeBreedFavorites')||'[]').map(Number));
 let onlyFavorites=false;
 const pretty=v=>(v||'').replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase());
+const regionFilter=$('#regionFilter');
 const romanGen=v=>({'generation-i':'I','generation-ii':'II','generation-iii':'III','generation-iv':'IV','generation-v':'V','generation-vi':'VI','generation-vii':'VII','generation-viii':'VIII','generation-ix':'IX'}[v]||pretty(v));
 
 function setStatus(msg,error=false){status.textContent=msg;status.classList.toggle('error',error)}
@@ -171,7 +176,8 @@ function localCatalog(){
     id:+c.dataset.id,
     name:c.dataset.name,
     display_name:pretty(c.dataset.name),
-    sprite:(c.querySelector('img')||{}).src||''
+    sprite:(c.querySelector('img')||{}).src||'',
+    region:'normal'
   }));
 }
 const quickGrid=$('#hypeQuickPokemonGrid');
@@ -190,7 +196,8 @@ function spriteFor(id,artwork=true){
 function normalizePokemonItem(x){
   const id=Number(x&&x.id), name=String((x&&x.name)||'').trim().toLowerCase();
   if(!id||!name)return null;
-  return {id,name,display_name:x.display_name||pretty(name),sprite:x.sprite||spriteFor(id,true)};
+  const region=String(x.region||'normal').toLowerCase();
+  return {id,name,region,display_name:x.display_name||pretty(name),sprite:x.sprite||spriteFor(id,true),species_id:Number(x.species_id||id)};
 }
 function uniquePokemon(items){
   const out=[],seen=new Set();
@@ -198,7 +205,7 @@ function uniquePokemon(items){
   return out;
 }
 function cardHTML(x){
-  return `<button type="button" class="breed-ref-poke-card search-generated" data-id="${x.id}" data-name="${x.name}" aria-label="Selecionar ${x.display_name}">
+  return `<button type="button" class="breed-ref-poke-card search-generated" data-id="${x.id}" data-name="${x.name}" data-region="${x.region}" aria-label="Selecionar ${x.display_name}">
     <span class="breed-card-star" title="Favoritar">${favorites.has(x.id)?'★':'☆'}</span>
     <img src="${x.sprite||spriteFor(x.id,true)}" alt="${x.display_name}" loading="lazy" data-fallback="${spriteFor(x.id,false)}">
     <strong>${x.display_name}</strong><small>#${String(x.id).padStart(4,'0')}</small><div class="breed-card-types"></div>
@@ -209,15 +216,17 @@ function attachImageFallbacks(root=document){
 }
 function paintPokemonGrid(found,limit=visibleLimit){
   const previousScroll=quickGrid.scrollTop;
-  const unique=uniquePokemon(found);
-  if(!unique.length){quickGrid.innerHTML='<div class="breed-search-empty">Nenhum Pokémon encontrado.</div>';return 0}
+  const region=regionFilter?.value||'';
+  const unique=uniquePokemon(found).filter(x=>!region||x.region===region);
+  if(!unique.length){quickGrid.innerHTML='<div class="breed-search-empty">Nenhum Pokémon encontrado nesta região.</div>';return 0}
   quickGrid.innerHTML=unique.slice(0,limit).map(cardHTML).join('');
   attachImageFallbacks(quickGrid); renderFavs();
   quickGrid.scrollTop=previousScroll;
   return Math.min(unique.length,limit);
 }
 function paintSearchResults(found){
-  const unique=uniquePokemon(found).slice(0,12);
+  const region=regionFilter?.value||'';
+  const unique=uniquePokemon(found).filter(x=>!region||x.region===region).slice(0,12);
   results.innerHTML=unique.map(x=>`<button type="button" class="pokemon-result" data-id="${x.id}" data-name="${x.name}"><img src="${x.sprite||spriteFor(x.id,false)}" alt=""><span>${x.display_name}</span><small>#${String(x.id).padStart(4,'0')}</small></button>`).join('');
   results.hidden=!unique.length; return unique.length;
 }
@@ -245,8 +254,17 @@ async function loadFullCatalog(){
         }
       }catch(_){ }
     }
-    fullCatalog=uniquePokemon([...seedCatalog,...remote]).sort((a,b)=>a.id-b.id);
-    catalogReady=fullCatalog.length>seedCatalog.length;
+    // Mantém as formas regionais mesmo se a PokéAPI ou o endpoint do HYPE estiverem indisponíveis.
+    let regionals=[];
+    try{
+      const response=await fetch('/static/breed_regional_forms.json',{cache:'force-cache'});
+      if(response.ok){
+        const data=await response.json();
+        regionals=(data.forms||[]).map(x=>({...x,display_name:pretty(x.name)}));
+      }
+    }catch(_){ }
+    fullCatalog=uniquePokemon([...seedCatalog,...remote,...regionals]).sort((a,b)=>a.id-b.id);
+    catalogReady=remote.length>100;
     return fullCatalog;
   })().finally(()=>{catalogLoading=null});
   return catalogLoading;
@@ -290,7 +308,7 @@ async function enrichPokemonInfoClient(id,info){
   try{
     const [pr,sr]=await Promise.all([
       fetch(`https://pokeapi.co/api/v2/pokemon/${id}/`,{cache:'force-cache'}),
-      fetch(`https://pokeapi.co/api/v2/pokemon-species/${id}/`,{cache:'force-cache'})
+      fetch(`https://pokeapi.co/api/v2/pokemon-species/${info.species_id||id}/`,{cache:'force-cache'})
     ]);
     const p=pr.ok?await pr.json():null, sp=sr.ok?await sr.json():null;
     if(p){
@@ -329,13 +347,13 @@ async function selectPokemon(id,name){
     }
     info=await enrichPokemonInfoClient(id,info);
     selected={id,name:info.name||name,info,validated:true};
-    idInput.value=String(id); search.value=pretty(selected.name);
+    idInput.value=String(id); search.value=info.display_name||pretty(selected.name);
     $('#pokemonNext').disabled=false; $('#breed_special_alert').hidden=!info.breed_especial;
     renderDetail(false);
     updateExtraPriceAlerts();
     const catLabel=info.categoria_label||String(info.categoria||'comum').replace('_',' ').toUpperCase();
     const reason=info.classificacao_motivo?' • '+info.classificacao_motivo:'';
-    setStatus(`Pokémon válido • ${catLabel}${reason} ✓`);
+    setStatus(`Pokémon válido • ${catLabel}${reason}${info.nota_bebe?' • Filhote disponível por reprodução da evolução':''} ✓`);
   }catch(e){
     if(selected&&selected.id===id){selected.validated=false;$('#pokemonNext').disabled=true;renderDetail(false)}
     setStatus((e&&e.message)||'Não foi possível validar o Pokémon.',true);
@@ -346,14 +364,14 @@ function renderDetail(loading=false){
   if(!selected)return; const d=selected.info||{};
   const empty=$('#detailEmpty'),content=$('#detailContent');
   empty.hidden=true; empty.style.display='none'; content.hidden=false; content.style.display='block';
-  $('#detailName').textContent=pretty(selected.name); $('#detailNumber').textContent='#'+String(selected.id).padStart(4,'0');
+  $('#detailName').textContent=d.display_name||pretty(selected.name); $('#detailNumber').textContent='#'+String(selected.id).padStart(4,'0');
   const art=d.sprite||spriteFor(selected.id,true), preview=$('#pokemon_preview');
   preview.src=art; preview.onerror=()=>{preview.onerror=null;preview.src=spriteFor(selected.id,false)};
-  $$('.selectedPokemonArt').forEach(x=>x.src=art); $$('.selectedPokemonName').forEach(x=>x.textContent=pretty(selected.name));
+  $('.selectedPokemonArt').forEach(x=>x.src=art); $('.selectedPokemonName').forEach(x=>x.textContent=d.display_name||pretty(selected.name));
   $('#detailTypes').innerHTML=(d.types||[]).map(t=>`<span class="type-${t}">${pretty(t)}</span>`).join('')||(loading?'<span class="breed-loading-chip">Carregando...</span>':'<span>—</span>');
   $('#detailHeight').textContent=d.height!=null?(d.height/10).toFixed(1)+' m':(loading?'...':'—');
   $('#detailWeight').textContent=d.weight!=null?(d.weight/10).toFixed(1)+' kg':(loading?'...':'—');
-  $('#detailEgg').textContent=(d.egg_groups||[]).map(pretty).join(' / ')||(loading?'Carregando...':'—');
+  $('#detailEgg').textContent=d.is_baby?'Filhote: reprodução dos pais evoluídos':((d.egg_groups||[]).map(pretty).join(' / ')||(loading?'Carregando...':'—'));
   $('#detailGeneration').textContent=d.generation?romanGen(d.generation):(loading?'...':'—');
   $('#detailAbilities').textContent=(d.abilities||[]).map(a=>pretty(a.name)+(a.hidden?' (HA)':'')).join(', ')||(loading?'Carregando...':'—');
   const stats=d.stats||[], total=stats.reduce((n,x)=>n+(Number(x.value)||0),0); $('#detailTotal').textContent=stats.length?total:(loading?'...':'—');
@@ -394,7 +412,7 @@ function updateIvs(){
   if(zeroSpeed.checked&&f5){const x=$('.breed-ref-ivs b[data-iv="velocidade"]');if(x){x.textContent='0';x.className='zero'}}
   updateExtraPriceAlerts();
 }
-const HYPE_BREED_BUILD = 'V34.6';
+const HYPE_BREED_BUILD = 'V34.7';
 const HYPE_BREED_PRICE_URL = '/api/breed/preco';
 function formatHypePrice(v){
   const n=Math.max(0, Math.round(Number(v)||0));
@@ -497,6 +515,7 @@ $$('.breed-mode-card').forEach(btn=>btn.addEventListener('click',()=>{breedTipo.
 $$('[data-iv-preset]').forEach(btn=>btn.addEventListener('click',()=>{const preset=btn.dataset.ivPreset;customIvInputs.forEach(i=>{i.value=preset==='clear'?'0':(preset==='zero-speed'&&i.dataset.customIv==='speed'?'0':'31')});schedulePrice()}));
 customIvInputs.forEach(i=>i.addEventListener('input',()=>{let v=parseInt(i.value||0,10);if(Number.isNaN(v))return;i.value=Math.max(0,Math.min(31,v));}));
 breedTipo.addEventListener('change',()=>{updateIvs();schedulePrice()});ivSelect.addEventListener('change',updateIvs);zeroSpeed.addEventListener('change',()=>{updateIvs();schedulePrice()});['nature','ha','genero'].forEach(id=>$('#'+id).addEventListener('change',()=>{updateExtraPriceAlerts();schedulePrice()})); $('#treinado').addEventListener('change',()=>{updateEvs();schedulePrice()});
+regionFilter.addEventListener('change',()=>{searchPokemon()});
 $('#sortFilter').addEventListener('change',filterCards); $('#favoriteFilter').addEventListener('click',e=>{onlyFavorites=!onlyFavorites;e.currentTarget.classList.toggle('active',onlyFavorites);filterCards()});
 // Os filtros de tipo/Egg Group serão preenchidos visualmente quando houver dados; não bloqueiam o pedido.
 $('#typeFilter').disabled=true; $('#eggFilter').disabled=true;

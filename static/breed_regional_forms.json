@@ -1,0 +1,359 @@
+{
+  "source": "PokeAPI/pokeapi data/v2/csv/pokemon.csv",
+  "regions": [
+    "alola",
+    "galar",
+    "hisui",
+    "paldea"
+  ],
+  "forms": [
+    {
+      "id": 10091,
+      "name": "rattata-alola",
+      "species_id": 19,
+      "region": "alola"
+    },
+    {
+      "id": 10092,
+      "name": "raticate-alola",
+      "species_id": 20,
+      "region": "alola"
+    },
+    {
+      "id": 10100,
+      "name": "raichu-alola",
+      "species_id": 26,
+      "region": "alola"
+    },
+    {
+      "id": 10101,
+      "name": "sandshrew-alola",
+      "species_id": 27,
+      "region": "alola"
+    },
+    {
+      "id": 10102,
+      "name": "sandslash-alola",
+      "species_id": 28,
+      "region": "alola"
+    },
+    {
+      "id": 10103,
+      "name": "vulpix-alola",
+      "species_id": 37,
+      "region": "alola"
+    },
+    {
+      "id": 10104,
+      "name": "ninetales-alola",
+      "species_id": 38,
+      "region": "alola"
+    },
+    {
+      "id": 10105,
+      "name": "diglett-alola",
+      "species_id": 50,
+      "region": "alola"
+    },
+    {
+      "id": 10106,
+      "name": "dugtrio-alola",
+      "species_id": 51,
+      "region": "alola"
+    },
+    {
+      "id": 10107,
+      "name": "meowth-alola",
+      "species_id": 52,
+      "region": "alola"
+    },
+    {
+      "id": 10161,
+      "name": "meowth-galar",
+      "species_id": 52,
+      "region": "galar"
+    },
+    {
+      "id": 10108,
+      "name": "persian-alola",
+      "species_id": 53,
+      "region": "alola"
+    },
+    {
+      "id": 10229,
+      "name": "growlithe-hisui",
+      "species_id": 58,
+      "region": "hisui"
+    },
+    {
+      "id": 10230,
+      "name": "arcanine-hisui",
+      "species_id": 59,
+      "region": "hisui"
+    },
+    {
+      "id": 10109,
+      "name": "geodude-alola",
+      "species_id": 74,
+      "region": "alola"
+    },
+    {
+      "id": 10110,
+      "name": "graveler-alola",
+      "species_id": 75,
+      "region": "alola"
+    },
+    {
+      "id": 10111,
+      "name": "golem-alola",
+      "species_id": 76,
+      "region": "alola"
+    },
+    {
+      "id": 10162,
+      "name": "ponyta-galar",
+      "species_id": 77,
+      "region": "galar"
+    },
+    {
+      "id": 10163,
+      "name": "rapidash-galar",
+      "species_id": 78,
+      "region": "galar"
+    },
+    {
+      "id": 10164,
+      "name": "slowpoke-galar",
+      "species_id": 79,
+      "region": "galar"
+    },
+    {
+      "id": 10165,
+      "name": "slowbro-galar",
+      "species_id": 80,
+      "region": "galar"
+    },
+    {
+      "id": 10166,
+      "name": "farfetchd-galar",
+      "species_id": 83,
+      "region": "galar"
+    },
+    {
+      "id": 10112,
+      "name": "grimer-alola",
+      "species_id": 88,
+      "region": "alola"
+    },
+    {
+      "id": 10113,
+      "name": "muk-alola",
+      "species_id": 89,
+      "region": "alola"
+    },
+    {
+      "id": 10231,
+      "name": "voltorb-hisui",
+      "species_id": 100,
+      "region": "hisui"
+    },
+    {
+      "id": 10232,
+      "name": "electrode-hisui",
+      "species_id": 101,
+      "region": "hisui"
+    },
+    {
+      "id": 10114,
+      "name": "exeggutor-alola",
+      "species_id": 103,
+      "region": "alola"
+    },
+    {
+      "id": 10115,
+      "name": "marowak-alola",
+      "species_id": 105,
+      "region": "alola"
+    },
+    {
+      "id": 10167,
+      "name": "weezing-galar",
+      "species_id": 110,
+      "region": "galar"
+    },
+    {
+      "id": 10168,
+      "name": "mr-mime-galar",
+      "species_id": 122,
+      "region": "galar"
+    },
+    {
+      "id": 10250,
+      "name": "tauros-paldea-combat-breed",
+      "species_id": 128,
+      "region": "paldea"
+    },
+    {
+      "id": 10251,
+      "name": "tauros-paldea-blaze-breed",
+      "species_id": 128,
+      "region": "paldea"
+    },
+    {
+      "id": 10252,
+      "name": "tauros-paldea-aqua-breed",
+      "species_id": 128,
+      "region": "paldea"
+    },
+    {
+      "id": 10169,
+      "name": "articuno-galar",
+      "species_id": 144,
+      "region": "galar"
+    },
+    {
+      "id": 10170,
+      "name": "zapdos-galar",
+      "species_id": 145,
+      "region": "galar"
+    },
+    {
+      "id": 10171,
+      "name": "moltres-galar",
+      "species_id": 146,
+      "region": "galar"
+    },
+    {
+      "id": 10233,
+      "name": "typhlosion-hisui",
+      "species_id": 157,
+      "region": "hisui"
+    },
+    {
+      "id": 10253,
+      "name": "wooper-paldea",
+      "species_id": 194,
+      "region": "paldea"
+    },
+    {
+      "id": 10172,
+      "name": "slowking-galar",
+      "species_id": 199,
+      "region": "galar"
+    },
+    {
+      "id": 10234,
+      "name": "qwilfish-hisui",
+      "species_id": 211,
+      "region": "hisui"
+    },
+    {
+      "id": 10235,
+      "name": "sneasel-hisui",
+      "species_id": 215,
+      "region": "hisui"
+    },
+    {
+      "id": 10173,
+      "name": "corsola-galar",
+      "species_id": 222,
+      "region": "galar"
+    },
+    {
+      "id": 10174,
+      "name": "zigzagoon-galar",
+      "species_id": 263,
+      "region": "galar"
+    },
+    {
+      "id": 10175,
+      "name": "linoone-galar",
+      "species_id": 264,
+      "region": "galar"
+    },
+    {
+      "id": 10236,
+      "name": "samurott-hisui",
+      "species_id": 503,
+      "region": "hisui"
+    },
+    {
+      "id": 10237,
+      "name": "lilligant-hisui",
+      "species_id": 549,
+      "region": "hisui"
+    },
+    {
+      "id": 10247,
+      "name": "basculin-white-striped",
+      "species_id": 550,
+      "region": "hisui"
+    },
+    {
+      "id": 10176,
+      "name": "darumaka-galar",
+      "species_id": 554,
+      "region": "galar"
+    },
+    {
+      "id": 10177,
+      "name": "darmanitan-galar-standard",
+      "species_id": 555,
+      "region": "galar"
+    },
+    {
+      "id": 10179,
+      "name": "yamask-galar",
+      "species_id": 562,
+      "region": "galar"
+    },
+    {
+      "id": 10238,
+      "name": "zorua-hisui",
+      "species_id": 570,
+      "region": "hisui"
+    },
+    {
+      "id": 10239,
+      "name": "zoroark-hisui",
+      "species_id": 571,
+      "region": "hisui"
+    },
+    {
+      "id": 10180,
+      "name": "stunfisk-galar",
+      "species_id": 618,
+      "region": "galar"
+    },
+    {
+      "id": 10240,
+      "name": "braviary-hisui",
+      "species_id": 628,
+      "region": "hisui"
+    },
+    {
+      "id": 10241,
+      "name": "sliggoo-hisui",
+      "species_id": 705,
+      "region": "hisui"
+    },
+    {
+      "id": 10242,
+      "name": "goodra-hisui",
+      "species_id": 706,
+      "region": "hisui"
+    },
+    {
+      "id": 10243,
+      "name": "avalugg-hisui",
+      "species_id": 713,
+      "region": "hisui"
+    },
+    {
+      "id": 10244,
+      "name": "decidueye-hisui",
+      "species_id": 724,
+      "region": "hisui"
+    }
+  ]
+}

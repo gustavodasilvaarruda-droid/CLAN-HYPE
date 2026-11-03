@@ -1,0 +1,52 @@
+name: HYPE Breed regional and baby tests
+on:
+  pull_request:
+    paths:
+      - "app.py"
+      - "templates/breed.html"
+      - "modules/breed_regional.py"
+      - "static/breed_regional_forms.json"
+      - "static/breed_regional_v1.css"
+      - "tests/test_breed_regional_forms.py"
+      - "tests/test_breed_member_orders.py"
+      - ".github/workflows/breed-regional-tests.yml"
+  push:
+    branches:
+      - "feature/breed-regionais-*"
+jobs:
+  breed-regressions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r requirements.txt
+      - name: Compile Flask and regional catalog
+        run: python -m py_compile app.py modules/breed_regional.py
+      - name: Validate Breed Jinja and extract browser JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          from jinja2 import Environment
+          src = Path('templates/breed.html').read_text(encoding='utf-8')
+          Environment().parse(src)
+          js = src.rsplit('<script>', 1)[1].split('</script>', 1)[0]
+          js = re.sub(r'{{.*?}}', 'null', js)
+          Path('/tmp/hype_breed_ui.js').write_text(js, encoding='utf-8')
+          print('Jinja/JS extracted')
+          PY
+          node --check /tmp/hype_breed_ui.js
+      - name: Run regional forms and baby target tests
+        run: python -m unittest discover -s tests -p "test_breed_regional_forms.py" -v
+      - name: Validate Flask boot and global CSRF using fake Supabase
+        run: python -m unittest discover -s tests -p "test_hype_wallet_flask_integration.py" -v
+      - name: Verify member order permission regressions
+        run: python -m unittest discover -s tests -p "test_breed_member_orders.py" -v
