@@ -17,6 +17,10 @@ from urllib.request import urlopen
 from urllib.parse import quote, urlencode, urlparse
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from modules.breed_regional import (
+    regional_forms, regional_form, breed_species_id,
+    pokemon_form_valid, breed_target_allowed, form_display_name,
+)
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
@@ -1327,16 +1331,17 @@ def classificar_pokemon_preco(pokemon_id):
 
 @lru_cache(maxsize=2048)
 def _pokeapi_species_rule(pokemon_id):
-    """Valida se a espécie pode ser alvo de Breed. PokéAPI + fallback CSV oficial."""
+    """Valida a espécie de origem para formas regionais e bebês (PokéAPI + CSV)."""
+    species_id = breed_species_id(pokemon_id)
     try:
-        with urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{int(pokemon_id)}/", timeout=4) as resp:
+        with urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{species_id}/", timeout=4) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         egg_groups = [g.get("name") for g in (data.get("egg_groups") or []) if g.get("name")]
         is_baby = bool(data.get("is_baby"))
         is_legendary = bool(data.get("is_legendary"))
         is_mythical = bool(data.get("is_mythical"))
         no_eggs = "no-eggs" in egg_groups
-        breedavel = not (is_baby or is_legendary or is_mythical or no_eggs)
+        breedavel = breed_target_allowed(is_baby, is_legendary, is_mythical, no_eggs)
         so_com_ditto = breedavel and data.get("gender_rate") == -1
         return {
             "breedavel": breedavel,
@@ -1355,7 +1360,7 @@ def _pokeapi_species_rule(pokemon_id):
     # Fallback oficial do projeto PokéAPI. Evita que uma indisponibilidade da API
     # transforme a validação em permissiva.
     try:
-        pid = str(int(pokemon_id))
+        pid = str(species_id)
         species = next((r for r in _pokeapi_csv('pokemon_species.csv') if r.get('id') == pid), None)
         if not species:
             return None
@@ -1389,7 +1394,13 @@ def _pokeapi_species_rule(pokemon_id):
 
 def regra_breed_pokemon(pokemon_id, pokemon_nome):
     nome = (pokemon_nome or "").strip().lower()
-    if nome == "ditto":
+    if not pokemon_form_valid(pokemon_id, nome):
+        return {
+            "breedavel": False, "so_com_ditto": False, "breed_especial": False,
+            "motivo": "Forma de Pokémon inválida. Selecione novamente pelo catálogo.",
+            "egg_groups": [], "categoria_bloqueio": "forma_invalida"
+        }
+    if breed_species_id(pokemon_id) == 132:
         return {
             "breedavel": False, "so_com_ditto": False, "breed_especial": False,
             "motivo": "Ditto é parceiro de Breed e não pode ser solicitado como Pokémon alvo.",
@@ -1397,7 +1408,15 @@ def regra_breed_pokemon(pokemon_id, pokemon_nome):
         }
 
     bloqueados = _safe_table("pokemon_bloqueados", "*", ativo=True)
-    bloqueio = next((x for x in bloqueados if (x.get("pokemon") or "").strip().lower() == nome), None)
+    nomes_bloqueio = {nome}
+    form = regional_form(pokemon_id)
+    if form:
+        # Uma proibição da espécie normal também vale para suas formas regionais.
+        nomes_bloqueio.add(str(form['name'].split('-')[0]))
+        externa_nome = _pokeapi_species_rule(pokemon_id)
+        if externa_nome and externa_nome.get('nome'):
+            nomes_bloqueio.add(externa_nome['nome'].strip().lower())
+    bloqueio = next((x for x in bloqueados if (x.get("pokemon") or "").strip().lower() in nomes_bloqueio), None)
     if bloqueio:
         return {
             "breedavel": False, "so_com_ditto": False, "breed_especial": False,
@@ -1417,14 +1436,12 @@ def regra_breed_pokemon(pokemon_id, pokemon_nome):
 
     motivo = None
     categoria = None
-    if externa.get('is_baby'):
-        motivo, categoria = "Pokémon bebê não pode ser solicitado no Breed.", "baby"
-    elif externa.get('is_legendary'):
+    if externa.get('is_legendary'):
         motivo, categoria = "Pokémon Lendário não pode ser solicitado no Breed.", "legendary"
     elif externa.get('is_mythical'):
         motivo, categoria = "Pokémon Mítico não pode ser solicitado no Breed.", "mythical"
-    elif externa.get('no_eggs') or not externa.get('breedavel'):
-        motivo, categoria = "Esta espécie pertence ao Egg Group No Eggs Discovered e não pode breedar.", "no-eggs"
+    elif not externa.get('breedavel'):
+        motivo, categoria = "Esta espécie não pode ser solicitada por reprodução.", "no-eggs"
 
     if motivo:
         return {
@@ -1441,7 +1458,9 @@ def regra_breed_pokemon(pokemon_id, pokemon_nome):
         "breedavel": True, "so_com_ditto": so_com_ditto,
         "breed_especial": so_com_ditto, "motivo": None,
         "egg_groups": externa.get("egg_groups", []), "categoria_bloqueio": None,
-        "is_baby": False, "is_legendary": False, "is_mythical": False,
+        "is_baby": bool(externa.get('is_baby')), "is_legendary": False, "is_mythical": False,
+        "nota_bebe": ("Filhote solicitado como resultado do Breed; os pais precisam ser evoluções compatíveis."
+                       if externa.get('is_baby') else None),
         "categoria_preco": meta.get('categoria') or 'comum',
         "categoria_label": meta.get('categoria_label') or 'Comum',
         "classificacao_motivo": meta.get('classificacao_motivo'),
@@ -2935,18 +2954,28 @@ def api_breed_preco():
         return jsonify({'ok': False, 'error': 'Falha temporária ao calcular o preço.'}), 500
 
 
+def _breed_catalogo_com_formas():
+    """Um único catálogo para busca e seleção; forma regional conserva ID próprio."""
+    base = [
+        {'id': x['id'], 'name': x['name'], 'region': None, 'species_id': x['id']}
+        for x in _pokeapi_species_index() if x.get('id') and x.get('name')
+    ]
+    return base + list(regional_forms().values())
+
+
+def _breed_catalog_item(x):
+    return {
+        'id': x['id'], 'name': x['name'],
+        'region': x.get('region'), 'species_id': x.get('species_id', x['id']),
+        'display_name': form_display_name(x['name'], x.get('region')),
+        'sprite': f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{x['id']}.png"
+    }
+
+
 @app.route('/api/breed/pokemon/catalogo')
 @login_required
 def api_breed_catalogo_pokemon():
-    itens = _pokeapi_species_index()
-    return {'results': [
-        {
-            'id': x['id'],
-            'name': x['name'],
-            'display_name': (x['name'] or '').replace('-', ' ').title(),
-            'sprite': f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{x['id']}.png"
-        } for x in itens if x.get('id') and x.get('name')
-    ]}
+    return {'results': [_breed_catalog_item(x) for x in _breed_catalogo_com_formas()]}
 
 
 @app.route('/api/breed/pokemon/buscar')
@@ -2959,15 +2988,10 @@ def api_breed_buscar_pokemon():
     # Catálogo remoto centralizado no Flask. Se estiver fora do ar, a interface
     # ainda mantém os cards HYPE locais e o pedido continua utilizável.
     encontrados = []
-    for item in _pokeapi_species_index():
+    for item in _breed_catalogo_com_formas():
         nome = (item.get('name') or '').lower()
-        if q in nome:
-            encontrados.append({
-                'id': item['id'],
-                'name': nome,
-                'display_name': nome.replace('-', ' ').title(),
-                'sprite': f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{item['id']}.png"
-            })
+        if q in nome or q in form_display_name(nome, item.get('region')).lower():
+            encontrados.append(_breed_catalog_item(item))
             if len(encontrados) >= 24:
                 break
 
@@ -3053,12 +3077,18 @@ def _pokeapi_github_details(pokemon_id):
 @login_required
 def api_breed_pokemon(pokemon_id):
     nome = request.args.get('nome', '').strip()
+    form = regional_form(pokemon_id)
+    species_id = breed_species_id(pokemon_id)
     regra = regra_breed_pokemon(pokemon_id, nome)
     meta = classificar_pokemon_preco(pokemon_id)
 
     resposta = {
         'id': pokemon_id,
         'name': nome,
+        'display_name': form_display_name(nome, form['region'] if form else None),
+        'species_id': species_id,
+        'region': form['region'] if form else None,
+        'nota_bebe': regra.get('nota_bebe'),
         'breedavel': bool(regra.get('breedavel')),
         'so_com_ditto': bool(regra.get('so_com_ditto')),
         'breed_especial': bool(regra.get('breed_especial')),
@@ -3098,7 +3128,7 @@ def api_breed_pokemon(pokemon_id):
         print(f"Metadados Pokémon #{pokemon_id} indisponíveis: {e}")
 
     try:
-        with urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{pokemon_id}/", timeout=4) as resp:
+        with urlopen(f"https://pokeapi.co/api/v2/pokemon-species/{species_id}/", timeout=4) as resp:
             sdata = json.loads(resp.read().decode('utf-8'))
         resposta['generation'] = (sdata.get('generation') or {}).get('name')
         if not resposta['egg_groups']:
