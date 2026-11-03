@@ -172,5 +172,23 @@ class BreedBackendRuleTests(unittest.TestCase):
         self.assertEqual(r['categoria_bloqueio'], 'forma_invalida')
 
 
+class BreedFrontendSelectionTests(unittest.TestCase):
+    def test_step_preview_nodes_are_iterated_as_collections(self):
+        # Regression: querySelector returns one element, not a NodeList.
+        src = (Path(__file__).resolve().parents[1] / 'templates/breed.html').read_text(encoding='utf-8')
+        self.assertIn("$('.selectedPokemonArt').forEach", src)
+        self.assertIn("$('.selectedPokemonName').forEach", src)
+        self.assertNotIn("$" + "('.selectedPokemonArt').forEach", src.replace("$(", "COLLECTION("))
+        self.assertNotIn("$" + "('.selectedPokemonName').forEach", src.replace("$(", "COLLECTION("))
+
+    def test_next_button_unblocks_before_optional_pokeapi_metadata(self):
+        src = (Path(__file__).resolve().parents[1] / 'templates/breed.html').read_text(encoding='utf-8')
+        selection = src.split('async function selectPokemon(', 1)[1].split('function renderDetail(', 1)[0]
+        self.assertIn('if(!info.breedavel)', selection)
+        self.assertIn("$('#pokemonNext').disabled=false", selection)
+        self.assertIn('enrichPokemonInfoClient(id,info).then(', selection)
+        self.assertNotIn('await enrichPokemonInfoClient(', selection)
+
+
 if __name__ == '__main__':
     unittest.main()
