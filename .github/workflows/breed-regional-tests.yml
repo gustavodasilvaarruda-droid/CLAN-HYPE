@@ -6,6 +6,7 @@ on:
       - "templates/breed.html"
       - "modules/breed_regional.py"
       - "static/breed_regional_forms.json"
+      - "static/breed_regional_v1.css"
       - "tests/test_breed_regional_forms.py"
       - "tests/test_breed_member_orders.py"
       - ".github/workflows/breed-regional-tests.yml"
@@ -45,5 +46,7 @@ jobs:
           node --check /tmp/hype_breed_ui.js
       - name: Run regional forms and baby target tests
         run: python -m unittest discover -s tests -p "test_breed_regional_forms.py" -v
+      - name: Validate Flask boot and global CSRF using fake Supabase
+        run: python -m unittest discover -s tests -p "test_hype_wallet_flask_integration.py" -v
       - name: Verify member order permission regressions
         run: python -m unittest discover -s tests -p "test_breed_member_orders.py" -v
