@@ -224,11 +224,16 @@ class BattleRoomRoutesTests(unittest.TestCase):
                              for x in self.db.tables['hype_batalha_participantes']))
 
     def test_already_finalized_cannot_register_twice(self):
+        # Primeiro os DOIS ficam prontos. Só então cada um confirma o resultado.
         for email in ('alpha@example.org', 'beta@example.org'):
             self.sign_in(email)
             self.client.post('/torneios/batalha/22/pronto')
+        for email in ('alpha@example.org', 'beta@example.org'):
+            self.sign_in(email)
             self.client.post('/torneios/batalha/22/resultado',
                              data={'vencedor_slot': '1'})
+        self.assertEqual(self.db.tables['partidas_torneio'][0]['status'],
+                         'finalizada')
         self.sign_in('beta@example.org')
         self.client.post('/torneios/batalha/22/resultado',
                          data={'vencedor_slot': '2'})
