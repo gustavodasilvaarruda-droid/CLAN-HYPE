@@ -4,6 +4,10 @@ on:
     paths:
       - 'modules/events_v26.py'
       - 'modules/battle_room_rules.py'
+      - 'templates/sala_batalha.html'
+      - 'templates/torneio_detalhe.html'
+      - 'templates/admin_chave.html'
+      - 'supabase/migrations/20261104_hype_avanco_automatico_rodadas.sql'
       - 'tests/test_hype_battle_room_*.py'
       - '.github/workflows/hype-battle-room-tests.yml'
   workflow_dispatch:
@@ -11,12 +15,28 @@ on:
 jobs:
   battle-room:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: hype_arena_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hype_arena_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      HYPE_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/hype_arena_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Instalar Flask
-        run: python -m pip install 'Flask>=3.0,<4'
-      - name: Testar permissões, presença e confirmação dupla
+      - name: Instalar Flask e driver PostgreSQL para teste isolado
+        run: python -m pip install 'Flask>=3.0,<4' 'psycopg[binary]>=3.2,<4'
+      - name: Testar presença, confirmação dupla e avanço automático com PostgreSQL
         run: python -m unittest discover -s tests -p 'test_hype_battle_room_*.py' -v
