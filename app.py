@@ -4393,6 +4393,10 @@ def resultado_partida(partida_id):
         rows=supabase.table('partidas_torneio').select('*').eq('id',partida_id).limit(1).execute().data or []
         if not rows: raise ValueError('Partida não encontrada')
         p=rows[0]
+        if p.get('status')=='finalizada': raise ValueError('Esta partida já foi finalizada. O resultado oficial não pode ser sobrescrito.')
+        torneio_atual=_safe_table('torneios','status_torneio',id=p.get('torneio_id'))
+        if not torneio_atual or torneio_atual[0].get('status_torneio')!='em_andamento':
+            raise ValueError('Somente partidas de torneios em andamento aceitam resultados.')
         if vencedor not in (p.get('jogador1_email'),p.get('jogador2_email')): raise ValueError('Vencedor inválido')
         nick=p.get('jogador1_nick') if vencedor==p.get('jogador1_email') else p.get('jogador2_nick')
         supabase.table('partidas_torneio').update({'vencedor_email':vencedor,'vencedor_nick':nick,'status':'finalizada','finalizada_em':agora_iso()}).eq('id',partida_id).execute()
@@ -4406,12 +4410,17 @@ def resultado_partida(partida_id):
 def admin_chave_torneio(torneio_id):
     if not tem_permissao('pode_gerenciar_torneios'): return redirect(url_for('painel'))
     partidas=_safe_table('partidas_torneio','*',torneio_id=torneio_id)
-    return render_template('admin_chave.html',torneio_id=torneio_id,partidas=sorted(partidas,key=lambda x:(x.get('rodada',0),x.get('ordem',0))))
+    torneio_rows=_safe_table('torneios','*',id=torneio_id)
+    return render_template('admin_chave.html',torneio_id=torneio_id,partidas=sorted(partidas,key=lambda x:(x.get('rodada',0),x.get('ordem',0))),torneio=torneio_rows[0] if torneio_rows else {})
 
 @app.route('/admin/torneios/<int:torneio_id>/proxima-rodada', methods=['POST'])
 @login_required
 def proxima_rodada(torneio_id):
     if not tem_permissao('pode_gerenciar_torneios'): return redirect(url_for('painel'))
+    torneio_estado=_safe_table('torneios','status_torneio',id=torneio_id)
+    if not torneio_estado or torneio_estado[0].get('status_torneio')!='em_andamento':
+        flash('O torneio não está em andamento. Não é possível criar rodadas ou pontuar novamente.', 'info')
+        return redirect(url_for('admin_chave_torneio', torneio_id=torneio_id))
     partidas=_safe_table('partidas_torneio','*',torneio_id=torneio_id)
     if not partidas: return redirect(url_for('admin_conteudo'))
     rodada=max(int(x.get('rodada') or 1) for x in partidas)
