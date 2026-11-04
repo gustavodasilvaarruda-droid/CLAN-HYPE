@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
 
 
-def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, registrar_log, criar_notificacao):
+def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, registrar_log, criar_notificacao, battle_db=None):
     bp = Blueprint('events26', __name__)
 
     def youtube_embed_url(url):
@@ -159,8 +159,25 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         return redirect(url_for('admin_conteudo'))
 
 
-    # HYPE Arena: Sala de Batalha integrada às partidas existentes, sem alterar
-    # o sistema de chaveamento nem realizar movimentação de moedas.
+    # HYPE Arena: o torneio e os jogadores vêm da base existente;
+    # as confirmações ficam em tabela privada, acessada só pelo servidor.
+    def battle_store():
+        if battle_db is not None:
+            return battle_db
+        from modules.hype_battle_service import get_battle_client
+        return get_battle_client()
+
+    def battle_state(partida_id):
+        db = battle_store()
+        if db is None:
+            return {}, False
+        try:
+            rows = db.table('hype_batalha_participantes').select('*').eq(
+                'partida_id', partida_id).execute().data or []
+            return {row['usuario_email']: row for row in rows}, True
+        except Exception:
+            return {}, False
+
     @bp.route('/torneios/<int:torneio_id>/batalha/<int:partida_id>')
     def sala_batalha(torneio_id, partida_id):
         from flask import abort
@@ -173,8 +190,7 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
             abort(404)
 
         participantes = players(partida)
-        rows = safe_table('hype_batalha_participantes', '*', partida_id=partida_id)
-        estados = {row.get('usuario_email'): row for row in rows}
+        estados, sala_disponivel = battle_state(partida_id)
         perfis = {}
         for email in participantes:
             dados = safe_table('usuarios_clan', 'email,nick_jogo,avatar_url', email=email)
@@ -188,30 +204,17 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         divergencia = bool(enviados and
                           estados[participantes[0]]['vencedor_reportado_email'] !=
                           estados[participantes[1]]['vencedor_reportado_email'])
+        torneio_ativo = torneio.get('status_torneio') == 'em_andamento'
         return render_template(
-            'sala_batalha.html',
-            torneio=torneio, partida=partida, participantes=participantes,
-            perfis=perfis, estados=estados, ambos_prontos=ambos_prontos,
-            email_atual=email_atual, meu_estado=meu_estado,
-            pode_interagir=bool(email_atual in participantes and partida.get('status') != 'finalizada'),
-            divergencia=divergencia, admin=admin_ok(),
+            'sala_batalha.html', torneio=torneio, partida=partida,
+            participantes=participantes, perfis=perfis, estados=estados,
+            ambos_prontos=ambos_prontos, email_atual=email_atual,
+            meu_estado=meu_estado, divergencia=divergencia, admin=admin_ok(),
+            sala_disponivel=sala_disponivel, torneio_ativo=torneio_ativo,
+            pode_interagir=bool(sala_disponivel and torneio_ativo and
+                               email_atual in participantes and
+                               partida.get('status') != 'finalizada'),
         )
-
-    def salvar_estado_batalha(partida_id, email, atualizacoes):
-        # Cada participante só altera sua própria linha. A chave composta evita
-        # duplicidade e a migração impede acesso direto pelo navegador.
-        anterior = one('hype_batalha_participantes', partida_id=partida_id, usuario_email=email) or {}
-        payload = {
-            'partida_id': partida_id,
-            'usuario_email': email,
-            'pronto': bool(anterior.get('pronto')),
-            'vencedor_reportado_email': anterior.get('vencedor_reportado_email'),
-            'atualizado_em': datetime.now(timezone.utc).isoformat(),
-        }
-        payload.update(atualizacoes)
-        supabase.table('hype_batalha_participantes').upsert(
-            payload, on_conflict='partida_id,usuario_email'
-        ).execute()
 
     def partida_autorizada(partida_id):
         from modules.battle_room_rules import players
@@ -219,7 +222,7 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         if not partida:
             return None
         torneio = one('torneios', id=partida.get('torneio_id'))
-        if not torneio or torneio.get('status_torneio') in ('cancelado', 'finalizado'):
+        if not torneio or torneio.get('status_torneio') != 'em_andamento':
             return None
         if partida.get('status') == 'finalizada':
             return None
@@ -232,62 +235,77 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
     def sala_batalha_pronto(partida_id):
         partida = partida_autorizada(partida_id)
         if not partida:
-            flash('Não é possível confirmar presença nesta partida.', 'erro')
+            flash('Esta partida não aceita confirmação de presença.', 'erro')
             return redirect(url_for('torneios'))
+        db = battle_store()
+        url_sala = url_for('events26.sala_batalha',
+                           torneio_id=partida['torneio_id'], partida_id=partida_id)
+        if db is None:
+            flash('Sala de Batalha ainda não ativada. Peça suporte à administração.', 'erro')
+            return redirect(url_sala)
         try:
-            salvar_estado_batalha(partida_id, session['usuario_email'], {'pronto': True})
-            flash('Você está pronto! Aguardando o outro competidor.', 'sucesso')
+            result = db.rpc('hype_batalha_confirmar_pronto', {
+                'p_partida_id': partida_id,
+                'p_usuario_email': session['usuario_email'],
+            }).execute().data
+            if result is True:
+                flash('Presença confirmada! Aguarde o adversário.', 'sucesso')
+            else:
+                flash('Não foi possível confirmar presença nesta partida.', 'erro')
         except Exception:
-            flash('Sala em preparação: é necessário configurar a tabela da Sala de Batalha.', 'erro')
-        return redirect(url_for('events26.sala_batalha', torneio_id=partida['torneio_id'], partida_id=partida_id))
+            flash('A confirmação ainda não está disponível no servidor.', 'erro')
+        return redirect(url_sala)
 
     @bp.route('/torneios/batalha/<int:partida_id>/resultado', methods=['POST'])
     @login_required
     def sala_batalha_resultado(partida_id):
-        from modules.battle_room_rules import players, both_ready, agreed_winner
+        from modules.battle_room_rules import players
         partida = partida_autorizada(partida_id)
         if not partida:
             flash('Você não pode registrar resultado nesta partida.', 'erro')
             return redirect(url_for('torneios'))
-
-        vencedor = (request.form.get('vencedor_email') or '').strip()
         participantes = players(partida)
-        url_sala = url_for('events26.sala_batalha', torneio_id=partida['torneio_id'], partida_id=partida_id)
-        if vencedor not in participantes:
-            flash('O vencedor informado não pertence a esta partida.', 'erro')
+        slot = (request.form.get('vencedor_slot') or '').strip()
+        url_sala = url_for('events26.sala_batalha',
+                           torneio_id=partida['torneio_id'], partida_id=partida_id)
+        if slot not in ('1', '2'):
+            flash('Escolha um dos dois competidores da partida.', 'erro')
             return redirect(url_sala)
-        estados = {row.get('usuario_email'): row for row in
-                   safe_table('hype_batalha_participantes', '*', partida_id=partida_id)}
-        if not both_ready(partida, estados):
-            flash('Os dois jogadores precisam confirmar que estão prontos primeiro.', 'erro')
+        vencedor = participantes[int(slot) - 1]
+        db = battle_store()
+        if db is None:
+            flash('Sala de Batalha ainda não ativada. Peça suporte à administração.', 'erro')
             return redirect(url_sala)
         try:
-            email = session['usuario_email']
-            salvar_estado_batalha(partida_id, email, {'vencedor_reportado_email': vencedor})
-            estados = {row.get('usuario_email'): row for row in
-                       safe_table('hype_batalha_participantes', '*', partida_id=partida_id)}
-            confirmado = agreed_winner(partida, estados)
-            if confirmado:
-                # Condicional no status torna finalizações simultâneas idempotentes.
-                nome = (partida.get('jogador1_nick') if confirmado == participantes[0]
-                        else partida.get('jogador2_nick'))
-                gravacao = supabase.table('partidas_torneio').update({
-                    'vencedor_email': confirmado,
-                    'vencedor_nick': nome,
-                    'status': 'finalizada',
-                    'finalizada_em': datetime.now(timezone.utc).isoformat(),
-                }).eq('id', partida_id).neq('status', 'finalizada').execute()
-                if gravacao.data:
-                    registrar_log('resultado_dupla_confirmacao', 'torneios', 'partida', partida_id,
-                                  {'torneio_id': partida['torneio_id'], 'vencedor_email': confirmado})
-                    criar_notificacao(confirmado, 'Vitória confirmada!',
-                                      'Os dois jogadores confirmaram seu resultado na HYPE Arena.',
+            response = db.rpc('hype_batalha_confirmar_resultado', {
+                'p_partida_id': partida_id,
+                'p_usuario_email': session['usuario_email'],
+                'p_vencedor_email': vencedor,
+            }).execute().data
+            result = response[0] if isinstance(response, list) and response else response
+            status = result.get('status') if isinstance(result, dict) else None
+            if status == 'finalizada':
+                try:
+                    registrar_log('resultado_dupla_confirmacao', 'torneios', 'partida',
+                                  partida_id, {'torneio_id': partida['torneio_id'],
+                                               'vencedor_email': result.get('vencedor_email')})
+                    criar_notificacao(result.get('vencedor_email'), 'Vitória confirmada!',
+                                      'Os dois competidores confirmaram o resultado da HYPE Arena.',
                                       'torneio', url_sala)
-                flash('Resultado confirmado pelos dois jogadores!', 'sucesso')
+                except Exception:
+                    # A notificação não desfaz uma finalização já confirmada pelo banco.
+                    pass
+                flash('Os dois jogadores confirmaram! Resultado oficial registrado.', 'sucesso')
+            elif status == 'divergencia':
+                flash('Resultados divergentes. A organização deve revisar a partida.', 'erro')
+            elif status == 'aguardando_oponente':
+                flash('Sua confirmação foi registrada. Aguardando o adversário.', 'sucesso')
+            elif status == 'aguardando_pronto':
+                flash('Os dois jogadores devem confirmar presença primeiro.', 'erro')
             else:
-                flash('Seu resultado foi enviado. Aguardando confirmação do adversário.', 'sucesso')
+                flash('Esta partida não aceita alterações no momento.', 'erro')
         except Exception:
-            flash('Não foi possível registrar a confirmação. Solicite revisão ao administrador.', 'erro')
+            flash('Não foi possível confirmar o resultado. Solicite revisão administrativa.', 'erro')
         return redirect(url_sala)
 
     return bp

@@ -13,6 +13,12 @@
     </span>
   </header>
 
+  {% if not sala_disponivel and partida.status!='finalizada' %}
+    <p class="hbr-warning" role="status">A sala está disponível para visualização, mas as confirmações ainda aguardam a configuração segura do banco de dados.</p>
+  {% elif not torneio_ativo and partida.status!='finalizada' %}
+    <p class="hbr-warning" role="status">Torneio fora de andamento: presença e resultados estão bloqueados para proteger o chaveamento.</p>
+  {% endif %}
+
   <section class="hbr-arena" aria-label="Confronto entre jogadores">
     {% for num in [1,2] %}
       {% set email = partida.jogador1_email if num==1 else partida.jogador2_email %}
@@ -58,7 +64,7 @@
         </form>
       {% elif pode_interagir and meu_estado.get('pronto') %}
         <div class="hbr-success">✓ Sua presença está confirmada.</div>
-      {% elif not email_atual and partida.status!='finalizada' %}
+      {% elif not email_atual and partida.status!='finalizada' and torneio_ativo and sala_disponivel %}
         <p class="hbr-info">Entre na sua conta HYPE para confirmar a presença, se você for um dos competidores.</p>
       {% endif %}
     </section>
@@ -73,10 +79,10 @@
         <form method="post" action="{{url_for('events26.sala_batalha_resultado',partida_id=partida.id)}}">
           <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
           <label for="hbr-winner-select">Vencedor informado</label>
-          <select id="hbr-winner-select" name="vencedor_email" required>
+          <select id="hbr-winner-select" name="vencedor_slot" required>
             <option value="">Selecione o vencedor</option>
-            <option value="{{partida.jogador1_email}}" {% if meu_estado.get('vencedor_reportado_email')==partida.jogador1_email %}selected{% endif %}>{{partida.jogador1_nick}}</option>
-            <option value="{{partida.jogador2_email}}" {% if meu_estado.get('vencedor_reportado_email')==partida.jogador2_email %}selected{% endif %}>{{partida.jogador2_nick}}</option>
+            <option value="1" {% if meu_estado.get('vencedor_reportado_email')==partida.jogador1_email %}selected{% endif %}>{{partida.jogador1_nick}}</option>
+            <option value="2" {% if meu_estado.get('vencedor_reportado_email')==partida.jogador2_email %}selected{% endif %}>{{partida.jogador2_nick}}</option>
           </select>
           <button class="hbr-button hbr-outline" type="submit">Enviar minha confirmação</button>
         </form>
