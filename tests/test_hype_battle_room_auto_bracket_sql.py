@@ -182,5 +182,156 @@ class AutoAdvanceSQLTests(unittest.TestCase):
                          [("manual1@test", "manual2@test", "pendente")])
 
 
+    def enroll(self, tournament_id, *emails):
+        for email in emails:
+            self.conn.execute(
+                "INSERT INTO public.usuarios_clan(email) VALUES (%s) ON CONFLICT DO NOTHING",
+                (email,))
+            self.conn.execute(
+                """INSERT INTO public.inscricoes_torneio(torneio_id,usuario_email)
+                   VALUES (%s,%s) ON CONFLICT DO NOTHING""",
+                (tournament_id, email))
+
+    def ranked_tournament(self, season_id=None, active=True):
+        if season_id is None:
+            season_id = self.conn.execute(
+                "INSERT INTO public.temporadas DEFAULT VALUES RETURNING id"
+            ).fetchone()[0]
+        return self.conn.execute(
+            """INSERT INTO public.torneios(
+                status_torneio, ranking_ativo, temporada_id,
+                pontos_campeao, pontos_vice
+            ) VALUES (%s, true, %s, 10, 6) RETURNING id""",
+            ('em_andamento' if active else 'cancelado', season_id)
+        ).fetchone()[0], season_id
+
+    def championship(self, tournament_id):
+        return self.conn.execute(
+            """SELECT status_torneio, campeao_email, vice_campeao_email,
+                      ranking_processado, finalizado_em
+                 FROM public.torneios WHERE id=%s""",
+            (tournament_id,)).fetchone()
+
+    def ranking(self, season):
+        return self.conn.execute(
+            """SELECT usuario_email,pontos,vitorias,podios
+                 FROM public.ranking_temporada
+                WHERE temporada_id=%s ORDER BY usuario_email""",
+            (season,)).fetchall()
+
+    def test_two_players_auto_champion_without_ranking(self):
+        t = self.tournament()
+        self.enroll(t, "a@test", "b@test")
+        m = self.match(t, 1, "a@test", "b@test")
+        self.finish(m, "a@test")
+        state = self.championship(t)
+        self.assertEqual(state[:4], ('finalizado', 'a@test', 'b@test', False))
+        self.assertIsNotNone(state[4])
+        self.assertEqual(self.round_matches(t, 2), [])
+
+    def test_ranked_final_awards_once_even_after_repeated_updates(self):
+        t, s = self.ranked_tournament()
+        self.enroll(t, "a@test", "b@test")
+        self.conn.execute(
+            """INSERT INTO public.ranking_temporada
+               (temporada_id, usuario_email, pontos, vitorias, podios)
+               VALUES (%s,'a@test', 5, 2, 1)""", (s,))
+        m = self.match(t, 1, "a@test", "b@test")
+        self.finish(m, "a@test")
+        self.assertEqual(self.championship(t)[:4],
+                         ('finalizado', 'a@test', 'b@test', True))
+        self.assertEqual(self.ranking(s),
+                         [('a@test', 15, 3, 2), ('b@test', 6, 0, 1)])
+        self.finish(m, "a@test")
+        self.assertEqual(self.ranking(s),
+                         [('a@test', 15, 3, 2), ('b@test', 6, 0, 1)])
+
+    def test_four_player_tournament_advances_and_closes(self):
+        t, s = self.ranked_tournament()
+        self.enroll(t, "a@test", "b@test", "c@test", "d@test")
+        a = self.match(t, 1, "a@test", "b@test")
+        b = self.match(t, 2, "c@test", "d@test")
+        self.finish(a, "a@test")
+        self.assertEqual(self.championship(t)[0], 'em_andamento')
+        self.finish(b, "d@test")
+        self.assertEqual(self.round_matches(t, 2),
+                         [('a@test', 'd@test', 'pendente')])
+        final = self.conn.execute(
+            "SELECT id FROM public.partidas_torneio WHERE torneio_id=%s AND rodada=2",
+            (t,)).fetchone()[0]
+        self.finish(final, "d@test")
+        self.assertEqual(self.championship(t)[:4],
+                         ('finalizado', 'd@test', 'a@test', True))
+        self.assertEqual(self.ranking(s),
+                         [('a@test', 6, 0, 1), ('d@test', 10, 1, 1)])
+
+    def test_unregistered_finalist_never_closes_tournament(self):
+        t, s = self.ranked_tournament()
+        self.enroll(t, "a@test")
+        m = self.match(t, 1, "a@test", "b@test")
+        self.finish(m, "a@test")
+        self.assertEqual(self.championship(t)[0], 'em_andamento')
+        self.assertEqual(self.ranking(s), [])
+
+    def test_bye_cannot_create_champion(self):
+        t = self.tournament()
+        self.enroll(t, "a@test", "b@test")
+        m = self.match(t, 1, "a@test", None)
+        self.finish(m, "a@test")
+        self.assertEqual(self.championship(t)[0], 'em_andamento')
+
+    def test_cancelled_event_cannot_award_ranking(self):
+        t, s = self.ranked_tournament(active=False)
+        self.enroll(t, "a@test", "b@test")
+        m = self.match(t, 1, "a@test", "b@test")
+        self.finish(m, "a@test")
+        self.assertEqual(self.championship(t)[0], 'cancelado')
+        self.assertEqual(self.ranking(s), [])
+
+    def test_final_does_not_close_with_incomplete_previous_round(self):
+        t, s = self.ranked_tournament()
+        self.enroll(t, "a@test", "b@test", "c@test", "d@test")
+        self.match(t, 1, "a@test", "b@test")
+        self.match(t, 2, "c@test", "d@test")
+        final = self.match(t, 1, "a@test", "c@test", round_=2)
+        self.finish(final, "a@test")
+        self.assertEqual(self.championship(t)[0], 'em_andamento')
+        self.assertEqual(self.ranking(s), [])
+
+    def test_final_does_not_close_if_finalists_do_not_match_bracket(self):
+        t, s = self.ranked_tournament()
+        self.enroll(t, "a@test", "b@test", "c@test", "d@test")
+        a = self.match(t, 1, "a@test", "b@test")
+        b = self.match(t, 2, "c@test", "d@test")
+        self.match(t, 1, "b@test", "c@test", round_=2)
+        self.finish(a, "a@test")
+        self.finish(b, "d@test")
+        final_id = self.conn.execute(
+            "SELECT id FROM public.partidas_torneio WHERE torneio_id=%s AND rodada=2",
+            (t,)).fetchone()[0]
+        self.finish(final_id, "b@test")
+        self.assertEqual(self.championship(t)[0], 'em_andamento')
+        self.assertEqual(self.ranking(s), [])
+
+    def test_ranked_tournament_without_season_closes_without_points(self):
+        t = self.conn.execute(
+            """INSERT INTO public.torneios(status_torneio, ranking_ativo)
+               VALUES ('em_andamento', true) RETURNING id""").fetchone()[0]
+        self.enroll(t, "a@test", "b@test")
+        m = self.match(t, 1, "a@test", "b@test")
+        self.finish(m, "a@test")
+        self.assertEqual(self.championship(t)[:4],
+                         ('finalizado', 'a@test', 'b@test', False))
+
+    def test_one_round_with_more_than_two_entries_is_not_a_final(self):
+        t, s = self.ranked_tournament()
+        self.enroll(t, "a@test", "b@test", "c@test")
+        m = self.match(t, 1, "a@test", "b@test")
+        self.finish(m, "a@test")
+        self.assertEqual(self.championship(t)[0], 'em_andamento')
+        self.assertEqual(self.ranking(s), [])
+
+
+
 if __name__ == "__main__":
     unittest.main()
