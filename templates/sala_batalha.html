@@ -1,0 +1,92 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Sala de Batalha · {{torneio.titulo}} · HYPE{% endblock %}
+{% block body_class %}hype-battle-room-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='hype_battle_room.css')}}?v=1">{% endblock %}
+{% block content %}
+<div class="hype-battle-room">
+  <a class="hbr-back" href="{{url_for('events26.torneio_detalhe',torneio_id=torneio.id)}}">← Voltar ao torneio</a>
+  <header class="hbr-header">
+    <div><span class="hbr-kicker">HYPE ARENA · SALA DE BATALHA</span><h1>{{torneio.titulo}}</h1>
+      <p>Rodada {{partida.rodada or 1}} · Confronto {{partida.ordem or 1}} · {{torneio.formato or 'Formato a definir'}}</p></div>
+    <span class="hbr-status {% if partida.status=='finalizada' %}hbr-finished{% elif ambos_prontos %}hbr-ready{% endif %}">
+      {% if partida.status=='finalizada' %}✓ Batalha finalizada{% elif ambos_prontos %}● Ambos prontos{% else %}● Aguardando jogadores{% endif %}
+    </span>
+  </header>
+
+  <section class="hbr-arena" aria-label="Confronto entre jogadores">
+    {% for num in [1,2] %}
+      {% set email = partida.jogador1_email if num==1 else partida.jogador2_email %}
+      {% set nick = partida.jogador1_nick if num==1 else partida.jogador2_nick %}
+      {% set perfil = perfis.get(email, {}) %}
+      {% set marcado = partida.status=='finalizada' and partida.vencedor_email==email and email %}
+      <article class="hbr-player {% if marcado %}hbr-winner{% endif %}">
+        <span class="hbr-player-label">COMPETIDOR {{'%02d'|format(num)}}</span>
+        <div class="hbr-avatar">
+          {% if perfil.get('avatar_url') %}<img src="{{perfil.avatar_url}}" alt="Avatar de {{nick or 'competidor'}}">
+          {% else %}<span>{{(nick or '?')[:1]|upper}}</span>{% endif %}
+        </div>
+        <h2>{{nick or 'A definir'}}</h2>
+        {% if marcado %}<div class="hbr-award">♛ VENCEDOR</div>
+        {% elif not email %}<div class="hbr-presence">Vaga não definida / BYE</div>
+        {% elif estados.get(email, {}).get('pronto') %}<div class="hbr-presence is-ready">✓ Pronto para batalhar</div>
+        {% else %}<div class="hbr-presence">Aguardando confirmação</div>{% endif %}
+        {% if email and email == email_atual %}<span class="hbr-you">VOCÊ</span>{% endif %}
+      </article>
+      {% if num==1 %}<div class="hbr-vs" aria-hidden="true">VS</div>{% endif %}
+    {% endfor %}
+  </section>
+
+  <div class="hbr-lower">
+    <section class="hbr-panel">
+      <span class="hbr-kicker">CENTRAL DO CONFRONTO</span><h2>Estado da batalha</h2>
+      {% if partida.status=='finalizada' %}
+        <p class="hbr-info">Resultado oficial registrado: <strong>{{partida.vencedor_nick or 'vencedor definido'}}</strong>. O chaveamento do torneio exibirá o vencedor.</p>
+      {% elif not participantes %}
+        <p class="hbr-info">Esta partida está aguardando um adversário. Não há confirmação de presença para confrontos com BYE.</p>
+      {% elif ambos_prontos %}
+        <p class="hbr-info">Os dois competidores estão prontos. Combinem a batalha no Cobblemon e confirmem o vencedor abaixo quando terminarem.</p>
+      {% else %}
+        <p class="hbr-info">Cada competidor deve confirmar que está pronto. A batalha ocorre dentro do Cobblemon, não no site.</p>
+      {% endif %}
+      {% if divergencia and partida.status!='finalizada' %}
+        <p class="hbr-warning">Os relatos de vitória são diferentes. A organização deverá conferir o resultado no painel do torneio.</p>
+      {% endif %}
+      {% if pode_interagir and not meu_estado.get('pronto') %}
+        <form method="post" action="{{url_for('events26.sala_batalha_pronto',partida_id=partida.id)}}">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+          <button class="hbr-button" type="submit">✓ Estou pronto</button>
+        </form>
+      {% elif pode_interagir and meu_estado.get('pronto') %}
+        <div class="hbr-success">✓ Sua presença está confirmada.</div>
+      {% elif not email_atual and partida.status!='finalizada' %}
+        <p class="hbr-info">Entre na sua conta HYPE para confirmar a presença, se você for um dos competidores.</p>
+      {% endif %}
+    </section>
+
+    <section class="hbr-panel">
+      <span class="hbr-kicker">RESULTADO OFICIAL</span><h2>Quem venceu?</h2>
+      {% if partida.status=='finalizada' %}
+        <div class="hbr-success">♛ {{partida.vencedor_nick or 'Vencedor confirmado'}}</div>
+      {% elif pode_interagir and ambos_prontos %}
+        <p class="hbr-info">Escolha quem realmente ganhou. O resultado só é registrado quando os dois competidores concordam.</p>
+        {% if meu_estado.get('vencedor_reportado_email') %}<div class="hbr-success">✓ Seu resultado já foi enviado. Pode corrigir antes do encerramento.</div>{% endif %}
+        <form method="post" action="{{url_for('events26.sala_batalha_resultado',partida_id=partida.id)}}">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+          <label for="hbr-winner-select">Vencedor informado</label>
+          <select id="hbr-winner-select" name="vencedor_email" required>
+            <option value="">Selecione o vencedor</option>
+            <option value="{{partida.jogador1_email}}" {% if meu_estado.get('vencedor_reportado_email')==partida.jogador1_email %}selected{% endif %}>{{partida.jogador1_nick}}</option>
+            <option value="{{partida.jogador2_email}}" {% if meu_estado.get('vencedor_reportado_email')==partida.jogador2_email %}selected{% endif %}>{{partida.jogador2_nick}}</option>
+          </select>
+          <button class="hbr-button hbr-outline" type="submit">Enviar minha confirmação</button>
+        </form>
+      {% else %}
+        <p class="hbr-info">A confirmação do resultado ficará disponível para os competidores depois que ambos estiverem prontos.</p>
+      {% endif %}
+    </section>
+  </div>
+  <footer class="hbr-footer">Os resultados podem ser revisados pelos administradores. Apostas, prêmios e pagamentos do Cobblemon não são movimentados por esta sala.
+    {% if admin %}<a href="{{url_for('admin_chave_torneio',torneio_id=torneio.id)}}">Abrir controle administrativo →</a>{% endif %}
+  </footer>
+</div>
+{% endblock %}

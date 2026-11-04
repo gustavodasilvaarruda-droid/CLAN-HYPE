@@ -1,0 +1,34 @@
+.hype-battle-room{--gold:#f3c869;--line:rgba(236,193,94,.28);max-width:1280px;margin:0 auto;padding:22px 12px 80px;color:#f5f1e8}
+.hbr-back{color:#e9c675;text-decoration:none;font-weight:700;display:inline-block;margin-bottom:21px}
+.hbr-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:28px}
+.hbr-kicker{font-size:11px;letter-spacing:.2em;font-weight:800;color:#e6b653}
+.hbr-header h1{font-size:clamp(1.8rem,4vw,3rem);margin:10px 0 8px;color:#fff;line-height:1.1}
+.hbr-header p,.hbr-info{color:#bcb9b4;line-height:1.7}
+.hbr-status{padding:12px 15px;border-radius:999px;border:1px solid var(--line);background:#17140e;color:#e6b653;font-size:12px;font-weight:800;white-space:nowrap}
+.hbr-status.hbr-ready{background:#0d271f;color:#8df0c3;border-color:#25664b}
+.hbr-status.hbr-finished{background:#30230e;color:#ffdc93}
+.hbr-arena{display:grid;grid-template-columns:minmax(0,1fr) 90px minmax(0,1fr);align-items:center;gap:16px;margin:0 0 24px}
+.hbr-player{position:relative;min-width:0;text-align:center;border:1px solid var(--line);border-radius:25px;overflow:hidden;padding:27px 18px;background:radial-gradient(ellipse at center top,rgba(200,148,46,.16),transparent 62%),linear-gradient(145deg,#201c17,#0c0c0e 75%);box-shadow:0 20px 55px rgba(0,0,0,.3)}
+.hbr-player.hbr-winner{border-color:#e6bb5e;box-shadow:0 0 0 1px rgba(230,187,94,.28),0 0 45px rgba(210,148,38,.14)}
+.hbr-player-label{font-size:10px;font-weight:800;letter-spacing:.23em;color:#d8b86e}
+.hbr-avatar{width:clamp(110px,17vw,190px);height:clamp(110px,17vw,190px);margin:21px auto 12px;border-radius:24px;border:2px solid #b38b43;display:flex;align-items:center;justify-content:center;overflow:hidden;background:linear-gradient(145deg,#433620,#121213);box-shadow:0 12px 35px rgba(0,0,0,.5)}
+.hbr-avatar img{width:100%;height:100%;object-fit:cover}
+.hbr-avatar span{font-size:clamp(4rem,8vw,7rem);font-weight:900;color:#f0c874}
+.hbr-player h2{font-size:clamp(1.15rem,3vw,2rem);word-break:break-word;margin:6px 0 12px}
+.hbr-vs{font-weight:1000;text-align:center;letter-spacing:-.08em;font-size:clamp(2rem,5vw,4.5rem);color:#f0bc58;text-shadow:0 0 28px rgba(239,185,77,.3)}
+.hbr-presence,.hbr-award{font-size:12px;font-weight:800;color:#bcb6ab;min-height:20px}
+.hbr-presence.is-ready{color:#8beab7}.hbr-award{color:#f4cd75}.hbr-you{position:absolute;top:12px;right:16px;color:#12100b;background:#f0c66b;border-radius:7px;padding:4px 7px;font-weight:900;font-size:10px}
+.hbr-lower{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.hbr-panel{background:linear-gradient(155deg,#1c1a16,#101114);border:1px solid var(--line);border-radius:20px;padding:24px;min-width:0}
+.hbr-panel h2{margin:8px 0 12px;font-size:1.4rem}
+.hbr-panel form{margin-top:18px}.hbr-panel label{display:block;font-size:13px;color:#d6c5a8;margin-bottom:9px}
+.hbr-panel select{width:100%;display:block;color:#f5f0e4;background:#171819;border:1px solid #75603b;border-radius:12px;padding:13px;font:inherit}
+.hbr-button{width:100%;border:0;background:linear-gradient(135deg,#ffe19b,#c28d38);color:#21170a;padding:14px 18px;font:inherit;font-weight:850;border-radius:12px;cursor:pointer;margin-top:12px}
+.hbr-button:hover{filter:brightness(1.1)}.hbr-button:focus-visible,.hbr-panel select:focus-visible{outline:3px solid #fff}
+.hbr-outline{color:#f2d593;background:#292217;border:1px solid #bc8f47}
+.hbr-success{border:1px solid #326e50;background:#153025;color:#a1efbd;padding:13px 15px;border-radius:12px;margin-top:15px}
+.hbr-warning{border-left:3px solid #f9bd59;padding:11px 14px;background:#2b200f;color:#f3d29b;border-radius:7px}
+.hbr-footer{color:#b9b3a5;line-height:1.6;font-size:12px;margin-top:25px}
+.hbr-footer a{display:block;color:#e9c675;margin-top:12px}
+@media(max-width:800px){.hbr-arena{grid-template-columns:minmax(0,1fr) 43px minmax(0,1fr);gap:8px}.hbr-player{padding:20px 8px}.hbr-vs{font-size:1.8rem}.hbr-lower{grid-template-columns:1fr}.hbr-header{flex-direction:column}.hbr-status{white-space:normal}}
+@media(max-width:410px){.hbr-avatar{width:95px;height:95px;border-radius:18px}.hbr-avatar span{font-size:3rem}.hbr-player-label{font-size:9px;letter-spacing:.05em}.hbr-presence,.hbr-award{font-size:10px}}
