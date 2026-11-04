@@ -29,7 +29,10 @@ BEGIN
       JOIN public.torneios t ON t.id = p.torneio_id
      WHERE p.id = p_partida_id
      FOR UPDATE OF p;
-    IF NOT FOUND OR m.torneio_status <> 'em_andamento' OR m.status = 'finalizada'
+    IF NOT FOUND THEN
+        RETURN FALSE;
+    END IF;
+    IF m.torneio_status <> 'em_andamento' OR m.status = 'finalizada'
        OR m.jogador1_email IS NULL OR m.jogador2_email IS NULL
        OR m.jogador1_email = m.jogador2_email
        OR p_usuario_email NOT IN (m.jogador1_email, m.jogador2_email) THEN
@@ -62,7 +65,10 @@ BEGIN
       JOIN public.torneios t ON t.id = p.torneio_id
      WHERE p.id = p_partida_id
      FOR UPDATE OF p;
-    IF NOT FOUND OR m.torneio_status <> 'em_andamento'
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('status', 'bloqueado');
+    END IF;
+    IF m.torneio_status <> 'em_andamento'
        OR m.status = 'finalizada'
        OR m.jogador1_email IS NULL OR m.jogador2_email IS NULL
        OR m.jogador1_email = m.jogador2_email
