@@ -46,7 +46,7 @@
     <section class="hbr-panel">
       <span class="hbr-kicker">CENTRAL DO CONFRONTO</span><h2>Estado da batalha</h2>
       {% if partida.status=='finalizada' %}
-        <p class="hbr-info">Resultado oficial registrado: <strong>{{partida.vencedor_nick or 'vencedor definido'}}</strong>. Quando todos os confrontos desta rodada terminarem, o chaveamento avança automaticamente. A confirmação do campeão e as premiações continuam com a organização.</p>
+        <p class="hbr-info">Resultado oficial registrado: <strong>{{partida.vencedor_nick or 'vencedor definido'}}</strong>. {% if torneio.status_torneio=='finalizado' %}🏆 Torneio encerrado: {{torneio.campeao_nick or 'campeão definido'}} é campeão, e {{torneio.vice_campeao_nick or 'o outro finalista'}} é vice.{% else %}Quando todos os confrontos desta rodada terminarem, o chaveamento avança automaticamente.{% endif %} Prêmios e pagamentos continuam com a organização.</p>
       {% elif not participantes %}
         <p class="hbr-info">Esta partida está aguardando um adversário. Não há confirmação de presença para confrontos com BYE.</p>
       {% elif ambos_prontos %}

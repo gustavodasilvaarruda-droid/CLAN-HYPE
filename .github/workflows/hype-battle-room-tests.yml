@@ -2,12 +2,14 @@ name: HYPE Sala de Batalha — testes
 on:
   pull_request:
     paths:
+      - 'app.py'
       - 'modules/events_v26.py'
       - 'modules/battle_room_rules.py'
       - 'templates/sala_batalha.html'
       - 'templates/torneio_detalhe.html'
       - 'templates/admin_chave.html'
       - 'supabase/migrations/20261104_hype_avanco_automatico_rodadas.sql'
+      - 'supabase/migrations/20261104_hype_encerramento_torneio_ranking_auto.sql'
       - 'tests/test_hype_battle_room_*.py'
       - '.github/workflows/hype-battle-room-tests.yml'
   workflow_dispatch:
@@ -38,5 +40,9 @@ jobs:
           python-version: '3.12'
       - name: Instalar Flask e driver PostgreSQL para teste isolado
         run: python -m pip install 'Flask>=3.0,<4' 'psycopg[binary]>=3.2,<4'
-      - name: Testar presença, confirmação dupla e avanço automático com PostgreSQL
+      - name: Verificar sintaxe do Flask e templates alterados
+        run: |
+          python -m py_compile app.py
+          python -c 'from jinja2 import Environment; from pathlib import Path; env=Environment(); [env.parse(Path(p).read_text()) for p in ("templates/admin_chave.html", "templates/torneio_detalhe.html", "templates/sala_batalha.html")]'
+      - name: Testar presença, dupla confirmação, chaveamento e ranking com PostgreSQL
         run: python -m unittest discover -s tests -p 'test_hype_battle_room_*.py' -v
