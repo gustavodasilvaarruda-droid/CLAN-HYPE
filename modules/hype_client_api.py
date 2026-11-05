@@ -1,4 +1,4 @@
-"""HYPE Client R7 read-only API. Never pass Supabase keys to Minecraft."""
+"""HYPE Client API: authenticated reads and server-calculated Breed previews. Never expose DB keys."""
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 from flask import Blueprint, jsonify, request, g
@@ -11,7 +11,7 @@ TOKEN_TTL = 60 * 60 * 4
 
 
 def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
-                                     login_blocked, login_fail, login_clear):
+                                     login_blocked, login_fail, login_clear, breed_services=None):
     api = Blueprint('hype_client_api', __name__, url_prefix='/api/hype/v1')
     serializer = URLSafeTimedSerializer(secret, salt=SALT)
 
@@ -223,5 +223,150 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             return jsonify({'ok': True, 'modulos': result})
         except Exception:
             return fail('Nao foi possivel validar o acesso aos modulos.', 503)
+
+
+    # Breed - endpoints shared with the site, accessible with the existing 4-hour
+    # Bearer token. These endpoints DO NOT create orders or write to Supabase.
+    # Business rules and price calculation come from app.py, not client guesses.
+    breed_services = breed_services or {}
+
+    def can_request_breed():
+        try:
+            return bool((get_permissions(g.hype_user['email']) or {}).get('pode_fazer_pedido_breed'))
+        except Exception:
+            return False
+
+    @api.get('/breed/pokemon/buscar')
+    @secure
+    def breed_search_pokemon():
+        if not can_request_breed():
+            return fail('Sem permissao para solicitar Breed.', 403)
+        query = (request.args.get('q') or '').strip().casefold()
+        if len(query) < 2:
+            return jsonify({'ok': True, 'results': []})
+        if len(query) > 80:
+            return fail('Pesquisa muito longa.', 400)
+        catalog = breed_services.get('catalogo')
+        if not catalog:
+            return fail('Catalogo indisponivel.', 503)
+        try:
+            matches = []
+            for item in catalog():
+                name = str(item.get('name') or '').strip()
+                if query not in name.casefold():
+                    continue
+                pokemon_id = int(item.get('id') or 0)
+                if pokemon_id <= 0:
+                    continue
+                matches.append({'id': pokemon_id, 'name': name,
+                                'display_name': name.replace('-', ' ').title()})
+                if len(matches) >= 24:
+                    break
+            return jsonify({'ok': True, 'results': matches})
+        except Exception:
+            return fail('Falha na pesquisa de Pokemon.', 503)
+
+    @api.get('/breed/pokemon/<int:pokemon_id>')
+    @secure
+    def breed_pokemon_details(pokemon_id):
+        if not can_request_breed():
+            return fail('Sem permissao para solicitar Breed.', 403)
+        name = (request.args.get('nome') or '').strip()
+        if pokemon_id < 1 or pokemon_id > 100000 or not name or len(name) > 120:
+            return fail('Pokemon invalido.', 400)
+        rule_fn = breed_services.get('regra')
+        classify_fn = breed_services.get('classificar')
+        if not rule_fn or not classify_fn:
+            return fail('Regras de Breed indisponiveis.', 503)
+        try:
+            rule = rule_fn(pokemon_id, name) or {}
+            meta = classify_fn(pokemon_id) or {}
+            return jsonify({'ok': True, 'pokemon': {
+                'id': pokemon_id, 'name': name,
+                'breedavel': bool(rule.get('breedavel')),
+                'motivo': rule.get('motivo'),
+                'so_com_ditto': bool(rule.get('so_com_ditto')),
+                'egg_groups': rule.get('egg_groups') or [],
+                'categoria': meta.get('categoria') or 'comum',
+                'categoria_label': meta.get('categoria_label') or 'Comum',
+                'taxa_femea_percentual': meta.get('taxa_femea_percentual'),
+            }})
+        except Exception:
+            return fail('Falha ao verificar o Pokemon.', 503)
+
+    @api.post('/breed/preco-preview')
+    @secure
+    def breed_price_preview():
+        """Price and promotions always come from the same functions as web checkout."""
+        if not can_request_breed():
+            return fail('Sem permissao para solicitar Breed.', 403)
+        if not request.is_json:
+            return fail('Envie JSON.', 415)
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return fail('JSON invalido.', 400)
+        try:
+            pokemon_id = int(body.get('pokemon_id', 0))
+        except (TypeError, ValueError, OverflowError):
+            return fail('Pokemon invalido.', 400)
+        pokemon = str(body.get('pokemon') or '').strip()
+        breed_type = str(body.get('breed_tipo') or '').strip().upper()
+        nature = str(body.get('nature') or '').strip()
+        gender = str(body.get('genero') or 'indiferente').strip().lower()
+        ha = body.get('ha')
+        trained = body.get('treinado', False)
+        zero_speed = body.get('zero_speed', False)
+        discard = str(body.get('iv_descartado') or '').strip().lower()
+        coupon = str(body.get('cupom') or '').strip().upper()
+        if (not 1 <= pokemon_id <= 100000 or not pokemon or len(pokemon) > 120
+                or breed_type not in ('F5', 'F6', 'PERSONALIZADO')
+                or gender not in ('macho', 'femea', 'indiferente')
+                or type(ha) is not bool or type(trained) is not bool
+                or type(zero_speed) is not bool or len(coupon) > 80):
+            return fail('Caracteristicas invalidas.', 400)
+        if nature and nature not in (breed_services.get('natures') or set()):
+            return fail('Nature invalida.', 400)
+        if breed_type == 'F5':
+            if discard not in (breed_services.get('ivs_f5') or set()):
+                return fail('Escolha o IV dispensavel no F5.', 400)
+            if zero_speed and discard == 'velocidade':
+                return fail('Zero Speed exige descartar outro IV.', 400)
+        elif discard or zero_speed:
+            return fail('IV dispensavel e Zero Speed sao exclusivos do F5.', 400)
+
+        rule_fn = breed_services.get('regra')
+        classify_fn = breed_services.get('classificar')
+        price_fn = breed_services.get('calcular')
+        if not all((rule_fn, classify_fn, price_fn)):
+            return fail('Calculadora oficial indisponivel.', 503)
+        try:
+            rule = rule_fn(pokemon_id, pokemon) or {}
+            if not rule.get('breedavel'):
+                return fail(rule.get('motivo') or 'Pokemon indisponivel para Breed.', 400)
+            meta = classify_fn(pokemon_id) or {}
+            with_ditto = bool(rule.get('so_com_ditto'))
+            category = 'ultra_raro' if with_ditto else (meta.get('categoria') or 'comum')
+            if category not in ('comum', 'raro', 'ultra_raro'):
+                category = 'comum'
+            total, detail = price_fn(
+                breed_type, ha=ha, genero=gender, categoria=category,
+                usa_ditto=with_ditto, treinado=trained, nature=nature or None,
+                zero_speed=zero_speed, pokemon_id=pokemon_id,
+                usuario_email=g.hype_user['email'], codigo_cupom=coupon)
+            total = int(total)
+            if total <= 0:
+                return fail('Tabela de precos nao configurada.', 422)
+            if coupon and detail.get('cupom_valido') is False:
+                return fail('Cupom invalido ou expirado.', 400)
+            return jsonify({
+                'ok': True, 'preco_total': total,
+                'preco_formatado': (' + f'{total:,}').replace(',', '.'),
+                'detalhes': detail,
+                'categoria': category,
+                'so_com_ditto': with_ditto,
+                'observacao': 'Valor de previa. O site recalcula ao criar o pedido.'
+            })
+        except Exception:
+            return fail('Falha temporaria ao calcular o preco.', 503)
 
     return api
