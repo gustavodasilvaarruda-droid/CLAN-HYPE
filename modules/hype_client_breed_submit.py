@@ -227,6 +227,23 @@ def install_breed_submit(api, db, secure, get_permissions, services):
             if not inserted:
                 return error('Pedido nao foi confirmado pelo banco. Consulte Meus Pedidos.', 503)
             order = inserted[0]
+            # Mirror the website's coupon accounting only AFTER the order exists.
+            # Repeated client requests return above, so they never charge twice.
+            if details.get('cupom_aplicado') and details.get('cupom_id'):
+                try:
+                    coupon_id = details['cupom_id']
+                    promotions = (db.table('promocoes_breed').select('id,codigo_cupom,usos,limite_usos')
+                                  .eq('id', coupon_id).limit(1).execute().data or [])
+                    if promotions and promotions[0].get('codigo_cupom'):
+                        p = promotions[0]
+                        uses = int(p.get('usos') or 0)
+                        limit = p.get('limite_usos')
+                        if limit in (None, '') or uses < int(limit):
+                            db.table('promocoes_breed').update({
+                                'usos': uses + 1, 'updated_at': datetime.now(timezone.utc).isoformat()
+                            }).eq('id', coupon_id).execute()
+                except Exception:
+                    pass  # A confirmed order must never be inserted a second time.
             try:
                 services['activity']('breed_criado', email,
                                      'Pedido de Breed pelo HYPE Client: ' + pokemon, 'breed', order.get('id'))
@@ -252,5 +269,5 @@ def install_breed_submit(api, db, secure, get_permissions, services):
                                                    'preco_total': p['preco_total']}}), 200
                 except Exception:
                     pass
-            api.logger if False else None  # never expose Supabase internals to players
+            # Never expose database exception details to the player.
             return error('Nao foi possivel registrar o pedido. Confira Meus Pedidos antes de tentar novamente.', 503)
