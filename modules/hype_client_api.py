@@ -11,7 +11,7 @@ TOKEN_TTL = 60 * 60 * 4
 
 
 def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
-                                     login_blocked, login_fail, login_clear):
+                                     login_blocked, login_fail, login_clear, breed_services=None):
     api = Blueprint('hype_client_api', __name__, url_prefix='/api/hype/v1')
     serializer = URLSafeTimedSerializer(secret, salt=SALT)
 
@@ -223,5 +223,9 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             return jsonify({'ok': True, 'modulos': result})
         except Exception:
             return fail('Nao foi possivel validar o acesso aos modulos.', 503)
+
+    if breed_services is not None:
+        from modules.hype_client_breed_submit import install_breed_submit
+        install_breed_submit(api, db, secure, get_permissions, breed_services)
 
     return api

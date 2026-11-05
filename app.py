@@ -7539,7 +7539,19 @@ from modules.hype_client_api import create_hype_client_api_blueprint
 app.register_blueprint(create_hype_client_api_blueprint(
     supabase, app.secret_key, obter_permissoes_usuario,
     membro_hype_ativo, _login_guard_bloqueado,
-    _login_guard_falha, _login_guard_limpar
+    _login_guard_falha, _login_guard_limpar,
+    breed_services={
+        'rule': regra_breed_pokemon,
+        'classify': classificar_pokemon_preco,
+        'calculate': calcular_preco_breed,
+        'split': calcular_divisao_breed,
+        'parse_date': parse_data_supabase,
+        'activity': registrar_atividade_reino,
+        'natures': NATURES_VALIDAS,
+        'f5_ivs': IVS_F5_VALIDOS,
+        'categories': BREED_CATEGORIAS_PRECO,
+        'category_labels': BREED_CATEGORIA_LABELS,
+    }
 ))
 
 # Carteira HYPE: isolada do Breed e sem acesso direto do navegador ao banco.
