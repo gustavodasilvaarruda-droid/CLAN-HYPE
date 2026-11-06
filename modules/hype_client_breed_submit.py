@@ -43,6 +43,111 @@ def install_breed_submit(api, db, secure, get_permissions, services):
     def error(message, code):
         return jsonify({'ok': False, 'erro': message}), code
 
+
+    @api.post('/pedidos/preview')
+    @secure
+    def preview_breed_order():
+        """Calculate the exact website price, without inserting an order or using a coupon."""
+        if not request.is_json:
+            return error('Envie JSON.', 415)
+        if request.content_length is not None and request.content_length > 16384:
+            return error('Pedido muito grande.', 413)
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return error('JSON invalido.', 400)
+
+        email = g.hype_user['email']
+        if not (get_permissions(email) or {}).get('pode_fazer_pedido_breed'):
+            return error('Conta sem permissao para solicitar Breed.', 403)
+        try:
+            pokemon_id = body.get('pokemon_id')
+            if type(pokemon_id) is not int or not 1 <= pokemon_id <= 99999:
+                raise InvalidOrder('ID do Pokemon invalido.')
+            regional = regional_form(pokemon_id)
+            if regional:
+                pokemon = regional['name']
+                requested_region = str(body.get('regiao') or regional['region']).strip().lower()
+                if requested_region != regional['region']:
+                    raise InvalidOrder('A regiao nao corresponde ao ID da forma.')
+            else:
+                if body.get('regiao'):
+                    raise InvalidOrder('Para formas regionais, envie o ID especifico da forma.')
+                pokemon = str(body.get('pokemon') or '').strip()
+                if not 1 <= len(pokemon) <= 80:
+                    raise InvalidOrder('Nome do Pokemon invalido.')
+                if any(x in pokemon.lower() for x in ('galar', 'alola', 'hisui', 'paldea')):
+                    raise InvalidOrder('Use o ID da forma regional.')
+            nature = str(body.get('nature') or '').strip()
+            if nature in ('Sem Nature', 'sem nature'):
+                nature = ''
+            if nature and nature not in services['natures']:
+                raise InvalidOrder('Nature invalida.')
+            ha = _boolean(body.get('ha'), 'ha')
+            genero = str(body.get('genero') or '').strip().lower()
+            if genero not in ('macho', 'femea', 'indiferente'):
+                raise InvalidOrder('Genero invalido.')
+            mode = str(body.get('breed_tipo') or '').strip().upper()
+            if mode not in ('F5', 'F6', 'PERSONALIZADO'):
+                raise InvalidOrder('Modo de Breed invalido.')
+            zero = _boolean(body.get('zero_speed', False), 'zero_speed')
+            trained = _boolean(body.get('treinado', False), 'treinado')
+            discarded = str(body.get('iv_descartado') or '').strip().lower() or None
+            if mode == 'F5':
+                if discarded not in services['f5_ivs']:
+                    raise InvalidOrder('Escolha o IV descartado para F5.')
+                if zero and discarded == 'velocidade':
+                    raise InvalidOrder('Zero Speed nao permite descartar velocidade.')
+            else:
+                if discarded or zero:
+                    raise InvalidOrder('IV descartado e Zero Speed sao exclusivos de F5.')
+            custom = _stats(body.get('ivs_personalizados') or {}, cap=31,
+                            required=(mode == 'PERSONALIZADO'))
+            if mode != 'PERSONALIZADO' and custom:
+                raise InvalidOrder('IVs personalizados exigem modo PERSONALIZADO.')
+            evs = _stats(body.get('evs_treinamento') or {}, cap=252, required=False)
+            if trained and sum(evs.values()) > 510:
+                raise InvalidOrder('Limite de 510 EVs ultrapassado.')
+            if not trained and evs:
+                raise InvalidOrder('EVs so podem ser enviados com treinamento.')
+            coupon = str(body.get('cupom_breed') or '').strip().upper()
+            if len(coupon) > 40 or (coupon and not all(x.isalnum() or x in '-_' for x in coupon)):
+                raise InvalidOrder('Cupom invalido.')
+            rule = services['rule'](pokemon_id, pokemon)
+            if not rule.get('breedavel'):
+                raise InvalidOrder(rule.get('motivo') or 'Pokemon nao disponivel para Breed.')
+            meta = services['classify'](pokemon_id)
+            category = str(meta.get('categoria') or 'comum').lower()
+            if category not in services['categories']:
+                category = 'comum'
+            uses_ditto = bool(rule.get('so_com_ditto'))
+            if uses_ditto:
+                category = 'ultra_raro'
+            total, details = services['calculate'](
+                mode, ha=ha, genero=genero, categoria=category,
+                usa_ditto=uses_ditto, treinado=trained, nature=nature or None,
+                zero_speed=zero, pokemon_id=pokemon_id, usuario_email=email,
+                codigo_cupom=coupon
+            )
+            if coupon and details.get('pricing_v2') and details.get('cupom_valido') is False:
+                return error('Cupom invalido ou indisponivel.', 422)
+            if total <= 0:
+                return error('Preco indisponivel. Tente novamente mais tarde.', 503)
+            details['classificacao_raridade'] = {
+                'categoria': category,
+                'label': meta.get('categoria_label') or services['category_labels'].get(category, 'Comum'),
+                'origem': meta.get('classificacao_origem'),
+                'motivo': meta.get('classificacao_motivo'),
+                'taxa_femea_percentual': meta.get('taxa_femea_percentual'),
+                'so_com_ditto': uses_ditto,
+            }
+            # Full breakdown matches POST; quotes have no side effects and no price lock.
+            return jsonify({'ok': True, 'preco_total': int(total),
+                            'total': int(total), **details}), 200
+        except InvalidOrder as exc:
+            return error(str(exc), 422)
+        except Exception:
+            return error('Nao foi possivel calcular o preco oficial.', 503)
+
     @api.post('/pedidos')
     @secure
     def submit_breed_order():
@@ -192,6 +297,12 @@ def install_breed_submit(api, db, secure, get_permissions, services):
                 return error('Cupom invalido ou indisponivel.', 422)
             if total <= 0:
                 return error('Preco indisponivel. Tente novamente mais tarde.', 503)
+            # Refuse a changed total BEFORE inserting: the player must review the new quote.
+            expected_total = body.get('expected_total')
+            if expected_total is not None:
+                if type(expected_total) is not int or expected_total != int(total):
+                    return jsonify({'ok': False, 'erro': 'Preco alterado. Volte a revisao e confira o novo valor.',
+                                    'preco_total_atual': int(total)}), 409
             details['classificacao_raridade'] = {
                 'categoria': category,
                 'label': meta.get('categoria_label') or services['category_labels'].get(category, 'Comum'),
