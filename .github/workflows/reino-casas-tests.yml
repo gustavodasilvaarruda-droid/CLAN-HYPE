@@ -1,0 +1,26 @@
+name: Reino HYPE - casas e aluguel de domingo
+on:
+  pull_request:
+    paths:
+      - 'app.py'
+      - 'templates/admin_reino.html'
+      - 'static/reino_casas_v32.css'
+      - 'supabase/migrations/20261107_reino_casas_domingo.sql'
+      - 'tests/test_reino_casas_domingo.py'
+      - '.github/workflows/reino-casas-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app.py'
+      - 'supabase/migrations/20261107_reino_casas_domingo.sql'
+      - 'tests/test_reino_casas_domingo.py'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile app.py
+      - run: python -m unittest discover -s tests -p 'test_reino_casas_domingo.py' -v

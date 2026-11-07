@@ -1,0 +1,22 @@
+/* Reino HYPE: estilos exclusivos das casas no painel administrativo. */
+.reino-casas-admin .reino-casas-admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;margin-top:18px}
+.reino-casa-admin-card{min-width:0;overflow:hidden;border:1px solid rgba(195,168,93,.25);border-radius:14px;background:rgba(14,18,25,.8)}
+.reino-casa-admin-cover{position:relative;aspect-ratio:16/9;background:#101820}
+.reino-casa-admin-cover img{width:100%;height:100%;object-fit:cover}
+.reino-casa-admin-cover>.status-pill{position:absolute;top:10px;right:10px;padding:5px 10px;background:rgba(12,16,20,.85)}
+.reino-casa-admin-placeholder{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:44px;color:#c4a65c}
+.reino-casa-admin-placeholder small{font-size:13px;color:#cbd1d8}
+.reino-casa-admin-summary{display:grid;gap:8px;padding:14px}
+.reino-casa-admin-summary>div{display:grid;gap:2px}
+.reino-casa-admin-summary strong{font-size:16px;overflow-wrap:anywhere}
+.reino-casa-admin-summary small{font-size:13px;color:#aab4bd}
+.reino-casa-admin-summary>b{color:#e3c36a}
+.reino-casa-admin-details{padding:0 14px 14px}
+.reino-casa-admin-details summary{cursor:pointer;padding:11px;border-radius:8px;border:1px solid rgba(195,168,93,.4);font-weight:700;text-align:center}
+.reino-casa-admin-details[open] summary{margin-bottom:14px}
+.reino-casa-admin-form{display:grid;gap:12px}
+.reino-casa-admin-form>label{display:grid;gap:5px;font-size:13px;color:#dde2e9}
+.reino-casa-admin-form>label.form-check{display:flex;align-items:center}
+.reino-casa-admin-form input,.reino-casa-admin-form select,.reino-casa-admin-form textarea{max-width:100%;min-width:0;box-sizing:border-box}
+.reino-casa-admin-form input[type=file]{font-size:12px}
+@media(max-width:560px){.reino-casas-admin .reino-casas-admin-grid{grid-template-columns:1fr}}
