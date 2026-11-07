@@ -149,6 +149,50 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         except Exception:
             return fail('Nao foi possivel consultar a fila.',503)
 
+    @api.get('/fila-completa')
+    @secure
+    @require_module('breeder')
+    def queue_complete():
+        """Read-only active Breeder queue, matching the website's operational states.
+
+        This route does not assume orders, edit payments or expose user emails.
+        The server checks the module and queue permission on every request.
+        """
+        email = g.hype_user['email']
+        perms = get_permissions(email) or {}
+        if not (perms.get('pode_ver_fila_breed') or perms.get('pode_assumir_breed')):
+            return fail('Sem permissao para consultar a fila.', 403)
+        statuses = ('pendente', 'em_andamento', 'aguardando_pagamento',
+                    'em_producao', 'cancelamento_solicitado', 'concluido',
+                    'aguardando_confirmacao', 'aguardando_confirmacao_cliente')
+        extras = ('zero_speed', 'treinado', 'usa_ditto', 'prioridade',
+                  'categoria_preco', 'pagamento_confirmado_em')
+        try:
+            rows = (db.table('pedidos_breed')
+                    .select(','.join(FIELDS + extras))
+                    .in_('status', list(statuses))
+                    .order('created_at', desc=False).limit(200).execute().data or [])
+            assigned = sorted({p['breeder_responsavel'] for p in rows
+                               if p.get('breeder_responsavel')})
+            nicks = {}
+            if assigned:
+                accounts = (db.table('usuarios_clan').select('email,nick_jogo')
+                            .in_('email', assigned).limit(200).execute().data or [])
+                nicks = {u['email']: u.get('nick_jogo') or 'Breeder'
+                         for u in accounts if u.get('email')}
+            orders = []
+            for p in rows:
+                public = clean_order(p)
+                public.update({k: p.get(k) for k in extras})
+                owner = p.get('breeder_responsavel')
+                public['breeder_nick'] = nicks.get(owner) if owner else None
+                public['meu_breed'] = owner == email
+                orders.append(public)
+            return jsonify({'ok': True, 'pedidos': orders,
+                            'fila_completa': True, 'limitado': len(rows) >= 200})
+        except Exception:
+            return fail('Nao foi possivel consultar a fila completa.', 503)
+
     @api.get('/painel-breeder')
     @secure
     @require_module('breeder')
