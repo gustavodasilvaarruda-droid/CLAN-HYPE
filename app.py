@@ -7596,6 +7596,9 @@ app.register_blueprint(create_hype_client_api_blueprint(
         'f5_ivs': IVS_F5_VALIDOS,
         'categories': BREED_CATEGORIAS_PRECO,
         'category_labels': BREED_CATEGORIA_LABELS,
+    },
+    order_services={
+        'notify': criar_notificacao,
     }
 ))
 

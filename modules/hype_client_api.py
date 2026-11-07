@@ -11,7 +11,7 @@ TOKEN_TTL = 60 * 60 * 4
 
 
 def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
-                                     login_blocked, login_fail, login_clear, breed_services=None):
+                                     login_blocked, login_fail, login_clear, breed_services=None, order_services=None):
     api = Blueprint('hype_client_api', __name__, url_prefix='/api/hype/v1')
     serializer = URLSafeTimedSerializer(secret, salt=SALT)
 
@@ -118,20 +118,44 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
     def me():
         return jsonify({'ok': True, 'usuario': safe_profile(g.hype_user)})
 
+    # Whitelist response fields: never reveal the breeder's email or private columns.
     FIELDS = ('id','pokemon','pokemon_id','nature','ha','genero','breed_tipo','iv_descartado',
               'status','preco_total','created_at','assumido_em','concluido_em','entregue_em',
-              'player','breeder_responsavel')
+              'player','treinado','evs_treinamento','ability','ivs_personalizados',
+              'zero_speed','breeder_responsavel')
+
+    def breeder_nick(email):
+        """Resolve the responsible breeder's public in-game nickname, not their email."""
+        if not email:
+            return None
+        cache = getattr(g, '_hype_breeder_nick_cache', None)
+        if cache is None:
+            cache = {}
+            g._hype_breeder_nick_cache = cache
+        if email not in cache:
+            try:
+                rows = (db.table('usuarios_clan').select('nick_jogo')
+                        .eq('email', email).limit(1).execute().data or [])
+                nick = rows[0].get('nick_jogo') if rows else None
+                cache[email] = nick.strip() if isinstance(nick, str) and nick.strip() else None
+            except Exception:
+                # A missing profile must not hide the order from its owner.
+                cache[email] = None
+        return cache[email]
+
     def clean_order(p, *, show_breeder=True):
         r = {k: p.get(k) for k in FIELDS if k != 'breeder_responsavel'}
         if show_breeder:
-            r['tem_breeder'] = bool(p.get('breeder_responsavel'))
+            email = p.get('breeder_responsavel')
+            r['tem_breeder'] = bool(email)
+            r['breeder_nick'] = breeder_nick(email)
         return r
 
     @api.get('/meus-pedidos')
     @secure
     def mine():
         try:
-            rows = db.table('pedidos_breed').select(','.join(FIELDS)).eq('usuario_email',g.hype_user['email']).order('created_at',desc=True).limit(100).execute().data or []
+            rows = db.table('pedidos_breed').select('*').eq('usuario_email',g.hype_user['email']).order('created_at',desc=True).limit(100).execute().data or []
             return jsonify({'ok': True,'pedidos':[clean_order(p) for p in rows]})
         except Exception:
             return fail('Nao foi possivel consultar os pedidos.',503)
@@ -144,7 +168,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         if not (perms.get('pode_ver_fila_breed') or perms.get('pode_assumir_breed')):
             return fail('Sem permissao para consultar a fila.',403)
         try:
-            rows = db.table('pedidos_breed').select(','.join(FIELDS)).eq('status','pendente').order('created_at',desc=False).limit(100).execute().data or []
+            rows = db.table('pedidos_breed').select('*').eq('status','pendente').order('created_at',desc=False).limit(100).execute().data or []
             return jsonify({'ok':True,'pedidos':[clean_order(p) for p in rows]})
         except Exception:
             return fail('Nao foi possivel consultar a fila.',503)
@@ -157,7 +181,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         if not (perms.get('pode_assumir_breed') or perms.get('pode_concluir_breed')):
             return fail('Sem permissao para acessar o painel.',403)
         try:
-            rows = db.table('pedidos_breed').select(','.join(FIELDS)).eq('breeder_responsavel',g.hype_user['email']).order('created_at',desc=True).limit(100).execute().data or []
+            rows = db.table('pedidos_breed').select('*').eq('breeder_responsavel',g.hype_user['email']).order('created_at',desc=True).limit(100).execute().data or []
             return jsonify({'ok': True,'pedidos':[clean_order(p) for p in rows]})
         except Exception:
             return fail('Nao foi possivel consultar o painel.',503)
@@ -230,5 +254,10 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     from modules.hype_client_order_details import install_order_details
     install_order_details(api, db, secure, clean_order)
+
+    # Writes are authenticated separately; site and mod share pedidos_breed.
+    from modules.hype_client_order_actions import install_order_actions
+    install_order_actions(api, db, secure,
+                          notifier=(order_services or {}).get('notify'))
 
     return api
