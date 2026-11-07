@@ -121,7 +121,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
     # Whitelist response fields: never reveal the breeder's email or private columns.
     FIELDS = ('id','pokemon','pokemon_id','nature','ha','genero','breed_tipo','iv_descartado',
               'status','preco_total','created_at','assumido_em','concluido_em','entregue_em',
-              'player','treinado','evs_treinamento','ability','ivs_personalizados',
+              'player','treinado','evs_treinamento','ability','modo_pedido','ivs_personalizados',
               'zero_speed','breeder_responsavel')
 
     def breeder_nick(email):
