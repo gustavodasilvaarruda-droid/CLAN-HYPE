@@ -228,4 +228,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         from modules.hype_client_breed_submit import install_breed_submit
         install_breed_submit(api, db, secure, get_permissions, breed_services)
 
+    from modules.hype_client_order_details import install_order_details
+    install_order_details(api, db, secure, clean_order)
+
     return api
