@@ -5688,6 +5688,44 @@ def _reino_admin_financeiro(email=None):
     )
 
 
+
+def _reino_proximo_domingo(data=None):
+    """Primeiro domingo futuro no fuso do Reino (Brasília)."""
+    data = data or datetime.now(HYPE_TZ).date()
+    dias = (6 - data.weekday()) % 7
+    return data + timedelta(days=dias or 7)
+
+
+def _reino_foto_casa(atual=None):
+    """Upload opcional de print da casa. Mantém a foto anterior se não enviada."""
+    foto = request.files.get('foto_casa')
+    if not foto or not foto.filename:
+        return atual
+    extensao = os.path.splitext(secure_filename(foto.filename))[1].lower()
+    permitido = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
+    if extensao not in permitido or foto.mimetype not in ('image/jpeg', 'image/png', 'image/webp'):
+        raise ValueError('Use uma imagem JPG, PNG ou WEBP.')
+    conteudo = foto.read(5 * 1024 * 1024 + 1)
+    if not conteudo or len(conteudo) > 5 * 1024 * 1024:
+        raise ValueError('A foto deve ter no máximo 5 MB.')
+    # Verifica a assinatura real do arquivo, não apenas o nome enviado.
+    eh_jpeg = conteudo[:3] == b'\\xff\\xd8\\xff'
+    eh_png = conteudo[:8] == b'\\x89PNG\\r\\n\\x1a\\n'
+    eh_webp = conteudo[:4] == b'RIFF' and conteudo[8:12] == b'WEBP'
+    if not ((extensao in ('.jpg', '.jpeg') and eh_jpeg) or
+            (extensao == '.png' and eh_png) or
+            (extensao == '.webp' and eh_webp)):
+        raise ValueError('O arquivo enviado não é uma imagem válida.')
+    caminho = f'casas/{uuid4().hex}{extensao}'
+    supabase.storage.from_('hype-media').upload(
+        caminho, conteudo, {'content-type': permitido[extensao]})
+    url = supabase.storage.from_('hype-media').get_public_url(caminho)
+    url = url if isinstance(url, str) else getattr(url, 'public_url', '')
+    if not url or not str(url).startswith('https://'):
+        raise ValueError('Não foi possível gerar o endereço público da foto.')
+    return url
+
+
 def _reino_data(valor):
     if not valor:
         return None
@@ -7090,6 +7128,7 @@ def admin_casa_nova():
         flash('Informe código e nome da casa.', 'erro')
         return redirect(url_for('admin_reino'))
     try:
+        foto_url = _reino_foto_casa(request.form.get('imagem_url','').strip() or None)
         supabase.table('casas_reino').insert({
             'codigo': codigo,
             'nome': nome,
@@ -7097,7 +7136,7 @@ def admin_casa_nova():
             'status': 'disponivel',
             'valor_aluguel': parse_valor_moeda(request.form.get('valor_aluguel')),
             'descricao': request.form.get('descricao','').strip() or None,
-            'imagem_url': request.form.get('imagem_url','').strip() or None,
+            'imagem_url': foto_url,
             'ativa': True
         }).execute()
         registrar_log('criar','reino','casa',codigo,{})
@@ -7119,7 +7158,7 @@ def admin_casa_salvar(casa_id):
         flash('Casa não encontrada.', 'erro'); return redirect(url_for('admin_reino'))
     antiga = rows[0]
     ocupante = request.form.get('ocupante_email','').strip() or None
-    if ocupante and not _safe_table('membros_hype','usuario_email',usuario_email=ocupante,ativo=True):
+    if ocupante and not membro_hype_ativo(ocupante):
         flash('A casa só pode ser vinculada a um membro HYPE ativo.', 'erro')
         return redirect(url_for('admin_reino'))
     status = request.form.get('status','disponivel')
@@ -7134,6 +7173,11 @@ def admin_casa_salvar(casa_id):
     if status == 'desativada' or not ativa:
         status = 'desativada'
         ocupante = None
+    try:
+        foto_url = _reino_foto_casa(request.form.get('imagem_url','').strip() or antiga.get('imagem_url'))
+    except (ValueError, Exception) as e:
+        flash(f'Não foi possível salvar a foto da casa: {e}', 'erro')
+        return redirect(url_for('admin_reino'))
     dados = {
         'codigo': request.form.get('codigo','').strip().upper() or antiga.get('codigo'),
         'nome': request.form.get('nome','').strip() or antiga.get('nome'),
@@ -7142,7 +7186,7 @@ def admin_casa_salvar(casa_id):
         'valor_aluguel': valor,
         'ocupante_email': ocupante,
         'descricao': request.form.get('descricao','').strip() or None,
-        'imagem_url': request.form.get('imagem_url','').strip() or None,
+        'imagem_url': foto_url,
         'ativa': ativa
     }
     try:
@@ -7159,8 +7203,8 @@ def admin_casa_salvar(casa_id):
             }).eq('casa_id',casa_id).eq('status','ativo').execute()
             supabase.table('contratos_casas').insert({
                 'casa_id':casa_id,'usuario_email':ocupante,'valor_semanal':valor,
-                'inicio':datetime.now(timezone.utc).date().isoformat(),
-                'proximo_vencimento':(datetime.now(timezone.utc).date()+timedelta(days=7)).isoformat(),
+                'inicio':datetime.now(HYPE_TZ).date().isoformat(),
+                'proximo_vencimento':_reino_proximo_domingo().isoformat(),
                 'status':'ativo'
             }).execute()
             criar_notificacao(ocupante,'Moradia no Reino HYPE',f"Você foi vinculado à {dados['nome']} ({dados['codigo']}).",'info',url_for('casas_reino'))
