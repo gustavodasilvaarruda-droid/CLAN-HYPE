@@ -56,7 +56,7 @@ class Database:
              'status': 'aguardando_confirmacao', 'pokemon': 'Bulbasaur',
              'preco_total': 300, 'breeder_responsavel': 'breeder@example.com',
              'treinado': True, 'evs_treinamento': {'atk': 252, 'speed': 252, 'hp': 4},
-             'ability': 'Overgrow', 'zero_speed': False,
+             'ability': 'Overgrow', 'modo_pedido': 'personalizado', 'zero_speed': False,
              'ivs_personalizados': {'atk': 31}},
         ]
         self.history = [{'tipo_pedido': 'breed', 'pedido_id': 3,
@@ -123,6 +123,7 @@ class OrderDetailTests(unittest.TestCase):
         self.assertTrue(orders[3]['treinado'])
         self.assertEqual(orders[3]['evs_treinamento']['atk'], 252)
         self.assertEqual(orders[3]['ability'], 'Overgrow')
+        self.assertEqual(orders[3]['modo_pedido'], 'personalizado')
         self.assertEqual(orders[3]['ivs_personalizados']['atk'], 31)
         self.assertIsNone(orders[1]['breeder_nick'])
         self.assertNotIn('breeder_responsavel', str(result.get_json()))
