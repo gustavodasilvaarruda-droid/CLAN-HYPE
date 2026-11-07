@@ -231,4 +231,8 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
     from modules.hype_client_order_details import install_order_details
     install_order_details(api, db, secure, clean_order)
 
+    # Writes are authenticated separately; site and mod share pedidos_breed.
+    from modules.hype_client_order_actions import install_order_actions
+    install_order_actions(api, db, secure)
+
     return api
