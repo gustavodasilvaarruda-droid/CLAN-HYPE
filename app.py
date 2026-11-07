@@ -5709,8 +5709,8 @@ def _reino_foto_casa(atual=None):
     if not conteudo or len(conteudo) > 5 * 1024 * 1024:
         raise ValueError('A foto deve ter no máximo 5 MB.')
     # Verifica a assinatura real do arquivo, não apenas o nome enviado.
-    eh_jpeg = conteudo[:3] == b'\\xff\\xd8\\xff'
-    eh_png = conteudo[:8] == b'\\x89PNG\\r\\n\\x1a\\n'
+    eh_jpeg = conteudo[:3] == bytes.fromhex('ffd8ff')
+    eh_png = conteudo[:8] == bytes.fromhex('89504e470d0a1a0a')
     eh_webp = conteudo[:4] == b'RIFF' and conteudo[8:12] == b'WEBP'
     if not ((extensao in ('.jpg', '.jpeg') and eh_jpeg) or
             (extensao == '.png' and eh_png) or
@@ -7175,7 +7175,7 @@ def admin_casa_salvar(casa_id):
         ocupante = None
     try:
         foto_url = _reino_foto_casa(request.form.get('imagem_url','').strip() or antiga.get('imagem_url'))
-    except (ValueError, Exception) as e:
+    except Exception as e:
         flash(f'Não foi possível salvar a foto da casa: {e}', 'erro')
         return redirect(url_for('admin_reino'))
     dados = {
