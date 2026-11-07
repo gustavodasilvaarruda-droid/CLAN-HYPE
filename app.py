@@ -5742,12 +5742,13 @@ def _reino_sincronizar_cobrancas(usuario_email=None):
     foi criada com sucesso. Assim uma falha de schema/conexão não faz o Reino
     perder uma semana de aluguel.
     """
-    hoje = datetime.now(timezone.utc).date()
     criadas = 0
     for tabela, tipo, id_key in (
         ('contratos_casas', 'casa', 'casa_id'),
         ('contratos_lojas', 'loja', 'loja_id'),
     ):
+        # Casas vencem no domingo de Brasília; preservar a regra atual das lojas.
+        hoje = datetime.now(HYPE_TZ).date() if tipo == 'casa' else datetime.now(timezone.utc).date()
         filtros = {'status': 'ativo'}
         if usuario_email:
             filtros['usuario_email'] = usuario_email
