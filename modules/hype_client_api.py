@@ -11,7 +11,7 @@ TOKEN_TTL = 60 * 60 * 4
 
 
 def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
-                                     login_blocked, login_fail, login_clear, breed_services=None):
+                                     login_blocked, login_fail, login_clear, breed_services=None, order_services=None):
     api = Blueprint('hype_client_api', __name__, url_prefix='/api/hype/v1')
     serializer = URLSafeTimedSerializer(secret, salt=SALT)
 
@@ -233,6 +233,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
 
     # Writes are authenticated separately; site and mod share pedidos_breed.
     from modules.hype_client_order_actions import install_order_actions
-    install_order_actions(api, db, secure)
+    install_order_actions(api, db, secure,
+                          notifier=(order_services or {}).get('notify'))
 
     return api
