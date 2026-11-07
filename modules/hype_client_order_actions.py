@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from flask import g, jsonify, request
 
 
-def install_order_actions(api, db, secure):
+def install_order_actions(api, db, secure, notifier=None):
     def fail(message, status):
         return jsonify({'ok': False, 'erro': message}), status
 
@@ -59,6 +59,12 @@ def install_order_actions(api, db, secure):
 
     def notify(email, title, message, category='aviso', link=None):
         if not email:
+            return
+        if notifier is not None:
+            try:
+                notifier(email, title, message, category, link)
+            except Exception:
+                pass
             return
         try:
             db.table('notificacoes').insert({
@@ -232,10 +238,13 @@ def install_order_actions(api, db, secure):
                 return fail('Nao e possivel relatar problema neste status.', 409)
             if p.get('problema_status') == 'aberto':
                 return fail('Ja existe um problema aberto para este pedido.', 409)
-            db.table('pedidos_breed').update({
+            rows = (db.table('pedidos_breed').update({
                 'problema_status': 'aberto', 'problema_motivo': reason.strip(),
                 'problema_aberto_em': now(),
-            }).eq('id', pedido_id).eq('usuario_email', g.hype_user['email']).eq('status', p['status']).execute()
+            }).eq('id', pedido_id).eq('usuario_email', g.hype_user['email'])
+              .eq('status', p['status']).execute().data or [])
+            if not rows:
+                return fail('O pedido mudou. Atualize e tente novamente.', 409)
             history(pedido_id, p['status'], p['status'],
                     'Cliente abriu um problema de entrega: ' + reason.strip())
             notify(p.get('breeder_responsavel'), 'Problema na entrega',
