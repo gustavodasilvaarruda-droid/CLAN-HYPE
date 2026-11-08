@@ -5,6 +5,14 @@ on:
     paths:
       - "app.py"
       - "modules/hype_membership_rules.py"
+      - "modules/hype_housing_status.py"
+      - "templates/admin_cargos.html"
+      - "templates/admin_membros_hype.html"
+      - "templates/hype_moradia_resumo.html"
+      - "templates/admin_reino.html"
+      - "static/admin_hype_filtros.js"
+      - "static/admin_hype_filtros.css"
+      - "tests/test_hype_housing_dashboard.py"
       - "modules/hype_mod_access.py"
       - "modules/hype_mod_admin.py"
       - "tests/test_hype_membership_roles.py"
@@ -18,6 +26,14 @@ on:
     paths:
       - "app.py"
       - "modules/hype_membership_rules.py"
+      - "modules/hype_housing_status.py"
+      - "templates/admin_cargos.html"
+      - "templates/admin_membros_hype.html"
+      - "templates/hype_moradia_resumo.html"
+      - "templates/admin_reino.html"
+      - "static/admin_hype_filtros.js"
+      - "static/admin_hype_filtros.css"
+      - "tests/test_hype_housing_dashboard.py"
       - "modules/hype_mod_access.py"
       - "modules/hype_mod_admin.py"
       - "tests/test_hype_membership_roles.py"
@@ -35,9 +51,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Verify Python syntax
-        run: python -m py_compile app.py modules/hype_membership_rules.py modules/hype_mod_access.py modules/hype_mod_admin.py
+        run: python -m py_compile app.py modules/hype_membership_rules.py modules/hype_housing_status.py modules/hype_mod_access.py modules/hype_mod_admin.py
       - name: Member roles and tournament rights
         run: python -m unittest discover -s tests -p "test_hype_membership_roles.py" -v
+      - name: HYPE housing dashboard and contracts
+        run: python -m unittest discover -s tests -p "test_hype_housing_dashboard.py" -v
       - name: Basic Breed ordering
         run: python -m unittest discover -s tests -p "test_breed_member_orders.py" -v
       - name: HYPE Mod access
