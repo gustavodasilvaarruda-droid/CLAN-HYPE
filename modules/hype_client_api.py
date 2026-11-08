@@ -173,6 +173,76 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         except Exception:
             return fail('Nao foi possivel consultar a fila.',503)
 
+
+    @api.get('/fila-completa')
+    @secure
+    @require_module('breeder')
+    def queue_full():
+        """Fila operacional para o HYPE Client. Leitura autorizada, sem emails privados."""
+        email = g.hype_user['email']
+        perms = get_permissions(email) or {}
+        if not (perms.get('pode_ver_fila_breed') or perms.get('pode_assumir_breed')):
+            return fail('Sem permissao para consultar a fila.', 403)
+
+        statuses = (
+            'pendente', 'em_andamento', 'aguardando_pagamento', 'em_producao',
+            'cancelamento_solicitado', 'concluido', 'aguardando_confirmacao',
+            'aguardando_confirmacao_cliente'
+        )
+        active_statuses = (
+            'aguardando_pagamento', 'em_producao', 'cancelamento_solicitado'
+        )
+        try:
+            rows = (db.table('pedidos_breed').select('*')
+                    .in_('status', list(statuses))
+                    .order('created_at', desc=False).limit(500).execute().data or [])
+
+            my_active = (db.table('pedidos_breed').select('id')
+                         .eq('breeder_responsavel', email)
+                         .in_('status', list(active_statuses))
+                         .execute().data or [])
+            max_active = 4
+            breeder_status = None
+            try:
+                profiles = (db.table('breeders_perfil').select('max_ativos,status')
+                            .eq('usuario_email', email).limit(1).execute().data or [])
+                if profiles:
+                    if profiles[0].get('max_ativos') is not None:
+                        max_active = max(1, int(profiles[0]['max_ativos']))
+                    breeder_status = profiles[0].get('status')
+                availability = (db.table('disponibilidade_funcoes').select('status')
+                                .eq('usuario_email', email).eq('funcao', 'breeder')
+                                .limit(1).execute().data or [])
+                if availability and availability[0].get('status'):
+                    breeder_status = availability[0]['status']
+                if breeder_status == 'ausente':
+                    breeder_status = 'indisponivel'
+            except Exception:
+                # A leitura da fila deve continuar mesmo se o perfil estiver indisponivel.
+                pass
+
+            resumo = {
+                'total': len(rows),
+                'pendentes': sum(p.get('status') == 'pendente' for p in rows),
+                'em_producao': sum(p.get('status') in (
+                    'em_andamento', 'aguardando_pagamento', 'em_producao',
+                    'cancelamento_solicitado') for p in rows),
+                'concluidos': sum(p.get('status') in (
+                    'concluido', 'aguardando_confirmacao',
+                    'aguardando_confirmacao_cliente') for p in rows),
+                'meus_ativos': len(my_active),
+                'max_ativos': max_active,
+                'status_breeder': breeder_status,
+                'parcial': len(rows) >= 500,
+            }
+            return jsonify({
+                'ok': True,
+                'pedidos': [clean_order(p) for p in rows],
+                'resumo': resumo,
+            })
+        except Exception:
+            return fail('Nao foi possivel consultar a fila completa.', 503)
+
     @api.get('/painel-breeder')
     @secure
     @require_module('breeder')
