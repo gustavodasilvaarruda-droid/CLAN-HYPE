@@ -94,7 +94,8 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
         try:
             modulos = consultar("hype_modulos", "codigo,nome,descricao,estado,versao,visivel,ordem")
             modulos.sort(key=lambda m: (m.get("ordem") or 0, m.get("nome") or ""))
-            cargos = consultar("cargos", "id,nome_cargo")
+            cargos = [r for r in consultar("cargos", "id,nome_cargo")
+                      if r.get("id") not in {"membro", "membro_hype", "visitante", "pedri"}]
             grupos = consultar("hype_modulos_grupos", "modulo_codigo,cargo_id", 5000)
             acessos = consultar(
                 "hype_modulos_acessos",
