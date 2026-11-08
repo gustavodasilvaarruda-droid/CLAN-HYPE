@@ -6,7 +6,7 @@
     <title>Gerenciamento de Cargos - Clã</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3001">
 <link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3001">  <link rel="stylesheet" href="{{url_for('static',filename='mobile_v36.css')}}?v=3601">
-<link rel="stylesheet" href="{{url_for('static',filename='admin_hype_filtros.css')}}?v=1"></head>
+<link rel="stylesheet" href="{{url_for('static',filename='admin_hype_filtros.css')}}?v=2"></head>
 <body>{% include 'admin_v29_nav.html' %}
 
     <!-- CABEÇALHO DA PÁGINA -->
@@ -98,12 +98,14 @@
             <!-- TABELA DE GERENCIAMENTO DE MEMBROS -->
             <h2 style="color: #d4af37; font-size: 1.3rem; margin-top: 30px;">👥 Gerenciar Cargos e Funções</h2>
             
+{% include "hype_moradia_resumo.html" %}
 <section class="hype-filters" data-hype-filter-root data-table-id="hype-cargos-tabela" aria-label="Buscar e filtrar jogadores">
 <h3>🔎 Localizar jogadores</h3>
 <div class="hype-filter-grid">
 <div class="hype-field"><label for="hype-cargos-tabela-busca">Pesquisar nick ou e-mail</label><input id="hype-cargos-tabela-busca" type="search" data-filter-search placeholder="Digite o nick do jogador..." autocomplete="off"></div>
 <div class="hype-field"><label for="hype-cargos-tabela-cargo">Cargo</label><select id="hype-cargos-tabela-cargo" data-filter-role><option value="">Todos os cargos</option>{% for c in cargos %}<option value="{{c.id|e}}">{{c.nome_cargo|e}}</option>{% endfor %}</select></div>
 <div class="hype-field"><label for="hype-cargos-tabela-hype">Vínculo com o clã</label><select id="hype-cargos-tabela-hype" data-filter-hype><option value="">Todos os jogadores</option><option value="1">Somente membros HYPE</option><option value="0">Fora do clã</option></select></div>
+<div class="hype-field"><label for="hype-cargos-tabela-moradia">Moradia no HYPE</label><select id="hype-cargos-tabela-moradia" data-filter-housing><option value="">Todas as situações</option><option value="sem_casa">HYPE sem casa</option><option value="com_casa">HYPE com casa</option><option value="verificar">Conferir moradia</option><option value="fora_cla">Fora do clã (não se aplica)</option></select></div>
 <button type="button" class="hype-filter-clear" data-filter-reset>Limpar filtros</button>
 </div><div class="hype-filter-counts" data-filter-chips aria-label="Filtro rápido por cargo"></div>
 <p class="hype-filter-feedback" data-filter-feedback role="status" aria-live="polite"></p>
@@ -115,18 +117,26 @@
                             <th>Nick no Jogo</th>
                             <th>E-mail</th>
                             <th>Cargo Atual / Clã</th>
+                            <th>Moradia</th>
                             <th>Alterar Para</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% if usuarios %}
                             {% for u in usuarios %}
-                            <tr data-player="{{u.nick_jogo|default('',true)|e}}" data-email="{{u.email|default('',true)|e}}" data-role="{{u.cargo|default('',true)|e}}" data-hype="{{'1' if u.hype_ativo else '0'}}">
+                            <tr data-player="{{u.nick_jogo|default('',true)|e}}" data-email="{{u.email|default('',true)|e}}" data-role="{{u.cargo|default('',true)|e}}" data-hype="{{'1' if u.hype_ativo else '0'}}" data-housing="{{u.moradia_status}}">
                                 <td><strong>{{ u.nick_jogo }}</strong></td>
                                 <td class="texto-secundario">{{ u.email }}</td>
                                 <td>
                                     <span class="badge-cargo">{{ u.cargo | upper }}</span>{% if u.hype_ativo %} <span class="hype-member-badge">[HYPE]</span>{% endif %}
                                 </td>
+                                <td class="hype-housing-cell">
+{% if u.moradia_status=='com_casa' %}<span class="hype-housing-badge com_casa">✓ Com casa</span><small>{{u.moradia_nome}}</small>
+{% elif u.moradia_status=='sem_casa' %}<span class="hype-housing-badge sem_casa">! Sem casa</span><a class="hype-housing-assign" href="{{url_for('admin_reino',morador=u.email)}}#hype-admin-casas">Atribuir casa →</a>
+{% elif u.moradia_status=='verificar' %}<span class="hype-housing-badge verificar">⚠ Verificar</span><small>{{u.moradia_nome}}</small><a class="hype-housing-assign" href="{{url_for('admin_reino',morador=u.email)}}#hype-admin-casas">Conferir no Reino →</a>
+{% elif u.moradia_status=='indisponivel' %}<span class="hype-housing-badge indisponivel">Dados indisponíveis</span>
+{% else %}<span class="hype-housing-badge fora_cla">Não se aplica</span>{% endif %}
+</td>
                                 <td>
                                     <form action="{{ url_for('alterar_cargo', email_usuario=u.email) }}" method="POST" class="form-alterar-cargo">
                                         {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
@@ -144,10 +154,10 @@
                                 </td>
                             </tr>
                             {% endfor %}
-                            <tr data-filter-empty hidden><td colspan="4" class="hype-filter-empty">Nenhum jogador corresponde aos filtros selecionados.</td></tr>
+                            <tr data-filter-empty hidden><td colspan="5" class="hype-filter-empty">Nenhum jogador corresponde aos filtros selecionados.</td></tr>
                         {% else %}
                             <tr>
-                                <td colspan="4" class="tabela-vazia">Nenhum usuário cadastrado ainda.</td>
+                                <td colspan="5" class="tabela-vazia">Nenhum usuário cadastrado ainda.</td>
                             </tr>
                         {% endif %}
                     </tbody>
@@ -160,6 +170,6 @@
         </div>
     </main>
 
-  <script src="{{url_for('static',filename='mobile_v36.js')}}?v=3601" defer></script><script src="{{url_for('static',filename='admin_hype_filtros.js')}}?v=1" defer></script>
+  <script src="{{url_for('static',filename='mobile_v36.js')}}?v=3601" defer></script><script src="{{url_for('static',filename='admin_hype_filtros.js')}}?v=2" defer></script>
 </body>
 </html>
