@@ -7131,7 +7131,14 @@ def admin_reino():
         loja_ref = lojas_por_id.get(contrato.get('loja_id'), {})
         contrato['loja_nome'] = loja_ref.get('nome') or f"Loja #{contrato.get('loja_id')}"
         contrato['loja_codigo'] = loja_ref.get('codigo') or '—'
-    return render_template('admin_reino.html', casas=casas, lojas=lojas, usuarios=usuarios, contratos=contratos, contratos_lojas=contratos_lojas)
+    # Atalho de Gerenciar Membros/Cargos: apenas destaca um morador HYPE válido.
+    # Não escolhe casa, não cria contratos nem dispara aluguéis.
+    escolhido = (request.args.get('morador') or '').strip().casefold()
+    morador_destaque = next((u for u in usuarios
+                            if (u.get('email') or '').strip().casefold() == escolhido), None)
+    return render_template('admin_reino.html', casas=casas, lojas=lojas, usuarios=usuarios,
+                           contratos=contratos, contratos_lojas=contratos_lojas,
+                           morador_destaque=morador_destaque)
 
 
 @app.route('/admin/reino/casas/nova', methods=['POST'])
