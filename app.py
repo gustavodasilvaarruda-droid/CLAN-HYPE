@@ -22,6 +22,7 @@ from modules.breed_regional import (
     pokemon_form_valid, breed_target_allowed, form_display_name,
 )
 from modules.hype_membership_rules import BASIC_ROLE, role_requires_active_clan, selectable_roles
+from modules.hype_housing_status import preencher_situacao_moradia
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
@@ -3922,6 +3923,19 @@ def gestao_breeders():
 # ROTAS ADMINISTRATIVAS (GESTÃO DE CARGOS)
 # ============================================================================
 
+def _carregar_moradia_admin(usuarios):
+    """Consulta somente leitura: nunca altera morador, contrato ou cobrança."""
+    try:
+        casas = (supabase.table('casas_reino')
+                 .select('id,codigo,nome,status,ativa,ocupante_email').execute().data or [])
+        contratos = (supabase.table('contratos_casas')
+                     .select('casa_id,usuario_email,status').execute().data or [])
+    except Exception as exc:
+        print(f'Não foi possível carregar moradias do painel: {exc}')
+        return preencher_situacao_moradia(usuarios, None, None)
+    return preencher_situacao_moradia(usuarios, casas, contratos)
+
+
 @app.route('/admin/cargos', methods=['GET'])
 @login_required
 def admin_cargos():
@@ -3948,7 +3962,9 @@ def admin_cargos():
     membros_ativos = {m.get('usuario_email') for m in _safe_table('membros_hype', 'usuario_email,ativo', ativo=True)}
     for u in usuarios:
         u['hype_ativo'] = u.get('email') in membros_ativos
-    return render_template('admin_cargos.html', usuarios=usuarios, cargos=cargos)
+    moradia_resumo = _carregar_moradia_admin(usuarios)
+    return render_template('admin_cargos.html', usuarios=usuarios, cargos=cargos,
+                           moradia_resumo=moradia_resumo, moradia_tabela='hype-cargos-tabela')
 
 
 @app.route('/admin/criar-cargo', methods=['POST'])
@@ -7063,10 +7079,13 @@ def admin_membros_hype():
     registros = {x.get('usuario_email'):x for x in _safe_table('membros_hype')}
     for u in usuarios:
         u['membro_hype'] = registros.get(u.get('email'))
+        u['hype_ativo'] = bool(u['membro_hype'] and u['membro_hype'].get('ativo'))
+    moradia_resumo = _carregar_moradia_admin(usuarios)
     # A página de membros usa a mesma lista real de cargos da gestão de cargos.
     cargos = sorted(selectable_roles(_safe_table('cargos', 'id,nome_cargo')),
                     key=lambda c: (c.get('nome_cargo') or '').lower())
-    return render_template('admin_membros_hype.html', usuarios=usuarios, cargos=cargos)
+    return render_template('admin_membros_hype.html', usuarios=usuarios, cargos=cargos,
+                           moradia_resumo=moradia_resumo, moradia_tabela='hype-membros-tabela')
 
 
 @app.route('/casas')
@@ -7112,7 +7131,14 @@ def admin_reino():
         loja_ref = lojas_por_id.get(contrato.get('loja_id'), {})
         contrato['loja_nome'] = loja_ref.get('nome') or f"Loja #{contrato.get('loja_id')}"
         contrato['loja_codigo'] = loja_ref.get('codigo') or '—'
-    return render_template('admin_reino.html', casas=casas, lojas=lojas, usuarios=usuarios, contratos=contratos, contratos_lojas=contratos_lojas)
+    # Atalho de Gerenciar Membros/Cargos: apenas destaca um morador HYPE válido.
+    # Não escolhe casa, não cria contratos nem dispara aluguéis.
+    escolhido = (request.args.get('morador') or '').strip().casefold()
+    morador_destaque = next((u for u in usuarios
+                            if (u.get('email') or '').strip().casefold() == escolhido), None)
+    return render_template('admin_reino.html', casas=casas, lojas=lojas, usuarios=usuarios,
+                           contratos=contratos, contratos_lojas=contratos_lojas,
+                           morador_destaque=morador_destaque)
 
 
 @app.route('/admin/reino/casas/nova', methods=['POST'])

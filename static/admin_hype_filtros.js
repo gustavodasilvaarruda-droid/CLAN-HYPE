@@ -7,16 +7,17 @@
     if(!table)return;
     var rows=Array.from(table.querySelectorAll('tbody tr[data-player]'));
     var search=root.querySelector('[data-filter-search]'),role=root.querySelector('[data-filter-role]'),
-        hype=root.querySelector('[data-filter-hype]'),reset=root.querySelector('[data-filter-reset]'),
+        hype=root.querySelector('[data-filter-hype]'),housing=root.querySelector('[data-filter-housing]'),reset=root.querySelector('[data-filter-reset]'),
         feedback=root.querySelector('[data-filter-feedback]'),chips=root.querySelector('[data-filter-chips]');
     var none=table.querySelector('[data-filter-empty]');
     function apply(){
-      var term=normalize(search.value),selected=role.value,status=hype.value,visible=0;
+      var term=normalize(search.value),selected=role.value,status=hype.value,home=housing?housing.value:'',visible=0;
       rows.forEach(function(row){
         var matchesName=normalize(row.dataset.player+' '+row.dataset.email).includes(term);
         var matchesRole=!selected||row.dataset.role===selected;
         var matchesHype=!status||row.dataset.hype===status;
-        var show=matchesName&&matchesRole&&matchesHype;
+        var matchesHousing=!home||row.dataset.housing===home;
+        var show=matchesName&&matchesRole&&matchesHype&&matchesHousing;
         row.hidden=!show;row.style.display=show?'':'none';if(show)visible++;
       });
       if(none)none.hidden=visible!==0;
@@ -35,8 +36,15 @@
         chip.addEventListener('click',function(){role.value=option.value;apply()});chips.appendChild(chip);
       });
     }
-    [search,role,hype].forEach(function(control){control.addEventListener('input',apply);control.addEventListener('change',apply)});
-    if(reset)reset.addEventListener('click',function(){search.value='';role.value='';hype.value='';apply();search.focus()});
+    [search,role,hype,housing].filter(Boolean).forEach(function(control){control.addEventListener('input',apply);control.addEventListener('change',apply)});
+    if(reset)reset.addEventListener('click',function(){search.value='';role.value='';hype.value='';if(housing)housing.value='';apply();search.focus()});
+    document.querySelectorAll('[data-housing-shortcut]').forEach(function(shortcut){
+      if(shortcut.dataset.housingTarget!==tableId||!housing)return;
+      shortcut.addEventListener('click',function(){
+        search.value='';role.value='';hype.value='1';housing.value=shortcut.dataset.housingShortcut;
+        apply();root.scrollIntoView({behavior:'smooth',block:'start'});
+      });
+    });
     apply();
   });
 })();

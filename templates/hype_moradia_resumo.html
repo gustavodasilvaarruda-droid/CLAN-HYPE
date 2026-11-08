@@ -1,0 +1,22 @@
+<section class="hype-housing-summary" aria-label="Moradias dos integrantes do clã">
+  <div class="hype-housing-summary-head">
+    <div><h2>🏠 Moradias do clã HYPE</h2><p>Todo integrante HYPE deve ter uma casa. Contas Membro do servidor não entram nessa exigência.</p></div>
+    <a class="hype-housing-reino-link" href="{{url_for('admin_reino')}}#hype-admin-casas">Gerenciar casas →</a>
+  </div>
+  {% if moradia_resumo.ok %}
+  <div class="hype-housing-summary-grid">
+    <div class="hype-housing-stat"><strong>{{moradia_resumo.total}}</strong><span>Integrantes HYPE</span></div>
+    <button type="button" class="hype-housing-stat" data-housing-shortcut="com_casa" data-housing-target="{{moradia_tabela}}"><strong>{{moradia_resumo.com_casa}}</strong><span>Com casa regular</span></button>
+    <button type="button" class="hype-housing-stat hype-housing-attention" data-housing-shortcut="sem_casa" data-housing-target="{{moradia_tabela}}"><strong>{{moradia_resumo.sem_casa}}</strong><span>Sem casa · clique para ver</span></button>
+    {% if moradia_resumo.verificar %}
+    <button type="button" class="hype-housing-stat" data-housing-shortcut="verificar" data-housing-target="{{moradia_tabela}}"><strong>{{moradia_resumo.verificar}}</strong><span>Conferir vínculo</span></button>
+    {% endif %}
+    <div class="hype-housing-stat"><strong>{{moradia_resumo.disponiveis}}</strong><span>Casas disponíveis</span></div>
+  </div>
+  {% if moradia_resumo.faltam_unidades %}
+  <p class="hype-housing-warning">Ainda faltam pelo menos <strong>{{moradia_resumo.faltam_unidades}}</strong> casa(s) para atender todos os integrantes atualmente sem moradia.</p>
+  {% endif %}
+  {% else %}
+  <p class="hype-housing-warning">Não foi possível consultar a situação das moradias. Nenhum integrante será marcado como sem casa até que o painel consiga carregar os dados.</p>
+  {% endif %}
+</section>
