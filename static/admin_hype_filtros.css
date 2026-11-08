@@ -1,7 +1,7 @@
 /* Admin CLAN HYPE: filtros restritos a membros e cargos. */
 .hype-filters{background:linear-gradient(130deg,#121720,#20222b);border:1px solid #66552b;border-radius:16px;padding:18px;margin:22px 0;color:#f3e7c9;box-shadow:0 10px 30px #0003}
 .hype-filters h3{margin:0 0 14px;color:#f1cf72;font-size:1.08rem}
-.hype-filter-grid{display:grid;grid-template-columns:minmax(200px,2fr) repeat(2,minmax(155px,1fr)) auto;gap:12px;align-items:end}
+.hype-filter-grid{display:grid;grid-template-columns:minmax(200px,2fr) repeat(3,minmax(145px,1fr)) auto;gap:12px;align-items:end}
 .hype-field{display:flex;flex-direction:column;gap:7px;min-width:0}
 .hype-field label{font-size:.85rem;color:#ebd8a3}
 .hype-field input,.hype-field select{width:100%;min-height:42px;border-radius:9px;border:1px solid #6d6045;background:#10141c;color:#fff;padding:9px 12px;box-sizing:border-box}
@@ -14,3 +14,30 @@
 .hype-filters [hidden],.hype-filter-empty[hidden]{display:none!important}
 @media(max-width:800px){.hype-filter-grid{grid-template-columns:1fr 1fr}.hype-filter-grid .hype-field:first-child{grid-column:1/-1}}
 @media(max-width:520px){.hype-filter-grid{grid-template-columns:1fr}.hype-filter-grid .hype-field:first-child{grid-column:auto}.hype-filter-clear{width:100%}}
+
+/* Painel de moradias HYPE: sinalização administrativa, sem alterar contratos. */
+.hype-housing-summary{margin:18px 0 24px;padding:20px;border:1px solid #64532d;border-radius:18px;background:linear-gradient(125deg,#121922,#242630);color:#eee6d9;box-shadow:0 12px 24px #0002}
+.hype-housing-summary-head{display:flex;gap:14px;align-items:start;justify-content:space-between;flex-wrap:wrap}
+.hype-housing-summary h2{font-size:1.18rem;color:#f3cd79;margin:0 0 6px}
+.hype-housing-summary p{margin:0;color:#cec7b8}
+.hype-housing-reino-link{display:inline-flex;border:1px solid #b99a52;color:#f3d88e!important;border-radius:9px;padding:9px 14px;text-decoration:none;font-weight:700}
+.hype-housing-summary-grid{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 0}
+.hype-housing-stat{background:#171e27;border:1px solid #62616b;border-radius:12px;min-width:118px;flex:1 1 136px;padding:13px;display:flex;flex-direction:column;align-items:start;gap:5px;text-align:left;color:#fff;font:inherit}
+.hype-housing-stat strong{font-size:1.65rem;line-height:1.1;color:#f3d082}
+.hype-housing-stat span{font-size:.82rem;color:#ddd6c7}
+button.hype-housing-stat{cursor:pointer}
+button.hype-housing-stat:hover{border-color:#e1c274;background:#222e3a}
+.hype-housing-attention{border-color:#cb8255}
+.hype-housing-attention strong{color:#ffc59d}
+.hype-housing-summary .hype-housing-warning{margin:14px 0 0;padding:11px 13px;background:#31241b;border-left:3px solid #dca368;border-radius:4px;color:#ffe2b9}
+.hype-housing-cell{min-width:130px}
+.hype-housing-cell small{display:block;color:#cbcbd0;margin-top:5px;overflow-wrap:anywhere}
+.hype-housing-badge{display:inline-block;border:1px solid #676767;border-radius:20px;padding:5px 9px;font-size:.81rem;font-weight:700;white-space:nowrap}
+.hype-housing-badge.com_casa{background:#163a32;color:#9de4bd;border-color:#3f866b}
+.hype-housing-badge.sem_casa{background:#493021;color:#ffd1a9;border-color:#be885e}
+.hype-housing-badge.verificar{background:#40371b;color:#ffe1a0;border-color:#ab9251}
+.hype-housing-badge.fora_cla,.hype-housing-badge.indisponivel{background:#30323c;color:#cfd1d8;border-color:#696c77}
+.hype-housing-assign{display:block;font-size:.82rem;font-weight:700;margin-top:7px;color:#eccc84!important;text-decoration:underline;text-underline-offset:3px}
+.hype-housing-assign:hover{color:#fff!important}
+@media(max-width:1030px){.hype-filter-grid{grid-template-columns:1fr 1fr}.hype-filter-grid .hype-field:first-child{grid-column:1/-1}}
+@media(max-width:520px){.hype-housing-summary{padding:14px}.hype-housing-summary-grid{gap:8px}.hype-housing-stat{min-width:115px;padding:11px}.hype-filter-grid{grid-template-columns:1fr}.hype-filter-grid .hype-field:first-child{grid-column:auto}}
