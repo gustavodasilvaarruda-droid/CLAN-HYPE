@@ -1,0 +1,44 @@
+name: HYPE Member Roles and Tournament Rights
+
+on:
+  pull_request:
+    paths:
+      - "app.py"
+      - "modules/hype_membership_rules.py"
+      - "modules/hype_mod_access.py"
+      - "modules/hype_mod_admin.py"
+      - "tests/test_hype_membership_roles.py"
+      - "tests/test_breed_member_orders.py"
+      - "tests/test_hype_mod_access.py"
+      - "sql/20261108_membros_servidor_hype_migracao.sql"
+      - ".github/workflows/hype-membership-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "app.py"
+      - "modules/hype_membership_rules.py"
+      - "modules/hype_mod_access.py"
+      - "modules/hype_mod_admin.py"
+      - "tests/test_hype_membership_roles.py"
+      - "sql/20261108_membros_servidor_hype_migracao.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  membership-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify Python syntax
+        run: python -m py_compile app.py modules/hype_membership_rules.py modules/hype_mod_access.py modules/hype_mod_admin.py
+      - name: Member roles and tournament rights
+        run: python -m unittest discover -s tests -p "test_hype_membership_roles.py" -v
+      - name: Basic Breed ordering
+        run: python -m unittest discover -s tests -p "test_breed_member_orders.py" -v
+      - name: HYPE Mod access
+        run: python -m unittest discover -s tests -p "test_hype_mod_access.py" -v

@@ -96,7 +96,7 @@
             </div>
 
             <!-- TABELA DE GERENCIAMENTO DE MEMBROS -->
-            <h2 style="color: #d4af37; font-size: 1.3rem; margin-top: 30px;">👥 Gerenciar Cargos e Aprovação de Membros</h2>
+            <h2 style="color: #d4af37; font-size: 1.3rem; margin-top: 30px;">👥 Gerenciar Cargos e Funções</h2>
             
 <section class="hype-filters" data-hype-filter-root data-table-id="hype-cargos-tabela" aria-label="Buscar e filtrar jogadores">
 <h3>🔎 Localizar jogadores</h3>
@@ -114,7 +114,7 @@
                         <tr>
                             <th>Nick no Jogo</th>
                             <th>E-mail</th>
-                            <th>Cargo Atual</th>
+                            <th>Cargo Atual / Clã</th>
                             <th>Alterar Para</th>
                         </tr>
                     </thead>
@@ -125,7 +125,7 @@
                                 <td><strong>{{ u.nick_jogo }}</strong></td>
                                 <td class="texto-secundario">{{ u.email }}</td>
                                 <td>
-                                    <span class="badge-cargo">{{ u.cargo | upper }}</span>
+                                    <span class="badge-cargo">{{ u.cargo | upper }}</span>{% if u.hype_ativo %} <span class="hype-member-badge">[HYPE]</span>{% endif %}
                                 </td>
                                 <td>
                                     <form action="{{ url_for('alterar_cargo', email_usuario=u.email) }}" method="POST" class="form-alterar-cargo">
