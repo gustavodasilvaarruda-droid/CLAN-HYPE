@@ -330,4 +330,11 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
     install_order_actions(api, db, secure,
                           notifier=(order_services or {}).get('notify'))
 
+    # Breeder actions reuse the existing site handlers and retain all accounting.
+    from modules.hype_client_breeder_actions import install_breeder_actions
+    install_breeder_actions(
+        api, db, secure, require_module, get_permissions,
+        (order_services or {}).get('breeder_handlers') or {},
+    )
+
     return api
