@@ -3945,6 +3945,10 @@ def admin_cargos():
         usuarios = []
         cargos = []
 
+    # O vínculo com o clã é independente do cargo cadastrado.
+    membros_ativos = {m.get('usuario_email') for m in _safe_table('membros_hype', 'usuario_email,ativo', ativo=True)}
+    for u in usuarios:
+        u['hype_ativo'] = u.get('email') in membros_ativos
     return render_template('admin_cargos.html', usuarios=usuarios, cargos=cargos)
 
 
@@ -7068,7 +7072,9 @@ def admin_membros_hype():
     registros = {x.get('usuario_email'):x for x in _safe_table('membros_hype')}
     for u in usuarios:
         u['membro_hype'] = registros.get(u.get('email'))
-    return render_template('admin_membros_hype.html', usuarios=usuarios)
+    # A página de membros usa a mesma lista real de cargos da gestão de cargos.
+    cargos = sorted(_safe_table('cargos', 'id,nome_cargo'), key=lambda c: (c.get('nome_cargo') or '').lower())
+    return render_template('admin_membros_hype.html', usuarios=usuarios, cargos=cargos)
 
 
 @app.route('/casas')

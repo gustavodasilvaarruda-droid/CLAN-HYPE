@@ -1,0 +1,16 @@
+/* Admin CLAN HYPE: filtros restritos a membros e cargos. */
+.hype-filters{background:linear-gradient(130deg,#121720,#20222b);border:1px solid #66552b;border-radius:16px;padding:18px;margin:22px 0;color:#f3e7c9;box-shadow:0 10px 30px #0003}
+.hype-filters h3{margin:0 0 14px;color:#f1cf72;font-size:1.08rem}
+.hype-filter-grid{display:grid;grid-template-columns:minmax(200px,2fr) repeat(2,minmax(155px,1fr)) auto;gap:12px;align-items:end}
+.hype-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.hype-field label{font-size:.85rem;color:#ebd8a3}
+.hype-field input,.hype-field select{width:100%;min-height:42px;border-radius:9px;border:1px solid #6d6045;background:#10141c;color:#fff;padding:9px 12px;box-sizing:border-box}
+.hype-filter-clear{min-height:42px;padding:8px 13px;border-radius:9px;background:transparent;color:#eacb78;border:1px solid #977d41;cursor:pointer}
+.hype-filter-counts{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0 0}
+.hype-filter-chip{border:1px solid #675a3e;border-radius:40px;background:#20242b;color:#eae2ca;padding:7px 12px;cursor:pointer;font:inherit;font-size:.85rem}
+.hype-filter-chip[aria-pressed="true"]{background:#625023;color:#fff;border-color:#e5bd5d}
+.hype-filter-feedback{font-size:.9rem;margin:13px 0 0;color:#e8d6ad}
+.hype-filter-empty{padding:24px;text-align:center;color:#e3d4af}
+.hype-filters [hidden],.hype-filter-empty[hidden]{display:none!important}
+@media(max-width:800px){.hype-filter-grid{grid-template-columns:1fr 1fr}.hype-filter-grid .hype-field:first-child{grid-column:1/-1}}
+@media(max-width:520px){.hype-filter-grid{grid-template-columns:1fr}.hype-filter-grid .hype-field:first-child{grid-column:auto}.hype-filter-clear{width:100%}}
