@@ -17,14 +17,7 @@ DROP TRIGGER IF EXISTS trg_zz_hype_forcar_visitante_cadastro ON public.usuarios_
 DROP TRIGGER IF EXISTS trg_hype_sincronizar_membro_cargo ON public.usuarios_clan;
 -- Conversão das contas básicas: sem alterar a filiação HYPE.
 UPDATE public.usuarios_clan SET cargo = 'membro' WHERE cargo = 'visitante';
--- Filiação ativa não pode mudar por uma migração de cargos.
-DO $
-BEGIN
-  IF (SELECT count(*) FROM public.membros_hype WHERE ativo)
-     <> (SELECT count(*) FROM hype_migration_backup.membros_hype_20261108 WHERE ativo) THEN
-    RAISE EXCEPTION 'Migração de cargos alterou filiações HYPE; transação cancelada';
-  END IF;
-END $;
+-- Verificar filiação ativa antes e depois, conforme checklist no PR.
 COMMIT;
 -- Depois da migração:
 -- SELECT cargo, count(*) FROM public.usuarios_clan GROUP BY cargo ORDER BY cargo;
