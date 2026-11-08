@@ -4006,19 +4006,16 @@ def criar_novo_cargo():
 @app.route('/alterar-cargo/<path:email_usuario>', methods=['POST'])
 @login_required
 def alterar_cargo(email_usuario):
-    """Altera cargo; entrada no Clã HYPE é uma aprovação separada."""
+    """Altera função sem aprovar automaticamente entrada no Clã HYPE."""
     email = session.get('usuario_email')
     if not obter_permissoes_usuario(email).get('pode_gerenciar_cargos', False):
         flash('Acesso negado.', 'erro')
         return redirect(url_for('painel'))
 
     novo_cargo = (request.form.get('novo_cargo') or '').strip()
-    # Não confiar em IDs de cargos enviados pelo navegador.
-    if not novo_cargo or not _safe_table('cargos', 'id', id=novo_cargo):
-        flash('Cargo selecionado inválido.', 'erro')
-        return redirect(url_for('admin_cargos'))
-    if email_usuario == email and novo_cargo == 'visitante':
-        flash('Você não pode retirar suas próprias permissões administrativas.', 'erro')
+    cargos_validos = selectable_roles(_safe_table('cargos', 'id,nome_cargo'))
+    if novo_cargo not in {c.get('id') for c in cargos_validos}:
+        flash('Cargo selecionado inválido ou descontinuado.', 'erro')
         return redirect(url_for('admin_cargos'))
 
     existentes = _safe_table('usuarios_clan', 'email,cargo', email=email_usuario)
@@ -4026,37 +4023,27 @@ def alterar_cargo(email_usuario):
         flash('Usuário não encontrado.', 'erro')
         return redirect(url_for('admin_cargos'))
     cargo_anterior = existentes[0].get('cargo')
+    hype_ativo = membro_hype_ativo(email_usuario)
+    if role_requires_active_clan(novo_cargo) and not hype_ativo:
+        flash('Primeiro adicione o jogador ao Clã HYPE em Gerenciar Membros.', 'erro')
+        return redirect(url_for('admin_cargos'))
+
+    if email_usuario == email and novo_cargo != cargo_anterior:
+        perms_novas = _safe_table('permissoes_cargos', 'pode_gerenciar_cargos', cargo_id=novo_cargo)
+        if not perms_novas or not perms_novas[0].get('pode_gerenciar_cargos'):
+            flash('Você não pode retirar sua própria permissão administrativa.', 'erro')
+            return redirect(url_for('admin_cargos'))
+
     try:
-        # Atualização coordenada das duas tabelas. Caso a segunda etapa falhe,
-        # restauramos o cargo para evitar promoção parcial e acesso acidental.
-        supabase.table('usuarios_clan').update({'cargo': novo_cargo}).eq('email', email_usuario).execute()
-        try:
-            hoje = datetime.now(timezone.utc).date().isoformat()
-            mh_existente = _safe_table('membros_hype', 'usuario_email,ativo', usuario_email=email_usuario)
-            # Promover visitante a 'membro' libera apenas o grupo básico.
-            # Somente /admin/membros confirma entrada no Clã HYPE.
-            ativo = bool(cargo_anterior != 'visitante' and novo_cargo != 'visitante'
-                         and mh_existente and mh_existente[0].get('ativo'))
-            dados = {'usuario_email': email_usuario, 'ativo': ativo,
-                     'saiu_em': None if ativo else hoje,
-                     'observacao': f'Alteração administrativa de cargo: {cargo_anterior} → {novo_cargo}'}
-            supabase.table('membros_hype').upsert(dados).execute()
-        except Exception:
-            supabase.table('usuarios_clan').update({'cargo': cargo_anterior}).eq('email', email_usuario).execute()
-            raise
+        # Exclusivamente a função muda. A filiação é controlada em /admin/membros.
+        if novo_cargo != cargo_anterior:
+            supabase.table('usuarios_clan').update({'cargo': novo_cargo}).eq('email', email_usuario).execute()
         registrar_log('alterar_cargo', 'usuarios', 'usuario', email_usuario, {
-            'anterior': cargo_anterior, 'novo': novo_cargo, 'membro_hype': ativo})
-        if novo_cargo == 'visitante':
-            aviso = 'Usuário alterado para visitante.'
-        elif ativo:
-            aviso = 'Cargo do integrante HYPE atualizado.'
-        else:
-            aviso = 'Cargo básico atualizado. Entrada no clã exige aprovação em Gerenciar membros HYPE.'
-        flash(aviso + f' Cargo: {novo_cargo.replace("_", " ")}.', 'sucesso')
+            'anterior': cargo_anterior, 'novo': novo_cargo, 'membro_hype': hype_ativo})
+        flash('Cargo atualizado. Vínculo com o Clã HYPE preservado.', 'sucesso')
     except Exception as e:
         print(f'[alterar_cargo] {e}')
         flash('Não foi possível alterar o cargo. Verifique a configuração do banco.', 'erro')
-
     return redirect(url_for('admin_cargos'))
 
 
