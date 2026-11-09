@@ -76,11 +76,13 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         formatos = {x.get('codigo'): x.get('nome') for x in safe_table('formatos_competitivos')}
         torneio['temporada_nome'] = temporadas.get(torneio.get('temporada_id'))
         torneio['formato_nome_config'] = formatos.get(torneio.get('formato_codigo'))
+        avatar_por_email = {email: perfil.get('avatar_url') for email, perfil in perfis.items()}
         replay_embed = youtube_embed_url(torneio.get('replay_url'))
         email_atual = session.get('usuario_email')
         meus_confrontos = [p for p in partidas if email_atual and email_atual in (p.get('jogador1_email'), p.get('jogador2_email'))]
         return render_template('torneio_detalhe.html', torneio=torneio, participantes=participantes,
-                               rodadas=rodadas, meus_confrontos=meus_confrontos, replay_embed=replay_embed)
+                               rodadas=rodadas, meus_confrontos=meus_confrontos,
+                               avatar_por_email=avatar_por_email, replay_embed=replay_embed)
 
     @bp.route('/admin/eventos/<int:item_id>/v26', methods=['POST'])
     @login_required
