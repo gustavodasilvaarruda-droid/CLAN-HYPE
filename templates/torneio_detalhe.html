@@ -1,6 +1,7 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}{{torneio.titulo}} - Torneio HYPE{% endblock %}
 {% block body_class %}hype-tournament-detail-page hype-v26-events{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='hype_arena_v2.css')}}?v=1">{% endblock %}
 {% block content %}
 <div class="v26-event-shell">
   <a class="v26-back" href="{{url_for('torneios')}}">← Voltar para Torneios</a>
@@ -12,11 +13,51 @@
       <div class="v26-meta-grid"><div><small>DATA</small><b>{{torneio.data_torneio|data_br if torneio.data_torneio else 'A definir'}}</b></div><div><small>FORMATO</small><b>{{torneio.formato_nome_config or torneio.formato or 'Livre'}}</b></div><div><small>JOGADORES</small><b>{{torneio.total_inscritos}}{% if torneio.limite_participantes %}/{{torneio.limite_participantes}}{% endif %}</b></div><div><small>PRÊMIO</small><b>{{torneio.premio or 'A definir'}}</b></div></div>
       {% if torneio.temporada_nome %}<div class="v26-season">Temporada <b>{{torneio.temporada_nome}}</b>{% if torneio.ranking_ativo %} · Campeão {{torneio.pontos_campeao}} pts · Vice {{torneio.pontos_vice}} pts{% endif %}</div>{% endif %}
       {% if torneio.campeao_nick %}<div class="v26-champion"><span>♛</span><div><small>CAMPEÃO</small><b>{{torneio.campeao_nick}}</b>{% if torneio.vice_campeao_nick %}<em>Vice: {{torneio.vice_campeao_nick}}</em>{% endif %}{% if torneio.status_torneio=='finalizado' %}<small>Resultado oficial · campeonato encerrado</small>{% endif %}</div></div>{% endif %}
-      <div class="v26-actions">{% if torneio.inscricoes_abertas %}{% if session.get('usuario_email') %}{% if torneio.usuario_inscrito %}<form method="post" action="{{url_for('cancelar_torneio',torneio_id=torneio.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="v26-btn ghost">Cancelar inscrição</button></form>{% else %}<form method="post" action="{{url_for('inscrever_torneio',torneio_id=torneio.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="v26-btn gold">Inscrever-me</button></form>{% endif %}{% else %}<a class="v26-btn gold" href="{{url_for('pagina_inicial')}}#entrar">Entrar para se inscrever</a>{% endif %}{% else %}<span class="v26-btn disabled">Inscrições fechadas</span>{% endif %}</div>
+      <div class="v26-actions arena-enroll-actions">
+        {% if torneio.usuario_inscrito %}
+          <span class="arena-confirmed">✓ Sua inscrição está confirmada</span>
+          {% if torneio.inscricoes_abertas and torneio.status_torneio=='inscricoes' %}
+            <form method="post" action="{{url_for('cancelar_torneio',torneio_id=torneio.id)}}" onsubmit="return confirm('Deseja cancelar sua inscrição?')">
+              <input type="hidden" name="csrf_token" value="{{csrf_token()}}"><button class="v26-btn ghost" type="submit">Cancelar inscrição</button>
+            </form>
+          {% endif %}
+        {% elif torneio.inscricoes_abertas and torneio.status_torneio=='inscricoes' %}
+          {% if session.get('usuario_email') %}
+            <form class="arena-enroll-form" method="post" action="{{url_for('inscrever_torneio',torneio_id=torneio.id)}}">
+              <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+              <label class="arena-rule-check"><input type="checkbox" name="aceito_regras" value="on" required> Li e aceito o regulamento e as condições de participação deste torneio.</label>
+              <button class="v26-btn gold" type="submit">Confirmar minha inscrição</button>
+            </form>
+          {% else %}
+            <a class="v26-btn gold" href="{{url_for('pagina_inicial')}}#entrar">Entrar para participar</a>
+          {% endif %}
+        {% else %}<span class="v26-btn disabled">Inscrições encerradas</span>{% endif %}
+      </div>
     </div>
   </section>
+  {% if session.get('usuario_email') %}
+  <section class="v26-panel arena-my-matches">
+    <div class="v26-section-head"><div><span>MINHA ARENA</span><h2>Meus confrontos</h2>
+      <p>Confira sua rodada e abra a sala para confirmar presença e acompanhar o resultado.</p></div>
+      <b>{{meus_confrontos|length}} partida(s)</b></div>
+    {% if meus_confrontos %}
+      <div class="arena-my-match-grid">
+      {% for m in meus_confrontos %}
+        <article class="arena-my-match">
+          <span class="arena-match-round">Rodada {{m.rodada}} · Confronto {{m.ordem}}</span>
+          <strong>{{m.jogador1_nick or 'A definir'}} <span>×</span> {{m.jogador2_nick or 'BYE'}}</strong>
+          <small>{% if m.status=='finalizada' %}✓ Concluída · {{m.vencedor_nick or 'vencedor confirmado'}}{% else %}Aguardando resultado{% endif %}</small>
+          {% if m.jogador1_email and m.jogador2_email %}
+            <a class="v26-btn compact" href="{{url_for('events26.sala_batalha',torneio_id=torneio.id,partida_id=m.id)}}">Abrir sala de batalha →</a>
+          {% endif %}
+        </article>
+      {% endfor %}
+      </div>
+    {% else %}<p class="v26-empty">{% if torneio.usuario_inscrito %}Você está inscrito. Aguarde o sorteio das chaves.{% else %}Você ainda não participa deste torneio.{% endif %}</p>{% endif %}
+  </section>
+  {% endif %}
   {% if replay_embed %}<section class="v26-panel"><div class="v26-section-head"><div><span>REPLAY OFICIAL</span><h2>Final / transmissão</h2></div></div><div class="v26-video"><iframe src="{{replay_embed}}" title="Replay {{torneio.titulo}}" allowfullscreen></iframe></div></section>{% endif %}
   <section class="v26-panel"><div class="v26-section-head"><div><span>CHAVEAMENTO</span><h2>Arena do torneio</h2><p>A próxima rodada é criada automaticamente quando todos os confrontos terminam. A finalização do torneio segue sob responsabilidade da organização.</p></div><b>{{rodadas|length}} rodadas</b></div>{% if rodadas %}<div class="v26-bracket">{% for numero, partidas in rodadas.items() %}<div class="v26-round"><h3>Rodada {{numero}}</h3>{% for m in partidas %}<div class="v26-match {% if m.status=='finalizada' %}done{% endif %}"><div class="{% if m.vencedor_email and m.vencedor_email==m.jogador1_email %}winner{% endif %}"><span>{{m.jogador1_nick or 'A definir'}}</span>{% if m.vencedor_email==m.jogador1_email %}<b>✓</b>{% endif %}</div><div class="{% if m.vencedor_email and m.vencedor_email==m.jogador2_email %}winner{% endif %}"><span>{{m.jogador2_nick or 'A definir'}}</span>{% if m.vencedor_email==m.jogador2_email %}<b>✓</b>{% endif %}</div>{% if m.jogador1_email and m.jogador2_email %}<a class="v26-btn compact" style="display:inline-block;margin-top:10px" href="{{url_for('events26.sala_batalha',torneio_id=torneio.id,partida_id=m.id)}}">⚔ Abrir Sala de Batalha</a>{% endif %}</div>{% endfor %}</div>{% endfor %}</div>{% else %}<p class="v26-empty">O chaveamento será publicado quando as inscrições forem encerradas.</p>{% endif %}</section>
-  <div class="v26-detail-grid"><section class="v26-panel"><div class="v26-section-head"><div><span>JOGADORES</span><h2>Participantes</h2></div><b>{{participantes|length}}</b></div><div class="v26-people">{% for p in participantes %}<div class="v26-person"><span>{{(p.nick_jogo or '?')[:1]|upper}}</span><b>{{p.nick_jogo}}</b></div>{% else %}<p class="v26-empty">Nenhum jogador inscrito.</p>{% endfor %}</div></section><section class="v26-panel"><div class="v26-section-head"><div><span>REGULAMENTO</span><h2>Regras</h2></div></div><p class="v26-rules">{{torneio.regras or 'As regras serão publicadas pela organização.'}}</p></section></div>
+  <div class="v26-detail-grid"><section class="v26-panel"><div class="v26-section-head"><div><span>JOGADORES</span><h2>Participantes</h2></div><b>{{participantes|length}}</b></div><div class="v26-people">{% for p in participantes %}<div class="v26-person"><span class="arena-person-avatar">{% if p.avatar_url %}<img src="{{p.avatar_url}}" alt="" loading="lazy">{% else %}{{(p.nick_jogo or '?')[:1]|upper}}{% endif %}</span><b>{{p.nick_jogo}}</b>{% if p.usuario_email==session.get('usuario_email') %}<small>Você</small>{% endif %}</div>{% else %}<p class="v26-empty">Nenhum jogador inscrito.</p>{% endfor %}</div></section><section class="v26-panel"><div class="v26-section-head"><div><span>REGULAMENTO</span><h2>Regras</h2></div></div><p class="v26-rules">{{torneio.regras or 'As regras serão publicadas pela organização.'}}</p></section></div>
 </div>
 {% endblock %}
