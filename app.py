@@ -7623,6 +7623,16 @@ app.register_blueprint(create_hype_client_api_blueprint(
     },
     order_services={
         'notify': criar_notificacao,
+        # Internal bearer-API bridge: same browser workflows and validations.
+        'breeder_handlers': {
+            'assumir': assumir_breed,
+            'confirmar_pagamento': confirmar_pagamento_breed,
+            'concluir': concluir_breed,
+            'devolver': devolver_breed_fila,
+            'entregar': entregar_breed,
+            'cancelamento_aprovar': lambda pedido_id: decidir_cancelamento_breed(pedido_id, 'aprovar'),
+            'cancelamento_recusar': lambda pedido_id: decidir_cancelamento_breed(pedido_id, 'recusar'),
+        },
     }
 ))
 
