@@ -1,6 +1,7 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}Eventos, Torneios e HYPE Live - Admin{% endblock %}
 {% block body_class %}hype-v26-admin-events{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='hype_arena_v2.css')}}?v=1">{% endblock %}
 {% block content %}{% include 'admin_v29_nav.html' %}
 <div class="v26-admin-shell">
   <div class="v26-admin-top"><div><span>ADMINISTRAÇÃO HYPE</span><h1>Eventos, Torneios e HYPE Live</h1><p>Crie a agenda, organize a Arena HYPE e publique transmissões e replays.</p></div><a class="v26-btn ghost" href="{{url_for('painel')}}">← Painel</a></div>
@@ -14,7 +15,95 @@
 
   <section class="v26-panel"><div class="v26-section-head"><div><span>GESTÃO</span><h2>Eventos publicados</h2></div></div><div class="v26-admin-cards">{% for e in eventos %}<article class="v26-admin-card"><div><span class="v26-mini-tag">EVENTO</span><h3>{{e.titulo}}</h3><p>{{e.data_evento|data_br if e.data_evento else 'Data a definir'}} · {{e.total_inscritos}} inscritos</p></div><form method="post" action="{{url_for('events26.admin_evento_v26',item_id=e.id)}}" class="v26-inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="status_evento"><option value="agendado" {% if (e.status_evento or 'agendado')=='agendado' %}selected{% endif %}>Agendado</option><option value="em_andamento" {% if e.status_evento=='em_andamento' %}selected{% endif %}>Em andamento</option><option value="finalizado" {% if e.status_evento=='finalizado' %}selected{% endif %}>Finalizado</option><option value="cancelado" {% if e.status_evento=='cancelado' %}selected{% endif %}>Cancelado</option></select><input name="replay_url" value="{{e.replay_url or ''}}" placeholder="Replay YouTube"><label class="v26-check"><input type="checkbox" name="destaque" {% if e.destaque %}checked{% endif %}> Destaque</label><button class="v26-btn compact">Salvar</button></form><div class="v26-card-actions"><a href="{{url_for('events26.evento_detalhe',evento_id=e.id)}}">Página pública</a><a href="{{url_for('participantes_evento',item_id=e.id)}}">Participantes</a><a href="{{url_for('final.resultados_evento',evento_id=e.id)}}">Resultados</a></div></article>{% else %}<p class="v26-empty">Nenhum evento cadastrado.</p>{% endfor %}</div></section>
 
-  <section class="v26-panel"><div class="v26-section-head"><div><span>ARENA</span><h2>Torneios</h2></div></div><div class="v26-admin-cards">{% for t in torneios %}<article class="v26-admin-card"><div><span class="v26-mini-tag tournament">TORNEIO</span><h3>{{t.titulo}}</h3><p>{{t.data_torneio|data_br if t.data_torneio else 'Data a definir'}} · {{t.total_inscritos}} inscritos{% if t.campeao_nick %} · Campeão {{t.campeao_nick}}{% endif %}</p></div><form method="post" action="{{url_for('events26.admin_torneio_v26',item_id=t.id)}}" class="v26-inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="status_torneio"><option value="inscricoes" {% if (t.status_torneio or 'inscricoes')=='inscricoes' %}selected{% endif %}>Inscrições</option><option value="em_andamento" {% if t.status_torneio=='em_andamento' %}selected{% endif %}>Em andamento</option><option value="finalizado" {% if t.status_torneio=='finalizado' %}selected{% endif %}>Finalizado</option><option value="cancelado" {% if t.status_torneio=='cancelado' %}selected{% endif %}>Cancelado</option></select><input name="replay_url" value="{{t.replay_url or ''}}" placeholder="Replay YouTube"><label class="v26-check"><input type="checkbox" name="inscricoes_abertas" {% if t.inscricoes_abertas %}checked{% endif %}> Inscrições abertas</label><label class="v26-check"><input type="checkbox" name="destaque" {% if t.destaque %}checked{% endif %}> Destaque</label><button class="v26-btn compact">Salvar</button></form><div class="v26-card-actions"><a href="{{url_for('events26.torneio_detalhe',torneio_id=t.id)}}">Página pública</a><a href="{{url_for('participantes_torneio',item_id=t.id)}}">Participantes</a><a href="{{url_for('admin_chave_torneio',torneio_id=t.id)}}">Chaveamento</a>{% if t.status_torneio in [None,'inscricoes'] %}<form method="post" action="{{url_for('gerar_chave_torneio',torneio_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Gerar chave</button></form>{% endif %}</div></article>{% else %}<p class="v26-empty">Nenhum torneio cadastrado.</p>{% endfor %}</div></section>
+  <section class="v26-panel">
+    <div class="v26-section-head"><div><span>ARENA HYPE · CONTROLE</span><h2>Gerenciar torneios</h2><p>Edite torneios de teste, organize as inscrições e confirme antes de excluir. Nenhuma exclusão é automática.</p></div></div>
+    <div class="v26-admin-cards">
+    {% for t in torneios %}
+    <article class="v26-admin-card arena-admin-card">
+      <div class="arena-admin-summary">
+        <div><span class="v26-mini-tag tournament">#{{t.id}} · TORNEIO</span>
+          <h3>{{t.titulo}}</h3>
+          <p>{{t.data_torneio|data_br if t.data_torneio else 'Data a definir'}} · {{t.total_inscritos}} inscritos{% if t.campeao_nick %} · Campeão {{t.campeao_nick}}{% endif %}</p>
+        </div>
+        <span class="arena-status">{{(t.status_torneio or 'inscricoes')|replace('_',' ')|title}}</span>
+      </div>
+      <div class="v26-card-actions arena-admin-links">
+        <a href="{{url_for('events26.torneio_detalhe',torneio_id=t.id)}}">Página pública</a>
+        <a href="{{url_for('participantes_torneio',item_id=t.id)}}">Inscrições</a>
+        <a href="{{url_for('admin_chave_torneio',torneio_id=t.id)}}">Chaves e resultados</a>
+      </div>
+      <form method="post" action="{{url_for('events26.admin_torneio_v26',item_id=t.id)}}" class="v26-inline-form arena-status-form">
+        <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+        <label>Situação<select name="status_torneio">
+          <option value="inscricoes" {% if (t.status_torneio or 'inscricoes')=='inscricoes' %}selected{% endif %}>Inscrições</option>
+          <option value="em_andamento" {% if t.status_torneio=='em_andamento' %}selected{% endif %}>Em andamento</option>
+          <option value="finalizado" {% if t.status_torneio=='finalizado' %}selected{% endif %}>Finalizado</option>
+          <option value="cancelado" {% if t.status_torneio=='cancelado' %}selected{% endif %}>Cancelado</option>
+        </select></label>
+        <label>Replay<input name="replay_url" value="{{t.replay_url or ''}}" placeholder="URL do YouTube"></label>
+        <label class="v26-check"><input type="checkbox" name="inscricoes_abertas" {% if t.inscricoes_abertas %}checked{% endif %}> Inscrições abertas</label>
+        <label class="v26-check"><input type="checkbox" name="destaque" {% if t.destaque %}checked{% endif %}> Destaque</label>
+        <button class="v26-btn compact">Salvar situação</button>
+      </form>
+      <div class="arena-admin-controls">
+        <details class="arena-admin-details">
+          <summary>✎ Editar torneio</summary>
+          <form class="v26-form arena-edit-form" method="post" action="{{url_for('editar_torneio',item_id=t.id)}}">
+            <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+            <label>Título<input name="titulo" maxlength="160" value="{{t.titulo}}" required></label>
+            <label>Descrição<textarea name="descricao" required>{{t.descricao}}</textarea></label>
+            <label>Regras<textarea name="regras">{{t.regras or ''}}</textarea></label>
+            <label>Prêmio<input name="premio" value="{{t.premio or ''}}"></label>
+            <label>URL da capa<input name="imagem_url" type="url" value="{{t.imagem_url or ''}}"></label>
+            {% if t.status_torneio in [None,'inscricoes'] and not t.tem_chave %}
+              <div class="v26-form-2">
+                <label>Data e horário<input type="datetime-local" name="data_torneio" value="{{(t.data_torneio or '')[:16]}}" required></label>
+                <label>Máximo de jogadores<input type="number" name="limite_participantes" min="2" value="{{t.limite_participantes or ''}}"></label>
+              </div>
+              <label>Formato<select name="formato_codigo">
+                <option value="">Selecionar</option>{% for f in formatos_competitivos %}<option value="{{f.codigo}}" {% if t.formato_codigo==f.codigo %}selected{% endif %}>{{f.nome}}</option>{% endfor %}
+              </select></label>
+              <label>Formato manual<input name="formato" value="{{t.formato or ''}}"></label>
+              <label>Temporada<select name="temporada_id"><option value="">Sem temporada</option>{% for temporada in temporadas %}<option value="{{temporada.id}}" {% if t.temporada_id==temporada.id %}selected{% endif %}>{{temporada.nome}}</option>{% endfor %}</select></label>
+              <div class="v26-form-2">
+                <label>Pontos campeão<input type="number" name="pontos_campeao" min="0" value="{{t.pontos_campeao or 0}}"></label>
+                <label>Pontos vice<input type="number" name="pontos_vice" min="0" value="{{t.pontos_vice or 0}}"></label>
+              </div>
+              <div class="v26-check-group"><label class="v26-check"><input type="checkbox" name="ranking_ativo" {% if t.ranking_ativo %}checked{% endif %}> Vale ranking</label>
+                <label class="v26-check"><input type="checkbox" name="inscricoes_abertas" {% if t.inscricoes_abertas %}checked{% endif %}> Inscrições abertas</label></div>
+            {% else %}
+              <p class="arena-hint">Chave ou resultado já iniciado: formato, data, inscrições e pontuação ficam bloqueados para preservar as partidas.</p>
+            {% endif %}
+            <label class="v26-check"><input type="checkbox" name="publicado" {% if t.publicado %}checked{% endif %}> Visível aos jogadores</label>
+            <button class="v26-btn gold" type="submit">Salvar alterações</button>
+          </form>
+        </details>
+        {% if t.status_torneio in [None,'inscricoes'] and not t.tem_chave %}
+        <form method="post" action="{{url_for('gerar_chave_torneio',torneio_id=t.id)}}" onsubmit="return confirm('Encerrar inscrições e sortear os confrontos?')">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+          <button class="v26-btn compact" type="submit" {% if t.total_inscritos < 2 %}disabled title="Pelo menos dois participantes"{% endif %}>⚔ Encerrar e sortear chaves</button>
+        </form>
+        {% endif %}
+        <details class="arena-admin-details arena-delete-details">
+          <summary>Excluir torneio de teste</summary>
+          {% if t.ranking_processado %}
+            <p class="arena-hint">Este torneio já pontuou ranking. A exclusão está bloqueada para preservar o histórico.</p>
+          {% else %}
+            <p>Isso apaga o torneio, as inscrições e as partidas vinculadas. Não pode ser desfeito.</p>
+            <form method="post" action="{{url_for('excluir_torneio',item_id=t.id)}}" class="arena-delete-form"
+                  onsubmit="return confirm('Confirma EXCLUIR o torneio e todas as inscrições e partidas vinculadas?')">
+              <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+              <label>Digite o título exato para confirmar:
+                <input name="confirmar_titulo" required autocomplete="off" placeholder="{{t.titulo}}" aria-label="Confirmação pelo título do torneio"></label>
+              <button class="v26-danger" type="submit">Excluir definitivamente</button>
+            </form>
+          {% endif %}
+        </details>
+      </div>
+    </article>
+    {% else %}<p class="v26-empty">Nenhum torneio cadastrado.</p>{% endfor %}
+    </div>
+  </section>
 
   <div class="v26-admin-grid">
     <section class="v26-panel"><div class="v26-section-head"><div><span>HYPE LIVE</span><h2>Novo replay</h2></div><a href="{{url_for('final.configuracoes')}}">Configurar transmissão →</a></div><form class="v26-form" method="post" action="{{url_for('events26.criar_replay')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Título<input name="titulo" required></label><label>Descrição<textarea name="descricao"></textarea></label><label>URL do YouTube<input name="youtube_url" required placeholder="https://youtube.com/watch?v=..."></label><div class="v26-form-2"><label>Origem<select name="origem_tipo"><option value="outro">Outro</option><option value="evento">Evento</option><option value="torneio">Torneio</option></select></label><label>ID da origem<input type="number" name="origem_id" min="1"></label></div><div class="v26-check-group"><label class="v26-check"><input type="checkbox" name="publicado" checked> Publicado</label><label class="v26-check"><input type="checkbox" name="destaque"> Destaque</label></div><button class="v26-btn gold">Publicar replay</button></form></section>
