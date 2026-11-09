@@ -1,0 +1,59 @@
+/* Arena HYPE v2 — classes isoladas para não afetar Breed, Reino ou módulos. */
+.arena-admin-card { display:grid; gap:16px; padding:18px; min-width:0 }
+.arena-admin-summary { display:flex; gap:14px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap }
+.arena-admin-summary h3 { margin:8px 0 5px; font-size:1.15rem; overflow-wrap:anywhere }
+.arena-admin-summary p { margin:0; color:#b9b9c2; font-size:.89rem }
+.arena-status { background:rgba(255,195,30,.11); border:1px solid rgba(255,203,50,.35); border-radius:999px; padding:6px 12px; font-size:.76rem; font-weight:800; color:#ffd65d; white-space:nowrap }
+.arena-admin-links { display:flex; flex-wrap:wrap; gap:10px; margin:0 }
+.arena-status-form { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; padding:12px; background:#0c0d12; border:1px solid #33303a; border-radius:12px }
+.arena-status-form > label { display:grid; gap:5px; font-size:.77rem; color:#c7c5c0 }
+.arena-status-form > label:not(.v26-check) { flex:1 1 140px }
+.arena-status-form input:not([type=checkbox]), .arena-status-form select { max-width:100%; min-width:0; box-sizing:border-box; padding:10px; background:#15171c; color:#eee; border:1px solid #555; border-radius:8px }
+.arena-status-form .v26-check { display:flex; align-items:center; gap:5px; flex:0 0 auto }
+.arena-admin-controls { display:grid; gap:12px }
+.arena-admin-details { display:block; padding:0; border:1px solid #45404a; border-radius:12px; background:linear-gradient(130deg,#111218,#0c0d0f); overflow:hidden }
+.arena-admin-details > summary { cursor:pointer; padding:13px 15px; color:#f5d464; font-weight:750; list-style-position:inside }
+.arena-admin-details[open] > summary { border-bottom:1px solid #333 }
+.arena-edit-form { padding:16px; display:grid; gap:12px }
+.arena-edit-form label, .arena-delete-form label { display:grid; gap:6px; min-width:0; color:#dededc }
+.arena-edit-form input:not([type=checkbox]), .arena-edit-form textarea, .arena-edit-form select,
+.arena-delete-form input { width:100%; min-width:0; box-sizing:border-box; background:#111419; color:#f1f1f1; border:1px solid #49454d; border-radius:9px; padding:10px }
+.arena-edit-form textarea { min-height:80px; resize:vertical }
+.arena-edit-form .v26-check { display:flex; align-items:center; gap:8px }
+.arena-edit-form .v26-form-2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px }
+.arena-hint { color:#d9c388; font-size:.88rem; line-height:1.5; padding:10px; background:#201a12; border-radius:8px }
+.arena-delete-details { border-color:#63373c }
+.arena-delete-details summary { color:#ff969c }
+.arena-delete-details > p { margin:12px 16px; color:#f0b8ba }
+.arena-delete-form { padding:0 16px 16px; display:grid; gap:12px }
+.arena-delete-form button { justify-self:start; cursor:pointer }
+.arena-confirmed { display:inline-flex; align-items:center; padding:9px 12px; border:1px solid #598c65; background:rgba(53,115,65,.13); border-radius:9px; color:#a7e5a7; font-weight:800; line-height:1.25 }
+.arena-enroll-actions { flex-wrap:wrap; align-items:center }
+.arena-enroll-form { width:min(100%,530px); display:grid; gap:12px }
+.arena-rule-check { display:flex; align-items:flex-start; gap:9px; color:#e0d9c4; line-height:1.5; font-size:.92rem }
+.arena-rule-check input { width:17px; height:17px; flex:0 0 auto; margin-top:3px; accent-color:#e9b600 }
+.arena-my-tournaments { margin:20px 0; padding:18px; display:grid; gap:12px; background:linear-gradient(130deg,#181813,#0b0c11); border:1px solid #6e531a; border-radius:15px }
+.arena-my-tournaments h2 { margin:6px 0; color:#f3d35e; font-size:1.23rem }
+.arena-my-tournaments p { margin:0; color:#bebeb9 }
+.arena-my-pills { display:flex; flex-wrap:wrap; gap:10px }
+.arena-my-pills a { display:inline-flex; border:1px solid #8a681a; background:#17140a; color:#f2d26c; padding:10px 14px; border-radius:9px; text-decoration:none; font-weight:750 }
+.arena-my-pills a:hover { background:#29200a }
+.arena-my-matches { margin:18px 0 }
+.arena-my-match-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px }
+.arena-my-match { display:grid; gap:12px; border:1px solid #57451b; border-radius:12px; background:linear-gradient(130deg,#171408,#0d1016); padding:15px; min-width:0 }
+.arena-my-match strong { color:#eee; font-size:1.03rem; overflow-wrap:anywhere }
+.arena-my-match strong span { color:#ffcd36 }
+.arena-match-round { font-size:.75rem; letter-spacing:.07em; color:#ffda66; text-transform:uppercase; font-weight:800 }
+.arena-my-match small { color:#bbb }
+.arena-person-avatar { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; overflow:hidden; border-radius:11px; background:#2b2b24; color:#f9d25d }
+.arena-person-avatar img { width:100%; height:100%; object-fit:cover }
+@media(max-width:690px) {
+  .arena-edit-form .v26-form-2 { grid-template-columns:1fr }
+  .arena-status-form { flex-direction:column; align-items:stretch }
+  .arena-status-form > label:not(.v26-check) { flex:1 1 auto; width:100% }
+  .arena-admin-card { padding:12px }
+  .arena-admin-controls .v26-btn, .arena-enroll-form .v26-btn { width:100%; text-align:center }
+  .arena-my-match-grid { grid-template-columns:1fr }
+}
+.arena-bracket-player { display:flex; align-items:center; gap:8px; min-width:0; overflow-wrap:anywhere }
+.arena-bracket-player img { width:30px; height:30px; flex:0 0 30px; object-fit:cover; border-radius:8px; border:1px solid rgba(245,198,50,.5) }

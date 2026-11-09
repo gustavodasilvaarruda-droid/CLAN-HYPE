@@ -4138,9 +4138,13 @@ def inscrever_torneio(torneio_id):
             flash('Torneio não encontrado.', 'erro')
             return redirect(url_for('torneios'))
         torneio = torneio[0]
-        if not torneio.get('inscricoes_abertas'):
+        if not torneio.get('publicado', False) or torneio.get('status_torneio') != 'inscricoes' or not torneio.get('inscricoes_abertas'):
             flash('As inscrições deste torneio estão fechadas.', 'erro')
             return redirect(url_for('torneios'))
+
+        if request.form.get('aceito_regras') != 'on':
+            flash('Leia e aceite o regulamento antes de confirmar a inscrição.', 'erro')
+            return redirect(url_for('events26.torneio_detalhe', torneio_id=torneio_id))
 
         existentes = supabase.table('inscricoes_torneio').select('id').eq('torneio_id', torneio_id).eq('usuario_email', email).execute().data or []
         if existentes:
@@ -4179,7 +4183,9 @@ def admin_conteudo():
         flash(f'Erro ao carregar conteúdo: {e}', 'erro')
         eventos_lista, torneios_lista = [], []
     for e in eventos_lista: e['total_inscritos']=len(_safe_table('inscricoes_evento','id',evento_id=e.get('id')))
-    for t in torneios_lista: t['total_inscritos']=len(_safe_table('inscricoes_torneio','id',torneio_id=t.get('id')))
+    for t in torneios_lista:
+        t['total_inscritos'] = len(_safe_table('inscricoes_torneio', 'id', torneio_id=t.get('id')))
+        t['tem_chave'] = bool(_safe_table('partidas_torneio', 'id', torneio_id=t.get('id')))
     temporadas_lista = sorted(_safe_table('temporadas'), key=lambda x: str(x.get('inicio') or ''), reverse=True)
     formatos_lista = sorted([x for x in _safe_table('formatos_competitivos') if x.get('ativo', True)], key=lambda x:(x.get('nome') or '').casefold())
     replays = sorted(_safe_table('hype_live_replays'), key=lambda x: str(x.get('created_at') or ''), reverse=True)
@@ -4259,16 +4265,33 @@ def excluir_evento(item_id):
 @app.route('/admin/torneios/<int:item_id>/excluir', methods=['POST'])
 @login_required
 def excluir_torneio(item_id):
-    if not _pode_administrar_conteudo():
+    if not _pode_administrar_conteudo() or not tem_permissao('pode_gerenciar_torneios'):
         flash('Acesso negado.', 'erro')
         return redirect(url_for('painel'))
     try:
+        registro = _safe_table('torneios', '*', id=item_id)
+        if not registro:
+            flash('Torneio não encontrado.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        torneio = registro[0]
+        if request.form.get('confirmar_titulo', '').strip() != torneio.get('titulo'):
+            flash('Exclusão cancelada: digite o título EXATO do torneio para confirmar.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        if torneio.get('ranking_processado'):
+            flash('Torneio com ranking contabilizado não pode ser excluído. Preserve o histórico e solicite uma correção auditada.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        inscricoes = _safe_table('inscricoes_torneio', 'id', torneio_id=item_id)
+        partidas = _safe_table('partidas_torneio', 'id', torneio_id=item_id)
+        # As chaves estrangeiras do Supabase apagam inscrições e partidas vinculadas.
         supabase.table('torneios').delete().eq('id', item_id).execute()
-        flash('Torneio excluído.', 'sucesso')
+        registrar_log('excluir_torneio_confirmado', 'torneios', 'torneio', item_id, {
+            'titulo': torneio.get('titulo'), 'inscricoes_removidas': len(inscricoes),
+            'partidas_removidas': len(partidas),
+        })
+        flash('Torneio e dados de teste associados excluídos após confirmação.', 'sucesso')
     except Exception as e:
         flash(f'Erro ao excluir torneio: {e}', 'erro')
     return redirect(url_for('admin_conteudo'))
-
 
 
 @app.route('/eventos/<int:evento_id>/inscrever', methods=['POST'])
@@ -4305,11 +4328,18 @@ def cancelar_evento(evento_id):
 @login_required
 def cancelar_torneio(torneio_id):
     try:
-        supabase.table('inscricoes_torneio').delete().eq('torneio_id',torneio_id).eq('usuario_email',session['usuario_email']).execute()
-        flash('Inscrição no torneio cancelada.','sucesso')
-    except Exception as e: flash(f'Erro: {e}','erro')
-    return redirect(url_for('torneios'))
-
+        torneio = _safe_table('torneios', '*', id=torneio_id)
+        if not torneio or torneio[0].get('status_torneio') != 'inscricoes' or not torneio[0].get('inscricoes_abertas'):
+            flash('Inscrição não pode ser cancelada após o encerramento das inscrições.', 'erro')
+            return redirect(url_for('events26.torneio_detalhe', torneio_id=torneio_id))
+        if _safe_table('partidas_torneio', 'id', torneio_id=torneio_id):
+            flash('O chaveamento já começou. Consulte a organização para desistir.', 'erro')
+            return redirect(url_for('events26.torneio_detalhe', torneio_id=torneio_id))
+        supabase.table('inscricoes_torneio').delete().eq('torneio_id', torneio_id).eq('usuario_email', session['usuario_email']).execute()
+        flash('Inscrição no torneio cancelada.', 'sucesso')
+    except Exception as e:
+        flash(f'Erro ao cancelar inscrição: {e}', 'erro')
+    return redirect(url_for('events26.torneio_detalhe', torneio_id=torneio_id))
 
 @app.route('/admin/eventos/<int:item_id>/editar', methods=['POST'])
 @login_required
@@ -4327,21 +4357,60 @@ def editar_evento(item_id):
 @app.route('/admin/torneios/<int:item_id>/editar', methods=['POST'])
 @login_required
 def editar_torneio(item_id):
-    if not tem_permissao('pode_gerenciar_torneios'): return redirect(url_for('painel'))
-    payload={'titulo':request.form.get('titulo','').strip(),'descricao':request.form.get('descricao','').strip(),
-             'data_torneio':request.form.get('data_torneio'),'formato':request.form.get('formato','').strip() or None,
-             'formato_codigo':request.form.get('formato_codigo') or None,
-             'temporada_id':int(request.form.get('temporada_id')) if request.form.get('temporada_id') else None,
-             'ranking_ativo':request.form.get('ranking_ativo')=='on',
-             'pontos_campeao':max(0,int(request.form.get('pontos_campeao') or 10)),
-             'pontos_vice':max(0,int(request.form.get('pontos_vice') or 6)),
-             'regras':request.form.get('regras','').strip() or None,'premio':request.form.get('premio','').strip() or None,
-             'limite_participantes':int(request.form.get('limite_participantes')) if request.form.get('limite_participantes') else None,
-             'publicado':request.form.get('publicado')=='on','inscricoes_abertas':request.form.get('inscricoes_abertas')=='on'}
-    try: supabase.table('torneios').update(payload).eq('id',item_id).execute(); flash('Torneio atualizado.','sucesso')
-    except Exception as e: flash(f'Erro: {e}','erro')
+    if not _pode_administrar_conteudo() or not tem_permissao('pode_gerenciar_torneios'):
+        flash('Acesso negado.', 'erro')
+        return redirect(url_for('painel'))
+    try:
+        rows = _safe_table('torneios', '*', id=item_id)
+        if not rows:
+            raise ValueError('Torneio não encontrado.')
+        torneio = rows[0]
+        titulo = request.form.get('titulo', '').strip()
+        descricao = request.form.get('descricao', '').strip()
+        if not titulo or not descricao:
+            raise ValueError('Título e descrição são obrigatórios.')
+        payload = {
+            'titulo': titulo,
+            'descricao': descricao,
+            'regras': request.form.get('regras', '').strip() or None,
+            'premio': request.form.get('premio', '').strip() or None,
+            'imagem_url': request.form.get('imagem_url', '').strip() or None,
+            'publicado': request.form.get('publicado') == 'on',
+        }
+        # Confrontos já sorteados e torneios finalizados são históricos:
+        # não reabrir inscrições nem mudar pontuação/formato retroativamente.
+        estrutura_bloqueada = torneio.get('status_torneio') != 'inscricoes' or bool(
+            _safe_table('partidas_torneio', 'id', torneio_id=item_id))
+        if not estrutura_bloqueada:
+            data = (request.form.get('data_torneio') or '').strip()
+            if not data:
+                raise ValueError('Data e horário são obrigatórios.')
+            limite = request.form.get('limite_participantes', '').strip()
+            limite = int(limite) if limite else None
+            if limite is not None and limite < 2:
+                raise ValueError('O limite deve ser de pelo menos 2 jogadores.')
+            inscritos = _safe_table('inscricoes_torneio', 'id', torneio_id=item_id)
+            if limite is not None and limite < len(inscritos):
+                raise ValueError('O limite não pode ser menor que a quantidade já inscrita.')
+            payload.update({
+                'data_torneio': data,
+                'formato': request.form.get('formato', '').strip() or None,
+                'formato_codigo': request.form.get('formato_codigo') or None,
+                'temporada_id': int(request.form.get('temporada_id')) if request.form.get('temporada_id') else None,
+                'ranking_ativo': request.form.get('ranking_ativo') == 'on',
+                'pontos_campeao': max(0, int(request.form.get('pontos_campeao') or 10)),
+                'pontos_vice': max(0, int(request.form.get('pontos_vice') or 6)),
+                'limite_participantes': limite,
+                'inscricoes_abertas': request.form.get('inscricoes_abertas') == 'on',
+            })
+        supabase.table('torneios').update(payload).eq('id', item_id).execute()
+        registrar_log('editar_torneio', 'torneios', 'torneio', item_id, {'campos': sorted(payload)})
+        flash('Torneio atualizado. Chaveamento e resultados preservados.', 'sucesso')
+    except (TypeError, ValueError) as e:
+        flash(f'Não foi possível salvar: {e}', 'erro')
+    except Exception as e:
+        flash(f'Erro ao editar torneio: {e}', 'erro')
     return redirect(url_for('admin_conteudo'))
-
 @app.route('/admin/eventos/<int:item_id>/participantes')
 @login_required
 def participantes_evento(item_id):
@@ -4360,6 +4429,10 @@ def participantes_torneio(item_id):
 @login_required
 def gerar_chave_torneio(torneio_id):
     if not tem_permissao('pode_gerenciar_torneios'): return redirect(url_for('painel'))
+    torneo_rows=_safe_table('torneios','*',id=torneio_id)
+    if not torneo_rows or torneo_rows[0].get('status_torneio') != 'inscricoes':
+        flash('O sorteio é permitido apenas para torneios na fase de inscrições.', 'erro')
+        return redirect(url_for('admin_conteudo'))
     inscritos=_safe_table('inscricoes_torneio','*',torneio_id=torneio_id)
     if len(inscritos)<2:
         flash('São necessários pelo menos 2 participantes.','erro'); return redirect(url_for('admin_conteudo'))
