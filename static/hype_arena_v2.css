@@ -55,3 +55,5 @@
   .arena-admin-controls .v26-btn, .arena-enroll-form .v26-btn { width:100%; text-align:center }
   .arena-my-match-grid { grid-template-columns:1fr }
 }
+.arena-bracket-player { display:flex; align-items:center; gap:8px; min-width:0; overflow-wrap:anywhere }
+.arena-bracket-player img { width:30px; height:30px; flex:0 0 30px; object-fit:cover; border-radius:8px; border:1px solid rgba(245,198,50,.5) }
