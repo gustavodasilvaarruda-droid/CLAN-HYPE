@@ -4183,7 +4183,9 @@ def admin_conteudo():
         flash(f'Erro ao carregar conteúdo: {e}', 'erro')
         eventos_lista, torneios_lista = [], []
     for e in eventos_lista: e['total_inscritos']=len(_safe_table('inscricoes_evento','id',evento_id=e.get('id')))
-    for t in torneios_lista: t['total_inscritos']=len(_safe_table('inscricoes_torneio','id',torneio_id=t.get('id')))
+    for t in torneios_lista:
+        t['total_inscritos'] = len(_safe_table('inscricoes_torneio', 'id', torneio_id=t.get('id')))
+        t['tem_chave'] = bool(_safe_table('partidas_torneio', 'id', torneio_id=t.get('id')))
     temporadas_lista = sorted(_safe_table('temporadas'), key=lambda x: str(x.get('inicio') or ''), reverse=True)
     formatos_lista = sorted([x for x in _safe_table('formatos_competitivos') if x.get('ativo', True)], key=lambda x:(x.get('nome') or '').casefold())
     replays = sorted(_safe_table('hype_live_replays'), key=lambda x: str(x.get('created_at') or ''), reverse=True)
