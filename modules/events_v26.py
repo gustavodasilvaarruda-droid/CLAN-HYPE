@@ -57,6 +57,16 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
             return redirect(url_for('torneios'))
         participantes = safe_table('inscricoes_torneio', '*', torneio_id=torneio_id)
         partidas = sorted(safe_table('partidas_torneio', '*', torneio_id=torneio_id), key=lambda x: (int(x.get('rodada') or 0), int(x.get('ordem') or 0)))
+        # Avatares são exibidos publicamente no perfil; os e-mails não são
+        # mostrados na interface. A página continua acessível a não-membros.
+        emails = {p.get('usuario_email') for p in participantes}
+        perfis = {}
+        if emails:
+            for perfil in safe_table('usuarios_clan', 'email,nick_jogo,avatar_url'):
+                if perfil.get('email') in emails:
+                    perfis[perfil['email']] = perfil
+        for participante in participantes:
+            participante['avatar_url'] = perfis.get(participante.get('usuario_email'), {}).get('avatar_url')
         rodadas = {}
         for p in partidas:
             rodadas.setdefault(int(p.get('rodada') or 1), []).append(p)
@@ -67,7 +77,10 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         torneio['temporada_nome'] = temporadas.get(torneio.get('temporada_id'))
         torneio['formato_nome_config'] = formatos.get(torneio.get('formato_codigo'))
         replay_embed = youtube_embed_url(torneio.get('replay_url'))
-        return render_template('torneio_detalhe.html', torneio=torneio, participantes=participantes, rodadas=rodadas, replay_embed=replay_embed)
+        email_atual = session.get('usuario_email')
+        meus_confrontos = [p for p in partidas if email_atual and email_atual in (p.get('jogador1_email'), p.get('jogador2_email'))]
+        return render_template('torneio_detalhe.html', torneio=torneio, participantes=participantes,
+                               rodadas=rodadas, meus_confrontos=meus_confrontos, replay_embed=replay_embed)
 
     @bp.route('/admin/eventos/<int:item_id>/v26', methods=['POST'])
     @login_required
@@ -97,19 +110,39 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
     def admin_torneio_v26(item_id):
         if not admin_ok():
             return redirect(url_for('painel'))
-        status = (request.form.get('status_torneio') or 'inscricoes').strip()
+        torneio = one('torneios', id=item_id)
+        if not torneio:
+            flash('Torneio não encontrado.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        status_atual = torneio.get('status_torneio') or 'inscricoes'
+        status = (request.form.get('status_torneio') or status_atual).strip()
         if status not in ('inscricoes', 'em_andamento', 'finalizado', 'cancelado'):
-            status = 'inscricoes'
+            flash('Situação inválida.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        tem_chave = bool(safe_table('partidas_torneio', 'id', torneio_id=item_id))
+        if status_atual == 'finalizado' and status != 'finalizado':
+            flash('O torneio já terminou; reabrir exigiria revisão dos resultados e do ranking.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        if status == 'finalizado' and status_atual != 'finalizado':
+            flash('O campeão só pode ser definido após a final validada.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        if status == 'em_andamento' and not tem_chave:
+            flash('Use "Encerrar e sortear chaves" para iniciar o torneio.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        if status == 'inscricoes' and tem_chave:
+            flash('Não é possível reabrir inscrições após gerar confrontos.', 'erro')
+            return redirect(url_for('admin_conteudo'))
         payload = {
             'status_torneio': status,
             'replay_url': (request.form.get('replay_url') or '').strip() or None,
             'destaque': request.form.get('destaque') == 'on',
-            'inscricoes_abertas': status == 'inscricoes' and request.form.get('inscricoes_abertas') == 'on',
+            'inscricoes_abertas': status == 'inscricoes' and not tem_chave and
+                                   request.form.get('inscricoes_abertas') == 'on',
         }
         try:
             supabase.table('torneios').update(payload).eq('id', item_id).execute()
             registrar_log('atualizar_torneio_v26', 'torneios', 'torneio', item_id, payload)
-            flash('Torneio atualizado.', 'sucesso')
+            flash('Situação do torneio atualizada.', 'sucesso')
         except Exception as e:
             flash(f'Erro ao atualizar torneio: {e}', 'erro')
         return redirect(url_for('admin_conteudo'))
