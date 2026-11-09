@@ -1,0 +1,32 @@
+name: HYPE Arena - torneios v2
+on:
+  pull_request:
+    paths:
+      - 'app.py'
+      - 'modules/events_v26.py'
+      - 'templates/admin_conteudo.html'
+      - 'templates/torneio_detalhe.html'
+      - 'templates/torneios.html'
+      - 'static/hype_arena_v2.css'
+      - 'tests/test_hype_arena_v2.py'
+      - '.github/workflows/hype-arena-v2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app.py'
+      - 'modules/events_v26.py'
+      - 'templates/admin_conteudo.html'
+      - 'templates/torneio_detalhe.html'
+      - 'templates/torneios.html'
+      - 'tests/test_hype_arena_v2.py'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check jinja2
+      - run: python -m py_compile app.py modules/events_v26.py
+      - run: python -m unittest discover -s tests -p 'test_hype_arena_v2.py' -v
