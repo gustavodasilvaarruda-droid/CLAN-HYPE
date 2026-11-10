@@ -26,7 +26,7 @@
             {% if torneio.usa_equipes_privadas %}
               <div class="arena-enroll-form">
                 <p>Prepare até três equipes sigilosas antes da inscrição. A entrada oficial dependerá de validação administrativa e pagamento confirmado.</p>
-                <a class="v26-btn gold" href="{{url_for('events26.equipes_torneio',torneio_id=torneio.id)}}">Preparar meus times</a>
+                <a class="v26-btn gold" href="{{url_for('expansion.team_builder',torneio_id=torneio.id)}}">Montar meu time</a>
               </div>
             {% else %}
             <form class="arena-enroll-form" method="post" action="{{url_for('inscrever_torneio',torneio_id=torneio.id)}}">
