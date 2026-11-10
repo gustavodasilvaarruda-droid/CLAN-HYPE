@@ -96,6 +96,15 @@ def _disponibilidade(especie, formato):
     return None
 
 
+
+def motivo_pokemon_indisponivel(especie, codigo_formato):
+    """Filtro preliminar para a lista visual. Nunca certifica legalidade plena."""
+    formato = obter_formato(codigo_formato)
+    if not formato:
+        return 'formato não cadastrado'
+    return _disponibilidade(especie, formato)
+
+
 def validar_equipe_basica(slots, codigo_formato):
     """Lista erros sem declarar legalidade completa. Exige 6 sets completos."""
     formato = obter_formato(codigo_formato)
@@ -121,6 +130,10 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: escolha um Pokémon válido.')
         elif chave in banidos:
             erros.append(f'Slot {indice}: {especie} não é permitido neste formato.')
+        else:
+            restricao = _disponibilidade(especie, formato)
+            if restricao:
+                erros.append(f'Slot {indice}: {especie} {restricao}.')
         if formato.get('species_clause', True) and chave in usados:
             erros.append(f'Slot {indice}: espécies repetidas não são permitidas.')
         usados.add(chave)
