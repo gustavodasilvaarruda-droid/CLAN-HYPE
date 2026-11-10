@@ -599,6 +599,11 @@
     messages.push({ok:filled.length>0,text:`${filled.length}/${teamSize()} Pokémon`});
     const species=filled.map(s=>speciesMeta(s.pokemon)?.num||speciesKey(s.pokemon));
     if(f?.species_clause) messages.push({ok:new Set(species).size===species.length,text:'Species Clause'});
+    if(f?.codigo?.includes('monotype')&&filled.length>1){
+      const teams=filled.map(slot=>new Set((speciesMeta(slot.pokemon)?.types||slot.tipos||[]).map(t=>speciesKey(t))));
+      const common=[...teams[0]].filter(type=>teams.every(x=>x.has(type)));
+      messages.push({ok:common.length>0,text:common.length?'Monotype: '+common.join('/'):'Monotype: tipos incompatíveis'});
+    }
     const items=filled.map(s=>String(s.item||'').toLowerCase()).filter(Boolean); if(f?.item_clause) messages.push({ok:new Set(items).size===items.length,text:'Item Clause'});
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
     const mechanics=filled.filter(s=>s.mecanica&&s.mecanica!=='nenhuma'); if(mechanics.length){ const invalid=mechanics.some(s=>f && !f[`permite_${s.mecanica}`]); messages.push({ok:!invalid,text:'Mecânicas do formato'}); }
