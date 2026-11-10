@@ -73,6 +73,19 @@ jobs:
       - run: node --check scripts/hype_showdown_validate.cjs
       # Só no CI (não muda o build do site no Render).
       - run: npm install --omit=dev --no-audit --no-fund
+      - name: Verificar compatibilidade dos 28 formatos cadastrados
+        run: |
+          node - <<'JS'
+          const {Dex} = require('pokemon-showdown');
+          const fs = require('node:fs');
+          const entries = JSON.parse(fs.readFileSync('data/hype_showdown_gen9_snapshot.json','utf8')).formatos;
+          const missing = entries.filter(x => !Dex.formats.get(x.showdown).exists).map(x => x.showdown);
+          if (missing.length) {
+            console.error('Formatos não reconhecidos no motor instalado:',missing.join(', '));
+            process.exit(1);
+          }
+          console.log(entries.length + ' formatos reconhecidos pelo motor oficial.');
+          JS
       - name: Showdown real - smoke test
         run: |
           python - <<'PY'
