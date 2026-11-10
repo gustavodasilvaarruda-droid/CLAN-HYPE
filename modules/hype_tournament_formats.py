@@ -12,7 +12,7 @@ _SNAPSHOT_PATH = Path(__file__).resolve().parents[1] / 'data' / 'hype_showdown_g
 with _SNAPSHOT_PATH.open(encoding='utf-8') as handle:
     _SNAPSHOT = json.load(handle)
 
-_FORMATS = {row['codigo']: row for row in _SNAPSHOT['formatos']}
+_FORMATS = {row['codigo']: {**row, 'validacao_completa': False} for row in _SNAPSHOT['formatos']}
 _ESPECIES = _SNAPSHOT['especies']
 
 
