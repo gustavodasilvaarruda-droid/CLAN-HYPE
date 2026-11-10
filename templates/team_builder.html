@@ -75,6 +75,7 @@
             </div>
             <div id="itemOptions" class="hype-item-options" role="listbox" hidden></div>
             <small id="itemHelp" class="hype-item-help">Pesquise pelo nome e escolha um item com imagem.</small>
+            <label class="hype-item-mode"><input type="checkbox" id="showAllItems"> Mostrar outros itens equipáveis</label>
           </div>
           <label>Level
             <input id="levelInput" type="number" min="1" max="100" value="100" inputmode="numeric">
@@ -329,20 +330,29 @@
     kyurem:['heavy-duty-boots','choice-specs','leftovers','loaded-dice'],
     rillaboom:['choice-band','assault-vest','grassy-seed','miracle-seed'],
   };
-  function selectableItems(){
+  let showAllHeldItems=false;
+  function allowedHeldItems(){
     const f=selectedFormat(), ban=new Set((f?.itens_proibidos||[]).map(slug));
-    const base=basePokemon(), recommendations=recommendedItems[base]||[];
-    const filtered=itemNames.filter(code=>!ban.has(slug(code))&&
+    const base=basePokemon();
+    return itemNames.filter(code=>!ban.has(slug(code))&&
       (!megaStoneOwner[code]||(megaStoneOwner[code]===base&&(!f||f.permite_mega===true)&&!megaStoneRestriction(code)))&&
       (!code.endsWith('-z')||!f||f.permite_zmove===true)&&
       (mechanicSelect.value!=='mega'||megaStoneOwner[code]===base)&&
       (mechanicSelect.value!=='zmove'||code.endsWith('-z')));
-    return filtered.sort((a,b)=>{
-      const ia=recommendations.indexOf(a), ib=recommendations.indexOf(b);
+  }
+  function selectableItems(){
+    const base=basePokemon(), recommendations=recommendedItems[base]||[];
+    const available=allowedHeldItems();
+    const restricted=!showAllHeldItems && recommendations.length>0 &&
+                     mechanicSelect.value!=='mega' && mechanicSelect.value!=='zmove';
+    const pool=restricted?available.filter(code=>recommendations.includes(code)):available;
+    return pool.sort((a,b)=>{
+      const ia=recommendations.indexOf(a),ib=recommendations.indexOf(b);
       return (ia<0?999:ia)-(ib<0?999:ib)||a.localeCompare(b);
     });
   }
-  const knownHeldItem = value => selectableItems().find(code => code === slug(value));
+  // Item já salvo pode ser equipável mesmo fora da lista de recomendações.
+  const knownHeldItem = value => allowedHeldItems().find(code=>code===slug(value));
   function syncMechanics(){
     const f=selectedFormat();
     [...mechanicSelect.options].forEach(o=>{if(o.value==='nenhuma')return;const allowed=!f||f['permite_'+o.value]===true;o.hidden=!allowed;o.disabled=!allowed;});
@@ -567,6 +577,10 @@
     $('liveValidation').innerHTML=messages.map(m=>`<span class="validation-pill ${m.ok?'ok':'warn'}">${m.ok?'✓':'!'} ${m.text}</span>`).join('');
   }
 
+  $('showAllItems').addEventListener('change',event=>{
+    showAllHeldItems=event.target.checked;
+    renderItemChoices();updateItemPreview();
+  });
   itemInput.addEventListener('focus',renderItemChoices);
   itemInput.addEventListener('input',()=>{renderItemChoices();updateItemPreview();});
   itemInput.addEventListener('keydown',event=>{
