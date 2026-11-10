@@ -69,6 +69,6 @@ def regulamento_congelado(formato):
         "",
         "Regras herdadas, combinações, golpes por origem e legalidade total "
         "DEVEM ser conferidos no TeamValidator oficial do Showdown. "
-        "O snapshot não autoriza aprovação automática.",
+        "O snapshot não autoriza aprovação automática; a validação oficial é obrigatória.",
     ]
     return '\n'.join(linhas)
