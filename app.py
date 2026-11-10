@@ -23,6 +23,7 @@ from modules.breed_regional import (
 )
 from modules.hype_membership_rules import BASIC_ROLE, role_requires_active_clan, selectable_roles
 from modules.hype_housing_status import preencher_situacao_moradia
+from modules.hype_tournament_formats import formatos_disponiveis, obter_formato, regulamento_congelado
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
@@ -4191,7 +4192,8 @@ def admin_conteudo():
     replays = sorted(_safe_table('hype_live_replays'), key=lambda x: str(x.get('created_at') or ''), reverse=True)
     cfg = {x.get('chave'): (x.get('valor') or '') for x in _safe_table('configuracoes_site')}
     return render_template('admin_conteudo.html', eventos=eventos_lista, torneios=torneios_lista, temporadas=temporadas_lista,
-                           formatos_competitivos=formatos_lista, replays=replays, cfg=cfg)
+                           formatos_competitivos=formatos_lista, formatos_preset=formatos_disponiveis(),
+                           replays=replays, cfg=cfg)
 
 
 @app.route('/admin/eventos/criar', methods=['POST'])
@@ -4220,21 +4222,26 @@ def criar_evento():
 @app.route('/admin/torneios/criar', methods=['POST'])
 @login_required
 def criar_torneio():
-    if not _pode_administrar_conteudo():
+    if not _pode_administrar_conteudo() or not tem_permissao('pode_gerenciar_torneios'):
         flash('Acesso negado.', 'erro')
         return redirect(url_for('painel'))
     try:
+        # O servidor define o regulamento; nunca confia no resumo editado no browser.
+        codigo_preset = (request.form.get('formato_preset') or '').strip()
+        preset = obter_formato(codigo_preset) if codigo_preset else None
+        if codigo_preset and preset is None:
+            raise ValueError('Formato competitivo predefinido desconhecido.')
         supabase.table('torneios').insert({
             'titulo': request.form.get('titulo', '').strip(),
             'descricao': request.form.get('descricao', '').strip(),
             'data_torneio': request.form.get('data_torneio'),
-            'formato': request.form.get('formato', '').strip() or None,
-            'formato_codigo': request.form.get('formato_codigo') or None,
+            'formato': preset['nome'] if preset else request.form.get('formato', '').strip() or None,
+            'formato_codigo': None if preset else request.form.get('formato_codigo') or None,
             'temporada_id': int(request.form.get('temporada_id')) if request.form.get('temporada_id') else None,
             'ranking_ativo': request.form.get('ranking_ativo') == 'on',
             'pontos_campeao': max(0, int(request.form.get('pontos_campeao') or 10)),
             'pontos_vice': max(0, int(request.form.get('pontos_vice') or 6)),
-            'regras': request.form.get('regras', '').strip() or None,
+            'regras': regulamento_congelado(preset) if preset else request.form.get('regras', '').strip() or None,
             'premio': request.form.get('premio', '').strip() or None,
             'imagem_url': request.form.get('imagem_url', '').strip() or None,
             'limite_participantes': int(request.form.get('limite_participantes')) if request.form.get('limite_participantes') else None,
