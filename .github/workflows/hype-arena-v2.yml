@@ -4,6 +4,8 @@ on:
     paths:
       - 'app.py'
       - 'modules/events_v26.py'
+      - 'modules/expansion_features.py'
+      - 'templates/team_builder.html'
       - 'modules/hype_tournament_formats.py'
       - 'modules/arena_private_teams.py'
       - 'templates/arena_torneio_equipes.html'
@@ -24,6 +26,8 @@ on:
     paths:
       - 'app.py'
       - 'modules/events_v26.py'
+      - 'modules/expansion_features.py'
+      - 'templates/team_builder.html'
       - 'modules/hype_tournament_formats.py'
       - 'modules/arena_private_teams.py'
       - 'templates/arena_torneio_equipes.html'
@@ -46,6 +50,6 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install --disable-pip-version-check jinja2
-      - run: python -m py_compile app.py modules/events_v26.py modules/hype_tournament_formats.py modules/arena_private_teams.py
+      - run: python -m py_compile app.py modules/events_v26.py modules/hype_tournament_formats.py modules/arena_private_teams.py modules/expansion_features.py
       - run: python -m unittest discover -s tests -p 'test_hype_arena_v2.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_arena_private_teams.py' -v
