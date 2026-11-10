@@ -6,6 +6,7 @@ autoriza inscrição/aprovação automática.
 """
 import re
 from modules.hype_tournament_formats import obter_formato
+from modules.hype_builder_suggestions import MEGA_STONES
 
 STATS = ('hp', 'atk', 'def', 'spa', 'spd', 'spe')
 
@@ -61,6 +62,12 @@ def validar_equipe_basica(slots, codigo_formato):
         usados.add(chave)
 
         item = str(slot.get('item') or '').strip()
+        mecanica = str(slot.get('mecanica') or 'nenhuma').strip().lower()
+        # Compara item e mecânica quando a espécie tem Mega Stone conhecida.
+        # A conferência completa de formas e disponibilidade segue pendente.
+        pedras = MEGA_STONES.get(str(especie).strip().lower().replace(' ', '-'), ())
+        if mecanica == 'mega' and pedras and _chave(item) not in {_chave(x) for x in pedras}:
+            erros.append(f'Slot {indice}: a Mega Evolução de {especie} exige uma Mega Stone correspondente.')
         if _chave(item) in BOLAS_CAPTURA:
             erros.append(f'Slot {indice}: {item} é uma Poké Ball de captura e não está disponível na Arena HYPE.')
         for campo, rotulo in (('ability', 'habilidade'), ('nature', 'natureza')):
