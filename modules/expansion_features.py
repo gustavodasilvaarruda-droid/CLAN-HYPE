@@ -6,8 +6,8 @@ import os
 import re
 import secrets
 from pathlib import Path
-from modules.arena_private_teams import codigo_formato_do_torneio
-from modules.hype_tournament_formats import formatos_disponiveis
+from modules.arena_private_teams import codigo_formato_do_torneio, motivo_pokemon_indisponivel
+from modules.hype_tournament_formats import formatos_disponiveis, obter_formato
 
 
 def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, registrar_log,
@@ -459,6 +459,19 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             if not nome or not slots:
                 flash('Informe o nome do time e pelo menos um Pokémon.', 'erro')
             else:
+                # Mesmo um rascunho não deve aceitar espécies banidas pelo formato.
+                # Combinações de golpes/itens continuam pendentes até a inscrição.
+                if formato_codigo and obter_formato(formato_codigo):
+                    bloqueados = [
+                        (slot['pokemon'], motivo_pokemon_indisponivel(slot['pokemon'], formato_codigo))
+                        for slot in slots
+                    ]
+                    bloqueados = [(nome_pokemon, motivo) for nome_pokemon, motivo in bloqueados if motivo]
+                    if bloqueados:
+                        nome_pokemon, motivo = bloqueados[0]
+                        flash(f'{nome_pokemon}: {motivo}. Selecione outro Pokémon do formato.', 'erro')
+                        return redirect(url_for('expansion.team_builder', torneio_id=torneio_contexto_id)
+                                        if torneio_contexto_id else url_for('expansion.team_builder'))
                 existente = safe_table('times_pokemon', '*', id=team_id) if team_id else []
                 if team_id and (not existente or existente[0].get('usuario_email') != email):
                     flash('Você só pode alterar um time da sua própria conta.', 'erro')

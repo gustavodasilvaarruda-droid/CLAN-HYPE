@@ -63,6 +63,16 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         self.assertIn("_safe_table('arena_torneio_equipes', 'id', torneio_id=item_id)",bloco)
         self.assertIn("if not estrutura_bloqueada and not preset_atual:",bloco)
 
+    def test_tournament_builder_rejects_banned_species_and_explains_rules(self):
+        builder = (ROOT / 'modules/expansion_features.py').read_text(encoding='utf-8')
+        template = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        ast.parse(builder)
+        self.assertIn('motivo_pokemon_indisponivel', builder)
+        self.assertIn('bloqueados = [(nome_pokemon, motivo)', builder)
+        self.assertIn('id="formatRuleSummary"', template)
+        self.assertIn('renderFormatRules()', template)
+        self.assertIn('Monotype: tipos incompatíveis', template)
+
     def test_capture_balls_denied_and_legitimate_items_left_alone(self):
         data = []
         for p in ('Dialga', 'Palkia', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh'):

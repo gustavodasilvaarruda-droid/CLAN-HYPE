@@ -1,0 +1,12 @@
+{
+  "name": "hype-arena-showdown-validator",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Validador oficial de legalidade dos times HYPE via pokemon-showdown",
+  "dependencies": {
+    "pokemon-showdown": "0.11.11"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

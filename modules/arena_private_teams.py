@@ -8,6 +8,10 @@ import re
 from modules.hype_tournament_formats import obter_formato, obter_especie_showdown
 
 STATS = ('hp', 'atk', 'def', 'spa', 'spd', 'spe')
+TERA_TYPES = frozenset(('normal', 'fire', 'water', 'electric', 'grass', 'ice',
+                         'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug',
+                         'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy',
+                         'stellar'))
 
 # Poké Balls são itens de captura, não opções apropriadas ao Team Builder competitivo.
 # Não usa terminações como "-ball": Light Ball e Iron Ball são itens válidos.
@@ -68,7 +72,12 @@ def _tier_banida(especie, formato):
     modo = formato.get('tipo_batalha')
     coluna = ('nd' if 'nationaldex' in formato['codigo'] else
               'doubles' if modo == 'doubles' else 'tier')
+    # Algumas formas (ex.: Arceus-Fairy) não repetem a tier no snapshot.
+    # O tier da espécie base continua valendo quando a forma não possui tier própria.
     tier = meta.get(coluna) or meta.get('tier') or ''
+    if not tier and meta.get('base'):
+        base_meta = obter_especie_showdown(meta['base']) or {}
+        tier = base_meta.get(coluna) or base_meta.get('tier') or ''
     banidas = {_chave(b.replace('ND ', '')) for b in formato.get('tiers_proibidos', ())}
     if _chave(tier) in banidas:
         return tier
@@ -119,6 +128,7 @@ def validar_equipe_basica(slots, codigo_formato):
     itens_banidos = {_chave(m) for m in formato.get('itens_proibidos', ())}
     habilidades_banidas = {_chave(m) for m in formato.get('habilidades_proibidas', ())}
     usados = set()
+    itens_usados = set()
     erros = []
     for indice, slot in enumerate(slots, 1):
         if not isinstance(slot, dict):
@@ -134,9 +144,14 @@ def validar_equipe_basica(slots, codigo_formato):
             restricao = _disponibilidade(especie, formato)
             if restricao:
                 erros.append(f'Slot {indice}: {especie} {restricao}.')
-        if formato.get('species_clause', True) and chave in usados:
+        # Species Clause vale pela espécie nacional, inclusive formas regionais
+        # e formas alternativas com nomes diferentes.
+        meta_especie = obter_especie_showdown(especie) or {}
+        numero_dex = meta_especie.get('num')
+        especie_identidade = numero_dex if type(numero_dex) is int and numero_dex > 0 else chave
+        if formato.get('species_clause', True) and especie_identidade in usados:
             erros.append(f'Slot {indice}: espécies repetidas não são permitidas.')
-        usados.add(chave)
+        usados.add(especie_identidade)
 
         nivel_max = int(formato.get('nivel_maximo') or 100)
         nivel = slot.get('level', 5 if formato.get('little_cup') else 100)
@@ -148,6 +163,14 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: {item} é uma Poké Ball de captura e não está disponível na Arena HYPE.')
         if item_id in itens_banidos:
             erros.append(f'Slot {indice}: o item {item} é proibido no formato.')
+        if formato.get('item_clause') and item_id and item_id in itens_usados:
+            erros.append(f'Slot {indice}: Item Clause proíbe itens repetidos.')
+        if item_id:
+            itens_usados.add(item_id)
+        if item_id in MEGA_STONE_OWNERS and not formato.get('permite_mega', False):
+            erros.append(f'Slot {indice}: Mega Stones são proibidas neste formato.')
+        if item_id.endswith('iumz') and not formato.get('permite_zmove', False):
+            erros.append(f'Slot {indice}: Z-Crystals são proibidos neste formato.')
         base = chave.split('mega')[0] if 'mega' in chave else chave
         if item_id in MEGA_STONE_OWNERS and base != MEGA_STONE_OWNERS[item_id]:
             erros.append(f'Slot {indice}: {item} é proibido para {especie}: a pedra não corresponde à espécie.')
@@ -177,6 +200,8 @@ def validar_equipe_basica(slots, codigo_formato):
         tera = str(slot.get('tera_type') or '').strip()
         if tera and not formato.get('permite_tera', False):
             erros.append(f'Slot {indice}: Terastalização não é permitida neste formato.')
+        if tera and _chave(tera) not in TERA_TYPES:
+            erros.append(f'Slot {indice}: Tera Type inválido.')
         if _chave(slot.get('ability')) in habilidades_banidas:
             erros.append(f"Slot {indice}: habilidade {slot.get('ability')} proibida no formato.")
         for campo, rotulo in (('ability', 'habilidade'), ('nature', 'natureza')):
@@ -206,4 +231,15 @@ def validar_equipe_basica(slots, codigo_formato):
                     total += valor
             if campo == 'evs' and total > 510:
                 erros.append(f'Slot {indice}: mais de 510 EVs.')
+    if 'monotype' in formato['codigo'] and isinstance(slots, list):
+        # Same Type Clause: ao menos um tipo deve ser comum a todas as espécies.
+        # Este teste usa o tipo base do snapshot, não substitui o TeamValidator.
+        compartilhados = None
+        for slot in slots:
+            especie = str(slot.get('pokemon') or '') if isinstance(slot, dict) else ''
+            meta = obter_especie_showdown(especie) or {}
+            tipos = {_chave(t) for t in meta.get('types', ())}
+            compartilhados = tipos if compartilhados is None else compartilhados & tipos
+        if not compartilhados:
+            erros.append('Monotype: todos os Pokémon precisam compartilhar pelo menos um tipo.')
     return erros[:25]

@@ -60,3 +60,12 @@
 /* Pesquisa por sugestões do Pokémon com catálogo alternativo explícito. */
 .hype-v7-team-builder .hype-item-mode{display:flex;align-items:center;gap:8px;color:#e2d4ae;font-size:.78rem;cursor:pointer;margin-top:5px}
 .hype-v7-team-builder .hype-item-mode input{width:16px;height:16px;accent-color:#d9ad4d;flex:none}
+
+
+/* Resumo visível do regulamento escolhido — sem depender de alertas modais. */
+.hype-v7-team-builder .hype-format-rule-summary{
+  margin:14px 0;padding:14px 16px;white-space:pre-line;line-height:1.65;
+  color:#e8dfc6;background:linear-gradient(130deg,#151923,#242019);
+  border:1px solid #8b723e;border-left:4px solid #deb86b;border-radius:12px;
+  font-size:.86rem;overflow-wrap:anywhere;
+}
