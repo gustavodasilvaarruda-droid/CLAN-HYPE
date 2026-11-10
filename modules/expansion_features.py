@@ -352,6 +352,8 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
     @login_required
     def team_builder():
         email = email_atual()
+        # Contexto opcional para criar um time privado e voltar ao torneio.
+        torneio_contexto_id = request.args.get('torneio_id', type=int)
         formatos = sorted([x for x in safe_table('formatos_competitivos') if x.get('ativo', True)], key=lambda x: (x.get('nome') or '').casefold())
         edit_id = request.args.get('editar', type=int)
         editing_team = None
@@ -429,7 +431,7 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                     'formato_codigo': formato_codigo,
                     'descricao': descricao,
                     'slots': slots,
-                    'publico': request.form.get('publico') == 'on',
+                    'publico': False if torneio_contexto_id else request.form.get('publico') == 'on',
                     'share_token': share_token,
                 }
                 if existente and existente[0].get('usuario_email') == email:
@@ -439,6 +441,8 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                 else:
                     supabase.table('times_pokemon').insert(payload).execute()
                     flash('Time salvo no HYPE Team Builder.', 'sucesso')
+                if torneio_contexto_id:
+                    return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_contexto_id))
             return redirect(url_for('expansion.team_builder'))
 
         meus = sorted(safe_table('times_pokemon', '*', usuario_email=email), key=lambda x: x.get('updated_at') or '', reverse=True)
@@ -454,7 +458,7 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         prefill_pokemon = (request.args.get('pokemon') or '').strip()[:80]
         prefill_build_id = request.args.get('build_id', type=int)
         prefill_build = next((x for x in builds_hype if int(x.get('id') or 0) == int(prefill_build_id or 0)), None)
-        return render_template('team_builder.html', meus_times=meus, times_publicos=publicos, formatos=formatos, builds_pessoais=builds_pessoais, builds_hype=builds_hype, prefill_build=prefill_build, prefill_pokemon=prefill_pokemon, editing_team=editing_team, favoritos_ids=favoritos_ids)
+        return render_template('team_builder.html', meus_times=meus, times_publicos=publicos, formatos=formatos, builds_pessoais=builds_pessoais, builds_hype=builds_hype, prefill_build=prefill_build, prefill_pokemon=prefill_pokemon, editing_team=editing_team, favoritos_ids=favoritos_ids, torneio_contexto_id=torneio_contexto_id)
 
     @bp.route('/team-builder/build/salvar', methods=['POST'])
     @login_required
