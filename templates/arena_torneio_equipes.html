@@ -43,8 +43,8 @@
   <section class="v26-panel">
     <div class="v26-section-head"><div><span>SELEÇÃO SEGURA</span><h2>Enviar time para conferência</h2></div></div>
     {% if pode_enviar %}
-      <p>Crie um time de seis Pokémon no Team Builder da HYPE. Deixe a opção de compartilhamento <strong>desmarcada</strong>, salve e selecione aqui.</p>
-      <a class="v26-btn ghost" href="{{url_for('expansion.team_builder',torneio_id=torneio.id)}}">Abrir Team Builder</a>
+      <p>Monte seu time no Team Builder e salve. Você voltará automaticamente para esta página com a equipe selecionada e pronta para enviar à conferência.</p>
+      <a class="v26-btn ghost" href="{{url_for('expansion.team_builder',torneio_id=torneio.id)}}">Montar ou editar time</a>
       <form method="post" class="arena-private-form">
         <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
         <label>Slot do torneio
@@ -56,7 +56,7 @@
           <select name="team_id" required>
             <option value="">Selecione uma equipe...</option>
             {% for time in meus_times %}
-              <option value="{{time.id}}">{{time.nome}} · {{time.slots|length}} Pokémon</option>
+              <option value="{{time.id}}" {% if time.id == time_preselecionado_id %}selected{% endif %}>{{time.nome}} · {{time.slots|length}} Pokémon</option>
             {% endfor %}
           </select>
         </label>
