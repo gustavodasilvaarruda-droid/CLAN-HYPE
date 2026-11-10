@@ -387,7 +387,7 @@
   $('teamForm').addEventListener('submit',e=>{saveEditor();const valid=slots.filter(s=>s.pokemon);if(!valid.length){e.preventDefault();alert('Adicione pelo menos um Pokémon.');return;}$('slotsJson').value=JSON.stringify(valid.map(cleanForStorage));});
 
   async function bootLists(){
-    try{ const r=await fetch('https://pokeapi.co/api/v2/pokemon?limit=2000'); const d=await r.json(); pokemonNames=d.results.map(x=>x.name);for(const x of d.results){const match=String(x.url||'').match(/\\/pokemon\\/(\\d+)\\/?$/);if(match)pokemonSpriteIds.set(x.name,Number(match[1]));} refreshPokemonOptions(); }catch(e){}
+    try{ const r=await fetch('https://pokeapi.co/api/v2/pokemon?limit=2000'); const d=await r.json(); pokemonNames=d.results.map(x=>x.name);for(const x of d.results){const match=String(x.url||'').match(/\/pokemon\/(\d+)\/?$/);if(match)pokemonSpriteIds.set(x.name,Number(match[1]));} refreshPokemonOptions(); }catch(e){}
     // Nunca importar a lista geral de itens: ela inclui Poké Balls e itens de bolsa.
   }
 
