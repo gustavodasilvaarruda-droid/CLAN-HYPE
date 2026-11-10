@@ -136,10 +136,10 @@ iframe { border: 0; }
   .hype-core-sidebar {
     position: fixed !important;
     z-index: 90 !important;
-    top: 66px !important;
+    top: 58px !important;
     left: 0 !important;
     width: min(82vw,320px) !important;
-    height: calc(100dvh - 66px) !important;
+    height: calc(100dvh - 58px) !important;
     transform: translateX(-105%);
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -196,8 +196,8 @@ iframe { border: 0; }
 }
 @media (max-width: 560px) {
   .hype-core-sidebar {
-    top: 60px !important;
-    height: calc(100dvh - 60px) !important;
+    top: 58px !important;
+    height: calc(100dvh - 58px) !important;
   }
 }
 @media (max-width: 420px) {
