@@ -5,7 +5,7 @@ NÃO substitui o validador oficial de legalidade do Pokémon Showdown e nunca
 autoriza inscrição/aprovação automática.
 """
 import re
-from modules.hype_tournament_formats import obter_formato
+from modules.hype_tournament_formats import obter_formato, obter_especie_showdown
 
 STATS = ('hp', 'atk', 'def', 'spa', 'spd', 'spe')
 
@@ -55,6 +55,47 @@ def _chave(texto):
     return re.sub(r'[^a-z0-9]', '', str(texto or '').casefold())
 
 
+def _id_especie(texto):
+    """Trata formas '-Base' como a espécie padrão para os bans explícitos."""
+    chave = _chave(texto)
+    return chave[:-4] if chave.endswith('base') else chave
+
+
+def _tier_banida(especie, formato):
+    meta = obter_especie_showdown(especie)
+    if not meta:
+        return None
+    modo = formato.get('tipo_batalha')
+    coluna = ('nd' if 'nationaldex' in formato['codigo'] else
+              'doubles' if modo == 'doubles' else 'tier')
+    tier = meta.get(coluna) or meta.get('tier') or ''
+    banidas = {_chave(b.replace('ND ', '')) for b in formato.get('tiers_proibidos', ())}
+    if _chave(tier) in banidas:
+        return tier
+    return None
+
+
+def _disponibilidade(especie, formato):
+    meta = obter_especie_showdown(especie)
+    if not meta:
+        return 'não consta no Pokédex do Showdown deste snapshot'
+    if not 'nationaldex' in formato['codigo']:
+        if meta.get('nonstandard') in ('Past', 'Future', 'Unobtainable', 'CAP', 'LGPE'):
+            return 'não está disponível nesta geração/formato'
+        if meta.get('tier') == 'Illegal':
+            return 'não é legal neste formato de Geração 9'
+    if formato.get('little_cup') and (meta.get('prevo') or not meta.get('evos')):
+        return 'não atende às condições de Little Cup (primeira evolução com evolução possível)'
+    if formato.get('nfe') and (not meta.get('prevo') or not meta.get('evos')):
+        return 'não atende às condições de NFE'
+    tier = _tier_banida(especie, formato)
+    if tier:
+        return f'pertence à tier proibida {tier}'
+    if _id_especie(especie) in {_id_especie(p) for p in formato.get('pokemons_proibidos', ())}:
+        return 'foi banido explicitamente'
+    return None
+
+
 def validar_equipe_basica(slots, codigo_formato):
     """Lista erros sem declarar legalidade completa. Exige 6 sets completos."""
     formato = obter_formato(codigo_formato)
@@ -64,9 +105,10 @@ def validar_equipe_basica(slots, codigo_formato):
     if not isinstance(slots, list) or len(slots) != tamanho:
         return [f'O time desse formato precisa conter exatamente {tamanho} Pokémon.']
 
-    banidos = {_chave(p) for p in formato.get('pokemons_proibidos', ())}
+    banidos = {_id_especie(p) for p in formato.get('pokemons_proibidos', ())}
     golpes_banidos = {_chave(m) for m in formato.get('golpes_proibidos', ())}
     itens_banidos = {_chave(m) for m in formato.get('itens_proibidos', ())}
+    habilidades_banidas = {_chave(m) for m in formato.get('habilidades_proibidas', ())}
     usados = set()
     erros = []
     for indice, slot in enumerate(slots, 1):
@@ -109,8 +151,17 @@ def validar_equipe_basica(slots, codigo_formato):
         if mecanica == 'mega' and (item_id not in MEGA_STONE_OWNERS or
                                    MEGA_STONE_OWNERS.get(item_id) != base):
             erros.append(f'Slot {indice}: Mega Evolução exige a Mega Stone correta.')
-        if mecanica == 'mega' and base == 'rayquaza':
-            erros.append(f'Slot {indice}: Mega Rayquaza é proibido neste formato.')
+        if mecanica == 'mega':
+            forma = base + 'mega'
+            if item_id in ('charizarditex', 'charizarditey'):
+                forma += item_id[-1]
+            if (restricao := _disponibilidade(forma, formato)):
+                erros.append(f'Slot {indice}: a Mega Evolução de {especie} {restricao}.')
+        tera = str(slot.get('tera_type') or '').strip()
+        if tera and not formato.get('permite_tera', False):
+            erros.append(f'Slot {indice}: Terastalização não é permitida neste formato.')
+        if _chave(slot.get('ability')) in habilidades_banidas:
+            erros.append(f"Slot {indice}: habilidade {slot.get('ability')} proibida no formato.")
         for campo, rotulo in (('ability', 'habilidade'), ('nature', 'natureza')):
             valor = str(slot.get(campo) or '').strip()
             if not valor or len(valor) > 100:
