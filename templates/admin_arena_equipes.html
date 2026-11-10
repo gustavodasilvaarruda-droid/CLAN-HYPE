@@ -1,0 +1,35 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Equipes privadas · Administração Arena HYPE{% endblock %}
+{% block body_class %}hype-tournament-detail-page hype-v26-events{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='hype_arena_private_teams.css')}}">{% endblock %}
+{% block content %}
+<div class="v26-event-shell arena-private-shell">
+  <a class="v26-back" href="{{url_for('events26.torneio_detalhe',torneio_id=torneio.id)}}">← Torneio</a>
+  <section class="v26-panel"><span class="arena-private-eyebrow">ACESSO RESTRITO · ADMINISTRAÇÃO</span>
+    <h1>Equipes enviadas · {{torneio.titulo}}</h1>
+    <p>Dados sigilosos. Não há confirmação automática de inscrição ou pagamento. Histórico preservado para auditoria.</p>
+  </section>
+  {% for email, times in grupos.items() %}
+  <section class="v26-panel">
+    <h2>{{times[0].nick_jogo or email}}</h2>
+    {% for time in times %}
+    <article class="arena-admin-team">
+      <h3>Slot {{time.slot}} · {{time.nome}} · {{time.status|replace('_',' ')}}</h3>
+      <div class="arena-private-grid">
+        {% for p in time.equipe %}
+        <div class="arena-private-card"><strong>{{p.pokemon}}</strong>
+          <div><small>Ability</small> {{p.ability}}</div><div><small>Item</small> {{p.item}}</div>
+          <div><small>Nature</small> {{p.nature}}</div><div><small>Moves</small> {{p.moves|join(', ')}}</div>
+          <div><small>EVs</small> {{p.evs}}</div><div><small>IVs</small> {{p.ivs}}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% else %}<section class="v26-panel"><p>Nenhum time enviado.</p></section>{% endfor %}
+  <section class="v26-panel"><h2>Histórico de alterações ({{historico|length}})</h2>
+    {% for h in historico %}<details class="arena-history"><summary>{{h.criado_em}} · {{h.usuario_email}} · Slot {{h.slot}} · {{h.operacao}}</summary><pre>{{h.registro|tojson(indent=2)}}</pre></details>{% else %}<p>Sem alterações registradas.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}
