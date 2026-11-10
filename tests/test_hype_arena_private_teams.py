@@ -132,7 +132,8 @@ class TestArenaPrivateTeams(unittest.TestCase):
                 self.assertEqual(f['geracao'], 9)
                 self.assertEqual(f['showdown'], f['codigo'])
                 self.assertTrue(1 <= f['tamanho_equipe'] <= 6)
-                self.assertIn('permiss', f.get('observacao', 'permiss') + 'permiss')
+                for flag in ('permite_mega', 'permite_zmove', 'permite_tera', 'permite_dynamax'):
+                    self.assertIsInstance(f[flag], bool)
                 self.assertFalse(f['validacao_completa'])
         self.assertTrue(any(f['codigo'] == 'gen9lc' and f['nivel_maximo'] == 5
                             for f in formats))
