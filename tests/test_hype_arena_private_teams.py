@@ -110,6 +110,33 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertIn("'status': 'aguardando_verificacao'", target_events)
         self.assertIn("time.get('publico')", target_events)
 
+    def test_tournament_team_format_is_enforced_on_server(self):
+        # Não permite enviar OU para um torneio National Dex Ubers e
+        # não expõe no seletor times privados de outros formatos.
+        events = (ROOT / 'modules/events_v26.py').read_text(encoding='utf-8')
+        builder = (ROOT / 'modules/expansion_features.py').read_text(encoding='utf-8')
+        view = (ROOT / 'templates/arena_torneio_equipes.html').read_text(encoding='utf-8')
+        self.assertIn("str(time.get('formato_codigo') or '').strip().lower() != codigo", events)
+        self.assertIn("str(t.get('formato_codigo') or '').lower() == codigo", events)
+        self.assertIn('time_selecionado_id=selecionado', events)
+        self.assertIn('team_id=time_salvo_id', builder)
+        self.assertIn('time.id == time_selecionado_id', view)
+        self.assertIn('{{tamanho_equipe}} Pokémon', view)
+
+    def test_every_tournament_format_has_consistent_teamsize(self):
+        from modules.hype_tournament_formats import formatos_disponiveis
+        formats = formatos_disponiveis()
+        self.assertGreaterEqual(len(formats), 28)
+        for f in formats:
+            with self.subTest(format=f['codigo']):
+                self.assertEqual(f['geracao'], 9)
+                self.assertEqual(f['showdown'], f['codigo'])
+                self.assertTrue(1 <= f['tamanho_equipe'] <= 6)
+                self.assertIn('permiss', f.get('observacao', 'permiss') + 'permiss')
+                self.assertFalse(f['validacao_completa'])
+        self.assertTrue(any(f['codigo'] == 'gen9lc' and f['nivel_maximo'] == 5
+                            for f in formats))
+
     def test_admin_only_and_owner_isolation(self):
         events = (ROOT / 'modules/events_v26.py').read_text(encoding='utf-8')
         admin = events[events.index('def admin_equipes_torneio('):events.index("    @bp.route('/admin/eventos/",events.index('def admin_equipes_torneio('))]
