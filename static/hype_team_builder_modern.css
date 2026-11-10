@@ -31,3 +31,14 @@
 .hype-v7-team-builder .hype-pokemon-option img{width:45px;height:45px;object-fit:contain;flex:none}
 .hype-v7-team-builder .hype-pokemon-options p{padding:10px;color:#c9c0ad;margin:0}
 @media(max-width:720px){.hype-v7-team-builder .hype-pokemon-options{max-height:255px}}
+
+/* Biblioteca pessoal e visor de Builds — HYPE Arena */
+.hype-v7-team-builder .hype-build-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.hype-v7-team-builder .hype-build-card-actions form{margin:0}
+.hype-v7-team-builder .hype-build-preview{color:#f4eddb;background:linear-gradient(145deg,#101720,#272012);border:1px solid #bd984e;border-radius:16px;width:min(540px,calc(100% - 28px));max-height:min(80vh,720px);padding:22px;box-shadow:0 18px 60px #000b}
+.hype-v7-team-builder .hype-build-preview::backdrop{background:rgba(0,0,0,.74);backdrop-filter:blur(4px)}
+.hype-v7-team-builder .hype-build-preview h3{color:#f2c969;margin:0 0 12px}
+.hype-v7-team-builder .hype-build-preview pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e5dc;font:inherit;line-height:1.7}
+.hype-v7-team-builder .evInput:focus{border-color:#f2c969;box-shadow:0 0 0 3px rgba(226,183,88,.18)}
+.hype-v7-team-builder .ev-total-line #evRemaining{color:#e8c777;font-weight:700}
+@media(max-width:640px){.hype-v7-team-builder .hype-build-card-actions button{flex:1 1 auto}.hype-v7-team-builder .hype-build-preview{padding:16px}}
