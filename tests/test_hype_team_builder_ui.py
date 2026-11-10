@@ -31,10 +31,12 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         self.assertNotIn("fetch('https://pokeapi.co/api/v2/item?limit=2500')", template)
         self.assertIn('hype_team_builder_modern.css', template)
         self.assertIn('disabled aria-label="Formato fixo do torneio"', template)
+        for marker in ('evRemaining', 'limitEvInput', 'selectableItems', 'data-edit-build', 'data-preview-build', 'data-duplicate-build'):
+            self.assertIn(marker, template)
 
     def test_capture_balls_denied_and_legitimate_items_left_alone(self):
         data = []
-        for p in ('Miraidon', 'Koraidon', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh'):
+        for p in ('Dialga', 'Palkia', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh'):
             data.append({
                 'pokemon': p, 'ability': 'Pressure', 'nature': 'Timid',
                 'item': 'Leftovers',
