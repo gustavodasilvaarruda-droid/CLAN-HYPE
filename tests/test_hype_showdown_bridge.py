@@ -64,6 +64,15 @@ class TestBridge(unittest.TestCase):
              patch('modules.hype_showdown_bridge.subprocess.run', side_effect=subprocess.TimeoutExpired(['node'], 12)):
             self.assertEqual(validar_time_showdown(team(), 'gen9ou')['status'], 'unavailable')
 
+    def test_little_cup_uses_level_five_when_old_slot_has_no_level(self):
+        with patch('modules.hype_showdown_bridge.shutil.which', return_value='/usr/bin/node'), \
+             patch('modules.hype_showdown_bridge.Path.is_dir', return_value=True), \
+             patch('modules.hype_showdown_bridge.subprocess.run') as run:
+            run.return_value = subprocess.CompletedProcess([], 0, '{"status":"illegal","errors":["Equipe incompleta"]}', '')
+            validar_time_showdown(team(), 'gen9lc')
+            payload = json.loads(run.call_args.kwargs['input'])
+            self.assertEqual(payload['slots'][0]['level'], 5)
+
     def test_node_script_and_dependency_are_declared(self):
         js = (ROOT / 'scripts/hype_showdown_validate.cjs').read_text(encoding='utf-8')
         package = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))
