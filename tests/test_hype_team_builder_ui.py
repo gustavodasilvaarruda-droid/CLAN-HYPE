@@ -33,6 +33,9 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
             self.assertIn(marker, template)
         self.assertNotIn("fetch('https://pokeapi.co/api/v2/item?limit=2500')", template)
         self.assertIn('hype_team_builder_modern.css', template)
+        for marker in ('id="showAllItems"', 'showAllHeldItems=false',
+                       'function allowedHeldItems()', 'recommendations.includes(code)'):
+            self.assertIn(marker, template)
         self.assertIn('disabled aria-label="Formato fixo do torneio"', template)
         # Exportação em texto Showdown, sem afirmar aprovação automática.
         for marker in ('id="exportShowdownBtn"', 'id="showdownExportText"',
