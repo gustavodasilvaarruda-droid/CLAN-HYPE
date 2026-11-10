@@ -60,8 +60,9 @@ def validar_equipe_basica(slots, codigo_formato):
     formato = obter_formato(codigo_formato)
     if not formato:
         return ['Formato não cadastrado para revisão de equipes.']
-    if not isinstance(slots, list) or len(slots) != 6:
-        return ['O time precisa conter exatamente seis Pokémon.']
+    tamanho = int(formato.get('tamanho_equipe') or 6)
+    if not isinstance(slots, list) or len(slots) != tamanho:
+        return [f'O time desse formato precisa conter exatamente {tamanho} Pokémon.']
 
     banidos = {_chave(p) for p in formato.get('pokemons_proibidos', ())}
     golpes_banidos = {_chave(m) for m in formato.get('golpes_proibidos', ())}
@@ -78,7 +79,7 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: escolha um Pokémon válido.')
         elif chave in banidos:
             erros.append(f'Slot {indice}: {especie} não é permitido neste formato.')
-        if chave in usados:
+        if formato.get('species_clause', True) and chave in usados:
             erros.append(f'Slot {indice}: espécies repetidas não são permitidas.')
         usados.add(chave)
 
@@ -92,6 +93,13 @@ def validar_equipe_basica(slots, codigo_formato):
         if item_id in MEGA_STONE_OWNERS and base != MEGA_STONE_OWNERS[item_id]:
             erros.append(f'Slot {indice}: {item} não corresponde à espécie {especie}.')
         mecanica = _chave(slot.get('mecanica') or 'nenhuma')
+        tera_ativa = bool(slot.get('tera_ativa', False)) or mecanica == 'tera'
+        if tera_ativa and not formato.get('permite_tera', False):
+            erros.append(f'Slot {indice}: Terastalização proibida neste formato.')
+        if tera_ativa and mecanica == 'mega':
+            erros.append(f'Slot {indice}: a forma Mega não pode Terastalizar.')
+        if tera_ativa and not str(slot.get('tera_type') or '').strip():
+            erros.append(f'Slot {indice}: escolha um Tera Type.')
         flags = {'mega': 'permite_mega', 'zmove': 'permite_zmove',
                  'tera': 'permite_tera', 'dynamax': 'permite_dynamax'}
         if mecanica not in ('nenhuma', *flags):
