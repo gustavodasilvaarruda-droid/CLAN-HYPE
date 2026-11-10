@@ -104,7 +104,8 @@
           </div>
         </div>
 
-        <div class="builder-section-title"><h3>Moves</h3><small>Os golpes disponíveis são carregados de acordo com o Pokémon selecionado.</small></div>
+        <div class="builder-section-title"><h3>Moves</h3><small>Os golpes são filtrados pelo aprendizado registrado no Showdown; o validador oficial decide a legalidade final.</small></div>
+        <p id="moveHelp" class="hype-rule-note">Selecione um Pokémon para consultar o aprendizado.</p>
         <div class="move-grid">
           {% for i in range(1,5) %}<label>Move {{i}}<input class="moveInput" data-index="{{i-1}}" list="moveList" autocomplete="off" placeholder="Escolha um golpe"></label>{% endfor %}
           <datalist id="moveList"></datalist>
@@ -473,6 +474,46 @@
     }
   }
 
+  // Pré-filtro pelo aprendizado de golpes do Showdown; transferências e combinações
+  // complexas ainda exigem o TeamValidator oficial antes de aprovar o torneio.
+  async function loadShowdownMovesForSlot(slot){
+    const hint=$('moveHelp');
+    if(hint){hint.textContent='Conferindo golpes na base do Pokémon Showdown...';}
+    if(!showdownLearnsetsPromise){
+      showdownLearnsetsPromise=fetch('https://play.pokemonshowdown.com/data/learnsets.json')
+        .then(r=>{if(!r.ok)throw new Error('learnsets');return r.json();})
+        .then(data=>{showdownLearnsets=data;return data;})
+        .catch(()=>null);
+    }
+    const data=await showdownLearnsetsPromise;
+    if(!data){if(hint)hint.textContent='Lista de golpes externa indisponível. Use o Showdown para conferência final.';return;}
+    const f=selectedFormat(), natdex=!!f?.codigo?.includes('nationaldex');
+    const mons=new Set(),queue=[speciesKey(slot.pokemon)];
+    while(queue.length){
+      const mon=queue.shift();if(!mon||mons.has(mon))continue;
+      mons.add(mon);
+      const meta=speciesMeta(mon),prevo=meta?.prevo||'',base=meta?.base||'';
+      if(prevo)queue.push(prevo);
+      if(base&&base!==mon)queue.push(base);
+    }
+    const available=new Set();
+    for(const mon of mons){
+      const learn=data[mon]?.learnset||data[mon]||{};
+      for(const [move,sources] of Object.entries(learn)){
+        if(!Array.isArray(sources))continue;
+        if(sources.some(src=>natdex?/^[1-9]/.test(src):/^9/.test(src)))available.add(move);
+      }
+    }
+    if(!available.size){
+      if(hint)hint.textContent='Sem lista confirmada para esta espécie; não considere o time validado.';
+      return;
+    }
+    slot.moves_available=[...available].sort();
+    if(current()===slot){
+      updateMoveList(slot.moves_available);
+      if(hint)hint.textContent=slot.moves_available.length+' golpes encontrados no aprendizado da geração'+(natdex?' e de gerações anteriores':' 9')+'. A legalidade final exige Showdown.';
+    }
+  }
   function updateMoveList(list){
     const f=selectedFormat(); const banned=new Set((f?.golpes_proibidos||[]).map(slug));
     $('moveList').innerHTML=(list||[]).filter(x=>!banned.has(slug(x))).slice(0,900).map(x=>`<option value="${x}">${pretty(x)}</option>`).join('');
@@ -541,6 +582,11 @@
   mechanicSelect.addEventListener('change',()=>{syncMechanics();assignMegaStone();saveEditor();renderEditor();});
   teraEnabled.addEventListener('change',()=>{updateMechanicVisibility();saveEditor();});
   document.querySelectorAll('.moveInput').forEach(el=>el.addEventListener('change',async()=>{
+    const f=selectedFormat(),inputId=speciesKey(el.value),moves=current().moves_available||[];
+    if(f&&showdownLearnsets&&inputId&&moves.length&&!moves.some(m=>speciesKey(m)===inputId)){
+      alert('Este golpe não consta no aprendizado disponível para este Pokémon no pré-filtro do Showdown.');
+      el.value='';saveEditor();return;
+    }
     const banned=new Set((selectedFormat()?.golpes_proibidos||[]).map(slug));
     if(banned.has(slug(el.value))){alert('Esse golpe é proibido pelo regulamento resumido deste formato.');el.value='';saveEditor();return;}
     await loadMoveMeta(el.value.trim()); saveEditor();
