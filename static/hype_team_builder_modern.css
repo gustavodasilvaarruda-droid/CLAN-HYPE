@@ -42,3 +42,10 @@
 .hype-v7-team-builder .evInput:focus{border-color:#f2c969;box-shadow:0 0 0 3px rgba(226,183,88,.18)}
 .hype-v7-team-builder .ev-total-line #evRemaining{color:#e8c777;font-weight:700}
 @media(max-width:640px){.hype-v7-team-builder .hype-build-card-actions button{flex:1 1 auto}.hype-v7-team-builder .hype-build-preview{padding:16px}}
+
+/* Terastalização independente da Mega/Z-Move e responsiva. */
+.hype-v7-team-builder .hype-tera-control{display:flex;flex-direction:column;gap:7px;padding:12px;border:1px solid #6b5834;background:linear-gradient(135deg,#151622,#20202d);border-radius:12px}
+.hype-v7-team-builder .hype-tera-control>label:first-child{font-weight:700;color:#e9d8aa}
+.hype-v7-team-builder .hype-tera-toggle{display:flex;align-items:center;gap:9px;font-size:.86rem;color:#f2e6ce}
+.hype-v7-team-builder .hype-tera-toggle input{width:18px;height:18px;accent-color:#d6a84d}
+.hype-v7-team-builder .hype-tera-control select{min-height:42px;border-radius:9px}
