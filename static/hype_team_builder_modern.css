@@ -51,3 +51,8 @@
 .hype-v7-team-builder .hype-tera-control select{min-height:42px;border-radius:9px}
 
 .hype-v7-team-builder .hype-mega-ability{display:block;color:#e7c66a;margin-top:5px;font-weight:600}.hype-v7-team-builder .hype-mega-ability[hidden]{display:none}
+
+/* Exportação Showdown: texto legível e selecionável em celular e desktop. */
+.hype-v7-team-builder #showdownExportDialog textarea{display:block;width:100%;box-sizing:border-box;min-height:260px;background:#10151d;color:#efe8d5;border:1px solid #aa8849;border-radius:10px;padding:12px;font:500 .92rem/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
+.hype-v7-team-builder #showdownExportDialog p{color:#cbc4b5;font-size:.9rem;line-height:1.5}
+.hype-v7-team-builder #showdownExportDialog .hype-build-card-actions{justify-content:flex-end}
