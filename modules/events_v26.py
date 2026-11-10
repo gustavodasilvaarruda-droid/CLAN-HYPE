@@ -161,8 +161,12 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         meus_times = [t for t in safe_table('times_pokemon', '*', usuario_email=email)
                       if not t.get('publico') and isinstance(t.get('slots'), list)]
         meus_times.sort(key=lambda t: str(t.get('updated_at') or ''), reverse=True)
+        time_preselecionado_id = request.args.get('team_id', type=int)
+        if not any(t.get('id') == time_preselecionado_id for t in meus_times):
+            time_preselecionado_id = None
         return render_template('arena_torneio_equipes.html', torneio=torneio,
                                enviados=enviados, meus_times=meus_times,
+                               time_preselecionado_id=time_preselecionado_id,
                                pode_enviar=pode_enviar)
 
     @bp.route('/admin/torneios/<int:torneio_id>/equipes')
