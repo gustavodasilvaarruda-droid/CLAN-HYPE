@@ -31,3 +31,25 @@
 .hype-v7-team-builder .hype-pokemon-option img{width:45px;height:45px;object-fit:contain;flex:none}
 .hype-v7-team-builder .hype-pokemon-options p{padding:10px;color:#c9c0ad;margin:0}
 @media(max-width:720px){.hype-v7-team-builder .hype-pokemon-options{max-height:255px}}
+
+
+/* HYPE Builder 3.1: edição de spreads, recomendações e biblioteca de Builds */
+.hype-v7-team-builder .hype-stat-active{outline:1px solid rgba(255,205,113,.7);border-radius:12px;background:rgba(244,186,81,.07)}
+.hype-v7-team-builder .evInput,.hype-v7-team-builder .ivInput{transition:border-color .16s,box-shadow .16s,background .16s;font-variant-numeric:tabular-nums}
+.hype-v7-team-builder .evInput:focus,.hype-v7-team-builder .ivInput:focus{border-color:#ffd075!important;background:#251e16!important;box-shadow:0 0 0 3px rgba(255,204,96,.17),0 0 18px rgba(240,178,64,.15)!important;outline:none}
+.hype-v7-team-builder #evRemaining{color:#f5c96b;font-size:.86rem}
+.hype-v7-team-builder .hype-build-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+.hype-v7-team-builder .hype-build-card-actions button{font-size:.8rem;padding:8px 10px;min-height:37px;white-space:nowrap}
+.hype-build-preview{width:min(520px,calc(100vw - 24px));max-height:85vh;overflow:auto;background:linear-gradient(165deg,#151a24,#101116);color:#f9f2de;border:1px solid #b89149;box-shadow:0 24px 90px #000b;border-radius:18px;padding:25px}
+.hype-build-preview::backdrop{background:rgba(0,0,0,.78);backdrop-filter:blur(5px)}
+.hype-build-preview .hype-preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hype-build-preview .hype-preview-head h2{color:#ffd381;margin:0;font-size:1.4rem}
+.hype-build-preview #hypeBuildPreviewContent{border-top:1px solid #59462b;margin-top:15px;padding-top:10px}
+.hype-build-preview #hypeBuildPreviewContent p{border-bottom:1px solid #ffffff17;padding:7px 0;overflow-wrap:anywhere}
+.hype-build-preview .hype-build-card-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.hype-v7-team-builder .hype-recommended-strip{color:#dac38e;font-size:.77rem;margin-top:6px}
+.hype-v7-team-builder .hype-item-option small{display:block;font-size:.7rem;color:#c8ae6d}
+.hype-v7-team-builder .hype-item-catalog-toggle{margin-top:7px;border:1px solid #83683a;border-radius:9px;background:#242119;color:#f7d995;padding:7px 9px;cursor:pointer}
+.hype-v7-team-builder .hype-mechanic-hint{display:block;color:#d3c3a0;font-size:.78rem;line-height:1.4}
+.hype-v7-team-builder .hype-item-preview-badge{display:inline-flex;padding:3px 7px;border-radius:8px;background:#302a20;color:#f6d695;font-size:.72rem;margin-top:5px}
+@media(max-width:680px){.hype-build-preview{padding:16px}.hype-v7-team-builder .hype-build-card-actions button{flex:1 1 42%}}
