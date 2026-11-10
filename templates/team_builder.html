@@ -109,7 +109,7 @@
 
         <div class="builder-section-title"><h3>EVs / IVs</h3><small>Limite padrão: 510 EVs no total e 252 por atributo.</small></div>
         <div class="stat-editor" id="statEditor"></div>
-        <div class="ev-total-line"><b>EVs usados:</b> <span id="evTotal">0</span>/510 <span id="evWarning"></span></div>
+        <div class="ev-total-line"><b>EVs usados:</b> <span id="evTotal">0</span>/510 · <strong id="evRemaining">510 restantes</strong> <span id="evWarning"></span></div>
 
         <label class="wide-note">Observação do set<textarea id="notesInput" placeholder="Ex.: preserve para o late game, funciona como win condition..."></textarea></label>
 
@@ -150,7 +150,7 @@
   </form>
 
   <form method="post" action="{{url_for('expansion.team_builder_salvar_build')}}" id="saveBuildForm" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input name="nome_build" id="saveBuildName">
+    <input type="hidden" name="build_id" id="saveBuildId"><input name="nome_build" id="saveBuildName">
     <input name="formato_codigo" id="saveBuildFormat">
     <input name="build_json" id="saveBuildJson">
   </form>
@@ -175,12 +175,26 @@
       <article class="build-library-card">
         <span class="breed-kicker">{{b.pokemon}}</span><h3>{{b.nome}}</h3>
         <small>{{b.formato_codigo or 'Qualquer formato'}}</small>
-        <form method="post" action="{{url_for('expansion.team_builder_excluir_build',build_id=b.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-perigo btn-sm">Excluir</button></form>
+        <div class="hype-build-card-actions">
+          <button type="button" class="cta-dark hype-build-view" data-id="{{b.id}}">Visualizar</button>
+          <button type="button" class="cta-gold hype-build-edit" data-id="{{b.id}}">Editar</button>
+          <button type="button" class="cta-dark hype-build-apply" data-id="{{b.id}}">Usar no time</button>
+          <button type="button" class="cta-dark hype-build-duplicate" data-id="{{b.id}}">Duplicar</button>
+          <form method="post" action="{{url_for('expansion.team_builder_excluir_build',build_id=b.id)}}" onsubmit="return confirm('Excluir esta Build?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-perigo btn-sm">Excluir</button></form>
+        </div>
       </article>
       {% else %}<p class="muted">Nenhuma Build pessoal salva ainda.</p>{% endfor %}
     </div>
   </section>
 
+  <dialog id="hypeBuildPreview" class="hype-build-preview" aria-labelledby="hypeBuildPreviewTitle">
+    <div class="hype-preview-head"><h2 id="hypeBuildPreviewTitle">Prévia da Build</h2><button type="button" id="hypeBuildPreviewClose" class="cta-dark">Fechar</button></div>
+    <div id="hypeBuildPreviewContent"></div>
+    <div class="hype-build-card-actions">
+      <button type="button" class="cta-gold" id="hypePreviewApply">Usar no time</button>
+      <button type="button" class="cta-dark" id="hypePreviewEdit">Editar esta Build</button>
+    </div>
+  </dialog>
   <section class="dash-card"><div class="section-title-row"><div><span class="breed-kicker">MINHA BIBLIOTECA</span><h2>Meus times</h2></div><span class="v27-counter">{{meus_times|length}} salvo(s)</span></div><div class="team-grid">{% for t in meus_times %}<article class="team-card v27-team-card"><div class="v27-team-card-head"><div><span class="breed-kicker">{{t.formato or 'Formato livre'}}</span><h3>{{t.nome}}</h3></div><span class="status-pill {{'entrada' if t.publico else 'saida'}}">{{'PÚBLICO' if t.publico else 'PRIVADO'}}</span></div><p>{{t.descricao or 'Sem descrição.'}}</p><div class="team-pokemon-list">{% for s in t.slots %}<span>{% if s.sprite %}<img src="{{s.sprite}}" alt="">{% endif %}<b>{{s.pokemon}}</b><small>{{s.item or '-'}} · {{s.papel or ''}}</small></span>{% endfor %}</div><div class="v27-team-meta"><span>◉ {{t.visualizacoes or 0}} views</span><span>⧉ {{t.duplicacoes or 0}} cópias</span></div><div class="card-actions"><a class="cta-dark" href="{{url_for('expansion.team_builder',editar=t.id)}}">Editar</a><a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=t.id)}}">Analisar</a>{% if t.share_token %}<a class="cta-gold" href="{{url_for('competitive.time_compartilhado',share_token=t.share_token)}}">Abrir / Compartilhar</a>{% endif %}<form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-dark btn-sm">Duplicar</button></form><form method="post" action="{{url_for('expansion.team_builder_excluir',team_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-perigo btn-sm">Excluir</button></form></div></article>{% else %}<p class="muted">Você ainda não salvou nenhum time.</p>{% endfor %}</div></section>
 
   <section class="dash-card"><div class="section-title-row"><div><span class="breed-kicker">COMUNIDADE HYPE</span><h2>Times públicos</h2></div></div><div class="team-grid">{% for t in times_publicos %}<article class="team-card v27-team-card"><span class="breed-kicker">{{t.formato or 'Formato livre'}}</span><h3>{{t.nome}}</h3><p>{{t.descricao or 'Time compartilhado pela comunidade.'}}</p><div class="team-pokemon-list">{% for s in t.slots %}<span>{% if s.sprite %}<img src="{{s.sprite}}" alt="">{% endif %}<b>{{s.pokemon}}</b><small>{{s.item or '-'}} · {{s.papel or ''}}</small></span>{% endfor %}</div><div class="v27-team-meta"><span>◉ {{t.visualizacoes or 0}}</span><span>⧉ {{t.duplicacoes or 0}}</span></div><div class="card-actions">{% if t.share_token %}<a class="cta-dark" href="{{url_for('competitive.time_compartilhado',share_token=t.share_token)}}">Ver time</a>{% else %}<a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=t.id)}}">Ver análise</a>{% endif %}<form method="post" action="{{url_for('expansion.team_builder_favoritar',team_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-dark btn-sm">{{ '★ Favoritado' if t.id in favoritos_ids else '☆ Favoritar' }}</button></form><form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-gold btn-sm">Usar como base</button></form></div></article>{% else %}<p class="muted">Nenhum time público ainda.</p>{% endfor %}</div></section>
@@ -261,7 +275,7 @@
   natures.forEach(n => natureSelect.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`));
   teraSelect.innerHTML = '<option value="">Nenhum</option>' + types.map(t=>`<option value="${t}">${t}</option>`).join('');
 
-  $('statEditor').innerHTML = stats.map(([k,label]) => `<div class="stat-row"><b>${label}</b><label>EV<input class="evInput" data-stat="${k}" type="number" min="0" max="252" value="0"></label><label>IV<input class="ivInput" data-stat="${k}" type="number" min="0" max="31" value="31"></label></div>`).join('');
+  $('statEditor').innerHTML = stats.map(([k,label]) => `<div class="stat-row"><b>${label}</b><label>EV<input class="evInput" data-stat="${k}" type="number" inputmode="numeric" min="0" max="252" step="1" value="0" aria-label="EV de ${label}"></label><label>IV<input class="ivInput" data-stat="${k}" type="number" inputmode="numeric" min="0" max="31" step="1" value="31" aria-label="IV de ${label}"></label></div>`).join('');
 
   function pretty(v){ return String(v||'').replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()); }
   function slug(v){ return String(v||'').trim().toLowerCase().replaceAll(' ','-').replace(/[^a-z0-9-]/g,''); }
@@ -286,7 +300,7 @@
     document.querySelectorAll('.moveInput').forEach((el,i)=>el.value=(s.moves||[])[i]||'');
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
-    updateMoveList(s.moves_available||[]); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); updateMechanicVisibility(); liveValidate();
+    updateMoveList(s.moves_available||[]); updateItemPreview(); closeItemChoices(); closePokemonChoices(); normalizeEVInputs(); updateEvTotal(); updateMechanicVisibility(); liveValidate();
   }
 
   function saveEditor(){
@@ -320,7 +334,28 @@
     if(s.move_types[move] && s.move_categories[move]) return;
     try{ const r=await fetch(`https://pokeapi.co/api/v2/move/${encodeURIComponent(key)}`); if(!r.ok) return; const d=await r.json(); s.move_types[move]=d.type?.name||''; s.move_types[key]=d.type?.name||''; s.move_categories[move]=d.damage_class?.name||''; s.move_categories[key]=d.damage_class?.name||''; }catch(e){}
   }
-  function updateEvTotal(){ const total=[...document.querySelectorAll('.evInput')].reduce((a,x)=>a+capInt(x.value,0,252,0),0); $('evTotal').textContent=total; $('evWarning').textContent=total>510?'— excedeu o limite!':(total===510?'— completo':''); $('evWarning').className=total>510?'bad-text':'good-text'; }
+  // Limita cada campo conforme o orçamento REAL restante, não apenas o resumo.
+  function normalizeEVInputs(changed=null){
+    const inputs=[...document.querySelectorAll('.evInput')];
+    if(changed){
+      const other=inputs.filter(el=>el!==changed).reduce((sum,el)=>sum+capInt(el.value,0,252,0),0);
+      changed.value=String(Math.min(capInt(changed.value,0,252,0),Math.max(0,510-other)));
+    }
+    let remaining=510;
+    for(const el of inputs){
+      const allowed=Math.min(252,remaining);
+      el.value=String(Math.min(capInt(el.value,0,252,0),allowed));
+      el.max=String(allowed);
+      remaining-=Number(el.value);
+    }
+  }
+  function updateEvTotal(){
+    const total=[...document.querySelectorAll('.evInput')].reduce((a,x)=>a+capInt(x.value,0,252,0),0);
+    $('evTotal').textContent=total;
+    $('evRemaining').textContent=`${Math.max(0,510-total)} restantes`;
+    $('evWarning').textContent=total===510?'— completo':'';
+    $('evWarning').className='good-text';
+  }
   function updateMechanicVisibility(){ $('teraWrap').style.display=mechanicSelect.value==='tera'?'flex':'none'; }
 
   function selectedFormat(){ return formatos.find(f=>f.codigo===$('formatSelect').value)||null; }
@@ -362,7 +397,13 @@
   });
   pokemonInput.addEventListener('blur',()=>setTimeout(closePokemonChoices,130));
   [abilitySelect,natureSelect,roleSelect,mechanicSelect,teraSelect,notesInput,$('formatSelect')].forEach(el=>el.addEventListener('change',()=>{saveEditor();updateMechanicVisibility();}));
-  document.querySelectorAll('.moveInput,.evInput,.ivInput').forEach(el=>el.addEventListener('input',()=>{saveEditor();updateEvTotal();}));
+  document.querySelectorAll('.moveInput,.ivInput').forEach(el=>el.addEventListener('input',()=>{saveEditor();updateEvTotal();}));
+  document.querySelectorAll('.evInput').forEach(el=>{
+    el.addEventListener('focus',()=>{el.select();el.closest('.stat-row')?.classList.add('hype-stat-active');});
+    el.addEventListener('blur',()=>el.closest('.stat-row')?.classList.remove('hype-stat-active'));
+    el.addEventListener('input',()=>{normalizeEVInputs(el);saveEditor();updateEvTotal();});
+    el.addEventListener('change',()=>{normalizeEVInputs(el);saveEditor();});
+  });
   document.querySelectorAll('.moveInput').forEach(el=>el.addEventListener('change',async()=>{
     const banned=new Set((selectedFormat()?.golpes_proibidos||[]).map(slug));
     if(banned.has(slug(el.value))){alert('Esse golpe é proibido pelo regulamento resumido deste formato.');el.value='';saveEditor();return;}
@@ -377,7 +418,60 @@
   function applyHypeBuild(id){ const row=hypeBuilds.find(x=>Number(x.id)===Number(id)); if(!row){alert('Selecione uma Build HYPE.');return;} slots[active]=Object.assign(emptySlot(),row._slot||{}); renderEditor(); renderTabs(); if(slots[active].pokemon) loadPokemonDetails(slots[active].pokemon); }
   $('loadHypeBuildBtn').addEventListener('click',()=>applyHypeBuild($('hypeBuildSelect').value));
   document.querySelectorAll('.v27-apply-build').forEach(btn=>btn.addEventListener('click',()=>{applyHypeBuild(btn.dataset.buildId); window.scrollTo({top:document.querySelector('.showdown-workspace').offsetTop-80,behavior:'smooth'});}));
-  $('saveBuildBtn').addEventListener('click',()=>{saveEditor();if(!current().pokemon){alert('Escolha um Pokémon antes de salvar a Build.');return;}const name=prompt('Nome desta Build:',`${pretty(current().pokemon)} - ${current().papel||'Set'}`);if(!name)return;$('saveBuildName').value=name;$('saveBuildFormat').value=$('formatSelect').value;$('saveBuildJson').value=JSON.stringify(cleanForStorage(current()));$('saveBuildForm').submit();});
+  let editingBuildId = null;
+  const buildById=id=>savedBuilds.find(b=>Number(b.id)===Number(id));
+  function applySavedBuild(row, edit=false){
+    if(!row)return;
+    saveEditor();slots[active]=Object.assign(emptySlot(),JSON.parse(JSON.stringify(row.dados||{})));
+    editingBuildId=edit?Number(row.id):null;
+    $('saveBuildBtn').textContent=edit?'Atualizar esta Build':'Salvar como Build';
+    renderEditor();renderTabs();
+    if(slots[active].pokemon)loadPokemonDetails(slots[active].pokemon);
+    document.querySelector('.showdown-editor')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function previewSavedBuild(id){
+    const row=buildById(id);if(!row)return;
+    const data=row.dados||{}, box=$('hypeBuildPreviewContent');
+    const evs=Object.entries(data.evs||{}).map(([k,v])=>k.toUpperCase()+': '+v).join(' · ');
+    const ivs=Object.entries(data.ivs||{}).map(([k,v])=>k.toUpperCase()+': '+v).join(' · ');
+    box.replaceChildren();
+    for(const [name,value] of [
+      ['Pokémon',data.pokemon||row.pokemon],['Item',data.item||'Nenhum'],
+      ['Habilidade',data.ability||'Não informada'],['Natureza',data.nature||'Não informada'],
+      ['Golpes',(data.moves||[]).filter(Boolean).join(' · ')||'Nenhum'],
+      ['EVs',evs||'Nenhum'],['IVs',ivs||'Nenhum'],
+      ['Mecânica especial',data.mecanica||'Nenhuma']
+    ]){
+      const p=document.createElement('p'), label=document.createElement('b');
+      label.textContent=name+': ';p.append(label,document.createTextNode(String(value||'')));box.append(p);
+    }
+    $('hypeBuildPreviewTitle').textContent=row.nome||'Prévia da Build';
+    $('hypePreviewApply').onclick=()=>{closeBuildPreview();applySavedBuild(row,false);};
+    $('hypePreviewEdit').onclick=()=>{closeBuildPreview();applySavedBuild(row,true);};
+    const dlg=$('hypeBuildPreview');if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');
+  }
+  function closeBuildPreview(){const dlg=$('hypeBuildPreview');if(typeof dlg.close==='function'&&dlg.open)dlg.close();else dlg.removeAttribute('open');}
+  $('hypeBuildPreviewClose').addEventListener('click',closeBuildPreview);
+  document.querySelectorAll('.hype-build-view').forEach(el=>el.addEventListener('click',()=>previewSavedBuild(el.dataset.id)));
+  document.querySelectorAll('.hype-build-apply').forEach(el=>el.addEventListener('click',()=>applySavedBuild(buildById(el.dataset.id),false)));
+  document.querySelectorAll('.hype-build-edit').forEach(el=>el.addEventListener('click',()=>applySavedBuild(buildById(el.dataset.id),true)));
+  document.querySelectorAll('.hype-build-duplicate').forEach(el=>el.addEventListener('click',()=>{
+    const row=buildById(el.dataset.id);if(!row)return;
+    const nome=prompt('Nome da cópia:',(row.nome||'Build')+' - Cópia');if(!nome)return;
+    $('saveBuildId').value='';$('saveBuildName').value=nome;
+    $('saveBuildFormat').value=row.formato_codigo||'';
+    $('saveBuildJson').value=JSON.stringify(row.dados||{});
+    $('saveBuildForm').submit();
+  }));
+  $('saveBuildBtn').addEventListener('click',()=>{
+    saveEditor();if(!current().pokemon){alert('Escolha um Pokémon antes de salvar a Build.');return;}
+    const row=editingBuildId?buildById(editingBuildId):null;
+    const nome=prompt(row?'Atualizar nome da Build:':'Nome desta Build:',row?.nome||`${pretty(current().pokemon)} - ${current().papel||'Set'}`);
+    if(!nome)return;
+    $('saveBuildId').value=editingBuildId||'';
+    $('saveBuildName').value=nome;$('saveBuildFormat').value=$('formatSelect').value;
+    $('saveBuildJson').value=JSON.stringify(cleanForStorage(current()));$('saveBuildForm').submit();
+  });
 
   $('reviewTeamBtn').addEventListener('click',()=>{saveEditor();const empty=slots.map((s,i)=>!s.pokemon?i+1:null).filter(Boolean); alert(empty.length?`Slots vazios: ${empty.join(', ')}. Você pode salvar assim mesmo e completar depois.`:'Os 6 slots estão preenchidos. Salve o time e clique em “Analisar Time” para receber vantagens, riscos e plano de jogo.');});
   document.querySelectorAll('.hype-v7-team-poke').forEach(btn=>btn.addEventListener('click',()=>{
