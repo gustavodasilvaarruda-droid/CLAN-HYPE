@@ -64,8 +64,9 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexubers'), [])
         team[0]['item'] = 'Abomasite'
         self.assertTrue(any('não corresponde' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
+        team[0]['pokemon'] = 'Gengar'
         team[0]['item'] = 'Gengarite'
-        self.assertTrue(any('proibido' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
+        self.assertTrue(any('AG' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
 
     def test_catalogue_gen9_lc_natdex_and_team_sizes(self):
         from modules.hype_tournament_formats import formatos_disponiveis
