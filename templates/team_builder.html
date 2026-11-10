@@ -92,13 +92,15 @@
               <option value="nenhuma">Nenhuma</option>
               <option value="mega">Mega Evolution</option>
               <option value="zmove">Z-Move</option>
-              <option value="tera">Terastal</option>
               <option value="dynamax">Dynamax / Gigantamax</option>
             </select>
           </label>
-          <label id="teraWrap">Tera Type
+          <div id="teraWrap" class="hype-tera-control">
+            <label for="teraEnabled">Terastalização (quando permitida)</label>
+            <label class="hype-tera-toggle"><input id="teraEnabled" type="checkbox"> Usar Tera neste Pokémon</label>
+            <label for="teraSelect">Tera Type</label>
             <select id="teraSelect"></select>
-          </label>
+          </div>
         </div>
 
         <div class="builder-section-title"><h3>Moves</h3><small>Os golpes disponíveis são carregados de acordo com o Pokémon selecionado.</small></div>
@@ -209,7 +211,7 @@
   const formatos = {{ formatos|tojson }};
   const prefillPokemon = {{ prefill_pokemon|default('', true)|tojson }};
   const editingTeam = {{ editing_team|tojson if editing_team else 'null' }};
-  const emptySlot = () => ({pokemon:'',pokemon_id:null,tipos:[],sprite:'',item:'',ability:'',nature:'',papel:'',mecanica:'nenhuma',tera_type:'',moves:['','','',''],evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31},base_stats:{},move_types:{},move_categories:{},observacao:''});
+  const emptySlot = () => ({pokemon:'',pokemon_id:null,tipos:[],sprite:'',item:'',ability:'',nature:'',papel:'',mecanica:'nenhuma',tera_ativa:false,tera_type:'',moves:['','','',''],evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31},base_stats:{},move_types:{},move_categories:{},observacao:''});
   let slots = Array.from({length:6}, emptySlot);
   if(editingTeam && Array.isArray(editingTeam.slots)){ editingTeam.slots.slice(0,6).forEach((x,i)=>{ slots[i]=Object.assign(emptySlot(),x||{}); }); }
   let active = 0;
@@ -241,11 +243,31 @@
   const $ = id => document.getElementById(id);
   const pokemonResults = $('pokemonOptions');
   const itemResults = $('itemOptions'), itemIcon = $('itemSelectedIcon'), itemHelp = $('itemHelp');
+  const teraEnabled = $('teraEnabled');
   const itemIconUrl = code => 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/'+encodeURIComponent(code)+'.png';
   function basePokemon(){return slug(pokemonInput.value||current().pokemon).replace(/-mega(?:-[xy])?$/,'');}
+  // Recomendações estratégicas; itens legais não recomendados continuam pesquisáveis.
+  const recommendedItems = {
+    garchomp:['rocky-helmet','leftovers','life-orb','choice-scarf','choice-band','focus-sash','loaded-dice'],
+    metagross:['metagrossite','assault-vest','choice-band','choice-scarf','leftovers','weakness-policy'],
+    venusaur:['venusaurite','black-sludge','leftovers','heavy-duty-boots','life-orb'],
+    charizard:['charizardite-x','charizardite-y','heavy-duty-boots','choice-specs','life-orb'],
+    tyranitar:['tyranitarite','assault-vest','leftovers','choice-band','smooth-rock'],
+    gengar:['choice-scarf','choice-specs','focus-sash','life-orb','black-sludge'],
+    lucario:['lucarionite','life-orb','focus-sash','choice-band'],
+    kyurem:['heavy-duty-boots','choice-specs','leftovers','loaded-dice'],
+    rillaboom:['choice-band','assault-vest','grassy-seed','miracle-seed'],
+  };
   function selectableItems(){
     const f=selectedFormat(), ban=new Set((f?.itens_proibidos||[]).map(slug));
-    return itemNames.filter(code=>!ban.has(slug(code))&&(!megaStoneOwner[code]||(megaStoneOwner[code]===basePokemon()&&(!f||f.permite_mega===true))));
+    const base=basePokemon(), recommendations=recommendedItems[base]||[];
+    const filtered=itemNames.filter(code=>!ban.has(slug(code))&&
+      (!megaStoneOwner[code]||(megaStoneOwner[code]===base&&(!f||f.permite_mega===true)))&&
+      (!code.endsWith('-z')||!f||f.permite_zmove===true));
+    return filtered.sort((a,b)=>{
+      const ia=recommendations.indexOf(a), ib=recommendations.indexOf(b);
+      return (ia<0?999:ia)-(ib<0?999:ib)||a.localeCompare(b);
+    });
   }
   const knownHeldItem = value => selectableItems().find(code => code === slug(value));
   function syncMechanics(){
@@ -262,9 +284,10 @@
   }
   function updateItemPreview(){
     const chosen=knownHeldItem(itemInput.value), value=itemInput.value.trim();
+    const species=basePokemon(), recommendations=recommendedItems[species]||[];
     itemIcon.hidden=!chosen;
     if(chosen){itemIcon.src=itemIconUrl(chosen);itemIcon.alt=pretty(chosen);}
-    itemHelp.textContent=!value?'Digite para buscar entre os itens competitivos.':chosen?'Selecionado: '+pretty(chosen):'Escolha uma das opções da lista para usar este item.';
+    itemHelp.textContent=!value?(recommendations.length?'Primeiras opções: sugestões para '+pretty(species)+'. Pesquise outros itens equipáveis.':'Pesquise itens equipáveis permitidos no formato.'):(chosen?'Selecionado: '+pretty(chosen):'Escolha uma das opções da lista para usar este item.');
     itemHelp.classList.toggle('hype-item-error',!!value&&!chosen);
   }
   function closeItemChoices(){itemResults.hidden=true;itemInput.setAttribute('aria-expanded','false');}
@@ -294,7 +317,8 @@
     pokemonResults.hidden=false;pokemonInput.setAttribute('aria-expanded','true');
   }
   function renderItemChoices(){
-    const query=slug(itemInput.value), options=selectableItems().filter(code=>code.includes(query)).slice(0,14);
+    const query=slug(itemInput.value), choices=selectableItems(), recs=recommendedItems[basePokemon()]||[];
+    const options=choices.filter(code=>code.includes(query)&&(!recs.length||query||recs.includes(code))).slice(0,14);
     itemResults.replaceChildren();
     for(const code of options){
       const btn=document.createElement('button'); btn.type='button'; btn.className='hype-item-option'; btn.setAttribute('role','option');
@@ -328,19 +352,19 @@
       el.max=String(Math.max(0,Math.min(252,510-others)));
     }
   }
-  function cleanForStorage(s){ return {pokemon:s.pokemon||'',pokemon_id:Number.isInteger(s.pokemon_id)?s.pokemon_id:null,tipos:Array.isArray(s.tipos)?s.tipos.slice(0,2):[],sprite:s.sprite||'',item:s.item||'',ability:s.ability||'',nature:s.nature||'',papel:s.papel||'',mecanica:s.mecanica||'nenhuma',tera_type:s.tera_type||'',moves:Array.isArray(s.moves)?s.moves.slice(0,4):[],evs:s.evs||{},ivs:s.ivs||{},base_stats:s.base_stats||{},move_types:s.move_types||{},move_categories:s.move_categories||{},observacao:s.observacao||''}; }
+  function cleanForStorage(s){ return {pokemon:s.pokemon||'',pokemon_id:Number.isInteger(s.pokemon_id)?s.pokemon_id:null,tipos:Array.isArray(s.tipos)?s.tipos.slice(0,2):[],sprite:s.sprite||'',item:s.item||'',ability:s.ability||'',nature:s.nature||'',papel:s.papel||'',mecanica:s.mecanica||'nenhuma',tera_ativa:!!s.tera_ativa,tera_type:s.tera_type||'',moves:Array.isArray(s.moves)?s.moves.slice(0,4):[],evs:s.evs||{},ivs:s.ivs||{},base_stats:s.base_stats||{},move_types:s.move_types||{},move_categories:s.move_categories||{},observacao:s.observacao||''}; }
 
   function renderTabs(){
-    $('slotTabs').innerHTML = slots.map((s,i)=>`<button type="button" class="slot-tab ${i===active?'active':''}" data-slot="${i}">${s.sprite?`<img src="${s.sprite}" alt="">`:'<span class="slot-number">'+(i+1)+'</span>'}<span><b>${s.pokemon?pretty(s.pokemon):'Slot '+(i+1)}</b><small>${s.item?pretty(s.item):'Vazio'}</small></span></button>`).join('');
+    $('slotTabs').innerHTML = slots.slice(0,teamSize()).map((s,i)=>`<button type="button" class="slot-tab ${i===active?'active':''}" data-slot="${i}">${s.sprite?`<img src="${s.sprite}" alt="">`:'<span class="slot-number">'+(i+1)+'</span>'}<span><b>${s.pokemon?pretty(s.pokemon):'Slot '+(i+1)}</b><small>${s.item?pretty(s.item):'Vazio'}</small></span></button>`).join('');
     document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderEditor();renderTabs();}));
-    $('teamCount').textContent = `${slots.filter(s=>s.pokemon).length}/6`;
+    $('teamCount').textContent = `${slots.slice(0,teamSize()).filter(s=>s.pokemon).length}/${teamSize()}`;
   }
 
   function renderEditor(){
     const s=current();
     $('slotLabel').textContent=`SLOT ${active+1}`;
     $('editorPokemonName').textContent=s.pokemon?pretty(s.pokemon):'Escolha um Pokémon';
-    pokemonInput.value=s.pokemon||''; itemInput.value=s.item||''; natureSelect.value=s.nature||''; roleSelect.value=s.papel||''; mechanicSelect.value=s.mecanica||'nenhuma'; teraSelect.value=s.tera_type||''; notesInput.value=s.observacao||'';
+    pokemonInput.value=s.pokemon||''; itemInput.value=s.item||''; natureSelect.value=s.nature||''; roleSelect.value=s.papel||''; mechanicSelect.value=s.mecanica==='tera'?'nenhuma':s.mecanica||'nenhuma'; teraSelect.value=s.tera_type||''; teraEnabled.checked=!!s.tera_ativa||s.mecanica==='tera'; notesInput.value=s.observacao||'';
     const portrait=$('pokemonPortrait'); portrait.innerHTML=s.sprite?`<img src="${s.sprite}" alt="${s.pokemon}">`:'<span>?</span>';
     $('typeBadges').innerHTML=(s.tipos||[]).map(t=>`<span class="type-chip type-${t}">${pretty(t)}</span>`).join('');
     abilitySelect.innerHTML = s.abilities?.length ? '<option value="">Selecione...</option>'+s.abilities.map(a=>`<option value="${a}" ${a===s.ability?'selected':''}>${pretty(a)}</option>`).join('') : `<option value="${s.ability||''}">${s.ability?pretty(s.ability):'Escolha o Pokémon primeiro'}</option>`;
@@ -351,7 +375,7 @@
   }
 
   function saveEditor(){
-    const s=current(); s.pokemon=pokemonInput.value.trim(); s.item=itemInput.value.trim(); s.ability=abilitySelect.value; s.nature=natureSelect.value; s.papel=roleSelect.value; s.mecanica=mechanicSelect.value; s.tera_type=teraSelect.value; s.observacao=notesInput.value.trim();
+    const s=current(); s.pokemon=pokemonInput.value.trim(); s.item=itemInput.value.trim(); s.ability=abilitySelect.value; s.nature=natureSelect.value; s.papel=roleSelect.value; s.mecanica=mechanicSelect.value; s.tera_ativa=teraEnabled.checked; s.tera_type=teraSelect.value; s.observacao=notesInput.value.trim();
     s.moves=[...document.querySelectorAll('.moveInput')].map(x=>x.value.trim());
     s.evs={}; document.querySelectorAll('.evInput').forEach(el=>s.evs[el.dataset.stat]=capInt(el.value,0,252,0));
     s.ivs={}; document.querySelectorAll('.ivInput').forEach(el=>s.ivs[el.dataset.stat]=capInt(el.value,0,31,31));
@@ -382,17 +406,24 @@
     try{ const r=await fetch(`https://pokeapi.co/api/v2/move/${encodeURIComponent(key)}`); if(!r.ok) return; const d=await r.json(); s.move_types[move]=d.type?.name||''; s.move_types[key]=d.type?.name||''; s.move_categories[move]=d.damage_class?.name||''; s.move_categories[key]=d.damage_class?.name||''; }catch(e){}
   }
   function updateEvTotal(){ const total=evFields().reduce((a,x)=>a+capInt(x.value,0,252,0),0); $('evTotal').textContent=total; $('evRemaining').textContent=Math.max(0,510-total); $('evWarning').textContent=total>510?'— ajuste EVs antigos':(total===510?'— completo':''); $('evWarning').className=total>510?'bad-text':'good-text'; updateEvLimits(); }
-  function updateMechanicVisibility(){ $('teraWrap').style.display=mechanicSelect.value==='tera'?'flex':'none'; }
+  function updateMechanicVisibility(){
+    const f=selectedFormat(), allowed=!f||f.permite_tera===true;
+    $('teraWrap').style.display=allowed?'flex':'none';
+    teraEnabled.disabled=!allowed;
+    if(!allowed || mechanicSelect.value==='mega')teraEnabled.checked=false;
+    teraSelect.disabled=!allowed||!teraEnabled.checked;
+  }
 
   function selectedFormat(){ return formatos.find(f=>f.codigo===$('formatSelect').value)||null; }
+  function teamSize(){ const n=Number(selectedFormat()?.tamanho_equipe||6); return Number.isInteger(n)&&n>=1&&n<=6?n:6; }
   function refreshPokemonOptions(){
     const f=selectedFormat(), banned=new Set((f?.pokemons_proibidos||[]).map(slug));
     $('pokemonList').innerHTML=pokemonNames.filter(n=>!banned.has(slug(n))).map(n=>`<option value="${n}">${pretty(n)}</option>`).join('');
     updateMoveList(current().moves_available||[]);
   }
   function liveValidate(){
-    const filled=slots.filter(s=>s.pokemon); const f=selectedFormat(); const messages=[];
-    messages.push({ok:filled.length>0,text:`${filled.length}/6 Pokémon`});
+    const filled=slots.slice(0,teamSize()).filter(s=>s.pokemon); const f=selectedFormat(); const messages=[];
+    messages.push({ok:filled.length>0,text:`${filled.length}/${teamSize()} Pokémon`});
     const species=filled.map(s=>String(s.pokemon).toLowerCase()); if(f?.species_clause) messages.push({ok:new Set(species).size===species.length,text:'Species Clause'});
     const items=filled.map(s=>String(s.item||'').toLowerCase()).filter(Boolean); if(f?.item_clause) messages.push({ok:new Set(items).size===items.length,text:'Item Clause'});
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
@@ -422,7 +453,7 @@
     if(e.key==='Enter'&&!pokemonResults.hidden){e.preventDefault();const first=pokemonResults.querySelector('button');if(first)first.click();}
   });
   pokemonInput.addEventListener('blur',()=>setTimeout(closePokemonChoices,130));
-  [abilitySelect,natureSelect,roleSelect,mechanicSelect,teraSelect,notesInput,$('formatSelect')].forEach(el=>el.addEventListener('change',()=>{saveEditor();updateMechanicVisibility();}));
+  [abilitySelect,natureSelect,roleSelect,mechanicSelect,teraSelect,teraEnabled,notesInput,$('formatSelect')].forEach(el=>el.addEventListener('change',()=>{saveEditor();updateMechanicVisibility();}));
   document.querySelectorAll('.moveInput,.ivInput').forEach(el=>el.addEventListener('input',()=>{saveEditor();updateEvTotal();}));
   evFields().forEach(el=>{
     el.addEventListener('focus',()=>el.select());
@@ -430,6 +461,7 @@
     el.addEventListener('blur',()=>{if(el.value==='')el.value='0';limitEvInput(el);saveEditor();updateEvTotal();});
   });
   mechanicSelect.addEventListener('change',()=>{syncMechanics();assignMegaStone();saveEditor();});
+  teraEnabled.addEventListener('change',()=>{updateMechanicVisibility();saveEditor();});
   document.querySelectorAll('.moveInput').forEach(el=>el.addEventListener('change',async()=>{
     const banned=new Set((selectedFormat()?.golpes_proibidos||[]).map(slug));
     if(banned.has(slug(el.value))){alert('Esse golpe é proibido pelo regulamento resumido deste formato.');el.value='';saveEditor();return;}
@@ -494,14 +526,14 @@
     pokemonInput.value=btn.dataset.pokemon||'';
     loadPokemonDetails(btn.dataset.pokemon||'');
   }));
-  $('teamForm').addEventListener('submit',e=>{saveEditor();const valid=slots.filter(s=>s.pokemon);if(!valid.length){e.preventDefault();alert('Adicione pelo menos um Pokémon.');return;}if(valid.some(s=>Object.values(s.evs||{}).reduce((t,n)=>t+Number(n||0),0)>510)){e.preventDefault();alert('O total de EVs não pode ultrapassar 510.');return;}$('slotsJson').value=JSON.stringify(valid.map(cleanForStorage));});
+  $('teamForm').addEventListener('submit',e=>{saveEditor();const valid=slots.slice(0,teamSize()).filter(s=>s.pokemon);if(!valid.length){e.preventDefault();alert('Adicione pelo menos um Pokémon.');return;}if(valid.some(s=>Object.values(s.evs||{}).reduce((t,n)=>t+Number(n||0),0)>510)){e.preventDefault();alert('O total de EVs não pode ultrapassar 510.');return;}$('slotsJson').value=JSON.stringify(valid.map(cleanForStorage));});
 
   async function bootLists(){
     try{ const r=await fetch('https://pokeapi.co/api/v2/pokemon?limit=2000'); const d=await r.json(); pokemonNames=d.results.map(x=>x.name);for(const x of d.results){const match=String(x.url||'').match(/\/pokemon\/(\d+)\/?$/);if(match)pokemonSpriteIds.set(x.name,Number(match[1]));} refreshPokemonOptions(); }catch(e){}
     // Nunca importar a lista geral de itens: ela inclui Poké Balls e itens de bolsa.
   }
 
-  $('formatSelect').addEventListener('change',()=>{syncMechanics();refreshPokemonOptions();updateItemPreview();});
+  $('formatSelect').addEventListener('change',()=>{if(active>=teamSize()){saveEditor();active=0;renderEditor();}syncMechanics();refreshPokemonOptions();updateItemPreview();renderTabs();liveValidate();});
   bootLists(); renderTabs(); renderEditor();
   if(prefillBuild && prefillBuild._slot){
     slots[0]=Object.assign(emptySlot(),prefillBuild._slot); active=0; renderEditor(); renderTabs();
