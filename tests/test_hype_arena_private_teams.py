@@ -80,7 +80,10 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertEqual(catalogo['gen9lc']['nivel_maximo'],5)
         self.assertEqual(catalogo['gen91v1']['tamanho_equipe'],3)
         self.assertTrue(validar_equipe_basica(equipe_valida(), 'gen91v1'))
-        self.assertEqual(validar_equipe_basica(equipe_valida()[:3], 'gen91v1'), [])
+        trio = equipe_valida()[:3]
+        for slot, especie in zip(trio, ('Metagross', 'Garchomp', 'Venusaur')):
+            slot['pokemon'] = especie
+        self.assertEqual(validar_equipe_basica(trio, 'gen91v1'), [])
 
     def test_tera_separated_and_special_format_restrictions(self):
         slots=equipe_valida()
