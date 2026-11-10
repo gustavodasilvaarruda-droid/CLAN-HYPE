@@ -56,6 +56,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
         team[0]['mecanica'] = 'dynamax'
         self.assertTrue(any('dynamax' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
         team[0]['mecanica'] = 'tera'
+        team[0]['tera_type'] = 'Fire'
         self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexubers'), [])
         team[0]['pokemon'] = 'Metagross'
         team[0]['mecanica'] = 'mega'
@@ -65,6 +66,32 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertTrue(any('não corresponde' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
         team[0]['item'] = 'Gengarite'
         self.assertTrue(any('proibido' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
+
+    def test_catalogue_gen9_lc_natdex_and_team_sizes(self):
+        from modules.hype_tournament_formats import formatos_disponiveis
+        catalogo = {f['codigo']: f for f in formatos_disponiveis()}
+        self.assertGreaterEqual(len(catalogo), 20)
+        for code in ('gen9ou','gen9ubers','gen9lc','gen9nationaldex',
+                     'gen9nationaldexubers','gen9nationaldexag','gen9doublesou'):
+            self.assertIn(code,catalogo)
+            self.assertIn('Identificador Pokémon Showdown: '+code, catalogo[code]['regulamento'])
+            self.assertFalse(catalogo[code]['validacao_completa'])
+        self.assertEqual(catalogo['gen9lc']['nivel_maximo'],5)
+        self.assertEqual(catalogo['gen91v1']['tamanho_equipe'],3)
+        self.assertTrue(validar_equipe_basica(equipe_valida(), 'gen91v1'))
+        self.assertEqual(validar_equipe_basica(equipe_valida()[:3], 'gen91v1'), [])
+
+    def test_tera_separated_and_special_format_restrictions(self):
+        slots=equipe_valida()
+        slots[0]['pokemon']='Metagross'
+        slots[0]['mecanica']='mega'
+        slots[0]['item']='Metagrossite'
+        slots[0]['tera_ativa']=True
+        slots[0]['tera_type']='Fairy'
+        self.assertTrue(any('não pode Terastalizar' in e for e in
+                            validar_equipe_basica(slots, 'gen9nationaldexubers')))
+        slots[0]['tera_ativa']=False
+        self.assertEqual(validar_equipe_basica(slots, 'gen9nationaldexubers'), [])
 
     def test_never_automatically_confirms_registration(self):
         app = (ROOT / 'app.py').read_text(encoding='utf-8')
