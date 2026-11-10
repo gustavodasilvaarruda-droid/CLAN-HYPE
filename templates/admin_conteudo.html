@@ -1,7 +1,7 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}Eventos, Torneios e HYPE Live - Admin{% endblock %}
 {% block body_class %}hype-v26-admin-events{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='hype_arena_v2.css')}}?v=1">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='hype_arena_v2.css')}}?v=1"><link rel="stylesheet" href="{{url_for('static',filename='hype_arena_presets.css')}}?v=1">{% endblock %}
 {% block content %}{% include 'admin_v29_nav.html' %}
 <div class="v26-admin-shell">
   <div class="v26-admin-top"><div><span>ADMINISTRAÇÃO HYPE</span><h1>Eventos, Torneios e HYPE Live</h1><p>Crie a agenda, organize a Arena HYPE e publique transmissões e replays.</p></div><a class="v26-btn ghost" href="{{url_for('painel')}}">← Painel</a></div>
