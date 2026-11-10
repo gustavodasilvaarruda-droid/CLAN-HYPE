@@ -4243,7 +4243,7 @@ def criar_torneio():
             'descricao': request.form.get('descricao', '').strip(),
             'data_torneio': request.form.get('data_torneio'),
             'formato': preset['nome'] if preset else request.form.get('formato', '').strip() or None,
-            'formato_codigo': None if preset else request.form.get('formato_codigo') or None,
+            'formato_codigo': preset['codigo'] if preset else request.form.get('formato_codigo') or None,
             'temporada_id': int(request.form.get('temporada_id')) if request.form.get('temporada_id') else None,
             'ranking_ativo': request.form.get('ranking_ativo') == 'on',
             'pontos_campeao': max(0, int(request.form.get('pontos_campeao') or 10)),
@@ -4386,15 +4386,20 @@ def editar_torneio(item_id):
         payload = {
             'titulo': titulo,
             'descricao': descricao,
-            'regras': request.form.get('regras', '').strip() or None,
             'premio': request.form.get('premio', '').strip() or None,
             'imagem_url': request.form.get('imagem_url', '').strip() or None,
             'publicado': request.form.get('publicado') == 'on',
         }
         # Confrontos já sorteados e torneios finalizados são históricos:
         # não reabrir inscrições nem mudar pontuação/formato retroativamente.
-        estrutura_bloqueada = torneio.get('status_torneio') != 'inscricoes' or bool(
-            _safe_table('partidas_torneio', 'id', torneio_id=item_id))
+        estrutura_bloqueada = (torneio.get('status_torneio') != 'inscricoes' or bool(
+            _safe_table('partidas_torneio', 'id', torneio_id=item_id)) or bool(
+            _safe_table('arena_torneio_equipes', 'id', torneio_id=item_id)))
+        # Presets preservam seu snapshot. Regulamentos e formato não podem mudar
+        # após o primeiro time enviado, mesmo antes do chaveamento.
+        preset_atual = codigo_formato_do_torneio(torneio.get('regras'))
+        if not estrutura_bloqueada and not preset_atual:
+            payload['regras'] = request.form.get('regras', '').strip() or None
         if not estrutura_bloqueada:
             data = (request.form.get('data_torneio') or '').strip()
             if not data:
@@ -4408,8 +4413,8 @@ def editar_torneio(item_id):
                 raise ValueError('O limite não pode ser menor que a quantidade já inscrita.')
             payload.update({
                 'data_torneio': data,
-                'formato': request.form.get('formato', '').strip() or None,
-                'formato_codigo': request.form.get('formato_codigo') or None,
+                'formato': torneio.get('formato') if preset_atual else request.form.get('formato', '').strip() or None,
+                'formato_codigo': preset_atual or request.form.get('formato_codigo') or None,
                 'temporada_id': int(request.form.get('temporada_id')) if request.form.get('temporada_id') else None,
                 'ranking_ativo': request.form.get('ranking_ativo') == 'on',
                 'pontos_campeao': max(0, int(request.form.get('pontos_campeao') or 10)),
