@@ -45,8 +45,8 @@ GRANT USAGE, SELECT ON SEQUENCE public.arena_torneio_equipes_id_seq TO service_r
 GRANT USAGE, SELECT ON SEQUENCE public.arena_torneio_equipes_historico_id_seq TO service_role;
 
 CREATE OR REPLACE FUNCTION public.registrar_historico_equipes_arena()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER
+SET search_path = public AS $
 BEGIN
   INSERT INTO public.arena_torneio_equipes_historico
     (torneio_id, usuario_email, slot, operacao, registro)
@@ -57,3 +57,5 @@ DROP TRIGGER IF EXISTS trg_historico_equipes_arena ON public.arena_torneio_equip
 CREATE TRIGGER trg_historico_equipes_arena
 AFTER INSERT OR UPDATE ON public.arena_torneio_equipes
 FOR EACH ROW EXECUTE FUNCTION public.registrar_historico_equipes_arena();
+REVOKE EXECUTE ON FUNCTION public.registrar_historico_equipes_arena() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.registrar_historico_equipes_arena() TO service_role;
