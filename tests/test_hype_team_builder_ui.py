@@ -1,5 +1,8 @@
 """Regressões do Team Builder: formatos, itens e privacidade do torneio."""
 import ast
+import re
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -30,11 +33,39 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
             self.assertIn(marker, template)
         self.assertNotIn("fetch('https://pokeapi.co/api/v2/item?limit=2500')", template)
         self.assertIn('hype_team_builder_modern.css', template)
+        for marker in ('id="showAllItems"', 'showAllHeldItems=false',
+                       'function allowedHeldItems()', 'recommendations.includes(code)'):
+            self.assertIn(marker, template)
         self.assertIn('disabled aria-label="Formato fixo do torneio"', template)
+        # Exportação em texto Showdown, sem afirmar aprovação automática.
+        for marker in ('id="exportShowdownBtn"', 'id="showdownExportText"',
+                       'exportShowdownText()', "rows.push('EVs: '+ev)",
+                       'A exportação não comprova a legalidade da equipe'):
+            self.assertIn(marker, template)
+        for marker in ('evRemaining', 'limitEvInput', 'selectableItems', 'data-edit-build', 'data-preview-build', 'data-duplicate-build', 'id="teraEnabled"', 'recommendedItems', 'teamSize', 'refreshMegaDisplay'):
+            self.assertIn(marker, template)
+
+    def test_inline_javascript_parses_in_node_when_available(self):
+        if not shutil.which('node'):
+            self.skipTest('Node indisponível neste ambiente')
+        template=(ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        js=template.split('<script>',1)[1].split('</script>',1)[0]
+        js=re.sub(r'{{[^{}]*}}', 'null', js)
+        result=subprocess.run(['node','--check'], input=js, text=True,
+                              capture_output=True, timeout=12)
+        self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_tournament_format_is_frozen_after_private_team(self):
+        app=(ROOT / 'app.py').read_text(encoding='utf-8')
+        self.assertIn("'formato_codigo': preset['codigo'] if preset else", app)
+        bloco=app[app.index('def editar_torneio('):app.index('def participantes_torneio(',app.index('def editar_torneio('))]
+        self.assertIn("preset_atual = codigo_formato_do_torneio",bloco)
+        self.assertIn("_safe_table('arena_torneio_equipes', 'id', torneio_id=item_id)",bloco)
+        self.assertIn("if not estrutura_bloqueada and not preset_atual:",bloco)
 
     def test_capture_balls_denied_and_legitimate_items_left_alone(self):
         data = []
-        for p in ('Miraidon', 'Koraidon', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh'):
+        for p in ('Dialga', 'Palkia', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh'):
             data.append({
                 'pokemon': p, 'ability': 'Pressure', 'nature': 'Timid',
                 'item': 'Leftovers',

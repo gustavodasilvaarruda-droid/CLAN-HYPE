@@ -5,6 +5,7 @@ import json
 import os
 import re
 import secrets
+from pathlib import Path
 from modules.arena_private_teams import codigo_formato_do_torneio
 from modules.hype_tournament_formats import formatos_disponiveis
 
@@ -342,13 +343,22 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             'ability': str(row.get('ability') or '').strip()[:100],
             'nature': str(row.get('nature') or '').strip()[:40],
             'papel': str(row.get('papel') or '').strip()[:80],
-            'mecanica': 'tera' if tera else 'nenhuma', 'tera_type': tera[:30],
+            'level': 100, 'mecanica': 'nenhuma', 'tera_ativa': bool(tera), 'tera_type': tera[:30],
             'observacao': str(row.get('estrategia') or '').strip()[:500],
             'moves': _split_moves_build(row.get('moves')),
             'evs': _parse_spread_texto(row.get('evs'), 0),
             'ivs': _parse_spread_texto(row.get('ivs'), 31),
             'base_stats': {}, 'move_types': {}, 'move_categories': {},
         }
+
+    @bp.route('/team-builder/showdown-snapshot')
+    @login_required
+    def team_builder_showdown_snapshot():
+        """Snapshot público de regras e tiers; não expõe times ou dados pessoais."""
+        directory = Path(__file__).resolve().parents[1] / 'data'
+        response = send_from_directory(directory, 'hype_showdown_gen9_snapshot.json', mimetype='application/json')
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        return response
 
     @bp.route('/team-builder', methods=['GET', 'POST'])
     @login_required
@@ -418,6 +428,8 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                                 'nature': str(slot.get('nature') or '').strip()[:40],
                                 'papel': str(slot.get('papel') or '').strip()[:80],
                                 'mecanica': str(slot.get('mecanica') or 'nenhuma').strip()[:30],
+                                'level': slot.get('level', 100) if type(slot.get('level', 100)) is int else 100,
+                                'tera_ativa': bool(slot.get('tera_ativa') or slot.get('mecanica') == 'tera'),
                                 'tera_type': str(slot.get('tera_type') or '').strip()[:30],
                                 'observacao': str(slot.get('observacao') or '').strip()[:500],
                                 'moves': [str(x).strip()[:100] for x in (slot.get('moves') or []) if str(x).strip()][:4],
@@ -448,6 +460,14 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                 flash('Informe o nome do time e pelo menos um Pokémon.', 'erro')
             else:
                 existente = safe_table('times_pokemon', '*', id=team_id) if team_id else []
+                if team_id and (not existente or existente[0].get('usuario_email') != email):
+                    flash('Você só pode alterar um time da sua própria conta.', 'erro')
+                    return redirect(url_for('expansion.team_builder'))
+                if torneio_contexto_id and existente and (
+                        existente[0].get('formato_codigo') != torneio_formato_codigo):
+                    flash('Esse time foi salvo para outro formato. Duplique-o antes de adaptar ao torneio.', 'erro')
+                    return redirect(url_for('events26.equipes_torneio',
+                                            torneio_id=torneio_contexto_id))
                 share_token = (existente[0].get('share_token') if existente else None) or secrets.token_urlsafe(9)
                 payload = {
                     'usuario_email': email,
@@ -459,15 +479,27 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                     'publico': False if torneio_contexto_id else request.form.get('publico') == 'on',
                     'share_token': share_token,
                 }
-                if existente and existente[0].get('usuario_email') == email:
+                time_salvo_id = None
+                if existente:
                     payload.pop('usuario_email', None)
-                    supabase.table('times_pokemon').update(payload).eq('id', team_id).execute()
+                    supabase.table('times_pokemon').update(payload).eq('id', team_id).eq(
+                        'usuario_email', email).execute()
+                    time_salvo_id = team_id
                     flash('Time atualizado no HYPE Team Builder.', 'sucesso')
                 else:
-                    supabase.table('times_pokemon').insert(payload).execute()
+                    resposta = supabase.table('times_pokemon').insert(payload).execute()
+                    inseridos = getattr(resposta, 'data', None) or []
+                    if inseridos and isinstance(inseridos[0], dict):
+                        time_salvo_id = inseridos[0].get('id')
                     flash('Time salvo no HYPE Team Builder.', 'sucesso')
                 if torneio_contexto_id:
-                    return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_contexto_id))
+                    # Volta à inscrição com o time recém-criado pré-selecionado,
+                    # mas sem submeter ou aprovar nada automaticamente.
+                    return redirect(url_for('events26.equipes_torneio',
+                                            torneio_id=torneio_contexto_id,
+                                            team_id=time_salvo_id) if time_salvo_id else
+                                    url_for('events26.equipes_torneio',
+                                            torneio_id=torneio_contexto_id))
             return redirect(url_for('expansion.team_builder'))
 
         meus = sorted(safe_table('times_pokemon', '*', usuario_email=email), key=lambda x: x.get('updated_at') or '', reverse=True)
@@ -491,6 +523,8 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         email = email_atual()
         nome = (request.form.get('nome_build') or '').strip()
         formato_codigo = (request.form.get('formato_codigo') or '').strip() or None
+        build_id_raw = (request.form.get('build_id') or '').strip()
+        build_id = int(build_id_raw) if build_id_raw.isdigit() else None
         bruto = (request.form.get('build_json') or '').strip()
         try:
             dados = json.loads(bruto) if bruto else {}
@@ -510,6 +544,8 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             'nature': str(dados.get('nature') or '').strip()[:40],
             'papel': str(dados.get('papel') or '').strip()[:80],
             'mecanica': str(dados.get('mecanica') or 'nenhuma').strip()[:30],
+            'level': dados.get('level', 100) if type(dados.get('level', 100)) is int else 100,
+            'tera_ativa': bool(dados.get('tera_ativa') or dados.get('mecanica') == 'tera'),
             'tera_type': str(dados.get('tera_type') or '').strip()[:30],
             'observacao': str(dados.get('observacao') or '').strip()[:500],
             'moves': [str(x).strip()[:100] for x in (dados.get('moves') or []) if str(x).strip()][:4],
@@ -519,16 +555,34 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             'move_types': dados.get('move_types') if isinstance(dados.get('move_types'), dict) else {},
             'move_categories': dados.get('move_categories') if isinstance(dados.get('move_categories'), dict) else {},
         }
+        for campo, limite in (('evs', 252), ('ivs', 31)):
+            valores = clean[campo]
+            if any(type(v) is not int or not 0 <= v <= limite for v in valores.values()):
+                flash(f'{campo.upper()} inválidos: revise os limites.', 'erro')
+                return redirect(url_for('expansion.team_builder'))
+        if sum(clean['evs'].values()) > 510:
+            flash('O total de EVs não pode exceder 510.', 'erro')
+            return redirect(url_for('expansion.team_builder'))
+        payload = {
+            'usuario_email': email,
+            'nome': nome[:120],
+            'pokemon': pokemon[:80],
+            'pokemon_id': clean.get('pokemon_id'),
+            'formato_codigo': formato_codigo,
+            'dados': clean,
+        }
+        if build_id:
+            rows = safe_table('builds_pessoais', '*', id=build_id)
+            if not rows or rows[0].get('usuario_email') != email:
+                flash('Você só pode editar suas próprias Builds.', 'erro')
+                return redirect(url_for('expansion.team_builder'))
         try:
-            supabase.table('builds_pessoais').insert({
-                'usuario_email': email,
-                'nome': nome[:120],
-                'pokemon': pokemon[:80],
-                'pokemon_id': clean.get('pokemon_id'),
-                'formato_codigo': formato_codigo,
-                'dados': clean,
-            }).execute()
-            flash('Build pessoal salva. Ela já pode ser reutilizada em outros times.', 'sucesso')
+            if build_id:
+                supabase.table('builds_pessoais').update(payload).eq('id', build_id).eq('usuario_email', email).execute()
+                flash('Build pessoal atualizada.', 'sucesso')
+            else:
+                supabase.table('builds_pessoais').insert(payload).execute()
+                flash('Build pessoal salva. Ela já pode ser reutilizada em outros times.', 'sucesso')
         except Exception as e:
             flash(f'Não foi possível salvar a Build: {e}', 'erro')
         return redirect(url_for('expansion.team_builder'))

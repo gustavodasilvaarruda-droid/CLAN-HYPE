@@ -5,7 +5,7 @@ NÃO substitui o validador oficial de legalidade do Pokémon Showdown e nunca
 autoriza inscrição/aprovação automática.
 """
 import re
-from modules.hype_tournament_formats import obter_formato
+from modules.hype_tournament_formats import obter_formato, obter_especie_showdown
 
 STATS = ('hp', 'atk', 'def', 'spa', 'spd', 'spe')
 
@@ -21,6 +21,27 @@ BOLAS_CAPTURA = frozenset({
 })
 
 
+# Pedras de Mega Evolução vinculadas à espécie-base. Uma pedra de outra
+# espécie não deve aparecer nem ser aceita em um set de torneio.
+MEGA_STONE_OWNERS = {
+    'abomasite': 'abomasnow', 'absolite': 'absol', 'aerodactylite': 'aerodactyl',
+    'aggronite': 'aggron', 'alakazite': 'alakazam', 'altarianite': 'altaria',
+    'ampharosite': 'ampharos', 'audinite': 'audino', 'banettite': 'banette',
+    'beedrillite': 'beedrill', 'blastoisinite': 'blastoise', 'blazikenite': 'blaziken',
+    'cameruptite': 'camerupt', 'charizarditex': 'charizard', 'charizarditey': 'charizard',
+    'diancite': 'diancie', 'galladite': 'gallade', 'garchompite': 'garchomp',
+    'gardevoirite': 'gardevoir', 'gengarite': 'gengar', 'glalitite': 'glalie',
+    'gyaradosite': 'gyarados', 'heracronite': 'heracross', 'houndoominite': 'houndoom',
+    'kangaskhanite': 'kangaskhan', 'latiasite': 'latias', 'latiosite': 'latios',
+    'lopunnite': 'lopunny', 'lucarionite': 'lucario', 'manectite': 'manectric',
+    'mawilite': 'mawile', 'medichamite': 'medicham', 'metagrossite': 'metagross',
+    'pinsirite': 'pinsir', 'sablenite': 'sableye', 'salamencite': 'salamence',
+    'sceptilite': 'sceptile', 'scizorite': 'scizor', 'sharpedonite': 'sharpedo',
+    'slowbronite': 'slowbro', 'steelixite': 'steelix', 'swampertite': 'swampert',
+    'tyranitarite': 'tyranitar', 'venusaurite': 'venusaur',
+}
+
+
 def codigo_formato_do_torneio(regras):
     texto = str(regras or '')
     match = re.search(r'^Identificador Pokémon Showdown:\s*([a-z0-9]+)\s*$', texto, re.I | re.M)
@@ -34,16 +55,69 @@ def _chave(texto):
     return re.sub(r'[^a-z0-9]', '', str(texto or '').casefold())
 
 
+def _id_especie(texto):
+    """Trata formas '-Base' como a espécie padrão para os bans explícitos."""
+    chave = _chave(texto)
+    return chave[:-4] if chave.endswith('base') else chave
+
+
+def _tier_banida(especie, formato):
+    meta = obter_especie_showdown(especie)
+    if not meta:
+        return None
+    modo = formato.get('tipo_batalha')
+    coluna = ('nd' if 'nationaldex' in formato['codigo'] else
+              'doubles' if modo == 'doubles' else 'tier')
+    tier = meta.get(coluna) or meta.get('tier') or ''
+    banidas = {_chave(b.replace('ND ', '')) for b in formato.get('tiers_proibidos', ())}
+    if _chave(tier) in banidas:
+        return tier
+    return None
+
+
+def _disponibilidade(especie, formato):
+    meta = obter_especie_showdown(especie)
+    if not meta:
+        return 'não consta no Pokédex do Showdown deste snapshot'
+    if not 'nationaldex' in formato['codigo']:
+        if meta.get('nonstandard') in ('Past', 'Future', 'Unobtainable', 'CAP', 'LGPE'):
+            return 'não está disponível nesta geração/formato'
+        if meta.get('tier') == 'Illegal':
+            return 'não é legal neste formato de Geração 9'
+    if formato.get('little_cup') and (meta.get('prevo') or not meta.get('evos')):
+        return 'não atende às condições de Little Cup (primeira evolução com evolução possível)'
+    if formato.get('nfe') and (not meta.get('prevo') or not meta.get('evos')):
+        return 'não atende às condições de NFE'
+    tier = _tier_banida(especie, formato)
+    if tier:
+        return f'pertence à tier proibida {tier}'
+    if _id_especie(especie) in {_id_especie(p) for p in formato.get('pokemons_proibidos', ())}:
+        return 'foi banido explicitamente'
+    return None
+
+
+
+def motivo_pokemon_indisponivel(especie, codigo_formato):
+    """Filtro preliminar para a lista visual. Nunca certifica legalidade plena."""
+    formato = obter_formato(codigo_formato)
+    if not formato:
+        return 'formato não cadastrado'
+    return _disponibilidade(especie, formato)
+
+
 def validar_equipe_basica(slots, codigo_formato):
     """Lista erros sem declarar legalidade completa. Exige 6 sets completos."""
     formato = obter_formato(codigo_formato)
     if not formato:
         return ['Formato não cadastrado para revisão de equipes.']
-    if not isinstance(slots, list) or len(slots) != 6:
-        return ['O time precisa conter exatamente seis Pokémon.']
+    tamanho = int(formato.get('tamanho_equipe') or 6)
+    if not isinstance(slots, list) or len(slots) != tamanho:
+        return [f'O time desse formato precisa conter exatamente {tamanho} Pokémon.']
 
-    banidos = {_chave(p) for p in formato.get('pokemons_proibidos', ())}
+    banidos = {_id_especie(p) for p in formato.get('pokemons_proibidos', ())}
     golpes_banidos = {_chave(m) for m in formato.get('golpes_proibidos', ())}
+    itens_banidos = {_chave(m) for m in formato.get('itens_proibidos', ())}
+    habilidades_banidas = {_chave(m) for m in formato.get('habilidades_proibidas', ())}
     usados = set()
     erros = []
     for indice, slot in enumerate(slots, 1):
@@ -56,13 +130,55 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: escolha um Pokémon válido.')
         elif chave in banidos:
             erros.append(f'Slot {indice}: {especie} não é permitido neste formato.')
-        if chave in usados:
+        else:
+            restricao = _disponibilidade(especie, formato)
+            if restricao:
+                erros.append(f'Slot {indice}: {especie} {restricao}.')
+        if formato.get('species_clause', True) and chave in usados:
             erros.append(f'Slot {indice}: espécies repetidas não são permitidas.')
         usados.add(chave)
 
+        nivel_max = int(formato.get('nivel_maximo') or 100)
+        nivel = slot.get('level', 5 if formato.get('little_cup') else 100)
+        if type(nivel) is not int or not 1 <= nivel <= nivel_max:
+            erros.append(f'Slot {indice}: nível fora do limite de {nivel_max} do formato.')
         item = str(slot.get('item') or '').strip()
-        if _chave(item) in BOLAS_CAPTURA:
+        item_id = _chave(item)
+        if item_id in BOLAS_CAPTURA:
             erros.append(f'Slot {indice}: {item} é uma Poké Ball de captura e não está disponível na Arena HYPE.')
+        if item_id in itens_banidos:
+            erros.append(f'Slot {indice}: o item {item} é proibido no formato.')
+        base = chave.split('mega')[0] if 'mega' in chave else chave
+        if item_id in MEGA_STONE_OWNERS and base != MEGA_STONE_OWNERS[item_id]:
+            erros.append(f'Slot {indice}: {item} é proibido para {especie}: a pedra não corresponde à espécie.')
+        mecanica = _chave(slot.get('mecanica') or 'nenhuma')
+        tera_ativa = bool(slot.get('tera_ativa', False)) or mecanica == 'tera'
+        if tera_ativa and not formato.get('permite_tera', False):
+            erros.append(f'Slot {indice}: Terastalização proibida neste formato.')
+        if tera_ativa and mecanica == 'mega':
+            erros.append(f'Slot {indice}: a forma Mega não pode Terastalizar.')
+        if tera_ativa and not str(slot.get('tera_type') or '').strip():
+            erros.append(f'Slot {indice}: escolha um Tera Type.')
+        flags = {'mega': 'permite_mega', 'zmove': 'permite_zmove',
+                 'tera': 'permite_tera', 'dynamax': 'permite_dynamax'}
+        if mecanica not in ('nenhuma', *flags):
+            erros.append(f'Slot {indice}: mecânica desconhecida.')
+        elif mecanica in flags and not formato.get(flags[mecanica], False):
+            erros.append(f'Slot {indice}: a mecânica {mecanica} não é permitida neste formato.')
+        if mecanica == 'mega' and (item_id not in MEGA_STONE_OWNERS or
+                                   MEGA_STONE_OWNERS.get(item_id) != base):
+            erros.append(f'Slot {indice}: Mega Evolução exige a Mega Stone correta.')
+        if mecanica == 'mega':
+            forma = base + 'mega'
+            if item_id in ('charizarditex', 'charizarditey'):
+                forma += item_id[-1]
+            if (restricao := _disponibilidade(forma, formato)):
+                erros.append(f'Slot {indice}: a Mega Evolução de {especie} {restricao}.')
+        tera = str(slot.get('tera_type') or '').strip()
+        if tera and not formato.get('permite_tera', False):
+            erros.append(f'Slot {indice}: Terastalização não é permitida neste formato.')
+        if _chave(slot.get('ability')) in habilidades_banidas:
+            erros.append(f"Slot {indice}: habilidade {slot.get('ability')} proibida no formato.")
         for campo, rotulo in (('ability', 'habilidade'), ('nature', 'natureza')):
             valor = str(slot.get(campo) or '').strip()
             if not valor or len(valor) > 100:
