@@ -88,6 +88,7 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
 class TestHypeMobileAdmin(unittest.TestCase):
     def test_dashboard_and_leader_navigation(self):
         env = Environment(loader=FileSystemLoader(str(ROOT / 'templates')), autoescape=True)
+        env.filters['preco'] = lambda value: value  # filtro registrado na aplicação Flask
         for name in ('admin_dashboard_geral.html', 'hype_app_base.html',
                      'builders_base.html', 'admin_v29_nav.html', 'admin_economia.html'):
             self.assertIsNotNone(env.get_template(name))
