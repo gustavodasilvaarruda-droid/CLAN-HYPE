@@ -121,3 +121,92 @@ iframe { border: 0; }
   .hgb-sidebar { transition:none !important; }
   .hype-v18-slider { scroll-behavior:auto !important; }
 }
+
+
+/* HYPE V36.1 - corrigir cortes e interacao do menu em telas pequenas.
+   O CSS visual do desktop permanece intocado. */
+@media (max-width: 900px) {
+  /* Entre 821 e 900px a barra ja tem botao de menu, mas a lateral
+     ainda era exibida como sidebar de desktop. */
+  .hype-core-app {
+    display: block !important;
+    grid-template-columns: minmax(0,1fr) !important;
+    min-width: 0;
+  }
+  .hype-core-sidebar {
+    position: fixed !important;
+    z-index: 90 !important;
+    top: 58px !important;
+    left: 0 !important;
+    width: min(82vw,320px) !important;
+    height: calc(100dvh - 58px) !important;
+    transform: translateX(-105%);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .hype-core-sidebar.open { transform: translateX(0) !important; }
+  .hype-core-main, .hype-dashboard-page .hype-v6-page { min-width: 0; max-width: 100%; }
+  /* O visual V7 usava um minmax(410px) com !important que se sobrepunha
+     ao breakpoint e alargava todo o Painel do Membro no celular. */
+  .hype-dashboard-page .hype-v6-profile-grid {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+  .hype-dashboard-page .hype-v6-profile-grid > *,
+  .hype-dashboard-page .member2-columns > *,
+  .hype-dashboard-page .hype-v6-panel-head > * { min-width: 0; }
+  .hype-dashboard-page .hype-v6-mini-stats {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  }
+  .hype-dashboard-page .hype-v6-mini-stats article { min-width: 0; }
+  .hype-dashboard-page .hype-v6-mini-stats article > div { min-width: 0; }
+  .hype-dashboard-page .hype-v6-mini-stats b,
+  .hype-dashboard-page .hype-v6-mini-stats small {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .hype-dashboard-page .hype-v6-member-banner {
+    padding: 18px !important;
+    min-width: 0;
+  }
+  .hype-dashboard-page .hype-v6-member-banner > img {
+    right: -55px !important;
+    width: 220px !important;
+    height: 220px !important;
+    opacity: .17 !important;
+    pointer-events: none;
+  }
+  .hype-dashboard-page .hype-v6-member-banner .hype-v6-banner-copy {
+    position: relative;
+    z-index: 3;
+    min-width: 0;
+  }
+  .hype-dashboard-page .member2-columns {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+  .hype-dashboard-page .member2-progress {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  }
+  .hype-dashboard-page .member2-progress > *,
+  .hype-dashboard-page .hype-v6-panel,
+  .hype-dashboard-page .hype-v6-panel-head { min-width: 0; }
+  .hype-dashboard-page .hype-v6-panel-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+}
+@media (max-width: 560px) {
+  .hype-core-sidebar {
+    top: 58px !important;
+    height: calc(100dvh - 58px) !important;
+  }
+}
+@media (max-width: 420px) {
+  /* Em telas estreitas os quatro indicadores precisam de uma coluna,
+     evitando textos e icones truncados ou espremidos. */
+  .hype-dashboard-page .hype-v6-mini-stats {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+  .hype-dashboard-page .member2-progress {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+}

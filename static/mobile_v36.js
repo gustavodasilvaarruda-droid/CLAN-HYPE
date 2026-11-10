@@ -17,7 +17,11 @@
     backdrop.className = 'hype-mobile-nav-backdrop';
     backdrop.hidden = true;
     backdrop.addEventListener('click', closeMenus);
-    document.body.appendChild(backdrop);
+    // A sidebar esta dentro de .hgb-app (z-index:1). Se a pelicula
+    // ficar no body (z-index:89), ela cobre a propria sidebar e bloqueia
+    // os links. No app, backdrop (89) e menu (90) compartilham camada.
+    const host = sidebar?.closest('.hgb-app') || document.body;
+    host.appendChild(backdrop);
     return backdrop;
   }
   function isOpen() {
