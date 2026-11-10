@@ -46,7 +46,7 @@ GRANT USAGE, SELECT ON SEQUENCE public.arena_torneio_equipes_historico_id_seq TO
 
 CREATE OR REPLACE FUNCTION public.registrar_historico_equipes_arena()
 RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER
-SET search_path = public AS $
+SET search_path = public AS $$
 BEGIN
   INSERT INTO public.arena_torneio_equipes_historico
     (torneio_id, usuario_email, slot, operacao, registro)
