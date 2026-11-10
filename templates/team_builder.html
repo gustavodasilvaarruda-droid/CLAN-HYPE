@@ -53,6 +53,7 @@
           <div>
             <span class="breed-kicker" id="slotLabel">SLOT 1</span>
             <h2 id="editorPokemonName">Escolha um Pokémon</h2>
+            <small id="megaAbilityHelp" class="hype-mega-ability" hidden></small>
             <div id="typeBadges" class="type-badges"></div>
           </div>
           <button type="button" class="btn-perigo btn-sm" id="removeSlotBtn">Remover</button>
@@ -245,6 +246,29 @@
   const itemResults = $('itemOptions'), itemIcon = $('itemSelectedIcon'), itemHelp = $('itemHelp');
   const teraEnabled = $('teraEnabled');
   const itemIconUrl = code => 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/'+encodeURIComponent(code)+'.png';
+  const megaDetailsCache=new Map();
+  async function refreshMegaDisplay(){
+    const element=$('megaAbilityHelp');
+    element.hidden=true;
+    if(mechanicSelect.value!=='mega')return;
+    const s=current(), base=basePokemon(), item=slug(itemInput.value);
+    if(!megaStoneOwner[item]||megaStoneOwner[item]!==base)return;
+    const megaName=base+'-mega'+(item.endsWith('-x')?'-x':item.endsWith('-y')?'-y':'');
+    try{
+      let p=megaDetailsCache.get(megaName);
+      if(!p){
+        const r=await fetch('https://pokeapi.co/api/v2/pokemon/'+encodeURIComponent(megaName));
+        if(!r.ok)return;
+        p=await r.json();megaDetailsCache.set(megaName,p);
+      }
+      if(current()!==s||mechanicSelect.value!=='mega'||slug(itemInput.value)!==item)return;
+      const portrait=$('pokemonPortrait'),src=p.sprites?.other?.['official-artwork']?.front_default||p.sprites?.front_default;
+      if(src){const img=document.createElement('img');img.src=src;img.alt=pretty(megaName);portrait.replaceChildren(img);}
+      $('editorPokemonName').textContent=pretty(megaName);
+      const abilities=(p.abilities||[]).map(x=>pretty(x.ability?.name)).filter(Boolean);
+      if(abilities.length){element.textContent='Mega Ability: '+abilities.join(', ');element.hidden=false;}
+    }catch(e){ /* imagem externa indisponível: manter retrato base */ }
+  }
   function basePokemon(){return slug(pokemonInput.value||current().pokemon).replace(/-mega(?:-[xy])?$/,'');}
   // Recomendações estratégicas; itens legais não recomendados continuam pesquisáveis.
   const recommendedItems = {
@@ -295,7 +319,7 @@
     itemInput.value=code;
     if(megaStoneOwner[code])mechanicSelect.value='mega';
     else if(mechanicSelect.value==='mega')mechanicSelect.value='nenhuma';
-    closeItemChoices(); updateItemPreview(); updateMechanicVisibility(); saveEditor();
+    closeItemChoices(); updateItemPreview(); updateMechanicVisibility(); saveEditor(); renderEditor();
   }
   function closePokemonChoices(){pokemonResults.hidden=true;pokemonInput.setAttribute('aria-expanded','false');}
   function renderPokemonChoices(){
@@ -371,7 +395,7 @@
     document.querySelectorAll('.moveInput').forEach((el,i)=>el.value=(s.moves||[])[i]||'');
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
-    updateMoveList(s.moves_available||[]); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate();
+    updateMoveList(s.moves_available||[]); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate(); refreshMegaDisplay();
   }
 
   function saveEditor(){
@@ -460,7 +484,7 @@
     el.addEventListener('input',()=>{limitEvInput(el);saveEditor();updateEvTotal();});
     el.addEventListener('blur',()=>{if(el.value==='')el.value='0';limitEvInput(el);saveEditor();updateEvTotal();});
   });
-  mechanicSelect.addEventListener('change',()=>{syncMechanics();assignMegaStone();saveEditor();});
+  mechanicSelect.addEventListener('change',()=>{syncMechanics();assignMegaStone();saveEditor();renderEditor();});
   teraEnabled.addEventListener('change',()=>{updateMechanicVisibility();saveEditor();});
   document.querySelectorAll('.moveInput').forEach(el=>el.addEventListener('change',async()=>{
     const banned=new Set((selectedFormat()?.golpes_proibidos||[]).map(slug));
