@@ -55,6 +55,11 @@
     </nav>
     <div class="hgb-side-divider"></div>
     <nav class="hgb-side-nav"><a href="{{url_for('eventos')}}"><span>♛</span>Eventos e Torneios</a><a href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a><a href="{{url_for('expansion.hype_live')}}"><span>●</span>HYPE Live</a>{% if session.get('usuario_email') %}<form class="hgb-logout-inline" action="{{url_for('logout')}}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="hgb-account-logout" type="submit"><span>↪</span>Sair</button></form>{% endif %}</nav>
+    {% if hype_permissoes.get('pode_gerenciar_cargos') %}
+    <div class="hgb-side-divider"></div>
+    <div class="hgb-side-section-title">GESTÃO HYPE</div>
+    <nav class="hgb-side-nav"><a href="{{url_for('expansion.admin_dashboard')}}"><span>♛</span>Painel Administrativo</a><a href="{{url_for('admin_conteudo')}}"><span>▣</span>Gerenciar Torneios</a></nav>
+    {% endif %}
     <div class="hgb-sidebar-art"></div>
   </aside>
   <main class="hgb-main hype-core-main">
