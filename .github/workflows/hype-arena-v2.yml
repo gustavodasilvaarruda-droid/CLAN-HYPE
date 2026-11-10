@@ -6,6 +6,8 @@ on:
       - 'modules/events_v26.py'
       - 'modules/expansion_features.py'
       - 'templates/team_builder.html'
+      - 'static/hype_team_builder_modern.css'
+      - 'tests/test_hype_team_builder_ui.py'
       - 'modules/hype_tournament_formats.py'
       - 'modules/arena_private_teams.py'
       - 'templates/arena_torneio_equipes.html'
@@ -28,6 +30,8 @@ on:
       - 'modules/events_v26.py'
       - 'modules/expansion_features.py'
       - 'templates/team_builder.html'
+      - 'static/hype_team_builder_modern.css'
+      - 'tests/test_hype_team_builder_ui.py'
       - 'modules/hype_tournament_formats.py'
       - 'modules/arena_private_teams.py'
       - 'templates/arena_torneio_equipes.html'
@@ -53,3 +57,4 @@ jobs:
       - run: python -m py_compile app.py modules/events_v26.py modules/hype_tournament_formats.py modules/arena_private_teams.py modules/expansion_features.py
       - run: python -m unittest discover -s tests -p 'test_hype_arena_v2.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_arena_private_teams.py' -v
+      - run: python -m unittest discover -s tests -p 'test_hype_team_builder_ui.py' -v

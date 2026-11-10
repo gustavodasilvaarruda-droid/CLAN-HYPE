@@ -5,6 +5,8 @@ import json
 import os
 import re
 import secrets
+from modules.arena_private_teams import codigo_formato_do_torneio
+from modules.hype_tournament_formats import formatos_disponiveis
 
 
 def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, registrar_log,
@@ -353,8 +355,30 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
     def team_builder():
         email = email_atual()
         # Contexto opcional para criar um time privado e voltar ao torneio.
-        torneio_contexto_id = request.args.get('torneio_id', type=int)
-        formatos = sorted([x for x in safe_table('formatos_competitivos') if x.get('ativo', True)], key=lambda x: (x.get('nome') or '').casefold())
+        torneio_contexto_id = request.args.get('torneio_id', type=int) or request.form.get('torneio_id', type=int)
+        torneio_formato_codigo = None
+        if torneio_contexto_id:
+            torneios = safe_table('torneios', '*', id=torneio_contexto_id)
+            torneio = torneios[0] if torneios else None
+            if not torneio or not torneio.get('publicado'):
+                flash('Torneio indisponível para a montagem de times.', 'erro')
+                return redirect(url_for('torneios'))
+            torneio_formato_codigo = codigo_formato_do_torneio(torneio.get('regras'))
+            if not torneio_formato_codigo:
+                flash('O torneio ainda não possui um formato competitivo reconhecido.', 'erro')
+                return redirect(url_for('events26.torneio_detalhe', torneio_id=torneio_contexto_id))
+            if request.method == 'POST' and not (
+                    torneio.get('inscricoes_abertas') and torneio.get('status_torneio') == 'inscricoes'):
+                flash('As inscrições estão fechadas. O time não foi alterado.', 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_contexto_id))
+        catalogo = {
+            str(x.get('codigo')): x for x in safe_table('formatos_competitivos')
+            if x.get('ativo', True) and x.get('codigo')
+        }
+        # Os presets da Arena também precisam existir no seletor do Team Builder.
+        for preset in formatos_disponiveis():
+            catalogo[preset['codigo']] = {**catalogo.get(preset['codigo'], {}), **preset}
+        formatos = sorted(catalogo.values(), key=lambda x: (x.get('nome') or '').casefold())
         edit_id = request.args.get('editar', type=int)
         editing_team = None
         if edit_id:
@@ -365,8 +389,9 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         if request.method == 'POST':
             team_id = request.form.get('team_id', type=int)
             nome = (request.form.get('nome') or '').strip()
-            formato_codigo = (request.form.get('formato_codigo') or '').strip() or None
-            formato_livre = (request.form.get('formato') or '').strip() or None
+            # O formato do torneio prevalece sobre qualquer alteração enviada pelo navegador.
+            formato_codigo = torneio_formato_codigo or (request.form.get('formato_codigo') or '').strip() or None
+            formato_livre = None if torneio_formato_codigo else (request.form.get('formato') or '').strip() or None
             formato_row = next((x for x in formatos if x.get('codigo') == formato_codigo), None)
             formato = (formato_row or {}).get('nome') or formato_livre
             descricao = (request.form.get('descricao') or '').strip() or None
@@ -458,7 +483,7 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         prefill_pokemon = (request.args.get('pokemon') or '').strip()[:80]
         prefill_build_id = request.args.get('build_id', type=int)
         prefill_build = next((x for x in builds_hype if int(x.get('id') or 0) == int(prefill_build_id or 0)), None)
-        return render_template('team_builder.html', meus_times=meus, times_publicos=publicos, formatos=formatos, builds_pessoais=builds_pessoais, builds_hype=builds_hype, prefill_build=prefill_build, prefill_pokemon=prefill_pokemon, editing_team=editing_team, favoritos_ids=favoritos_ids, torneio_contexto_id=torneio_contexto_id)
+        return render_template('team_builder.html', meus_times=meus, times_publicos=publicos, formatos=formatos, builds_pessoais=builds_pessoais, builds_hype=builds_hype, prefill_build=prefill_build, prefill_pokemon=prefill_pokemon, editing_team=editing_team, favoritos_ids=favoritos_ids, torneio_contexto_id=torneio_contexto_id, torneio_formato_codigo=torneio_formato_codigo)
 
     @bp.route('/team-builder/build/salvar', methods=['POST'])
     @login_required
