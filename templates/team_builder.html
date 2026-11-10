@@ -31,6 +31,9 @@
         {% if not torneio_formato_codigo %}<label>Formato manual<input name="formato" placeholder="Use somente se não escolher acima" value="{{ editing_team.formato if editing_team and not editing_team.formato_codigo else '' }}"></label>{% endif %}
         <label class="wide">Descrição<textarea name="descricao" placeholder="Plano geral do time, matchup que você quer cobrir, observações...">{{ editing_team.descricao if editing_team else '' }}</textarea></label>
       </div>
+      <div class="hype-format-rule-summary" id="formatRuleSummary" role="status" aria-live="polite">
+        Selecione um formato para consultar as restrições de equipe.
+      </div>
       {% if torneio_contexto_id %}
         <div class="arena-private-alert">Time preparado para torneio: o salvamento será sempre privado. Depois você escolherá o slot para envio.</div>
         <a class="cta-dark" href="{{url_for('events26.equipes_torneio',torneio_id=torneio_contexto_id)}}">Voltar aos slots do torneio</a>
@@ -301,7 +304,10 @@
     if(f.nfe&&(!meta.prevo||!meta.evos?.length))return 'NFE exige um Pokémon intermediário de evolução.';
     const k=speciesKey(value);
     if((f.pokemons_proibidos||[]).some(x=>{const ban=speciesKey(x);return ban===k||(ban.endsWith('base')&&ban.slice(0,-4)===k);}))return 'Pokémon banido pelo formato.';
-    const tier=f.codigo.includes('nationaldex')?meta.nd:(f.tipo_batalha==='doubles'?meta.doubles:meta.tier);
+    const baseMeta=meta.base?speciesMeta(meta.base):null;
+    const tier=f.codigo.includes('nationaldex')?(meta.nd||baseMeta?.nd||meta.tier||baseMeta?.tier):
+               (f.tipo_batalha==='doubles'?(meta.doubles||baseMeta?.doubles||meta.tier||baseMeta?.tier):
+                (meta.tier||baseMeta?.tier));
     if(tier&&new Set((f.tiers_proibidos||[]).map(x=>speciesKey(x.replace(/^ND\s+/i,'')))).has(speciesKey(tier)))return 'Tier '+tier+' proibida no formato.';
     return '';
   }
@@ -312,7 +318,8 @@
     const id=base+'mega'+(stone.endsWith('-x')?'x':stone.endsWith('-y')?'y':'');
     const meta=speciesMeta(id);
     if(!meta)return 'Forma Mega não encontrada';
-    const tier=f.codigo.includes('nationaldex')?meta.nd:meta.tier;
+    const baseMeta=meta.base?speciesMeta(meta.base):null;
+    const tier=f.codigo.includes('nationaldex')?(meta.nd||baseMeta?.nd||meta.tier||baseMeta?.tier):(meta.tier||baseMeta?.tier);
     if(tier&&new Set((f.tiers_proibidos||[]).map(x=>speciesKey(x.replace(/^ND\s+/i,'')))).has(speciesKey(tier)))return 'Mega proibida por tier';
     if((f.pokemons_proibidos||[]).some(x=>speciesKey(x)===id))return 'Mega banida';
     return '';
@@ -562,6 +569,26 @@
 
   function selectedFormat(){ return formatos.find(f=>f.codigo===$('formatSelect').value)||null; }
   function teamSize(){ const n=Number(selectedFormat()?.tamanho_equipe||6); return Number.isInteger(n)&&n>=1&&n<=6?n:6; }
+  function renderFormatRules(){
+    const el=$('formatRuleSummary'),f=selectedFormat();
+    if(!f){el.textContent='Modo livre: sem regras automáticas de torneio. Escolha um formato para filtrar os Pokémon.';return;}
+    const flags=[['Mega',f.permite_mega],['Z-Move',f.permite_zmove],
+                 ['Terastal',f.permite_tera],['Dynamax',f.permite_dynamax]]
+      .map(([name,allowed])=>name+': '+(allowed?'permitido':'proibido'));
+    const picked=f.picked_team_size?' · Escolhidos em batalha: '+f.picked_team_size:'';
+    const clauses=[];
+    if(f.little_cup)clauses.push('Little Cup · nível máximo 5');
+    if(f.species_clause)clauses.push('Species Clause');
+    if(f.item_clause)clauses.push('Item Clause');
+    el.textContent=f.nome+' · '+(f.tipo_batalha==='doubles'?'Doubles':'Singles')+
+      ' · Equipe de '+teamSize()+' Pokémon'+picked+'\n'+
+      flags.join(' · ')+'\n'+
+      (clauses.length?clauses.join(' · ')+'\n':'')+
+      'Banimentos explícitos: '+(f.pokemons_proibidos||[]).length+
+      ' Pokémon; '+(f.itens_proibidos||[]).length+' itens; '+
+      (f.golpes_proibidos||[]).length+' golpes. '+
+      'A conferência é preliminar: a aprovação final depende das regras oficiais do Showdown.';
+  }
   function refreshPokemonOptions(){
     const f=selectedFormat(), banned=new Set((f?.pokemons_proibidos||[]).map(slug));
     $('pokemonList').innerHTML=pokemonNames.filter(n=>!banned.has(slug(n))).map(n=>`<option value="${n}">${pretty(n)}</option>`).join('');
@@ -570,7 +597,8 @@
   function liveValidate(){
     const filled=slots.slice(0,teamSize()).filter(s=>s.pokemon); const f=selectedFormat(); const messages=[];
     messages.push({ok:filled.length>0,text:`${filled.length}/${teamSize()} Pokémon`});
-    const species=filled.map(s=>String(s.pokemon).toLowerCase()); if(f?.species_clause) messages.push({ok:new Set(species).size===species.length,text:'Species Clause'});
+    const species=filled.map(s=>speciesMeta(s.pokemon)?.num||speciesKey(s.pokemon));
+    if(f?.species_clause) messages.push({ok:new Set(species).size===species.length,text:'Species Clause'});
     const items=filled.map(s=>String(s.item||'').toLowerCase()).filter(Boolean); if(f?.item_clause) messages.push({ok:new Set(items).size===items.length,text:'Item Clause'});
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
     const mechanics=filled.filter(s=>s.mecanica&&s.mecanica!=='nenhuma'); if(mechanics.length){ const invalid=mechanics.some(s=>f && !f[`permite_${s.mecanica}`]); messages.push({ok:!invalid,text:'Mecânicas do formato'}); }
@@ -737,8 +765,8 @@
     }
   }
 
-  $('formatSelect').addEventListener('change',()=>{saveEditor();if(active>=teamSize())active=0;if(selectedFormat()?.little_cup)slots.forEach(slot=>slot.level=5);renderEditor();syncMechanics();refreshPokemonOptions();updateItemPreview();renderTabs();liveValidate();});
-  renderTabs();renderEditor();
+  $('formatSelect').addEventListener('change',()=>{saveEditor();if(active>=teamSize())active=0;if(selectedFormat()?.little_cup)slots.forEach(slot=>slot.level=5);renderEditor();syncMechanics();refreshPokemonOptions();updateItemPreview();renderTabs();liveValidate();renderFormatRules();});
+  renderTabs();renderEditor();renderFormatRules();
   bootLists().then(()=>{
     if(prefillBuild&&prefillBuild._slot){
       slots[0]=Object.assign(emptySlot(),prefillBuild._slot);active=0;renderEditor();renderTabs();
