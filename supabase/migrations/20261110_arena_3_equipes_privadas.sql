@@ -41,7 +41,8 @@ REVOKE ALL ON public.arena_torneio_equipes FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.arena_torneio_equipes_historico FROM PUBLIC, anon, authenticated;
 GRANT ALL ON public.arena_torneio_equipes TO service_role;
 GRANT ALL ON public.arena_torneio_equipes_historico TO service_role;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.arena_torneio_equipes_id_seq TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.arena_torneio_equipes_historico_id_seq TO service_role;
 
 CREATE OR REPLACE FUNCTION public.registrar_historico_equipes_arena()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
