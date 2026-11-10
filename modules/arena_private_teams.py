@@ -231,4 +231,15 @@ def validar_equipe_basica(slots, codigo_formato):
                     total += valor
             if campo == 'evs' and total > 510:
                 erros.append(f'Slot {indice}: mais de 510 EVs.')
+    if 'monotype' in formato['codigo'] and isinstance(slots, list):
+        # Same Type Clause: ao menos um tipo deve ser comum a todas as espécies.
+        # Este teste usa o tipo base do snapshot, não substitui o TeamValidator.
+        compartilhados = None
+        for slot in slots:
+            especie = str(slot.get('pokemon') or '') if isinstance(slot, dict) else ''
+            meta = obter_especie_showdown(especie) or {}
+            tipos = {_chave(t) for t in meta.get('types', ())}
+            compartilhados = tipos if compartilhados is None else compartilhados & tipos
+        if not compartilhados:
+            erros.append('Monotype: todos os Pokémon precisam compartilhar pelo menos um tipo.')
     return erros[:25]
