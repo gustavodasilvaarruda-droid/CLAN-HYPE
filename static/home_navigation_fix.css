@@ -1,0 +1,69 @@
+/* HYPE: correção de navegação desktop e mobile na página inicial.
+   Banner de boas-vindas no fluxo: nunca bloqueia links nem menus. */
+.hype-home-welcome[hidden],
+.hype-login-hint[hidden] { display:none !important; }
+
+.hype-v6-homebar > nav,
+.hype-v6-homebar .hype-v6-home-actions,
+.hype-v7-home-sidebar nav { position:relative; z-index:2; }
+
+.hype-home-welcome {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  flex-wrap:wrap;
+  margin:0 0 10px;
+  padding:15px 18px;
+  background:linear-gradient(115deg,rgba(40,28,10,.92),rgba(10,12,18,.97));
+  border:1px solid rgba(255,201,56,.38);
+  border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
+  color:#f2f2f3;
+}
+.hype-home-welcome-copy { min-width:0; flex:1 1 310px; }
+.hype-home-welcome-copy h2 {
+  margin:3px 0 4px;
+  font-size:clamp(1.05rem,2vw,1.25rem);
+  line-height:1.2;
+}
+.hype-home-welcome-copy p {
+  margin:0; max-width:670px; color:#c7c3b5;
+  font-size:.83rem; line-height:1.45;
+}
+.hype-home-welcome-actions {
+  display:flex; justify-content:flex-end; align-items:center;
+  flex-wrap:wrap; gap:8px;
+}
+.hype-home-welcome-actions button { cursor:pointer; }
+.hype-home-welcome-dismiss {
+  border:1px solid rgba(255,255,255,.19);
+  background:transparent;
+  border-radius:8px;
+  padding:10px 12px;
+  min-height:40px;
+  color:#e1d8c3;
+  font-weight:700;
+}
+.hype-home-welcome-dismiss:hover,
+.hype-home-welcome-dismiss:focus-visible {
+  color:#fff; border-color:rgba(255,213,73,.6);
+}
+.hype-login-hint {
+  border:1px solid rgba(248,198,63,.45);
+  background:rgba(248,198,63,.08);
+  border-radius:8px;
+  color:#ffe0a1;
+  padding:10px;
+  font-size:.86rem;
+  line-height:1.4;
+}
+@media (max-width:900px) {
+  .hype-home-welcome { padding:12px; }
+  .hype-home-welcome-actions { justify-content:flex-start; }
+  .hype-home-welcome-actions > button { min-height:44px; }
+}
+@media (max-width:500px) {
+  .hype-home-welcome-actions { width:100%; }
+  .hype-home-welcome-actions > button { flex:1 1 115px; }
+}
