@@ -31,5 +31,33 @@ def test_menu_mobile_tem_posicao_e_largura_responsivas():
 
 def test_base_html_carrega_assets_revisados():
     base = (ROOT / "templates" / "hype_app_base.html").read_text(encoding="utf-8")
-    assert "mobile_v36.css')}}?v=3611" in base
-    assert "mobile_v36.js')}}?v=3611" in base
+    assert "mobile_v36.css')}}?v=3620" in base
+    assert "mobile_v36.js')}}?v=3620" in base
+
+
+def test_home_e_paginas_internas_mesma_versao_mobile():
+    home = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    base = (ROOT / "templates" / "hype_app_base.html").read_text(encoding="utf-8")
+    for template in (home, base):
+        assert "mobile_v36.css')}}?v=3620" in template
+        assert "mobile_v36.js')}}?v=3620" in template
+
+
+def test_backdrop_e_visual_e_nao_bloqueia_cliques():
+    css = (ROOT / "static" / "mobile_v36.css").read_text(encoding="utf-8")
+    js = (ROOT / "static" / "mobile_v36.js").read_text(encoding="utf-8")
+    assert ".hype-mobile-nav-backdrop {" in css
+    assert "pointer-events: none !important" in css
+    assert "backdrop-filter: none !important" in css
+    assert "backdrop.addEventListener('click', closeMenus)" not in js
+
+
+def test_clique_fora_fecha_menu_sem_ativar_links_de_fundo():
+    js = (ROOT / "static" / "mobile_v36.js").read_text(encoding="utf-8")
+    assert "document.addEventListener('click', event =>" in js
+    assert "sidebar.contains(target)" in js
+    assert "menuBtn.contains(target)" in js
+    assert "homeNav.contains(target)" in js
+    assert "homeBtn.contains(target)" in js
+    assert "event.preventDefault();" in js
+    assert "event.stopImmediatePropagation();" in js

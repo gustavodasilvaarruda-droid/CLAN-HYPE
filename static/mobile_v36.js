@@ -16,7 +16,7 @@
     backdrop = document.createElement('div');
     backdrop.className = 'hype-mobile-nav-backdrop';
     backdrop.hidden = true;
-    backdrop.addEventListener('click', closeMenus);
+    // Pelicula apenas visual: nenhum toque deve ser capturado por ela.
     // A sidebar esta dentro de .hgb-app (z-index:1). Se a pelicula
     // ficar no body (z-index:89), ela cobre a propria sidebar e bloqueia
     // os links. No app, backdrop (89) e menu (90) compartilham camada.
@@ -32,8 +32,16 @@
     const open = mobile() && isOpen();
     if (open) getBackdrop();
     if (backdrop) backdrop.hidden = !open;
-    if (menuBtn) menuBtn.setAttribute('aria-expanded', sidebar && sidebar.classList.contains('open') ? 'true' : 'false');
-    if (homeBtn) homeBtn.setAttribute('aria-expanded', homebar && homebar.classList.contains('hype-home-nav-open') ? 'true' : 'false');
+    if (menuBtn) {
+      const expanded = !!(sidebar && sidebar.classList.contains('open'));
+      menuBtn.setAttribute('aria-expanded', String(expanded));
+      menuBtn.setAttribute('aria-label', expanded ? 'Fechar menu' : 'Abrir menu');
+    }
+    if (homeBtn) {
+      const expanded = !!(homebar && homebar.classList.contains('hype-home-nav-open'));
+      homeBtn.setAttribute('aria-expanded', String(expanded));
+      homeBtn.setAttribute('aria-label', expanded ? 'Fechar menu HYPE' : 'Abrir menu HYPE');
+    }
     document.body.classList.toggle('hype-mobile-menu-open', !!open);
   }
   function closeMenus() {
@@ -41,6 +49,19 @@
     if (homebar) homebar.classList.remove('hype-home-nav-open');
     syncMenus();
   }
+  // A pelicula nunca captura cliques. O primeiro toque fora apenas fecha
+  // o menu, sem acionar por engano um botao/link que esteja por tras.
+  document.addEventListener('click', event => {
+    if (!mobile() || !isOpen()) return;
+    const target = event.target;
+    if ((sidebar && sidebar.contains(target)) ||
+        (menuBtn && menuBtn.contains(target)) ||
+        (homeNav && homeNav.contains(target)) ||
+        (homeBtn && homeBtn.contains(target))) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeMenus();
+  }, true);
   if (sidebar && menuBtn) {
     menuBtn.setAttribute('aria-controls', 'hgbSidebar');
     menuBtn.setAttribute('aria-expanded', 'false');
