@@ -138,6 +138,10 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: espécies repetidas não são permitidas.')
         usados.add(chave)
 
+        nivel_max = int(formato.get('nivel_maximo') or 100)
+        nivel = slot.get('level', 5 if formato.get('little_cup') else 100)
+        if type(nivel) is not int or not 1 <= nivel <= nivel_max:
+            erros.append(f'Slot {indice}: nível fora do limite de {nivel_max} do formato.')
         item = str(slot.get('item') or '').strip()
         item_id = _chave(item)
         if item_id in BOLAS_CAPTURA:
