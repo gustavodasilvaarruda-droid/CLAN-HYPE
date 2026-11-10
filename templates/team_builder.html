@@ -123,7 +123,7 @@
           </label>
           <button type="button" class="cta-gold" id="loadHypeBuildBtn">Aplicar no slot</button>
           <button type="button" class="cta-dark" id="duplicateSlotBtn">Duplicar set</button>
-          <button type="button" class="cta-gold" id="saveBuildBtn">Salvar como Build</button>
+          <button type="button" class="cta-gold" id="saveBuildBtn">Salvar como Build</button><button type="button" class="cta-dark" id="newBuildBtn">Nova Build</button>
         </div>
       </section>
 
@@ -150,6 +150,7 @@
   </form>
 
   <form method="post" action="{{url_for('expansion.team_builder_salvar_build')}}" id="saveBuildForm" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="build_id" id="saveBuildId">
     <input name="nome_build" id="saveBuildName">
     <input name="formato_codigo" id="saveBuildFormat">
     <input name="build_json" id="saveBuildJson">
@@ -175,12 +176,21 @@
       <article class="build-library-card">
         <span class="breed-kicker">{{b.pokemon}}</span><h3>{{b.nome}}</h3>
         <small>{{b.formato_codigo or 'Qualquer formato'}}</small>
-        <form method="post" action="{{url_for('expansion.team_builder_excluir_build',build_id=b.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-perigo btn-sm">Excluir</button></form>
+        <div class="hype-build-card-actions">
+          <button type="button" class="cta-dark btn-sm" data-preview-build="{{b.id}}">Visualizar</button>
+          <button type="button" class="cta-gold btn-sm" data-edit-build="{{b.id}}">Editar</button>
+          <button type="button" class="cta-dark btn-sm" data-duplicate-build="{{b.id}}">Duplicar</button>
+          <form method="post" action="{{url_for('expansion.team_builder_excluir_build',build_id=b.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-perigo btn-sm">Excluir</button></form>
+        </div>
       </article>
       {% else %}<p class="muted">Nenhuma Build pessoal salva ainda.</p>{% endfor %}
     </div>
   </section>
 
+  <dialog id="buildPreviewDialog" class="hype-build-preview">
+    <h3 id="buildPreviewTitle">Build salva</h3><pre id="buildPreviewText"></pre>
+    <button type="button" class="cta-dark" id="closeBuildPreview">Fechar</button>
+  </dialog>
   <section class="dash-card"><div class="section-title-row"><div><span class="breed-kicker">MINHA BIBLIOTECA</span><h2>Meus times</h2></div><span class="v27-counter">{{meus_times|length}} salvo(s)</span></div><div class="team-grid">{% for t in meus_times %}<article class="team-card v27-team-card"><div class="v27-team-card-head"><div><span class="breed-kicker">{{t.formato or 'Formato livre'}}</span><h3>{{t.nome}}</h3></div><span class="status-pill {{'entrada' if t.publico else 'saida'}}">{{'PÚBLICO' if t.publico else 'PRIVADO'}}</span></div><p>{{t.descricao or 'Sem descrição.'}}</p><div class="team-pokemon-list">{% for s in t.slots %}<span>{% if s.sprite %}<img src="{{s.sprite}}" alt="">{% endif %}<b>{{s.pokemon}}</b><small>{{s.item or '-'}} · {{s.papel or ''}}</small></span>{% endfor %}</div><div class="v27-team-meta"><span>◉ {{t.visualizacoes or 0}} views</span><span>⧉ {{t.duplicacoes or 0}} cópias</span></div><div class="card-actions"><a class="cta-dark" href="{{url_for('expansion.team_builder',editar=t.id)}}">Editar</a><a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=t.id)}}">Analisar</a>{% if t.share_token %}<a class="cta-gold" href="{{url_for('competitive.time_compartilhado',share_token=t.share_token)}}">Abrir / Compartilhar</a>{% endif %}<form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-dark btn-sm">Duplicar</button></form><form method="post" action="{{url_for('expansion.team_builder_excluir',team_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn-perigo btn-sm">Excluir</button></form></div></article>{% else %}<p class="muted">Você ainda não salvou nenhum time.</p>{% endfor %}</div></section>
 
   <section class="dash-card"><div class="section-title-row"><div><span class="breed-kicker">COMUNIDADE HYPE</span><h2>Times públicos</h2></div></div><div class="team-grid">{% for t in times_publicos %}<article class="team-card v27-team-card"><span class="breed-kicker">{{t.formato or 'Formato livre'}}</span><h3>{{t.nome}}</h3><p>{{t.descricao or 'Time compartilhado pela comunidade.'}}</p><div class="team-pokemon-list">{% for s in t.slots %}<span>{% if s.sprite %}<img src="{{s.sprite}}" alt="">{% endif %}<b>{{s.pokemon}}</b><small>{{s.item or '-'}} · {{s.papel or ''}}</small></span>{% endfor %}</div><div class="v27-team-meta"><span>◉ {{t.visualizacoes or 0}}</span><span>⧉ {{t.duplicacoes or 0}}</span></div><div class="card-actions">{% if t.share_token %}<a class="cta-dark" href="{{url_for('competitive.time_compartilhado',share_token=t.share_token)}}">Ver time</a>{% else %}<a class="cta-dark" href="{{url_for('competitive.analisar_team',team_id=t.id)}}">Ver análise</a>{% endif %}<form method="post" action="{{url_for('expansion.team_builder_favoritar',team_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-dark btn-sm">{{ '★ Favoritado' if t.id in favoritos_ids else '☆ Favoritar' }}</button></form><form method="post" action="{{url_for('expansion.team_builder_duplicar',team_id=t.id)}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cta-gold btn-sm">Usar como base</button></form></div></article>{% else %}<p class="muted">Nenhum time público ainda.</p>{% endfor %}</div></section>
@@ -193,6 +203,7 @@
   const natures = ['Adamant','Bashful','Bold','Brave','Calm','Careful','Docile','Gentle','Hardy','Hasty','Impish','Jolly','Lax','Lonely','Mild','Modest','Naive','Naughty','Quiet','Quirky','Rash','Relaxed','Sassy','Serious','Timid'];
   const types = ['Normal','Fire','Water','Electric','Grass','Ice','Fighting','Poison','Ground','Flying','Psychic','Bug','Rock','Ghost','Dragon','Dark','Steel','Fairy'];
   const savedBuilds = {{ builds_pessoais|tojson }};
+  let editingBuildId = null;
   const hypeBuilds = {{ builds_hype|tojson }};
   const prefillBuild = {{ prefill_build|tojson if prefill_build else 'null' }};
   const formatos = {{ formatos|tojson }};
@@ -433,7 +444,50 @@
   function applyHypeBuild(id){ const row=hypeBuilds.find(x=>Number(x.id)===Number(id)); if(!row){alert('Selecione uma Build HYPE.');return;} slots[active]=Object.assign(emptySlot(),row._slot||{}); renderEditor(); renderTabs(); if(slots[active].pokemon) loadPokemonDetails(slots[active].pokemon); }
   $('loadHypeBuildBtn').addEventListener('click',()=>applyHypeBuild($('hypeBuildSelect').value));
   document.querySelectorAll('.v27-apply-build').forEach(btn=>btn.addEventListener('click',()=>{applyHypeBuild(btn.dataset.buildId); window.scrollTo({top:document.querySelector('.showdown-workspace').offsetTop-80,behavior:'smooth'});}));
-  $('saveBuildBtn').addEventListener('click',()=>{saveEditor();if(!current().pokemon){alert('Escolha um Pokémon antes de salvar a Build.');return;}const name=prompt('Nome desta Build:',`${pretty(current().pokemon)} - ${current().papel||'Set'}`);if(!name)return;$('saveBuildName').value=name;$('saveBuildFormat').value=$('formatSelect').value;$('saveBuildJson').value=JSON.stringify(cleanForStorage(current()));$('saveBuildForm').submit();});
+  function submitPersonalBuild(data,name,id){
+    $('saveBuildId').value=id||'';
+    $('saveBuildName').value=name;
+    $('saveBuildFormat').value=$('formatSelect').value;
+    $('saveBuildJson').value=JSON.stringify(cleanForStorage(data));
+    $('saveBuildForm').submit();
+  }
+  $('saveBuildBtn').addEventListener('click',()=>{
+    saveEditor();
+    if(!current().pokemon){alert('Escolha um Pokémon antes de salvar a Build.');return;}
+    const row=editingBuildId?savedBuilds.find(b=>Number(b.id)===editingBuildId):null;
+    const name=prompt(row?'Atualizar nome da Build:':'Nome desta Build:',row?.nome||pretty(current().pokemon)+' - '+(current().papel||'Set'));
+    if(name?.trim())submitPersonalBuild(current(),name.trim(),editingBuildId);
+  });
+  $('newBuildBtn').addEventListener('click',()=>{editingBuildId=null;$('saveBuildBtn').textContent='Salvar como Build';});
+  function personalBuild(btn){return savedBuilds.find(b=>Number(b.id)===Number(btn.dataset.previewBuild||btn.dataset.editBuild||btn.dataset.duplicateBuild));}
+  document.querySelectorAll('[data-preview-build]').forEach(btn=>btn.addEventListener('click',()=>{
+    const b=personalBuild(btn);if(!b)return;
+    const d=b.dados||{};
+    $('buildPreviewTitle').textContent=b.nome||'Build';
+    $('buildPreviewText').textContent=[
+      'Pokémon: '+(d.pokemon||b.pokemon||'—'),
+      'Item: '+(d.item||'—'),
+      'Ability: '+(d.ability||'—'),
+      'Nature: '+(d.nature||'—'),
+      'Golpes: '+(d.moves||[]).join(', '),
+      'EVs: '+Object.entries(d.evs||{}).map(([k,v])=>k+' '+v).join(' / '),
+      'IVs: '+Object.entries(d.ivs||{}).map(([k,v])=>k+' '+v).join(' / ')
+    ].join('\n');
+    $('buildPreviewDialog').showModal();
+  }));
+  $('closeBuildPreview').addEventListener('click',()=>$('buildPreviewDialog').close());
+  document.querySelectorAll('[data-edit-build]').forEach(btn=>btn.addEventListener('click',()=>{
+    const b=personalBuild(btn);if(!b)return;
+    saveEditor();slots[active]=Object.assign(emptySlot(),b.dados||{});
+    editingBuildId=Number(b.id);$('saveBuildBtn').textContent='Salvar alterações da Build';
+    renderEditor();renderTabs();
+    document.querySelector('.showdown-workspace').scrollIntoView({behavior:'smooth'});
+  }));
+  document.querySelectorAll('[data-duplicate-build]').forEach(btn=>btn.addEventListener('click',()=>{
+    const b=personalBuild(btn);if(!b)return;
+    const name=prompt('Nome da cópia:', 'Cópia de '+b.nome);
+    if(name?.trim())submitPersonalBuild(b.dados||{},name.trim(),null);
+  }));
 
   $('reviewTeamBtn').addEventListener('click',()=>{saveEditor();const empty=slots.map((s,i)=>!s.pokemon?i+1:null).filter(Boolean); alert(empty.length?`Slots vazios: ${empty.join(', ')}. Você pode salvar assim mesmo e completar depois.`:'Os 6 slots estão preenchidos. Salve o time e clique em “Analisar Time” para receber vantagens, riscos e plano de jogo.');});
   document.querySelectorAll('.hype-v7-team-poke').forEach(btn=>btn.addEventListener('click',()=>{
