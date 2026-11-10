@@ -31,7 +31,10 @@ def validar_time_showdown(slots, formato_codigo):
         if not isinstance(raw, dict):
             return {'status': 'illegal', 'errors': ['Slot inválido.']}
         s = {k: raw.get(k) for k in (
-            'pokemon', 'item', 'ability', 'nature', 'tera_type', 'gender', 'level')}
+            'pokemon', 'item', 'ability', 'nature', 'tera_type', 'gender')}
+        # LC precisa ser validada no nível 5 mesmo para times antigos sem nível salvo.
+        level = raw.get('level')
+        s['level'] = level if type(level) is int else (5 if formato.get('little_cup') else 100)
         s['moves'] = raw.get('moves', []) if isinstance(raw.get('moves'), list) else []
         for field, default in (('evs', 0), ('ivs', 31)):
             values = raw.get(field) or {}
