@@ -4143,6 +4143,13 @@ def inscrever_torneio(torneio_id):
             flash('As inscrições deste torneio estão fechadas.', 'erro')
             return redirect(url_for('torneios'))
 
+        # Torneios com preset exigem envio privado, revisão administrativa e
+        # pagamento antes da inscrição. Bloqueia POST legado direto à rota.
+        from modules.arena_private_teams import codigo_formato_do_torneio
+        if codigo_formato_do_torneio(torneio.get('regras')):
+            flash('Prepare os times e aguarde validação e pagamento; a inscrição ainda não está liberada.', 'info')
+            return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+
         if request.form.get('aceito_regras') != 'on':
             flash('Leia e aceite o regulamento antes de confirmar a inscrição.', 'erro')
             return redirect(url_for('events26.torneio_detalhe', torneio_id=torneio_id))
