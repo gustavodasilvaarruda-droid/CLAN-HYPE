@@ -49,3 +49,5 @@
 .hype-v7-team-builder .hype-tera-toggle{display:flex;align-items:center;gap:9px;font-size:.86rem;color:#f2e6ce}
 .hype-v7-team-builder .hype-tera-toggle input{width:18px;height:18px;accent-color:#d6a84d}
 .hype-v7-team-builder .hype-tera-control select{min-height:42px;border-radius:9px}
+
+.hype-v7-team-builder .hype-mega-ability{display:block;color:#e7c66a;margin-top:5px;font-weight:600}.hype-v7-team-builder .hype-mega-ability[hidden]{display:none}
