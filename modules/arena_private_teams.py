@@ -146,7 +146,7 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: o item {item} é proibido no formato.')
         base = chave.split('mega')[0] if 'mega' in chave else chave
         if item_id in MEGA_STONE_OWNERS and base != MEGA_STONE_OWNERS[item_id]:
-            erros.append(f'Slot {indice}: {item} não corresponde à espécie {especie}.')
+            erros.append(f'Slot {indice}: {item} é proibido para {especie}: a pedra não corresponde à espécie.')
         mecanica = _chave(slot.get('mecanica') or 'nenhuma')
         tera_ativa = bool(slot.get('tera_ativa', False)) or mecanica == 'tera'
         if tera_ativa and not formato.get('permite_tera', False):
