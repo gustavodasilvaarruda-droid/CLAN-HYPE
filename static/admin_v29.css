@@ -5,3 +5,16 @@
 .hgb-logout-inline{display:inline-flex;margin:0}.hgb-logout-inline button{font-family:inherit}
 .admin-v29-security-note{border:1px solid rgba(73,216,143,.28);background:rgba(24,92,61,.12);color:#aee7c8;border-radius:9px;padding:10px 12px;font-size:.72rem}
 @media(max-width:900px){.admin-v29-nav{align-items:flex-start;flex-wrap:wrap}.admin-v29-links{order:3;width:100%;padding-bottom:2px}.admin-v29-exit{margin-left:auto}}
+
+/* V40: menu administrativo utilizável no celular, sem exigir rolagem lateral. */
+.admin-v29-mobile-toggle{display:none}
+@media(max-width:900px){
+ .admin-v29-nav{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px!important;padding:10px 12px!important}
+ .admin-v29-brand{min-width:0}
+ .admin-v29-mobile-toggle{display:inline-flex;min-height:45px;align-items:center;justify-content:center;background:#221b0f;color:#f1d087;border:1px solid #826a2d;border-radius:10px;padding:8px 12px;font-size:14px;font-weight:750;cursor:pointer}
+ .admin-v29-exit{grid-column:1/-1;margin:0!important;justify-self:start;min-height:42px;display:inline-flex;align-items:center}
+ .admin-v29-nav[data-mobile-ready="1"] .admin-v29-links{display:none!important}
+ .admin-v29-nav[data-mobile-ready="1"].is-open .admin-v29-links{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%;max-height:min(65dvh,580px);overflow-y:auto;overflow-x:hidden;grid-column:1/-1;order:initial;padding:8px 0}
+ .admin-v29-links a{display:flex!important;align-items:center;min-height:46px!important;white-space:normal!important;overflow-wrap:anywhere;background:#151619;border:1px solid #504324!important;padding:10px!important;font-size:13px!important}
+}
+@media(max-width:370px){.admin-v29-nav[data-mobile-ready="1"].is-open .admin-v29-links{grid-template-columns:minmax(0,1fr)}}
