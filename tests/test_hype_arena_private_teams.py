@@ -97,6 +97,49 @@ class TestArenaPrivateTeams(unittest.TestCase):
         slots[0]['tera_ativa']=False
         self.assertEqual(validar_equipe_basica(slots, 'gen9nationaldexubers'), [])
 
+    def test_tier_of_alt_form_inherited_from_base(self):
+        # Arceus-Fairy has no individual tier in the snapshot but inherits Uber.
+        team = equipe_valida()
+        team[0]['pokemon'] = 'Arceus-Fairy'
+        errors = validar_equipe_basica(team, 'gen9ou')
+        self.assertTrue(any('tier proibida' in error for error in errors), errors)
+
+    def test_species_clause_uses_national_dex_number(self):
+        # Two Rotom forms have the same National Dex number (479).
+        team = equipe_valida()
+        team[0]['pokemon'] = 'Rotom'
+        team[1]['pokemon'] = 'Rotom-Wash'
+        errors = validar_equipe_basica(team, 'gen9ou')
+        self.assertTrue(any('repetidas' in error for error in errors), errors)
+
+    def test_items_and_tera_follow_selected_format(self):
+        team = equipe_valida()
+        team[0]['pokemon'] = 'Metagross'
+        team[0]['item'] = 'Metagrossite'
+        self.assertTrue(any('Mega Stones' in e for e in validar_equipe_basica(team, 'gen9ou')))
+        team[0]['item'] = 'Normalium Z'
+        self.assertTrue(any('Z-Crystals' in e for e in validar_equipe_basica(team, 'gen9ou')))
+        team[0]['item'] = 'Leftovers'
+        team[0]['tera_ativa'] = True
+        team[0]['tera_type'] = 'Moon'
+        self.assertTrue(any('Tera Type inválido' in e for e in validar_equipe_basica(team, 'gen9ou')))
+        team[0]['tera_type'] = 'Fairy'
+        self.assertEqual(validar_equipe_basica(team, 'gen9ou'), [])
+
+    def test_all_gen9_presets_have_usable_rule_metadata(self):
+        from modules.hype_tournament_formats import formatos_disponiveis
+        presets = formatos_disponiveis()
+        self.assertGreaterEqual(len(presets), 28)
+        for preset in presets:
+            with self.subTest(format=preset['codigo']):
+                self.assertTrue(preset['codigo'].startswith('gen9'))
+                self.assertTrue(preset['nome'])
+                self.assertIn(preset['tamanho_equipe'], range(1, 7))
+                self.assertIsInstance(preset['pokemons_proibidos'], list)
+                self.assertIsInstance(preset['tiers_proibidos'], list)
+                self.assertFalse(preset['validacao_completa'])
+                self.assertIn('Identificador Pokémon Showdown:', preset['regulamento'])
+
     def test_never_automatically_confirms_registration(self):
         app = (ROOT / 'app.py').read_text(encoding='utf-8')
         events = (ROOT / 'modules/events_v26.py').read_text(encoding='utf-8')
