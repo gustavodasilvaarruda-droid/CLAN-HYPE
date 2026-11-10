@@ -460,6 +460,14 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                 flash('Informe o nome do time e pelo menos um Pokémon.', 'erro')
             else:
                 existente = safe_table('times_pokemon', '*', id=team_id) if team_id else []
+                if team_id and (not existente or existente[0].get('usuario_email') != email):
+                    flash('Você só pode alterar um time da sua própria conta.', 'erro')
+                    return redirect(url_for('expansion.team_builder'))
+                if torneio_contexto_id and existente and (
+                        existente[0].get('formato_codigo') != torneio_formato_codigo):
+                    flash('Esse time foi salvo para outro formato. Duplique-o antes de adaptar ao torneio.', 'erro')
+                    return redirect(url_for('events26.equipes_torneio',
+                                            torneio_id=torneio_contexto_id))
                 share_token = (existente[0].get('share_token') if existente else None) or secrets.token_urlsafe(9)
                 payload = {
                     'usuario_email': email,
@@ -471,15 +479,27 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                     'publico': False if torneio_contexto_id else request.form.get('publico') == 'on',
                     'share_token': share_token,
                 }
-                if existente and existente[0].get('usuario_email') == email:
+                time_salvo_id = None
+                if existente:
                     payload.pop('usuario_email', None)
-                    supabase.table('times_pokemon').update(payload).eq('id', team_id).execute()
+                    supabase.table('times_pokemon').update(payload).eq('id', team_id).eq(
+                        'usuario_email', email).execute()
+                    time_salvo_id = team_id
                     flash('Time atualizado no HYPE Team Builder.', 'sucesso')
                 else:
-                    supabase.table('times_pokemon').insert(payload).execute()
+                    resposta = supabase.table('times_pokemon').insert(payload).execute()
+                    inseridos = getattr(resposta, 'data', None) or []
+                    if inseridos and isinstance(inseridos[0], dict):
+                        time_salvo_id = inseridos[0].get('id')
                     flash('Time salvo no HYPE Team Builder.', 'sucesso')
                 if torneio_contexto_id:
-                    return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_contexto_id))
+                    # Volta à inscrição com o time recém-criado pré-selecionado,
+                    # mas sem submeter ou aprovar nada automaticamente.
+                    return redirect(url_for('events26.equipes_torneio',
+                                            torneio_id=torneio_contexto_id,
+                                            team_id=time_salvo_id) if time_salvo_id else
+                                    url_for('events26.equipes_torneio',
+                                            torneio_id=torneio_contexto_id))
             return redirect(url_for('expansion.team_builder'))
 
         meus = sorted(safe_table('times_pokemon', '*', usuario_email=email), key=lambda x: x.get('updated_at') or '', reverse=True)
