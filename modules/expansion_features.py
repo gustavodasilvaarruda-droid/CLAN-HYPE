@@ -5,6 +5,7 @@ import json
 import os
 import re
 import secrets
+from pathlib import Path
 from modules.arena_private_teams import codigo_formato_do_torneio
 from modules.hype_tournament_formats import formatos_disponiveis
 
@@ -349,6 +350,15 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             'ivs': _parse_spread_texto(row.get('ivs'), 31),
             'base_stats': {}, 'move_types': {}, 'move_categories': {},
         }
+
+    @bp.route('/team-builder/showdown-snapshot')
+    @login_required
+    def team_builder_showdown_snapshot():
+        """Snapshot público de regras e tiers; não expõe times ou dados pessoais."""
+        directory = Path(__file__).resolve().parents[1] / 'data'
+        response = send_from_directory(directory, 'hype_showdown_gen9_snapshot.json', mimetype='application/json')
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        return response
 
     @bp.route('/team-builder', methods=['GET', 'POST'])
     @login_required
