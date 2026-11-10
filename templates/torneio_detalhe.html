@@ -23,16 +23,29 @@
           {% endif %}
         {% elif torneio.inscricoes_abertas and torneio.status_torneio=='inscricoes' %}
           {% if session.get('usuario_email') %}
+            {% if torneio.usa_equipes_privadas %}
+              <div class="arena-enroll-form">
+                <p>Prepare até três equipes sigilosas antes da inscrição. A entrada oficial dependerá de validação administrativa e pagamento confirmado.</p>
+                <a class="v26-btn gold" href="{{url_for('events26.equipes_torneio',torneio_id=torneio.id)}}">Preparar meus times</a>
+              </div>
+            {% else %}
             <form class="arena-enroll-form" method="post" action="{{url_for('inscrever_torneio',torneio_id=torneio.id)}}">
               <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
               <label class="arena-rule-check"><input type="checkbox" name="aceito_regras" value="on" required> Li e aceito o regulamento e as condições de participação deste torneio.</label>
               <button class="v26-btn gold" type="submit">Confirmar minha inscrição</button>
             </form>
+            {% endif %}
           {% else %}
             <a class="v26-btn gold" href="{{url_for('pagina_inicial')}}#entrar">Entrar para participar</a>
           {% endif %}
         {% else %}<span class="v26-btn disabled">Inscrições encerradas</span>{% endif %}
       </div>
+      {% if session.get('usuario_email') and torneio.usa_equipes_privadas %}
+        <div class="v26-actions"><a class="v26-btn ghost" href="{{url_for('events26.equipes_torneio',torneio_id=torneio.id)}}">Consultar meus times enviados</a></div>
+      {% endif %}
+      {% if pode_ver_equipes %}
+        <div class="v26-actions"><a class="v26-btn ghost" href="{{url_for('events26.admin_equipes_torneio',torneio_id=torneio.id)}}">Admin · Ver equipes sigilosas e histórico</a></div>
+      {% endif %}
     </div>
   </section>
   {% if session.get('usuario_email') %}

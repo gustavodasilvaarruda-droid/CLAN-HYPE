@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
+from modules.arena_private_teams import codigo_formato_do_torneio, validar_equipe_basica
 
 
 def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, registrar_log, criar_notificacao, battle_db=None):
@@ -76,13 +77,119 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         formatos = {x.get('codigo'): x.get('nome') for x in safe_table('formatos_competitivos')}
         torneio['temporada_nome'] = temporadas.get(torneio.get('temporada_id'))
         torneio['formato_nome_config'] = formatos.get(torneio.get('formato_codigo'))
+        torneio['usa_equipes_privadas'] = bool(codigo_formato_do_torneio(torneio.get('regras')))
         avatar_por_email = {email: perfil.get('avatar_url') for email, perfil in perfis.items()}
         replay_embed = youtube_embed_url(torneio.get('replay_url'))
         email_atual = session.get('usuario_email')
         meus_confrontos = [p for p in partidas if email_atual and email_atual in (p.get('jogador1_email'), p.get('jogador2_email'))]
         return render_template('torneio_detalhe.html', torneio=torneio, participantes=participantes,
                                rodadas=rodadas, meus_confrontos=meus_confrontos,
-                               avatar_por_email=avatar_por_email, replay_embed=replay_embed)
+                               avatar_por_email=avatar_por_email, replay_embed=replay_embed,
+                               pode_ver_equipes=admin_ok())
+
+
+    @bp.route('/torneios/<int:torneio_id>/equipes', methods=['GET', 'POST'])
+    @login_required
+    def equipes_torneio(torneio_id):
+        """Envia uma cópia privada de um time já salvo; NÃO confirma inscrição."""
+        email = (session.get('usuario_email') or '').strip().lower()
+        if not email:
+            flash('Entre na sua conta para preparar os times.', 'erro')
+            return redirect(url_for('torneios'))
+        torneio = one('torneios', id=torneio_id)
+        if not torneio or not torneio.get('publicado'):
+            flash('Torneio indisponível.', 'erro')
+            return redirect(url_for('torneios'))
+        codigo = codigo_formato_do_torneio(torneio.get('regras'))
+        if not codigo:
+            flash('Este torneio ainda não possui um formato compatível com o envio privado.', 'erro')
+            return redirect(url_for('events26.torneio_detalhe', torneio_id=torneio_id))
+        pode_enviar = bool(torneio.get('inscricoes_abertas') and
+                           torneio.get('status_torneio') == 'inscricoes')
+        enviados_lista = safe_table('arena_torneio_equipes', '*',
+                                   torneio_id=torneio_id, usuario_email=email)
+        enviados = {int(t['slot']): t for t in enviados_lista if t.get('slot') is not None}
+
+        if request.method == 'POST':
+            if not pode_enviar:
+                flash('As inscrições estão fechadas. Nenhum time foi alterado.', 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            if request.form.get('aceito_regras') != 'on':
+                flash('Leia e aceite o regulamento antes do envio.', 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            slot = request.form.get('slot', type=int)
+            team_id = request.form.get('team_id', type=int)
+            if slot not in (1, 2, 3) or not team_id:
+                flash('Selecione um slot e um time válido.', 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            atual = enviados.get(slot)
+            if atual and atual.get('status') == 'aprovado':
+                flash('Um time aprovado não pode ser substituído sem liberação da administração.', 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            time = one('times_pokemon', id=team_id)
+            if not time or str(time.get('usuario_email') or '').lower() != email or time.get('publico'):
+                flash('Use apenas um time privado pertencente à sua conta.', 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            equipe = time.get('slots')
+            erros = validar_equipe_basica(equipe, codigo)
+            if erros:
+                flash('Revise o time: ' + ' | '.join(erros[:5]), 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            from datetime import datetime, timezone
+            timestamp = datetime.now(timezone.utc).isoformat()
+            payload = {
+                'nome': str(time.get('nome') or 'Time HYPE')[:100],
+                'equipe': equipe,
+                'formato_codigo': codigo,
+                'regras_snapshot': torneio.get('regras') or '',
+                'status': 'aguardando_verificacao',
+                'enviado_em': timestamp,
+                'atualizado_em': timestamp,
+            }
+            try:
+                if atual:
+                    supabase.table('arena_torneio_equipes').update(payload).eq('id', atual['id']).eq('torneio_id', torneio_id).eq('usuario_email', email).execute()
+                else:
+                    payload.update({'torneio_id': torneio_id, 'usuario_email': email, 'slot': slot})
+                    supabase.table('arena_torneio_equipes').insert(payload).execute()
+                flash(f'Time {slot} enviado em sigilo para conferência. Sua inscrição ainda NÃO está confirmada.', 'sucesso')
+            except Exception:
+                flash('Não foi possível salvar. A migração de equipes privadas pode estar pendente.', 'erro')
+            return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+
+        # Não exibir times já compartilhados publicamente como opções secretas.
+        meus_times = [t for t in safe_table('times_pokemon', '*', usuario_email=email)
+                      if not t.get('publico') and isinstance(t.get('slots'), list)]
+        meus_times.sort(key=lambda t: str(t.get('updated_at') or ''), reverse=True)
+        return render_template('arena_torneio_equipes.html', torneio=torneio,
+                               enviados=enviados, meus_times=meus_times,
+                               pode_enviar=pode_enviar)
+
+    @bp.route('/admin/torneios/<int:torneio_id>/equipes')
+    @login_required
+    def admin_equipes_torneio(torneio_id):
+        """Somente administrador acessa os sets e o histórico integral."""
+        if not admin_ok():
+            flash('Acesso restrito à administração.', 'erro')
+            return redirect(url_for('painel'))
+        torneio = one('torneios', id=torneio_id)
+        if not torneio:
+            flash('Torneio não encontrado.', 'erro')
+            return redirect(url_for('admin_conteudo'))
+        enviados = safe_table('arena_torneio_equipes', '*', torneio_id=torneio_id)
+        historico = safe_table('arena_torneio_equipes_historico', '*', torneio_id=torneio_id)
+        perfis = {str(u.get('email') or '').lower(): u.get('nick_jogo')
+                  for u in safe_table('usuarios_clan', 'email,nick_jogo')}
+        grupos = {}
+        for equipe in enviados:
+            endereco = str(equipe.get('usuario_email') or '').lower()
+            equipe['nick_jogo'] = perfis.get(endereco)
+            grupos.setdefault(endereco, []).append(equipe)
+        for times in grupos.values():
+            times.sort(key=lambda x: int(x.get('slot') or 0))
+        historico.sort(key=lambda x: str(x.get('criado_em') or ''), reverse=True)
+        return render_template('admin_arena_equipes.html', torneio=torneio,
+                               grupos=grupos, historico=historico)
 
     @bp.route('/admin/eventos/<int:item_id>/v26', methods=['POST'])
     @login_required

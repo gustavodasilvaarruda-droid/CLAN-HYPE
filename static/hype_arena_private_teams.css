@@ -1,0 +1,20 @@
+.arena-private-shell {max-width:1180px;margin:auto}
+.arena-private-eyebrow{color:#f3cf71;font-size:.78rem;letter-spacing:.12em;font-weight:800}
+.arena-private-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:12px;margin-top:15px}
+.arena-private-card{padding:16px;border:1px solid #55472c;background:linear-gradient(160deg,#161820,#22202a);border-radius:14px;overflow-wrap:anywhere}
+.arena-private-card h3{margin:8px 0}
+.arena-private-alert{border-left:3px solid #ffcb58;padding:12px;background:#3b3020}
+.arena-private-state{color:#e1c16e;font-weight:700}
+.arena-pokemon-icons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+.arena-poke-mini{text-align:center;min-width:0}
+.arena-poke-mini img{display:block;width:65px;max-width:100%;height:65px;object-fit:contain;margin:auto}
+.arena-poke-mini small{font-size:.7rem;overflow-wrap:anywhere}
+.arena-private-form{display:grid;gap:12px;max-width:670px;margin:18px 0}
+.arena-private-form label{display:grid;gap:7px}
+.arena-private-form select{width:100%;padding:12px;color:#fff;background:#161820;border:1px solid #6d5c39;border-radius:10px}
+.arena-private-form .arena-rule-check{display:flex;align-items:center}
+.arena-private-form .arena-rule-check input{width:auto}
+.arena-admin-team{padding:14px 0;border-bottom:1px solid #55472c}
+.arena-admin-team small{color:#f0c976;font-weight:700}
+.arena-history{padding:10px;border-bottom:1px solid #55472c}
+.arena-history pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}

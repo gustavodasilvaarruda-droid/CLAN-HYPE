@@ -28,7 +28,12 @@
         <label>Formato manual<input name="formato" placeholder="Use somente se não escolher acima" value="{{ editing_team.formato if editing_team and not editing_team.formato_codigo else '' }}"></label>
         <label class="wide">Descrição<textarea name="descricao" placeholder="Plano geral do time, matchup que você quer cobrir, observações...">{{ editing_team.descricao if editing_team else '' }}</textarea></label>
       </div>
-      <label class="check-line"><input type="checkbox" name="publico" {% if editing_team and editing_team.publico %}checked{% endif %}> Compartilhar este time com a comunidade HYPE</label>
+      {% if torneio_contexto_id %}
+        <div class="arena-private-alert">Time preparado para torneio: o salvamento será sempre privado. Depois você escolherá o slot para envio.</div>
+        <a class="cta-dark" href="{{url_for('events26.equipes_torneio',torneio_id=torneio_contexto_id)}}">Voltar aos slots do torneio</a>
+      {% else %}
+        <label class="check-line"><input type="checkbox" name="publico" {% if editing_team and editing_team.publico %}checked{% endif %}> Compartilhar este time com a comunidade HYPE</label>
+      {% endif %}
       <input type="hidden" name="slots_json" id="slotsJson">
     </section>
 
