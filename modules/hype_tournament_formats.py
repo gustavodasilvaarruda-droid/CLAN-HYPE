@@ -39,6 +39,7 @@ for _code, _label, _game, _size, _tera, _bans, _source in (
 # Sem motor oficial ativo, nenhum preset pode declarar aprovação completa.
 for _format in _FORMATS.values():
     _format['validacao_completa'] = False
+    _format.setdefault('nivel_maximo', 5 if _format.get('little_cup') else 100)
 del _code, _label, _game, _size, _tera, _bans, _source, _format
 
 _ESPECIES = _SNAPSHOT['especies']
