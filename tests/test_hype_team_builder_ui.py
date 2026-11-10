@@ -84,5 +84,36 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         self.assertEqual(validar_equipe_basica(data, 'gen9nationaldexubers'), [])
 
 
+
+class TestHypeMobileAdmin(unittest.TestCase):
+    def test_dashboard_and_leader_navigation(self):
+        env = Environment(loader=FileSystemLoader(str(ROOT / 'templates')), autoescape=True)
+        for name in ('admin_dashboard_geral.html', 'hype_app_base.html',
+                     'builders_base.html', 'admin_v29_nav.html', 'admin_economia.html'):
+            self.assertIsNotNone(env.get_template(name))
+        dashboard = (ROOT / 'templates/admin_dashboard_geral.html').read_text(encoding='utf-8')
+        self.assertIn('id="admin2MobileToggle"', dashboard)
+        self.assertIn('id="admin2Sidebar"', dashboard)
+        self.assertIn('hype_admin_mobile_v40.js', dashboard)
+        app_base = (ROOT / 'templates/hype_app_base.html').read_text(encoding='utf-8')
+        tools_base = (ROOT / 'templates/builders_base.html').read_text(encoding='utf-8')
+        for source in (app_base, tools_base):
+            self.assertIn("hype_permissoes.get('pode_gerenciar_cargos')", source)
+            self.assertIn("url_for('expansion.admin_dashboard')", source)
+        nav = (ROOT / 'templates/admin_v29_nav.html').read_text(encoding='utf-8')
+        self.assertIn('admin-v29-mobile-toggle', nav)
+        self.assertIn('aria-expanded', nav)
+
+    def test_mobile_controls_and_small_screen_styles(self):
+        css = (ROOT / 'static/hype_admin_mobile_v40.css').read_text(encoding='utf-8')
+        js = (ROOT / 'static/hype_admin_mobile_v40.js').read_text(encoding='utf-8')
+        common_css = (ROOT / 'static/admin_v29.css').read_text(encoding='utf-8')
+        for marker in ('.admin2-side.is-open', '.admin2-mobile-toolbar',
+                       '.admin2-metrics', '.admin2-table-wrap', 'max-width:400px'):
+            self.assertIn(marker, css)
+        for marker in ("'Escape'", 'aria-expanded', 'previousFocus', 'admin2MobileBackdrop'):
+            self.assertIn(marker, js)
+        self.assertIn('.admin-v29-nav[data-mobile-ready="1"].is-open', common_css)
+
 if __name__ == '__main__':
     unittest.main()
