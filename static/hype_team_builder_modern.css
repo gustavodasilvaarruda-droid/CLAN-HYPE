@@ -56,3 +56,7 @@
 .hype-v7-team-builder #showdownExportDialog textarea{display:block;width:100%;box-sizing:border-box;min-height:260px;background:#10151d;color:#efe8d5;border:1px solid #aa8849;border-radius:10px;padding:12px;font:500 .92rem/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
 .hype-v7-team-builder #showdownExportDialog p{color:#cbc4b5;font-size:.9rem;line-height:1.5}
 .hype-v7-team-builder #showdownExportDialog .hype-build-card-actions{justify-content:flex-end}
+
+/* Pesquisa por sugestões do Pokémon com catálogo alternativo explícito. */
+.hype-v7-team-builder .hype-item-mode{display:flex;align-items:center;gap:8px;color:#e2d4ae;font-size:.78rem;cursor:pointer;margin-top:5px}
+.hype-v7-team-builder .hype-item-mode input{width:16px;height:16px;accent-color:#d9ad4d;flex:none}
