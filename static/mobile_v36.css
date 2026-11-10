@@ -13,7 +13,10 @@ iframe { border: 0; }
 .hype-mobile-table-scroll { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; border-radius: 10px; }
 .hype-mobile-table-scroll > table { width: max-content; min-width: 100%; }
 .hype-mobile-table-scroll:focus-visible { outline: 2px solid var(--hype-mobile-gold); outline-offset: 2px; }
-.hype-mobile-nav-backdrop { position: fixed; inset: 0; z-index: 89; background: rgba(0,0,0,.64); backdrop-filter: blur(3px); }
+/* Backdrop visual: nunca intercepta toque ou cobre links interativos.
+   Evitar blur tambem impede que a gaveta pareca desabilitada caso haja
+   outra regra de empilhamento no navegador WebView. */
+.hype-mobile-nav-backdrop { position: fixed; inset: 0; z-index: 89; pointer-events: none !important; background: rgba(0,0,0,.60); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 .hype-mobile-nav-backdrop[hidden] { display: none !important; }
 .hype-mobile-home-toggle { display:none; align-items:center; justify-content:center; min-height:44px; min-width:44px; background:#12151b; color:var(--hype-mobile-gold); border:1px solid rgba(245,200,69,.4); border-radius:10px; font-size:24px; cursor:pointer; }
 @media (max-width: 900px) {
@@ -209,4 +212,13 @@ iframe { border: 0; }
   .hype-dashboard-page .member2-progress {
     grid-template-columns: minmax(0,1fr) !important;
   }
+}
+
+/* HYPE V36.2 - menu touch-safe em Android / iOS e PWA. */
+@media (max-width: 900px) {
+  .hype-core-sidebar.open { z-index: 90 !important; visibility: visible; pointer-events: auto !important; }
+  .hype-core-sidebar.open a, .hype-core-sidebar.open button { pointer-events: auto !important; }
+  .hype-v6-homebar.hype-home-nav-open { z-index: 100 !important; }
+  .hype-v6-homebar.hype-home-nav-open > nav { pointer-events: auto !important; }
+  .hype-v6-homebar.hype-home-nav-open > nav a { pointer-events: auto !important; }
 }
