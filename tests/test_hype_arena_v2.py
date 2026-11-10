@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
+from modules.hype_tournament_formats import formatos_disponiveis, obter_formato, regulamento_congelado
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -55,6 +56,33 @@ class ArenaHypeV2Tests(unittest.TestCase):
         ]
         self.assertIn("status == 'finalizado' and status_atual != 'finalizado'", section)
         self.assertIn("if status == 'inscricoes' and tem_chave:", section)
+
+    def test_presets_keep_rules_in_server_side_snapshot(self):
+        catalog = formatos_disponiveis()
+        self.assertTrue(catalog)
+        preset = obter_formato("gen9nationaldexubers")
+        self.assertEqual(preset["geracao"], 9)
+        rules = regulamento_congelado(preset)
+        self.assertIn("Shedinja", rules)
+        self.assertIn("Assist", rules)
+        self.assertIn("Baton Pass", rules)
+        self.assertIn("validação", rules)
+        self.assertIn("regulamento", catalog[0])
+        self.assertIsNone(obter_formato("invalid-format"))
+        with self.assertRaises(ValueError):
+            regulamento_congelado({"codigo": "invalid-format"})
+
+    def test_creation_uses_catalog_not_browser_rules(self):
+        source = ast.get_source_segment(self.app_source, self.function("criar_torneio"))
+        self.assertIn("regulamento_congelado(preset)", source)
+        self.assertIn("obter_formato(codigo_preset)", source)
+        self.assertIn("tem_permissao('pode_gerenciar_torneios')", source)
+        ui = (ROOT / "templates/admin_conteudo.html").read_text(encoding="utf-8")
+        self.assertIn('name="formato_preset"', ui)
+        self.assertIn('data-arena-preview', ui)
+        js = (ROOT / "static/hype_arena_presets.js").read_text(encoding="utf-8")
+        self.assertIn("rules.readOnly = true", js)
+        self.assertIn("preview.replaceChildren()", js)
 
     def test_templates_compile(self):
         env = Environment(loader=FileSystemLoader(str(ROOT / "templates")), autoescape=True)

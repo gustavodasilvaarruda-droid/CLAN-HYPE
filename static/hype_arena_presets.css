@@ -1,0 +1,9 @@
+/* Seletor de regras predefinidas; isolado da gestão de torneios antiga. */
+.arena-preset-picker { display:grid; gap:12px; padding:14px; border:1px solid #66511f; border-radius:14px; background:linear-gradient(135deg,#231e12,#101318) }
+.arena-preset-picker select { width:100%; min-width:0; box-sizing:border-box; background:#0f151d; border:1px solid #645537; color:#f3e6b9; border-radius:9px; padding:10px }
+.arena-preset-preview { display:grid; gap:7px; min-width:0; padding:12px; border-radius:10px; background:rgba(8,10,15,.74); border:1px solid #433b2d; color:#e9e3d1; line-height:1.45 }
+.arena-preset-preview p { margin:0; overflow-wrap:anywhere }
+.arena-preset-preview strong { color:#ffdd6f }
+.arena-preset-preview small { color:#c6bda9 }
+.arena-preset-preview a { color:#f7d45d; text-underline-offset:3px; width:fit-content }
+[data-arena-rules][readonly] { border-color:#786329!important; background:#141710!important; cursor:default }
