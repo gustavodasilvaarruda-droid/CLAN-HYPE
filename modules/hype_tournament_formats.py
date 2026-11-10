@@ -13,16 +13,21 @@ _FORMATS = {
         "geracao": 9,
         "nome": "Geração 9 · National Dex Ubers",
         "showdown": "gen9nationaldexubers",
-        "revisado_em": "2026-11-09",
-        "fonte": "https://www.smogon.com/dex/sv/formats/national-dex-ubers/",
-        "resumo": "Formato National Dex Ubers: Shedinja, Assist e Baton Pass são proibidos.",
-        "clausulas": ("Standard NatDex", "Team Preview", "Species Clause"),
-        "pokemons_proibidos": ("Shedinja",),
+        "revisado_em": "2026-11-10",
+        "fonte": "https://www.smogon.com/forums/threads/national-dex-ubers-metagame-discussion.3712168/",
+        "resumo": "National Dex Ubers: regras de tier, itens e mecânicas de acordo com a Smogon; exige verificação final no Showdown.",
+        "clausulas": ("Standard NatDex", "Team Preview", "Species Clause", "OHKO Clause", "Evasion Clause"),
+        "pokemons_proibidos": ("Shedinja", "Calyrex-Shadow", "Koraidon", "Miraidon", "Rayquaza-Mega", "Xerneas"),
+        "itens_proibidos": ("Gengarite",),
         "golpes_proibidos": ("Assist", "Baton Pass"),
+        "permite_mega": True,
+        "permite_zmove": True,
+        "permite_tera": True,
+        "permite_dynamax": False,
         "observacao": (
-            "Também se aplicam as demais cláusulas e restrições herdadas do "
-            "formato National Dex Ubers/ND AG. A lista abaixo é um resumo "
-            "informativo, não uma validação exaustiva de legalidade."
+            "Dynamax/Gigantamax não integra National Dex Ubers. Megas, Z-Moves e "
+            "Terastal seguem as restrições próprias do formato. Esta lista "
+            "continua resumida; a legalidade final requer Showdown."
         ),
     }
 }
@@ -57,6 +62,8 @@ def regulamento_congelado(formato):
         "CLÁUSULAS BASE: " + ", ".join(original["clausulas"]),
         "POKÉMON PROIBIDOS (RESUMO): " + ", ".join(original["pokemons_proibidos"]),
         "GOLPES PROIBIDOS (RESUMO): " + ", ".join(original["golpes_proibidos"]),
+        "ITENS PROIBIDOS (RESUMO): " + ", ".join(original.get("itens_proibidos", ())),
+        "MECÂNICAS: Mega=" + str(original.get("permite_mega", False)) + ", Z-Move=" + str(original.get("permite_zmove", False)) + ", Tera=" + str(original.get("permite_tera", False)) + ", Dynamax=" + str(original.get("permite_dynamax", False)),
         "",
         original["observacao"],
         "Os times só devem ser considerados aprovados após validação completa "
