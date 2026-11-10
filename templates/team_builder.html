@@ -17,6 +17,7 @@
 
   <form method="post" id="teamForm" class="showdown-team-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="team_id" value="{{ editing_team.id if editing_team else '' }}">
+    {% if torneio_contexto_id %}<input type="hidden" name="torneio_id" value="{{torneio_contexto_id}}">{% endif %}
     <section class="dash-card team-meta-card">
       <div class="admin-form-grid">
         <label>Nome do time<input name="nome" required placeholder="Ex.: Balance HYPE" value="{{ editing_team.nome if editing_team else '' }}"></label>
@@ -58,10 +59,12 @@
         </div>
 
         <div class="showdown-grid">
-          <label class="wide">Pokémon
-            <input id="pokemonInput" list="pokemonList" autocomplete="off" placeholder="Digite para pesquisar...">
+          <div class="hype-pokemon-field wide">
+            <label for="pokemonInput">Pokémon</label>
+            <input id="pokemonInput" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="pokemonOptions" aria-expanded="false" placeholder="Pesquise pelo nome do Pokémon...">
+            <div id="pokemonOptions" class="hype-pokemon-options" role="listbox" hidden></div>
             <datalist id="pokemonList"></datalist>
-          </label>
+          </div>
           <div class="hype-item-field">
             <label for="itemInput">Item competitivo</label>
             <div class="hype-item-search">
@@ -200,12 +203,14 @@
   if(editingTeam && Array.isArray(editingTeam.slots)){ editingTeam.slots.slice(0,6).forEach((x,i)=>{ slots[i]=Object.assign(emptySlot(),x||{}); }); }
   let active = 0;
   let pokemonNames = [];
+  const pokemonSpriteIds = new Map();
   // Lista de itens equipáveis competitivos. Não equivale à legalidade completa por formato.
   const heldItemCodes = `air-balloon assault-vest black-sludge blunder-policy booster-energy bright-powder charcoal choice-band choice-scarf choice-specs clear-amulet covert-cloak damp-rock dragon-fang eject-button eject-pack electric-seed eviolite expert-belt flame-orb focus-band focus-sash grassy-seed hard-stone heat-rock heavy-duty-boots icy-rock iron-ball kings-rock lagging-tail leftovers life-orb light-ball light-clay loaded-dice luminous-moss magnet mental-herb metal-coat metronome miracle-seed mirror-herb misty-seed muscle-band mystic-water never-melt-ice normal-gem poison-barb power-herb protective-pads psychic-seed quick-claw razor-claw razor-fang red-card rocky-helmet room-service safety-goggles scope-lens sharp-beak shed-shell shell-bell silk-scarf silver-powder sitrus-berry smooth-rock soft-sand spell-tag sticky-barb terrain-extender thick-club throat-spray toxic-orb twisted-spoon weakness-policy white-herb wide-lens wise-glasses zoom-lens adamant-orb lustrous-orb griseous-orb soul-dew leek deep-sea-scale deep-sea-tooth lucky-punch metal-powder quick-powder stick berry-juice leftovers black-belt black-glasses big-root binding-band absorb-bulb cell-battery chilan-berry chople-berry cobaberry colbur-berry haban-berry kasib-berry kebia-berry occa-berry passho-berry payapa-berry rindo-berry roseli-berry shuca-berry tanga-berry wacan-berry yache-berry babiri-berry charti-berry enigma-berry custap-berry figy-berry aguav-berry iapapa-berry mago-berry wiki-berry lum-berry leppa-berry oran-berry salac-berry petaya-berry liechi-berry ganlon-berry apicot-berry starf-berry kee-berry maranga-berry jaboca-berry rowap-berry pinch-berry choice-band charizardite-x charizardite-y venusaurite blastoisinite gengarite lucarionite metagrossite salamencite mawilite kangaskhanite scizorite tyranitarite garchompite alakazite gyaradosite sablenite latiosite latiasite lopunnite medichamite beedrillite pinsirite aerodactylite slowbronite heracronite galladite absolite swampertite sceptilite blazikenite gardevoirite aggronite ampharosite diancite altarianite cameruptite sharpedonite banettite audinite steelixite houndoominite manectite glalitite abomasite venusaurite firium-z waterium-z grassium-z electrium-z icium-z fightinium-z poisonium-z groundium-z flyinium-z psychium-z buginium-z rockium-z ghostium-z dragonium-z darkinium-z steelium-z fairium-z normalium-z ultranecrozium-z`.split(/\s+/);
   let itemNames = [...new Set(heldItemCodes)].sort();
   let debounce = null;
 
   const $ = id => document.getElementById(id);
+  const pokemonResults = $('pokemonOptions');
   const itemResults = $('itemOptions'), itemIcon = $('itemSelectedIcon'), itemHelp = $('itemHelp');
   const itemIconUrl = code => 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/'+encodeURIComponent(code)+'.png';
   const knownHeldItem = value => itemNames.find(code => code === slug(value));
@@ -219,6 +224,25 @@
   function closeItemChoices(){itemResults.hidden=true;itemInput.setAttribute('aria-expanded','false');}
   function chooseItem(code){
     itemInput.value=code; closeItemChoices(); updateItemPreview(); saveEditor();
+  }
+  function closePokemonChoices(){pokemonResults.hidden=true;pokemonInput.setAttribute('aria-expanded','false');}
+  function renderPokemonChoices(){
+    const query=slug(pokemonInput.value), f=selectedFormat();
+    const banned=new Set((f?.pokemons_proibidos||[]).map(slug));
+    const matches=pokemonNames.filter(code=>code.includes(query)&&!banned.has(slug(code))).slice(0,12);
+    pokemonResults.replaceChildren();
+    for(const code of matches){
+      const button=document.createElement('button');button.type='button';button.className='hype-pokemon-option';button.setAttribute('role','option');
+      const id=pokemonSpriteIds.get(code),img=document.createElement('img');
+      if(id){img.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+id+'.png';img.alt='';img.loading='lazy';img.addEventListener('error',()=>img.hidden=true);}
+      else img.hidden=true;
+      const name=document.createElement('span');name.textContent=pretty(code);
+      button.append(img,name);button.addEventListener('pointerdown',e=>e.preventDefault());
+      button.addEventListener('click',()=>{closePokemonChoices();pokemonInput.value=code;loadPokemonDetails(code);});
+      pokemonResults.append(button);
+    }
+    if(!matches.length){const p=document.createElement('p');p.textContent='Nenhum Pokémon disponível nesta busca.';pokemonResults.append(p);}
+    pokemonResults.hidden=false;pokemonInput.setAttribute('aria-expanded','true');
   }
   function renderItemChoices(){
     const query=slug(itemInput.value), options=itemNames.filter(code=>code.includes(query)).slice(0,14);
@@ -262,7 +286,7 @@
     document.querySelectorAll('.moveInput').forEach((el,i)=>el.value=(s.moves||[])[i]||'');
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
-    updateMoveList(s.moves_available||[]); updateItemPreview(); closeItemChoices(); updateEvTotal(); updateMechanicVisibility(); liveValidate();
+    updateMoveList(s.moves_available||[]); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); updateMechanicVisibility(); liveValidate();
   }
 
   function saveEditor(){
@@ -275,6 +299,8 @@
 
   async function loadPokemonDetails(name){
     const key=slug(name); if(!key) return;
+    const banned=new Set((selectedFormat()?.pokemons_proibidos||[]).map(slug));
+    if(banned.has(key)){alert('Pokémon proibido pelo regulamento resumido deste formato.');pokemonInput.value=current().pokemon||'';closePokemonChoices();return;}
     try{
       const r=await fetch(`https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(key)}`); if(!r.ok) throw new Error(); const p=await r.json();
       const format=selectedFormat();const banned=new Set((format?.pokemons_proibidos||[]).map(slug));
@@ -327,11 +353,21 @@
   });
   itemInput.addEventListener('blur',()=>setTimeout(closeItemChoices,130));
   $('clearItemBtn').addEventListener('click',()=>chooseItem(''));
-  pokemonInput.addEventListener('change',()=>loadPokemonDetails(pokemonInput.value));
-  pokemonInput.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{const exact=pokemonNames.find(x=>x===slug(pokemonInput.value));if(exact) loadPokemonDetails(exact);},350);});
+  pokemonInput.addEventListener('focus',renderPokemonChoices);
+  pokemonInput.addEventListener('change',()=>{closePokemonChoices();loadPokemonDetails(pokemonInput.value);});
+  pokemonInput.addEventListener('input',()=>{renderPokemonChoices();clearTimeout(debounce);debounce=setTimeout(()=>{const exact=pokemonNames.find(x=>x===slug(pokemonInput.value));if(exact) loadPokemonDetails(exact);},350);});
+  pokemonInput.addEventListener('keydown',e=>{
+    if(e.key==='Escape')closePokemonChoices();
+    if(e.key==='Enter'&&!pokemonResults.hidden){e.preventDefault();const first=pokemonResults.querySelector('button');if(first)first.click();}
+  });
+  pokemonInput.addEventListener('blur',()=>setTimeout(closePokemonChoices,130));
   [abilitySelect,natureSelect,roleSelect,mechanicSelect,teraSelect,notesInput,$('formatSelect')].forEach(el=>el.addEventListener('change',()=>{saveEditor();updateMechanicVisibility();}));
   document.querySelectorAll('.moveInput,.evInput,.ivInput').forEach(el=>el.addEventListener('input',()=>{saveEditor();updateEvTotal();}));
-  document.querySelectorAll('.moveInput').forEach(el=>el.addEventListener('change',async()=>{await loadMoveMeta(el.value.trim()); saveEditor();}));
+  document.querySelectorAll('.moveInput').forEach(el=>el.addEventListener('change',async()=>{
+    const banned=new Set((selectedFormat()?.golpes_proibidos||[]).map(slug));
+    if(banned.has(slug(el.value))){alert('Esse golpe é proibido pelo regulamento resumido deste formato.');el.value='';saveEditor();return;}
+    await loadMoveMeta(el.value.trim()); saveEditor();
+  }));
 
   $('removeSlotBtn').addEventListener('click',()=>{slots[active]=emptySlot();renderEditor();renderTabs();});
   $('clearTeamBtn').addEventListener('click',()=>{if(confirm('Limpar todos os seis slots?')){slots=Array.from({length:6},emptySlot);active=0;renderEditor();renderTabs();}});
@@ -351,7 +387,7 @@
   $('teamForm').addEventListener('submit',e=>{saveEditor();const valid=slots.filter(s=>s.pokemon);if(!valid.length){e.preventDefault();alert('Adicione pelo menos um Pokémon.');return;}$('slotsJson').value=JSON.stringify(valid.map(cleanForStorage));});
 
   async function bootLists(){
-    try{ const r=await fetch('https://pokeapi.co/api/v2/pokemon?limit=2000'); const d=await r.json(); pokemonNames=d.results.map(x=>x.name); refreshPokemonOptions(); }catch(e){}
+    try{ const r=await fetch('https://pokeapi.co/api/v2/pokemon?limit=2000'); const d=await r.json(); pokemonNames=d.results.map(x=>x.name);for(const x of d.results){const match=String(x.url||'').match(/\\/pokemon\\/(\\d+)\\/?$/);if(match)pokemonSpriteIds.set(x.name,Number(match[1]));} refreshPokemonOptions(); }catch(e){}
     // Nunca importar a lista geral de itens: ela inclui Poké Balls e itens de bolsa.
   }
 
