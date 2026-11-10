@@ -30,7 +30,8 @@ _FORMATS = {
 
 def formatos_disponiveis():
     """Cópias para serialização na prévia do formulário."""
-    return [deepcopy(registro) for registro in _FORMATS.values()]
+    return [{**deepcopy(registro), 'regulamento': regulamento_congelado(registro)}
+            for registro in _FORMATS.values()]
 
 
 def obter_formato(codigo):
