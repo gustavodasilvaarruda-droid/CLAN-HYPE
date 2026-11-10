@@ -50,15 +50,15 @@
     for (const field of legacy) if (field) field.disabled = true;
     preview.append(el("strong", preset.nome));
     preview.append(el("p", preset.resumo));
-    preview.append(el("p", "Pokémon proibidos no resumo: " + preset.pokemons_proibidos.join(", ")));
-    preview.append(el("p", "Golpes proibidos no resumo: " + preset.golpes_proibidos.join(", ")));
+    preview.append(el("p", preset.pokemons_proibidos.length ? "Pokémon proibidos no resumo: " + preset.pokemons_proibidos.join(", ") : "Banlist integral: consultar o formato oficial no Showdown."));
+    preview.append(el("p", preset.golpes_proibidos.length ? "Golpes proibidos no resumo: " + preset.golpes_proibidos.join(", ") : "Golpes, habilidades e combinações: exigem validação completa do Showdown."));
     preview.append(el("p", "Referência revisada em " + preset.revisado_em + ". O regulamento abaixo será salvo junto ao torneio."));
     const link = el("a", "Abrir regras de referência na Smogon");
     link.href = preset.fonte;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     preview.append(link);
-    preview.append(el("small", "A validação completa de Pokémon, golpes, itens e habilidades será integrada na etapa do Team Builder."));
+    preview.append(el("small", "ATENÇÃO: este catálogo vincula o formato ao torneio, mas NÃO certifica equipes legais. O organizador ainda precisa revisar as regras no Showdown."));
   }
   generation.addEventListener("change", refresh);
   selection.addEventListener("change", refresh);
