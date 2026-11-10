@@ -10,6 +10,10 @@ on:
       - 'tests/test_hype_team_builder_ui.py'
       - 'modules/hype_tournament_formats.py'
       - 'modules/arena_private_teams.py'
+      - 'modules/hype_showdown_bridge.py'
+      - 'scripts/hype_showdown_validate.cjs'
+      - 'package.json'
+      - 'tests/test_hype_showdown_bridge.py'
       - 'templates/arena_torneio_equipes.html'
       - 'templates/admin_arena_equipes.html'
       - 'static/hype_arena_private_teams.css'
@@ -34,6 +38,10 @@ on:
       - 'tests/test_hype_team_builder_ui.py'
       - 'modules/hype_tournament_formats.py'
       - 'modules/arena_private_teams.py'
+      - 'modules/hype_showdown_bridge.py'
+      - 'scripts/hype_showdown_validate.cjs'
+      - 'package.json'
+      - 'tests/test_hype_showdown_bridge.py'
       - 'templates/arena_torneio_equipes.html'
       - 'templates/admin_arena_equipes.html'
       - 'static/hype_arena_private_teams.css'
@@ -58,3 +66,27 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_hype_arena_v2.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_arena_private_teams.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_team_builder_ui.py' -v
+      - run: python -m unittest discover -s tests -p 'test_hype_showdown_bridge.py' -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check scripts/hype_showdown_validate.cjs
+      # Só no CI (não muda o build do site no Render).
+      - run: npm install --omit=dev --no-audit --no-fund
+      - name: Showdown real - smoke test
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          x={'format':'gen9ou','slots':[{
+            'pokemon':'Miraidon','ability':'Hadron Engine','nature':'Timid',
+            'moves':['Electro Drift','Draco Meteor','Volt Switch','Overheat'],
+            'evs':{'hp':0,'atk':0,'def':0,'spa':252,'spd':4,'spe':252},
+            'ivs':{'hp':31,'atk':31,'def':31,'spa':31,'spd':31,'spe':31}
+          }]}
+          proc=subprocess.run(['node','scripts/hype_showdown_validate.cjs'],
+                              input=json.dumps(x),text=True,capture_output=True,timeout=20)
+          assert proc.returncode==0,proc.stderr
+          result=json.loads(proc.stdout)
+          assert result['status']=='illegal',result
+          assert result['errors'],result
+          PY
