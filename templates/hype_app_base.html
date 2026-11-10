@@ -95,6 +95,11 @@
       <a class="{{'active' if request.endpoint and request.endpoint.startswith('community.') else ''}}" href="{{url_for('community.home')}}"><span>✣</span>Comunidade</a>
     </nav>
 
+    {% if hype_permissoes.get('pode_gerenciar_cargos') %}
+    <div class="hgb-side-divider"></div>
+    <div class="hgb-side-section-title">GESTÃO HYPE</div>
+    <nav class="hgb-side-nav"><a href="{{url_for('expansion.admin_dashboard')}}" class="{{'active' if request.endpoint=='expansion.admin_dashboard' else ''}}"><span>♛</span>Painel Administrativo</a><a href="{{url_for('admin_conteudo')}}"><span>▣</span>Gerenciar Torneios</a><a href="{{url_for('admin_membros_hype')}}"><span>♙</span>Gerenciar Membros</a></nav>
+    {% endif %}
     <div class="hgb-side-divider"></div>
     {% if session.get('usuario_email') %}
     <nav class="hgb-side-nav">
