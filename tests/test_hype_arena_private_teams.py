@@ -142,6 +142,16 @@ class TestArenaPrivateTeams(unittest.TestCase):
                 self.assertFalse(preset['validacao_completa'])
                 self.assertIn('Identificador Pokémon Showdown:', preset['regulamento'])
 
+    def test_monotype_same_type_clause(self):
+        team = equipe_valida()
+        for slot, specie in zip(team, ('Garchomp', 'Dragonite', 'Dragapult',
+                                       'Hydreigon', 'Salamence', 'Haxorus')):
+            slot['pokemon'] = specie
+        self.assertEqual(validar_equipe_basica(team, 'gen9monotype'), [])
+        team[0]['pokemon'] = 'Metagross'
+        errors = validar_equipe_basica(team, 'gen9monotype')
+        self.assertTrue(any('Monotype:' in e for e in errors), errors)
+
     def test_never_automatically_confirms_registration(self):
         app = (ROOT / 'app.py').read_text(encoding='utf-8')
         events = (ROOT / 'modules/events_v26.py').read_text(encoding='utf-8')
