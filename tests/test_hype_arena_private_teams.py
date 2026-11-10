@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def equipe_valida():
-    especies = ['Miraidon', 'Koraidon', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh']
+    especies = ['Dialga', 'Palkia', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh']
     return [
         {
             'pokemon': p,
@@ -47,6 +47,24 @@ class TestArenaPrivateTeams(unittest.TestCase):
         for item in ('Shedinja', 'Assist', 'Baton Pass', 'repetidas', 'EVS', 'habilidade'):
             self.assertIn(item, msgs)
         self.assertTrue(validar_equipe_basica(slots[:5], 'gen9nationaldexubers'))
+
+    def test_national_dex_ubers_bans_and_mechanics(self):
+        team = equipe_valida()
+        team[0]['pokemon'] = 'Miraidon'
+        self.assertTrue(any('Miraidon' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
+        team[0]['pokemon'] = 'Dialga'
+        team[0]['mecanica'] = 'dynamax'
+        self.assertTrue(any('dynamax' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
+        team[0]['mecanica'] = 'tera'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexubers'), [])
+        team[0]['pokemon'] = 'Metagross'
+        team[0]['mecanica'] = 'mega'
+        team[0]['item'] = 'Metagrossite'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexubers'), [])
+        team[0]['item'] = 'Abomasite'
+        self.assertTrue(any('não corresponde' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
+        team[0]['item'] = 'Gengarite'
+        self.assertTrue(any('proibido' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
 
     def test_never_automatically_confirms_registration(self):
         app = (ROOT / 'app.py').read_text(encoding='utf-8')
