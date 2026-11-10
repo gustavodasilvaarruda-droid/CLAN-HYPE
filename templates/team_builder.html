@@ -402,8 +402,8 @@
     pokemonResults.hidden=false;pokemonInput.setAttribute('aria-expanded','true');
   }
   function renderItemChoices(){
-    const query=slug(itemInput.value), choices=selectableItems(), recs=recommendedItems[basePokemon()]||[];
-    const options=choices.filter(code=>code.includes(query)&&(!recs.length||query||recs.includes(code))).slice(0,14);
+    const query=slug(itemInput.value), choices=selectableItems();
+    const options=choices.filter(code=>code.includes(query)).slice(0,14);
     itemResults.replaceChildren();
     for(const code of options){
       const btn=document.createElement('button'); btn.type='button'; btn.className='hype-item-option'; btn.setAttribute('role','option');
