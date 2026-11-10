@@ -1,0 +1,71 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}Meus times secretos · Arena HYPE{% endblock %}
+{% block body_class %}hype-tournament-detail-page hype-v26-events{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{url_for('static',filename='hype_arena_v2.css')}}">
+<link rel="stylesheet" href="{{url_for('static',filename='hype_arena_private_teams.css')}}">
+{% endblock %}
+{% block content %}
+<div class="v26-event-shell arena-private-shell">
+  <a class="v26-back" href="{{url_for('events26.torneio_detalhe',torneio_id=torneio.id)}}">← Voltar ao torneio</a>
+  <section class="v26-panel">
+    <span class="arena-private-eyebrow">ARENA HYPE 3.0 · TIMES PRIVADOS</span>
+    <h1>{{torneio.titulo}}</h1>
+    <p>Formato: <strong>{{torneio.formato}}</strong>. Prepare até três equipes de seis Pokémon. Seus times enviados são visíveis somente para você e para os administradores autorizados.</p>
+    <p class="arena-private-alert">A checagem abaixo é preliminar. Enviar um time NÃO confirma inscrição, pagamento ou legalidade oficial. A aprovação só será disponibilizada após integração com a validação completa.</p>
+  </section>
+  <section class="v26-panel">
+    <div class="v26-section-head"><div><span>SEUS TIMES</span><h2>Três slots de competição</h2></div></div>
+    <div class="arena-private-grid">
+      {% for i in range(1,4) %}
+      {% set time = enviados.get(i) %}
+      <article class="arena-private-card">
+        <span class="arena-private-eyebrow">SLOT {{i}} / 3</span>
+        {% if time %}
+          <h3>{{time.nome}}</h3>
+          <span class="arena-private-state">{{time.status|replace('_',' ')|capitalize}}</span>
+          <div class="arena-pokemon-icons">
+          {% for p in time.equipe %}
+            <span title="{{p.pokemon}}" class="arena-poke-mini">
+            {% if p.pokemon_id and p.pokemon_id > 0 and p.pokemon_id < 20000 %}
+              <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{{p.pokemon_id}}.png" alt="{{p.pokemon}}">
+            {% endif %}
+            <small>{{p.pokemon}}</small></span>
+          {% endfor %}
+          </div>
+        {% else %}
+          <h3>Slot disponível</h3><p>Nenhuma equipe enviada neste slot.</p>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="v26-panel">
+    <div class="v26-section-head"><div><span>SELEÇÃO SEGURA</span><h2>Enviar time para conferência</h2></div></div>
+    {% if pode_enviar %}
+      <p>Crie um time de seis Pokémon no Team Builder da HYPE. Deixe a opção de compartilhamento <strong>desmarcada</strong>, salve e selecione aqui.</p>
+      <a class="v26-btn ghost" href="{{url_for('expansion.team_builder')}}">Abrir Team Builder</a>
+      <form method="post" class="arena-private-form">
+        <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+        <label>Slot do torneio
+          <select name="slot" required>
+            {% for i in range(1,4) %}<option value="{{i}}">Time {{i}}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Time privado salvo
+          <select name="team_id" required>
+            <option value="">Selecione uma equipe...</option>
+            {% for time in meus_times %}
+              <option value="{{time.id}}">{{time.nome}} · {{time.slots|length}} Pokémon</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="arena-rule-check"><input type="checkbox" name="aceito_regras" value="on" required> Li e aceito o regulamento e sei que este envio não confirma minha inscrição.</label>
+        <button class="v26-btn gold" type="submit" {% if not meus_times %}disabled{% endif %}>Enviar para conferência</button>
+      </form>
+    {% else %}
+      <p>Não é possível enviar ou alterar times com as inscrições fechadas. Seus registros anteriores permanecem arquivados.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
