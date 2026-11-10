@@ -9,6 +9,17 @@ from modules.hype_tournament_formats import obter_formato
 
 STATS = ('hp', 'atk', 'def', 'spa', 'spd', 'spe')
 
+# Poké Balls são itens de captura, não opções apropriadas ao Team Builder competitivo.
+# Não usa terminações como "-ball": Light Ball e Iron Ball são itens válidos.
+BOLAS_CAPTURA = frozenset({
+    'pokeball', 'greatball', 'ultraball', 'masterball', 'premierball',
+    'healball', 'luxuryball', 'friendball', 'levelball', 'lureball',
+    'heavyball', 'loveball', 'moonball', 'fastball', 'sportball',
+    'safariball', 'duskball', 'diveball', 'netball', 'nestball',
+    'timerball', 'repeatball', 'quickball', 'dreamball', 'beastball',
+    'cherishball', 'parkball',
+})
+
 
 def codigo_formato_do_torneio(regras):
     texto = str(regras or '')
@@ -49,6 +60,9 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: espécies repetidas não são permitidas.')
         usados.add(chave)
 
+        item = str(slot.get('item') or '').strip()
+        if _chave(item) in BOLAS_CAPTURA:
+            erros.append(f'Slot {indice}: {item} é uma Poké Ball de captura e não está disponível na Arena HYPE.')
         for campo, rotulo in (('ability', 'habilidade'), ('nature', 'natureza')):
             valor = str(slot.get(campo) or '').strip()
             if not valor or len(valor) > 100:
