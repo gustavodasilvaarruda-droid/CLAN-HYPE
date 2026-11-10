@@ -34,6 +34,11 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         self.assertNotIn("fetch('https://pokeapi.co/api/v2/item?limit=2500')", template)
         self.assertIn('hype_team_builder_modern.css', template)
         self.assertIn('disabled aria-label="Formato fixo do torneio"', template)
+        # Exportação em texto Showdown, sem afirmar aprovação automática.
+        for marker in ('id="exportShowdownBtn"', 'id="showdownExportText"',
+                       'exportShowdownText()', "rows.push('EVs: '+ev)",
+                       'A exportação não comprova a legalidade da equipe'):
+            self.assertIn(marker, template)
         for marker in ('evRemaining', 'limitEvInput', 'selectableItems', 'data-edit-build', 'data-preview-build', 'data-duplicate-build', 'id="teraEnabled"', 'recommendedItems', 'teamSize', 'refreshMegaDisplay'):
             self.assertIn(marker, template)
 
