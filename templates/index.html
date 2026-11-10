@@ -5,6 +5,7 @@
 <title>Clã HYPE</title>
 <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3001"><link rel="manifest" href="{{url_for('expansion.manifest')}}">
   <link rel="stylesheet" href="{{url_for('static',filename='mobile_v36.css')}}?v=3601">
+  <link rel="stylesheet" href="{{url_for('static',filename='home_navigation_fix.css')}}?v=101">
 </head>
 <body class="builders-gold-ui hype-v6-home">
 <header class="hype-v6-homebar">
@@ -14,12 +15,12 @@
     <a href="{{url_for('buildershub.hub')}}">Ferramentas</a>
     <a href="{{url_for('community.home')}}">Comunidade</a>
     <a href="{{url_for('eventos')}}">Eventos</a>
-    <a href="{{url_for('painel_reino')}}">Reino HYPE</a>
+    <a data-hype-auth="Reino HYPE" href="{{url_for('painel_reino')}}">Reino HYPE</a>
     <a href="{{url_for('expansion.hype_live')}}">HYPE Live</a>
   </nav>
   <div class="hype-v6-home-actions">
     <form action="{{url_for('competitive.pokedex_competitiva')}}" method="get"><span>⌕</span><input name="q" placeholder="Buscar Pokémon..."></form>
-    {% if session.get('usuario_email') %}<a class="hype-v6-home-user" href="{{url_for('painel')}}"><span>{{(session.get('nick_jogo') or 'H')[:1]|upper}}</span>{{session.get('nick_jogo')}}</a>{% else %}<button class="hype-v6-btn gold" onclick="abrirModal('login')">Entrar</button>{% endif %}
+    {% if session.get('usuario_email') %}<a class="hype-v6-home-user" data-hype-auth="Painel do Membro" href="{{url_for('painel')}}"><span>{{(session.get('nick_jogo') or 'H')[:1]|upper}}</span>{{session.get('nick_jogo')}}</a>{% else %}<button class="hype-v6-btn gold" onclick="abrirModal('login')">Entrar</button>{% endif %}
   </div>
 </header>
 
@@ -30,13 +31,13 @@
     <div class="hype-v7-home-side-title">CENTRAL HYPE</div>
     <nav>
       <a class="active" href="{{url_for('pagina_inicial')}}"><span>⌂</span>Início</a>
-      <a href="{{url_for('painel')}}"><span>♙</span>Painel do Membro</a>
-      <a href="{{url_for('breed')}}#fazer-pedido"><span>▣</span>Fazer Pedido</a>
-      <a href="{{url_for('breed')}}#meus-pedidos"><span>▤</span>Meus Pedidos</a>
-      <a href="{{url_for('breed')}}#fila-breed"><span>☷</span>Fila de Breed</a>
+      <a data-hype-auth="Painel do Membro" href="{{url_for('painel')}}"><span>♙</span>Painel do Membro</a>
+      <a data-hype-auth="Breed" href="{{url_for('breed')}}#fazer-pedido"><span>▣</span>Fazer Pedido</a>
+      <a data-hype-auth="Breed" href="{{url_for('breed')}}#meus-pedidos"><span>▤</span>Meus Pedidos</a>
+      <a data-hype-auth="Breed" href="{{url_for('breed')}}#fila-breed"><span>☷</span>Fila de Breed</a>
       <a href="{{url_for('expansion.team_builder')}}"><span>♟</span>Team Builder</a>
       <a href="{{url_for('eventos')}}"><span>♛</span>Eventos e Torneios</a>
-      <a href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a>
+      <a data-hype-auth="Reino HYPE" href="{{url_for('painel_reino')}}"><span>♜</span>Reino HYPE</a>
       <a href="{{url_for('competitive.pokedex_competitiva')}}"><span>◉</span>Pokédex</a>
       <a href="{{url_for('buildershub.hub')}}"><span>✦</span>Guias e Builds</a>
       <a href="{{url_for('central_rankings')}}"><span>▥</span>Ranking</a>
@@ -45,6 +46,20 @@
   </aside>
 
 <main class="hype-v6-home-main hype-v7-home-main">
+{% if not session.get('usuario_email') %}
+<section class="hype-home-welcome" id="guestOnboarding" hidden aria-labelledby="guestWelcomeTitle">
+  <div class="hype-home-welcome-copy">
+    <span class="hype-v6-kicker">BEM-VINDO À HYPE</span>
+    <h2 id="guestWelcomeTitle">Explore o Clã HYPE</h2>
+    <p>Conheça as áreas públicas sem criar uma conta. Para usar o Painel, Breed e Reino HYPE, faça login.</p>
+  </div>
+  <div class="hype-home-welcome-actions">
+    <button type="button" class="hype-v6-btn gold" id="guestCreate">Criar conta</button>
+    <button type="button" class="hype-v6-btn secondary" id="guestLogin">Entrar</button>
+    <button type="button" class="hype-home-welcome-dismiss" id="guestExplore">Dispensar aviso</button>
+  </div>
+</section>
+{% endif %}
   <section class="hype-v6-home-hero">
     <div class="hype-v6-home-copy">
       <span class="hype-v6-kicker">CLÃ · EVENTOS · BREED · TORNEIOS</span>
@@ -52,7 +67,7 @@
       <h1>JUNTOS SOMOS <em>MAIS FORTES</em></h1>
       <p>Clã, eventos, Breed, torneios, comunidade competitiva e Reino HYPE reunidos em uma única plataforma.</p>
       <div class="hype-v6-home-cta">
-        {% if session.get('usuario_email') %}<a class="hype-v6-btn gold" href="{{url_for('painel')}}">Entrar no Painel</a>{% else %}<button class="hype-v6-btn gold" onclick="abrirModal('login')">Entrar</button><button class="hype-v6-btn purple" onclick="abrirModal('cadastro')">Criar Conta</button>{% endif %}
+        {% if session.get('usuario_email') %}<a class="hype-v6-btn gold" data-hype-auth="Painel do Membro" href="{{url_for('painel')}}">Entrar no Painel</a>{% else %}<button class="hype-v6-btn gold" onclick="abrirModal('login')">Entrar</button><button class="hype-v6-btn purple" onclick="abrirModal('cadastro')">Criar Conta</button>{% endif %}
         {% if discord_url %}<a class="hype-v6-btn secondary" href="{{discord_url}}" target="_blank" rel="noopener">Discord</a>{% endif %}
       </div>
       <div class="hype-v6-home-stats"><span><b>{{resumo.membros|default(0)}}</b>Membros</span><span><b>{{resumo.breeders|default(0)}}</b>Breeders</span><span><b>{{resumo.breeds|default(0)}}</b>Breeds concluídos</span></div>
@@ -61,11 +76,11 @@
   </section>
 
   <section class="hype-v6-home-shortcuts" id="sobre">
-    <a href="{{url_for('breed')}}"><span>◈</span><div><b>Breed</b><small>Pedidos e fila</small></div></a>
+    <a data-hype-auth="Breed" href="{{url_for('breed')}}"><span>◈</span><div><b>Breed</b><small>Pedidos e fila</small></div></a>
     <a href="{{url_for('eventos')}}"><span>♛</span><div><b>Eventos</b><small>Torneios e programação</small></div></a>
     <a href="{{url_for('expansion.team_builder')}}"><span>♟</span><div><b>Team Builder</b><small>Monte seus times</small></div></a>
     <a href="{{url_for('competitive.pokedex_competitiva')}}"><span>◉</span><div><b>Pokédex</b><small>Guias e builds</small></div></a>
-    <a href="{{url_for('painel_reino')}}"><span>♜</span><div><b>Reino HYPE</b><small>Casas e lojas</small></div></a>
+    <a data-hype-auth="Reino HYPE" href="{{url_for('painel_reino')}}"><span>♜</span><div><b>Reino HYPE</b><small>Casas e lojas</small></div></a>
     <a href="{{url_for('expansion.hype_live')}}"><span>●</span><div><b>HYPE Live</b><small>Acompanhe as lives</small></div></a>
   </section>
 
@@ -112,10 +127,11 @@
 
 <footer class="hype-v6-footer hype-v7-home-footer"><img src="{{url_for('static',filename='imagens/logodragaoh.png')}}" alt=""><div><b>CLÃ HYPE</b><p>União • Respeito • Competição</p></div><span>© 2026 Clã HYPE</span></footer>
 
-{% if not session.get('usuario_email') %}<div class="onboarding-overlay guest-onboarding" id="guestOnboarding" style="display:none"><div class="onboarding-card"><span class="breed-kicker">BEM-VINDO À HYPE</span><h2>Seu ponto central para o Clã HYPE</h2><p>Crie sua conta ou entre para acessar recursos pessoais. Você também pode continuar explorando as áreas públicas.</p><div class="inline-actions"><button class="cta-gold" id="guestCreate">Criar minha conta</button><button class="cta-dark" id="guestLogin">Já tenho uma conta</button><button class="text-button" id="guestExplore">Explorar primeiro</button></div></div></div>{% endif %}
+
 
 <div id="modalLogin" class="modal-fundo">
   <div class="caixa-login hype-v6-login-box"><span class="botao-fechar" onclick="fecharModal()">&times;</span><img class="hype-v6-login-logo" src="{{url_for('static',filename='imagens/hypeim.png')}}" alt="HYPE"><h2 id="tituloModal">Acesso ao Clã</h2>
+  <p class="hype-login-hint" id="hypeLoginHint" hidden>Entre na sua conta para continuar.</p>
     <form action="{{url_for('login_membro')}}" method="POST" id="formAutenticacao">{% if csrf_token %}<input type="hidden" name="csrf_token" value="{{csrf_token()}}">{% endif %}<input type="hidden" name="acao" id="campoAcao" value="login"><div class="campo-grupo" id="grupoNick" style="display:none"><label for="nick_jogo">Nick no Jogo</label><input type="text" id="nick_jogo" name="nick_jogo" placeholder="Ex.: HYPE_Player"></div><div class="campo-grupo"><label for="email">E-mail</label><input type="email" id="email" name="email" placeholder="seuemail@exemplo.com" required></div><div class="campo-grupo"><label for="senha">Senha</label><input type="password" id="senha" name="senha" placeholder="••••••" required></div><button type="submit" class="botao-entrar" id="btnSubmitModal">Entrar</button></form>
     <div class="hype-v6-login-switch"><span id="textoAlternar">Não tem conta ainda?</span> <a href="javascript:void(0)" id="linkAlternar" onclick="alternarModoModal()">Cadastre-se</a></div>
   </div>
@@ -126,7 +142,46 @@ function abrirModal(modo='login'){document.getElementById('modalLogin').style.di
 function fecharModal(){document.getElementById('modalLogin').style.display='none';}
 function alternarModoModal(){const titulo=document.getElementById('tituloModal'),grupoNick=document.getElementById('grupoNick'),inputNick=document.getElementById('nick_jogo'),btn=document.getElementById('btnSubmitModal'),acao=document.getElementById('campoAcao'),texto=document.getElementById('textoAlternar'),link=document.getElementById('linkAlternar');if(modoAtual==='login'){modoAtual='cadastro';titulo.innerText='Criar conta HYPE (Visitante)';grupoNick.style.display='block';inputNick.required=true;btn.innerText='Criar Conta';acao.value='cadastro';texto.innerText='Já possui uma conta?';link.innerText='Fazer Login';}else{modoAtual='login';titulo.innerText='Acesso ao Clã';grupoNick.style.display='none';inputNick.required=false;btn.innerText='Entrar';acao.value='login';texto.innerText='Não tem conta ainda?';link.innerText='Cadastre-se';}}
 window.onclick=function(event){const modal=document.getElementById('modalLogin');if(event.target===modal)fecharModal();}
-(function(){const box=document.getElementById('guestOnboarding');if(box&&!localStorage.getItem('hype_guest_onboarding_v1'))box.style.display='flex';const close=()=>{if(box)box.style.display='none';localStorage.setItem('hype_guest_onboarding_v1','1');};const create=document.getElementById('guestCreate'),login=document.getElementById('guestLogin'),explore=document.getElementById('guestExplore');if(create)create.addEventListener('click',()=>{close();abrirModal('cadastro');});if(login)login.addEventListener('click',()=>{close();abrirModal('login');});if(explore)explore.addEventListener('click',close);if('serviceWorker' in navigator){navigator.serviceWorker.register('{{url_for('expansion.service_worker')}}').catch(()=>{});}})();
+(function(){
+  const banner=document.getElementById('guestOnboarding');
+  const guest={{ 'false' if session.get('usuario_email') else 'true' }};
+  const storageKey='hype_guest_onboarding_v1';
+  let dismissed=false;
+  try { dismissed=localStorage.getItem(storageKey)==='1'; } catch (_) {}
+  if(banner && !dismissed) banner.hidden=false;
+  function dismiss(){
+    if(banner) banner.hidden=true;
+    try { localStorage.setItem(storageKey,'1'); } catch (_) {}
+  }
+  function openRequiredArea(area){
+    const hint=document.getElementById('hypeLoginHint');
+    if(hint){ hint.textContent='Para acessar '+area+', entre na sua conta HYPE.'; hint.hidden=false; }
+    abrirModal('login');
+    document.getElementById('email')?.focus();
+  }
+  document.getElementById('guestCreate')?.addEventListener('click',()=>{
+    dismiss();abrirModal('cadastro');
+  });
+  document.getElementById('guestLogin')?.addEventListener('click',()=>{
+    dismiss();abrirModal('login');
+  });
+  document.getElementById('guestExplore')?.addEventListener('click',dismiss);
+  if(guest){
+    document.querySelectorAll('a[data-hype-auth]').forEach(link=>{
+      link.addEventListener('click',event=>{
+        // Navegação normal com modificadores continua disponível.
+        if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        event.preventDefault();
+        openRequiredArea(link.dataset.hypeAuth || 'esta área');
+      });
+    });
+  }
+  if(location.hash==='#entrar' || location.hash==='#login') abrirModal('login');
+  if(location.hash==='#cadastro') abrirModal('cadastro');
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('{{url_for('expansion.service_worker')}}').catch(()=>{});
+  }
+})();
 document.querySelectorAll('.hype-v18-slider-shell').forEach((shell)=>{const track=shell.querySelector('[data-hype-slider]');const move=(dir)=>track.scrollBy({left:dir*Math.max(280,track.clientWidth*.78),behavior:'smooth'});shell.querySelector('.prev')?.addEventListener('click',()=>move(-1));shell.querySelector('.next')?.addEventListener('click',()=>move(1));});
 </script>
   <script src="{{url_for('static',filename='mobile_v36.js')}}?v=3601" defer></script>
