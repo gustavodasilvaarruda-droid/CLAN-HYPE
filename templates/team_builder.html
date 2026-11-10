@@ -152,7 +152,8 @@
 
     <div class="builder-main-actions">
       <button class="cta-gold" type="submit">{{ 'Atualizar time' if editing_team else 'Salvar time' }}</button>
-      <button class="cta-dark" type="button" id="reviewTeamBtn">Revisar os 6 slots</button>
+      <button class="cta-dark" type="button" id="reviewTeamBtn">Revisar os slots</button>
+      <button class="cta-dark" type="button" id="exportShowdownBtn">Exportar para Showdown</button>
     </div>
   </form>
 
@@ -194,6 +195,15 @@
     </div>
   </section>
 
+  <dialog id="showdownExportDialog" class="hype-build-preview">
+    <h3>Exportar equipe · Pokémon Showdown</h3>
+    <p>Copie este texto para o Team Builder oficial do Showdown e valide o formato escolhido. A exportação não comprova a legalidade da equipe.</p>
+    <textarea id="showdownExportText" readonly rows="15" aria-label="Equipe para importar no Showdown"></textarea>
+    <div class="hype-build-card-actions">
+      <button type="button" class="cta-gold" id="copyShowdownBtn">Copiar equipe</button>
+      <button type="button" class="cta-dark" id="closeShowdownExport">Fechar</button>
+    </div>
+  </dialog>
   <dialog id="buildPreviewDialog" class="hype-build-preview">
     <h3 id="buildPreviewTitle">Build salva</h3><pre id="buildPreviewText"></pre>
     <button type="button" class="cta-dark" id="closeBuildPreview">Fechar</button>
@@ -652,6 +662,39 @@
     const name=prompt('Nome da cópia:', 'Cópia de '+b.nome);
     if(name?.trim())submitPersonalBuild(b.dados||{},name.trim(),null);
   }));
+
+  function exportShowdownText(){
+    const named={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};
+    return slots.slice(0,teamSize()).filter(s=>s.pokemon).map(s=>{
+      const rows=[pretty(s.pokemon)+(s.item?' @ '+pretty(s.item):'')];
+      if(s.ability)rows.push('Ability: '+pretty(s.ability));
+      if(s.level&&s.level!==100)rows.push('Level: '+s.level);
+      if((s.tera_ativa||s.mecanica==='tera')&&s.tera_type)rows.push('Tera Type: '+pretty(s.tera_type));
+      const ev=Object.entries(s.evs||{}).filter(([k,v])=>named[k]&&Number(v)>0)
+        .map(([k,v])=>v+' '+named[k]).join(' / ');
+      if(ev)rows.push('EVs: '+ev);
+      const iv=Object.entries(s.ivs||{}).filter(([k,v])=>named[k]&&Number(v)!==31)
+        .map(([k,v])=>v+' '+named[k]).join(' / ');
+      if(iv)rows.push('IVs: '+iv);
+      if(s.nature)rows.push(pretty(s.nature)+' Nature');
+      (s.moves||[]).filter(Boolean).forEach(m=>rows.push('- '+pretty(m)));
+      return rows.join('\n');
+    }).join('\n\n');
+  }
+  $('exportShowdownBtn').addEventListener('click',()=>{
+    saveEditor();const text=exportShowdownText();
+    if(!text){alert('Adicione pelo menos um Pokémon antes de exportar.');return;}
+    $('showdownExportText').value=text;$('showdownExportDialog').showModal();
+  });
+  $('closeShowdownExport').addEventListener('click',()=>$('showdownExportDialog').close());
+  $('copyShowdownBtn').addEventListener('click',async()=>{
+    const field=$('showdownExportText');field.focus();field.select();
+    try{
+      if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(field.value);
+      else document.execCommand('copy');
+      $('copyShowdownBtn').textContent='Copiado!';
+    }catch(e){$('copyShowdownBtn').textContent='Selecione e copie manualmente';}
+  });
 
   $('reviewTeamBtn').addEventListener('click',()=>{saveEditor();const empty=slots.map((s,i)=>!s.pokemon?i+1:null).filter(Boolean); alert(empty.length?`Slots vazios: ${empty.join(', ')}. Você pode salvar assim mesmo e completar depois.`:'Os 6 slots estão preenchidos. Salve o time e clique em “Analisar Time” para receber vantagens, riscos e plano de jogo.');});
   document.querySelectorAll('.hype-v7-team-poke').forEach(btn=>btn.addEventListener('click',()=>{
