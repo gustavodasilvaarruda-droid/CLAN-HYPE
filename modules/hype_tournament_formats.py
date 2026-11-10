@@ -13,6 +13,34 @@ with _SNAPSHOT_PATH.open(encoding='utf-8') as handle:
     _SNAPSHOT = json.load(handle)
 
 _FORMATS = {row['codigo']: {**row, 'validacao_completa': False} for row in _SNAPSHOT['formatos']}
+# Formatos extras confirmados pela comunidade Smogon. São identificadores
+# de catálogo, NÃO um substituto pelo TeamValidator (banlists podem mudar).
+for _code, _label, _game, _size, _tera, _bans, _source in (
+    ('gen91v1', 'Geração 9 · 1v1', 'singles', 3, False,
+     ('Arceus', 'Miraidon', 'Koraidon', 'Gholdengo', 'Kyogre', 'Groudon', 'Mewtwo'),
+     'https://www.smogon.com/dex/sv/formats/1v1/'),
+    ('gen92v2doubles', 'Geração 9 · 2v2 Doubles', 'doubles', 4, True, (),
+     'https://github.com/smogon/pokemon-showdown/blob/master/config/formats.ts'),
+):
+    _FORMATS.setdefault(_code, {
+        'codigo': _code, 'showdown': _code, 'nome': _label, 'geracao': 9,
+        'tipo_batalha': _game, 'tamanho_equipe': _size,
+        'regras_showdown': ['Regulamento do formato no Showdown'],
+        'banlist_showdown': list(_bans), 'unbanlist_showdown': [],
+        'clausulas': ['Conferência final no Pokémon Showdown'],
+        'pokemons_proibidos': list(_bans), 'itens_proibidos': [],
+        'golpes_proibidos': [], 'habilidades_proibidas': [],
+        'tiers_proibidos': [], 'permite_mega': False,
+        'permite_zmove': False, 'permite_tera': _tera,
+        'permite_dynamax': False, 'little_cup': False, 'nfe': False,
+        'species_clause': True, 'item_clause': False,
+        'fonte': _source, 'revisado_em': '2026-11-10',
+    })
+# Sem motor oficial ativo, nenhum preset pode declarar aprovação completa.
+for _format in _FORMATS.values():
+    _format['validacao_completa'] = False
+del _code, _label, _game, _size, _tera, _bans, _source, _format
+
 _ESPECIES = _SNAPSHOT['especies']
 
 
