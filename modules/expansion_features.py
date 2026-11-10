@@ -491,6 +491,8 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         email = email_atual()
         nome = (request.form.get('nome_build') or '').strip()
         formato_codigo = (request.form.get('formato_codigo') or '').strip() or None
+        build_id_raw = (request.form.get('build_id') or '').strip()
+        build_id = int(build_id_raw) if build_id_raw.isdigit() else None
         bruto = (request.form.get('build_json') or '').strip()
         try:
             dados = json.loads(bruto) if bruto else {}
@@ -519,16 +521,34 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             'move_types': dados.get('move_types') if isinstance(dados.get('move_types'), dict) else {},
             'move_categories': dados.get('move_categories') if isinstance(dados.get('move_categories'), dict) else {},
         }
+        for campo, limite in (('evs', 252), ('ivs', 31)):
+            valores = clean[campo]
+            if any(type(v) is not int or not 0 <= v <= limite for v in valores.values()):
+                flash(f'{campo.upper()} inválidos: revise os limites.', 'erro')
+                return redirect(url_for('expansion.team_builder'))
+        if sum(clean['evs'].values()) > 510:
+            flash('O total de EVs não pode exceder 510.', 'erro')
+            return redirect(url_for('expansion.team_builder'))
+        payload = {
+            'usuario_email': email,
+            'nome': nome[:120],
+            'pokemon': pokemon[:80],
+            'pokemon_id': clean.get('pokemon_id'),
+            'formato_codigo': formato_codigo,
+            'dados': clean,
+        }
+        if build_id:
+            rows = safe_table('builds_pessoais', '*', id=build_id)
+            if not rows or rows[0].get('usuario_email') != email:
+                flash('Você só pode editar suas próprias Builds.', 'erro')
+                return redirect(url_for('expansion.team_builder'))
         try:
-            supabase.table('builds_pessoais').insert({
-                'usuario_email': email,
-                'nome': nome[:120],
-                'pokemon': pokemon[:80],
-                'pokemon_id': clean.get('pokemon_id'),
-                'formato_codigo': formato_codigo,
-                'dados': clean,
-            }).execute()
-            flash('Build pessoal salva. Ela já pode ser reutilizada em outros times.', 'sucesso')
+            if build_id:
+                supabase.table('builds_pessoais').update(payload).eq('id', build_id).eq('usuario_email', email).execute()
+                flash('Build pessoal atualizada.', 'sucesso')
+            else:
+                supabase.table('builds_pessoais').insert(payload).execute()
+                flash('Build pessoal salva. Ela já pode ser reutilizada em outros times.', 'sucesso')
         except Exception as e:
             flash(f'Não foi possível salvar a Build: {e}', 'erro')
         return redirect(url_for('expansion.team_builder'))
