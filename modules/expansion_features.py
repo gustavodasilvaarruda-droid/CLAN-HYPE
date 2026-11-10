@@ -459,15 +459,26 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
                     'publico': False if torneio_contexto_id else request.form.get('publico') == 'on',
                     'share_token': share_token,
                 }
+                time_salvo_id = None
                 if existente and existente[0].get('usuario_email') == email:
                     payload.pop('usuario_email', None)
                     supabase.table('times_pokemon').update(payload).eq('id', team_id).execute()
+                    time_salvo_id = team_id
                     flash('Time atualizado no HYPE Team Builder.', 'sucesso')
                 else:
-                    supabase.table('times_pokemon').insert(payload).execute()
+                    resultado = supabase.table('times_pokemon').insert(payload).execute()
+                    registros = getattr(resultado, 'data', None) or []
+                    if registros and isinstance(registros[0], dict):
+                        time_salvo_id = registros[0].get('id')
                     flash('Time salvo no HYPE Team Builder.', 'sucesso')
                 if torneio_contexto_id:
-                    return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_contexto_id))
+                    # O fluxo retorna à conferência com o time recém-salvo
+                    # selecionado, sem enviar nem aprovar automaticamente.
+                    return redirect(url_for('events26.equipes_torneio',
+                                            torneio_id=torneio_contexto_id,
+                                            team_id=time_salvo_id) if time_salvo_id else
+                                    url_for('events26.equipes_torneio',
+                                            torneio_id=torneio_contexto_id))
             return redirect(url_for('expansion.team_builder'))
 
         meus = sorted(safe_table('times_pokemon', '*', usuario_email=email), key=lambda x: x.get('updated_at') or '', reverse=True)
@@ -490,6 +501,7 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
     def team_builder_salvar_build():
         email = email_atual()
         nome = (request.form.get('nome_build') or '').strip()
+        build_id = request.form.get('build_id', type=int)
         formato_codigo = (request.form.get('formato_codigo') or '').strip() or None
         bruto = (request.form.get('build_json') or '').strip()
         try:
@@ -520,15 +532,24 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
             'move_categories': dados.get('move_categories') if isinstance(dados.get('move_categories'), dict) else {},
         }
         try:
-            supabase.table('builds_pessoais').insert({
-                'usuario_email': email,
+            payload = {
                 'nome': nome[:120],
                 'pokemon': pokemon[:80],
                 'pokemon_id': clean.get('pokemon_id'),
                 'formato_codigo': formato_codigo,
                 'dados': clean,
-            }).execute()
-            flash('Build pessoal salva. Ela já pode ser reutilizada em outros times.', 'sucesso')
+            }
+            if build_id:
+                existente = safe_table('builds_pessoais', '*', id=build_id)
+                if not existente or existente[0].get('usuario_email') != email:
+                    flash('Build não encontrada ou sem permissão para edição.', 'erro')
+                    return redirect(url_for('expansion.team_builder'))
+                supabase.table('builds_pessoais').update(payload).eq('id', build_id).eq('usuario_email', email).execute()
+                flash('Alterações da Build salvas com sucesso.', 'sucesso')
+            else:
+                payload['usuario_email'] = email
+                supabase.table('builds_pessoais').insert(payload).execute()
+                flash('Build pessoal salva. Ela já pode ser reutilizada em outros times.', 'sucesso')
         except Exception as e:
             flash(f'Não foi possível salvar a Build: {e}', 'erro')
         return redirect(url_for('expansion.team_builder'))
