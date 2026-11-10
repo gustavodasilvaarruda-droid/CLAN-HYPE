@@ -114,6 +114,8 @@ class TestArenaPrivateTeams(unittest.TestCase):
 
     def test_items_and_tera_follow_selected_format(self):
         team = equipe_valida()
+        for slot, specie in zip(team, ('Metagross', 'Garchomp', 'Rotom-Wash', 'Venusaur', 'Pelipper', 'Rillaboom')):
+            slot['pokemon'] = specie
         team[0]['pokemon'] = 'Metagross'
         team[0]['item'] = 'Metagrossite'
         self.assertTrue(any('Mega Stones' in e for e in validar_equipe_basica(team, 'gen9ou')))
