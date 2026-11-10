@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
 from modules.arena_private_teams import codigo_formato_do_torneio, validar_equipe_basica
 from modules.hype_tournament_formats import obter_formato
+from modules.hype_showdown_bridge import validar_time_showdown
 
 
 def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, registrar_log, criar_notificacao, battle_db=None):
@@ -139,6 +140,15 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
             if erros:
                 flash('Revise o time: ' + ' | '.join(erros[:5]), 'erro')
                 return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            # O motor oficial, quando instalado, valida golpes, habilidades,
+            # formas, transferências e cláusulas que o snapshot não consegue cobrir.
+            resultado_oficial = validar_time_showdown(equipe, codigo)
+            if resultado_oficial['status'] == 'illegal':
+                flash('Equipe reprovada pelo Pokémon Showdown: ' +
+                      ' | '.join(resultado_oficial['errors'][:4]), 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            # Sem motor oficial: equipe pode ser recebida para revisão HUMANA,
+            # mas nunca é automaticamente aprovada ou inscrita.
             from datetime import datetime, timezone
             timestamp = datetime.now(timezone.utc).isoformat()
             payload = {
@@ -156,7 +166,10 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
                 else:
                     payload.update({'torneio_id': torneio_id, 'usuario_email': email, 'slot': slot})
                     supabase.table('arena_torneio_equipes').insert(payload).execute()
-                flash(f'Time {slot} enviado em sigilo para conferência. Sua inscrição ainda NÃO está confirmada.', 'sucesso')
+                if resultado_oficial['status'] == 'legal':
+                    flash(f'Time {slot} passou no validador oficial Showdown e foi enviado para revisão. Sua inscrição ainda NÃO está confirmada.', 'sucesso')
+                else:
+                    flash(f'Time {slot} enviado em sigilo. Validação oficial indisponível: aguardando conferência manual; inscrição NÃO confirmada.', 'aviso')
             except Exception:
                 flash('Não foi possível salvar. A migração de equipes privadas pode estar pendente.', 'erro')
             return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
