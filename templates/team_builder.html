@@ -66,7 +66,7 @@
             <datalist id="pokemonList"></datalist>
           </div>
           <div class="hype-item-field">
-            <label for="itemInput">Item competitivo</label>
+            <label for="itemInput">Item equipável</label>
             <div class="hype-item-search">
               <img id="itemSelectedIcon" class="hype-item-current-icon" alt="" hidden>
               <input id="itemInput" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="itemOptions" aria-expanded="false" placeholder="Buscar item: Air Balloon, Leftovers...">
@@ -109,7 +109,7 @@
 
         <div class="builder-section-title"><h3>EVs / IVs</h3><small>Limite padrão: 510 EVs no total e 252 por atributo.</small></div>
         <div class="stat-editor" id="statEditor"></div>
-        <div class="ev-total-line"><b>EVs usados:</b> <span id="evTotal">0</span>/510 <span id="evWarning"></span></div>
+        <div class="ev-total-line"><b>EVs usados:</b> <span id="evTotal">0</span>/510 · <b>Restantes:</b> <span id="evRemaining">510</span> <span id="evWarning"></span></div>
 
         <label class="wide-note">Observação do set<textarea id="notesInput" placeholder="Ex.: preserve para o late game, funciona como win condition..."></textarea></label>
 
@@ -204,6 +204,24 @@
   let active = 0;
   let pokemonNames = [];
   const pokemonSpriteIds = new Map();
+  // Cada Mega Stone pertence a uma única espécie. Mega não é um item genérico.
+  const megaStoneOwner = {
+    'abomasite':'abomasnow','absolite':'absol','aerodactylite':'aerodactyl',
+    'aggronite':'aggron','alakazite':'alakazam','altarianite':'altaria',
+    'ampharosite':'ampharos','audinite':'audino','banettite':'banette',
+    'beedrillite':'beedrill','blastoisinite':'blastoise','blazikenite':'blaziken',
+    'cameruptite':'camerupt','charizardite-x':'charizard','charizardite-y':'charizard',
+    'diancite':'diancie','galladite':'gallade','garchompite':'garchomp',
+    'gardevoirite':'gardevoir','gengarite':'gengar','glalitite':'glalie',
+    'gyaradosite':'gyarados','heracronite':'heracross','houndoominite':'houndoom',
+    'kangaskhanite':'kangaskhan','latiasite':'latias','latiosite':'latios',
+    'lopunnite':'lopunny','lucarionite':'lucario','manectite':'manectric',
+    'mawilite':'mawile','medichamite':'medicham','metagrossite':'metagross',
+    'pinsirite':'pinsir','sablenite':'sableye','salamencite':'salamence',
+    'sceptilite':'sceptile','scizorite':'scizor','sharpedonite':'sharpedo',
+    'slowbronite':'slowbro','steelixite':'steelix','swampertite':'swampert',
+    'tyranitarite':'tyranitar','venusaurite':'venusaur'
+  };
   // Lista de itens equipáveis competitivos. Não equivale à legalidade completa por formato.
   const heldItemCodes = `air-balloon assault-vest black-sludge blunder-policy booster-energy bright-powder charcoal choice-band choice-scarf choice-specs clear-amulet covert-cloak damp-rock dragon-fang eject-button eject-pack electric-seed eviolite expert-belt flame-orb focus-band focus-sash grassy-seed hard-stone heat-rock heavy-duty-boots icy-rock iron-ball kings-rock lagging-tail leftovers life-orb light-ball light-clay loaded-dice luminous-moss magnet mental-herb metal-coat metronome miracle-seed mirror-herb misty-seed muscle-band mystic-water never-melt-ice normal-gem poison-barb power-herb protective-pads psychic-seed quick-claw razor-claw razor-fang red-card rocky-helmet room-service safety-goggles scope-lens sharp-beak shed-shell shell-bell silk-scarf silver-powder sitrus-berry smooth-rock soft-sand spell-tag sticky-barb terrain-extender thick-club throat-spray toxic-orb twisted-spoon weakness-policy white-herb wide-lens wise-glasses zoom-lens adamant-orb lustrous-orb griseous-orb soul-dew leek deep-sea-scale deep-sea-tooth lucky-punch metal-powder quick-powder stick berry-juice leftovers black-belt black-glasses big-root binding-band absorb-bulb cell-battery chilan-berry chople-berry cobaberry colbur-berry haban-berry kasib-berry kebia-berry occa-berry passho-berry payapa-berry rindo-berry roseli-berry shuca-berry tanga-berry wacan-berry yache-berry babiri-berry charti-berry enigma-berry custap-berry figy-berry aguav-berry iapapa-berry mago-berry wiki-berry lum-berry leppa-berry oran-berry salac-berry petaya-berry liechi-berry ganlon-berry apicot-berry starf-berry kee-berry maranga-berry jaboca-berry rowap-berry pinch-berry choice-band charizardite-x charizardite-y venusaurite blastoisinite gengarite lucarionite metagrossite salamencite mawilite kangaskhanite scizorite tyranitarite garchompite alakazite gyaradosite sablenite latiosite latiasite lopunnite medichamite beedrillite pinsirite aerodactylite slowbronite heracronite galladite absolite swampertite sceptilite blazikenite gardevoirite aggronite ampharosite diancite altarianite cameruptite sharpedonite banettite audinite steelixite houndoominite manectite glalitite abomasite venusaurite firium-z waterium-z grassium-z electrium-z icium-z fightinium-z poisonium-z groundium-z flyinium-z psychium-z buginium-z rockium-z ghostium-z dragonium-z darkinium-z steelium-z fairium-z normalium-z ultranecrozium-z`.split(/\s+/);
   let itemNames = [...new Set(heldItemCodes)].sort();
@@ -213,7 +231,24 @@
   const pokemonResults = $('pokemonOptions');
   const itemResults = $('itemOptions'), itemIcon = $('itemSelectedIcon'), itemHelp = $('itemHelp');
   const itemIconUrl = code => 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/'+encodeURIComponent(code)+'.png';
-  const knownHeldItem = value => itemNames.find(code => code === slug(value));
+  function basePokemon(){return slug(pokemonInput.value||current().pokemon).replace(/-mega(?:-[xy])?$/,'');}
+  function selectableItems(){
+    const f=selectedFormat(), ban=new Set((f?.itens_proibidos||[]).map(slug));
+    return itemNames.filter(code=>!ban.has(slug(code))&&(!megaStoneOwner[code]||(megaStoneOwner[code]===basePokemon()&&(!f||f.permite_mega===true))));
+  }
+  const knownHeldItem = value => selectableItems().find(code => code === slug(value));
+  function syncMechanics(){
+    const f=selectedFormat();
+    [...mechanicSelect.options].forEach(o=>{if(o.value==='nenhuma')return;const allowed=!f||f['permite_'+o.value]===true;o.hidden=!allowed;o.disabled=!allowed;});
+    if(mechanicSelect.selectedOptions[0]?.disabled)mechanicSelect.value='nenhuma';
+    updateMechanicVisibility();
+  }
+  function assignMegaStone(){
+    if(mechanicSelect.value!=='mega')return;
+    const stone=selectableItems().find(code=>megaStoneOwner[code]===basePokemon());
+    if(!stone){mechanicSelect.value='nenhuma';alert('Mega Evolution indisponível para este Pokémon neste formato.');return;}
+    itemInput.value=stone;updateItemPreview();
+  }
   function updateItemPreview(){
     const chosen=knownHeldItem(itemInput.value), value=itemInput.value.trim();
     itemIcon.hidden=!chosen;
@@ -223,7 +258,10 @@
   }
   function closeItemChoices(){itemResults.hidden=true;itemInput.setAttribute('aria-expanded','false');}
   function chooseItem(code){
-    itemInput.value=code; closeItemChoices(); updateItemPreview(); saveEditor();
+    itemInput.value=code;
+    if(megaStoneOwner[code])mechanicSelect.value='mega';
+    else if(mechanicSelect.value==='mega')mechanicSelect.value='nenhuma';
+    closeItemChoices(); updateItemPreview(); updateMechanicVisibility(); saveEditor();
   }
   function closePokemonChoices(){pokemonResults.hidden=true;pokemonInput.setAttribute('aria-expanded','false');}
   function renderPokemonChoices(){
@@ -245,7 +283,7 @@
     pokemonResults.hidden=false;pokemonInput.setAttribute('aria-expanded','true');
   }
   function renderItemChoices(){
-    const query=slug(itemInput.value), options=itemNames.filter(code=>code.includes(query)).slice(0,14);
+    const query=slug(itemInput.value), options=selectableItems().filter(code=>code.includes(query)).slice(0,14);
     itemResults.replaceChildren();
     for(const code of options){
       const btn=document.createElement('button'); btn.type='button'; btn.className='hype-item-option'; btn.setAttribute('role','option');
@@ -266,7 +304,19 @@
   function pretty(v){ return String(v||'').replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()); }
   function slug(v){ return String(v||'').trim().toLowerCase().replaceAll(' ','-').replace(/[^a-z0-9-]/g,''); }
   function current(){ return slots[active]; }
-  function capInt(v,min,max,def){ const n=parseInt(v,10); return Number.isFinite(n)?Math.max(min,Math.min(max,n)):def; }
+  function capInt(v,min,max,def){const n=Number(v);return Number.isFinite(n)?Math.max(min,Math.min(max,Math.trunc(n))):def;}
+  const evFields=()=>[...document.querySelectorAll('.evInput')];
+  function limitEvInput(el){
+    const others=evFields().filter(x=>x!==el).reduce((t,x)=>t+capInt(x.value,0,252,0),0);
+    const limit=Math.max(0,Math.min(252,510-others));
+    if(el.value!=='')el.value=String(capInt(el.value,0,limit,0));
+  }
+  function updateEvLimits(){
+    for(const el of evFields()){
+      const others=evFields().filter(x=>x!==el).reduce((t,x)=>t+capInt(x.value,0,252,0),0);
+      el.max=String(Math.max(0,Math.min(252,510-others)));
+    }
+  }
   function cleanForStorage(s){ return {pokemon:s.pokemon||'',pokemon_id:Number.isInteger(s.pokemon_id)?s.pokemon_id:null,tipos:Array.isArray(s.tipos)?s.tipos.slice(0,2):[],sprite:s.sprite||'',item:s.item||'',ability:s.ability||'',nature:s.nature||'',papel:s.papel||'',mecanica:s.mecanica||'nenhuma',tera_type:s.tera_type||'',moves:Array.isArray(s.moves)?s.moves.slice(0,4):[],evs:s.evs||{},ivs:s.ivs||{},base_stats:s.base_stats||{},move_types:s.move_types||{},move_categories:s.move_categories||{},observacao:s.observacao||''}; }
 
   function renderTabs(){
@@ -286,7 +336,7 @@
     document.querySelectorAll('.moveInput').forEach((el,i)=>el.value=(s.moves||[])[i]||'');
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
-    updateMoveList(s.moves_available||[]); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); updateMechanicVisibility(); liveValidate();
+    updateMoveList(s.moves_available||[]); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate();
   }
 
   function saveEditor(){
@@ -306,7 +356,7 @@
       const format=selectedFormat();const banned=new Set((format?.pokemons_proibidos||[]).map(slug));
       if(banned.has(key)){alert('Esse Pokémon está proibido pelo regulamento resumido do formato.');pokemonInput.value=current().pokemon||'';return;}
       const s=current(); s.pokemon=p.name; s.pokemon_id=p.id; s.tipos=p.types.map(x=>x.type.name); s.sprite=p.sprites?.other?.['official-artwork']?.front_default || p.sprites?.front_default || ''; s.abilities=p.abilities.map(x=>x.ability.name); s.moves_available=p.moves.map(x=>x.move.name).sort(); s.base_stats={}; const statMap={'hp':'hp','attack':'atk','defense':'def','special-attack':'spa','special-defense':'spd','speed':'spe'}; (p.stats||[]).forEach(x=>{const k=statMap[x.stat?.name];if(k)s.base_stats[k]=x.base_stat;});
-      if(!s.ability && s.abilities.length) s.ability=s.abilities[0]; pokemonInput.value=s.pokemon; renderEditor(); renderTabs();
+      if(!s.ability && s.abilities.length) s.ability=s.abilities[0]; pokemonInput.value=s.pokemon; renderEditor(); assignMegaStone(); saveEditor(); renderTabs();
     }catch(e){ current().pokemon=name.trim(); renderTabs(); $('editorPokemonName').textContent=name.trim()||'Escolha um Pokémon'; }
   }
 
@@ -320,7 +370,7 @@
     if(s.move_types[move] && s.move_categories[move]) return;
     try{ const r=await fetch(`https://pokeapi.co/api/v2/move/${encodeURIComponent(key)}`); if(!r.ok) return; const d=await r.json(); s.move_types[move]=d.type?.name||''; s.move_types[key]=d.type?.name||''; s.move_categories[move]=d.damage_class?.name||''; s.move_categories[key]=d.damage_class?.name||''; }catch(e){}
   }
-  function updateEvTotal(){ const total=[...document.querySelectorAll('.evInput')].reduce((a,x)=>a+capInt(x.value,0,252,0),0); $('evTotal').textContent=total; $('evWarning').textContent=total>510?'— excedeu o limite!':(total===510?'— completo':''); $('evWarning').className=total>510?'bad-text':'good-text'; }
+  function updateEvTotal(){ const total=evFields().reduce((a,x)=>a+capInt(x.value,0,252,0),0); $('evTotal').textContent=total; $('evRemaining').textContent=Math.max(0,510-total); $('evWarning').textContent=total>510?'— ajuste EVs antigos':(total===510?'— completo':''); $('evWarning').className=total>510?'bad-text':'good-text'; updateEvLimits(); }
   function updateMechanicVisibility(){ $('teraWrap').style.display=mechanicSelect.value==='tera'?'flex':'none'; }
 
   function selectedFormat(){ return formatos.find(f=>f.codigo===$('formatSelect').value)||null; }
@@ -362,7 +412,13 @@
   });
   pokemonInput.addEventListener('blur',()=>setTimeout(closePokemonChoices,130));
   [abilitySelect,natureSelect,roleSelect,mechanicSelect,teraSelect,notesInput,$('formatSelect')].forEach(el=>el.addEventListener('change',()=>{saveEditor();updateMechanicVisibility();}));
-  document.querySelectorAll('.moveInput,.evInput,.ivInput').forEach(el=>el.addEventListener('input',()=>{saveEditor();updateEvTotal();}));
+  document.querySelectorAll('.moveInput,.ivInput').forEach(el=>el.addEventListener('input',()=>{saveEditor();updateEvTotal();}));
+  evFields().forEach(el=>{
+    el.addEventListener('focus',()=>el.select());
+    el.addEventListener('input',()=>{limitEvInput(el);saveEditor();updateEvTotal();});
+    el.addEventListener('blur',()=>{if(el.value==='')el.value='0';limitEvInput(el);saveEditor();updateEvTotal();});
+  });
+  mechanicSelect.addEventListener('change',()=>{syncMechanics();assignMegaStone();saveEditor();});
   document.querySelectorAll('.moveInput').forEach(el=>el.addEventListener('change',async()=>{
     const banned=new Set((selectedFormat()?.golpes_proibidos||[]).map(slug));
     if(banned.has(slug(el.value))){alert('Esse golpe é proibido pelo regulamento resumido deste formato.');el.value='';saveEditor();return;}
@@ -384,14 +440,14 @@
     pokemonInput.value=btn.dataset.pokemon||'';
     loadPokemonDetails(btn.dataset.pokemon||'');
   }));
-  $('teamForm').addEventListener('submit',e=>{saveEditor();const valid=slots.filter(s=>s.pokemon);if(!valid.length){e.preventDefault();alert('Adicione pelo menos um Pokémon.');return;}$('slotsJson').value=JSON.stringify(valid.map(cleanForStorage));});
+  $('teamForm').addEventListener('submit',e=>{saveEditor();const valid=slots.filter(s=>s.pokemon);if(!valid.length){e.preventDefault();alert('Adicione pelo menos um Pokémon.');return;}if(valid.some(s=>Object.values(s.evs||{}).reduce((t,n)=>t+Number(n||0),0)>510)){e.preventDefault();alert('O total de EVs não pode ultrapassar 510.');return;}$('slotsJson').value=JSON.stringify(valid.map(cleanForStorage));});
 
   async function bootLists(){
     try{ const r=await fetch('https://pokeapi.co/api/v2/pokemon?limit=2000'); const d=await r.json(); pokemonNames=d.results.map(x=>x.name);for(const x of d.results){const match=String(x.url||'').match(/\/pokemon\/(\d+)\/?$/);if(match)pokemonSpriteIds.set(x.name,Number(match[1]));} refreshPokemonOptions(); }catch(e){}
     // Nunca importar a lista geral de itens: ela inclui Poké Balls e itens de bolsa.
   }
 
-  $('formatSelect').addEventListener('change',refreshPokemonOptions);
+  $('formatSelect').addEventListener('change',()=>{syncMechanics();refreshPokemonOptions();updateItemPreview();});
   bootLists(); renderTabs(); renderEditor();
   if(prefillBuild && prefillBuild._slot){
     slots[0]=Object.assign(emptySlot(),prefillBuild._slot); active=0; renderEditor(); renderTabs();
