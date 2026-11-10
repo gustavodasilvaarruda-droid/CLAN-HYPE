@@ -1,6 +1,7 @@
 <nav class="admin-v29-nav" aria-label="Administração HYPE">
   <a class="admin-v29-brand" href="{{ url_for('expansion.admin_dashboard') }}"><b>HYPE</b><span>ADMIN 3.0</span></a>
-  <div class="admin-v29-links">
+  <button type="button" class="admin-v29-mobile-toggle" aria-expanded="false" aria-controls="adminV29Links" aria-label="Abrir ou fechar menu administrativo">☰ Menu admin</button>
+  <div class="admin-v29-links" id="adminV29Links">
     <a href="{{ url_for('expansion.admin_dashboard') }}">Visão geral</a>
     <a href="{{ url_for('admin_membros_hype') }}">Membros</a>
     <a href="{{ url_for('admin_cargos') }}">Cargos</a>
@@ -18,3 +19,5 @@
   </div>
   <a class="admin-v29-exit" href="{{ url_for('painel') }}">Painel do membro →</a>
 </nav>
+
+<script>(()=>{document.querySelectorAll('.admin-v29-nav:not([data-mobile-ready])').forEach(nav=>{const btn=nav.querySelector('.admin-v29-mobile-toggle');if(!btn)return;nav.dataset.mobileReady='1';function set(open){nav.classList.toggle('is-open',open);btn.setAttribute('aria-expanded',String(open));}btn.addEventListener('click',()=>set(!nav.classList.contains('is-open')));nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>set(false)));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&nav.classList.contains('is-open')){set(false);btn.focus()}});window.addEventListener('resize',()=>{if(window.innerWidth>900)set(false)});});})();</script>

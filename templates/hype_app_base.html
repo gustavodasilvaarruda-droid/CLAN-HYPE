@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#070707">
   <title>{% block title %}Clã HYPE{% endblock %}</title>
   <link rel="stylesheet" href="{{url_for('static',filename='style.css')}}?v=3501">
-  <link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=3130">
+  <link rel="stylesheet" href="{{url_for('static',filename='admin_v29.css')}}?v=4001">
   <link rel="stylesheet" href="{{url_for('static',filename='community_v30.css')}}?v=3130">
   <link rel="stylesheet" href="{{url_for('static',filename='reino_v31.css')}}?v=3130">
   <link rel="manifest" href="{{url_for('expansion.manifest')}}">
@@ -47,6 +47,7 @@
           <div class="hgb-account-head"><b>{{session.get('nick_jogo') or 'Visitante HYPE'}}</b><small>{{(hype_header_user.cargo or session.get('cargo') or 'visitante')|replace('_',' ')|title}}</small></div>
           <a href="{{url_for('perfil_publico',nick=session.get('nick_jogo'))}}"><span>♙</span>Meu Perfil</a>
           <a href="{{url_for('central_notificacoes')}}"><span>♢</span>Notificações{% if hype_notificacoes_nao_lidas %}<em>{{hype_notificacoes_nao_lidas}}</em>{% endif %}</a>
+          {% if hype_permissoes.get('pode_gerenciar_cargos') %}<a href="{{url_for('expansion.admin_dashboard')}}"><span>♛</span>Painel Administrativo</a>{% endif %}
           <a href="{{url_for('conta_hype')}}"><span>⚙</span>Configurações</a>
           <a href="{{url_for('conta_hype')}}#discord"><span>◉</span>Discord</a>
           <div class="hgb-account-sep"></div>
@@ -95,6 +96,11 @@
       <a class="{{'active' if request.endpoint and request.endpoint.startswith('community.') else ''}}" href="{{url_for('community.home')}}"><span>✣</span>Comunidade</a>
     </nav>
 
+    {% if hype_permissoes.get('pode_gerenciar_cargos') %}
+    <div class="hgb-side-divider"></div>
+    <div class="hgb-side-section-title">GESTÃO HYPE</div>
+    <nav class="hgb-side-nav"><a href="{{url_for('expansion.admin_dashboard')}}" class="{{'active' if request.endpoint=='expansion.admin_dashboard' else ''}}"><span>♛</span>Painel Administrativo</a><a href="{{url_for('admin_conteudo')}}"><span>▣</span>Gerenciar Torneios</a><a href="{{url_for('admin_membros_hype')}}"><span>♙</span>Gerenciar Membros</a></nav>
+    {% endif %}
     <div class="hgb-side-divider"></div>
     {% if session.get('usuario_email') %}
     <nav class="hgb-side-nav">

@@ -1,8 +1,12 @@
 {% extends "hype_app_base.html" %}
 {% block title %}Painel Administrativo · HYPE{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='hype_admin_mobile_v40.css')}}?v=4001">{% endblock %}
 {% block content %}
 <div class="admin2-shell">
-  <aside class="admin2-side">
+  <div class="admin2-mobile-toolbar"><button type="button" id="admin2MobileToggle" aria-controls="admin2Sidebar" aria-expanded="false" aria-label="Abrir ferramentas de administração">☰ Menu do líder</button><a href="{{url_for('painel')}}">Painel do membro</a></div>
+  <div class="admin2-mobile-backdrop" id="admin2MobileBackdrop" hidden></div>
+  <aside class="admin2-side" id="admin2Sidebar" aria-label="Administração HYPE">
+    <button class="admin2-mobile-close" id="admin2MobileClose" type="button" aria-label="Fechar menu administrativo">×</button>
     <div class="admin2-side-title">♛ <b>ADMIN</b></div>
     <a class="admin2-member-return" href="{{url_for('painel')}}">← Painel do Membro</a>
     <nav>
@@ -78,3 +82,5 @@
   </main>
 </div>
 {% endblock %}
+
+{% block extra_scripts %}<script src="{{url_for('static',filename='hype_admin_mobile_v40.js')}}?v=4001" defer></script>{% endblock %}
