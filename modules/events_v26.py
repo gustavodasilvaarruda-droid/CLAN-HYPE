@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
 from modules.arena_private_teams import codigo_formato_do_torneio, validar_equipe_basica
+from modules.hype_tournament_formats import obter_formato
 
 
 def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, registrar_log, criar_notificacao, battle_db=None):
@@ -130,6 +131,9 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
             if not time or str(time.get('usuario_email') or '').lower() != email or time.get('publico'):
                 flash('Use apenas um time privado pertencente à sua conta.', 'erro')
                 return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
+            if str(time.get('formato_codigo') or '').strip().lower() != codigo:
+                flash('Este time pertence a outro formato. Monte ou salve uma equipe no formato deste torneio.', 'erro')
+                return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
             equipe = time.get('slots')
             erros = validar_equipe_basica(equipe, codigo)
             if erros:
@@ -158,12 +162,19 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
             return redirect(url_for('events26.equipes_torneio', torneio_id=torneio_id))
 
         # Não exibir times já compartilhados publicamente como opções secretas.
+        formato_regras = obter_formato(codigo) or {}
+        tamanho_equipe = int(formato_regras.get('tamanho_equipe') or 6)
         meus_times = [t for t in safe_table('times_pokemon', '*', usuario_email=email)
-                      if not t.get('publico') and isinstance(t.get('slots'), list)]
+                      if not t.get('publico') and isinstance(t.get('slots'), list)
+                      and str(t.get('formato_codigo') or '').lower() == codigo]
         meus_times.sort(key=lambda t: str(t.get('updated_at') or ''), reverse=True)
+        selecionado = request.args.get('team_id', type=int)
+        if not any(t.get('id') == selecionado for t in meus_times):
+            selecionado = None
         return render_template('arena_torneio_equipes.html', torneio=torneio,
                                enviados=enviados, meus_times=meus_times,
-                               pode_enviar=pode_enviar)
+                               pode_enviar=pode_enviar, tamanho_equipe=tamanho_equipe,
+                               torneio_formato_codigo=codigo, time_selecionado_id=selecionado)
 
     @bp.route('/admin/torneios/<int:torneio_id>/equipes')
     @login_required
