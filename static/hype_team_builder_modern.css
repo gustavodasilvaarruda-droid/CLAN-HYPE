@@ -18,3 +18,16 @@
 .hype-v7-team-builder .hype-context-tip{display:block;color:#ebc879;margin-top:6px;font-size:.75rem}
 .hype-v7-team-builder select:disabled{opacity:.8;cursor:not-allowed;border-color:#9b7d42}
 @media(max-width:720px){.hype-v7-team-builder .hype-item-options{max-height:245px}.hype-v7-team-builder .hype-item-option{min-height:46px;padding:8px}}
+
+/* Lista visual de Pokémon com miniaturas e seleção por nome. */
+.hype-v7-team-builder .hype-pokemon-field{display:flex;flex-direction:column;gap:7px;position:relative;min-width:0}
+.hype-v7-team-builder .hype-pokemon-field>label{color:#e9d8aa;font-weight:700;font-size:.88rem}
+.hype-v7-team-builder .hype-pokemon-field>input{min-height:48px;border-radius:12px;border:1px solid #6b5834;background:#151923;color:#fff}
+.hype-v7-team-builder .hype-pokemon-field>input:focus{border-color:#f2c969;outline:3px solid rgba(226,183,88,.15)}
+.hype-v7-team-builder .hype-pokemon-options{position:absolute;left:0;right:0;top:100%;z-index:48;max-height:315px;overflow:auto;border-radius:12px;border:1px solid #8b723e;background:#141923;box-shadow:0 18px 38px #000b;padding:6px}
+.hype-v7-team-builder .hype-pokemon-options[hidden]{display:none}
+.hype-v7-team-builder .hype-pokemon-option{display:flex;align-items:center;gap:12px;width:100%;min-height:54px;border:0;border-radius:9px;background:transparent;color:#f7f4e8;padding:5px 10px;text-align:left;font:inherit;cursor:pointer}
+.hype-v7-team-builder .hype-pokemon-option:hover,.hype-v7-team-builder .hype-pokemon-option:focus-visible{background:#3e3325;outline:1px solid #b58d42}
+.hype-v7-team-builder .hype-pokemon-option img{width:45px;height:45px;object-fit:contain;flex:none}
+.hype-v7-team-builder .hype-pokemon-options p{padding:10px;color:#c9c0ad;margin:0}
+@media(max-width:720px){.hype-v7-team-builder .hype-pokemon-options{max-height:255px}}
