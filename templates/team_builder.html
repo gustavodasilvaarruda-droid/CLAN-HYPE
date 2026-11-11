@@ -532,7 +532,7 @@
 
   function renderTabs(){
     $('slotTabs').innerHTML = slots.slice(0,teamSize()).map((s,i)=>`<button type="button" class="slot-tab ${i===active?'active':''}" data-slot="${i}">${s.sprite?`<img src="${s.sprite}" alt="">`:'<span class="slot-number">'+(i+1)+'</span>'}<span><b>${s.pokemon?pretty(s.pokemon):'Slot '+(i+1)}</b><small>${s.item?pretty(s.item):'Vazio'}</small></span></button>`).join('');
-    document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderEditor();renderTabs();}));
+    document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderEditor();renderTabs();if(current().pokemon&&showdownLearnsets)loadShowdownMovesForSlot(current());}));
     $('teamCount').textContent = `${slots.slice(0,teamSize()).filter(s=>s.pokemon).length}/${teamSize()}`;
   }
 
@@ -575,7 +575,8 @@
       const p=await r.json();if(current()!==origin)return;
       if(speciesRestriction(name)){pokemonInput.value=current().pokemon||'';return;}
       const slot=current(),previousPokemon=slot.pokemon;
-       slot.pokemon=meta?.n||p.name;slot.pokemon_id=meta?.num||p.id;
+       slot.pokemon=meta?.n||p.name;
+       if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.level=formatDefaultLevel(selectedFormat());slot.pokemon_id=meta?.num||p.id;
        const linkedItem=requiredFormHeldItem(slot.pokemon);
        if(linkedItem)slot.item=linkedItem;
        else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
@@ -591,7 +592,8 @@
     }catch(e){
       if(meta&&current()===origin){
         const slot=current(),previousPokemon=slot.pokemon;
-         slot.pokemon=meta.n;slot.pokemon_id=meta.num;slot.tipos=meta.types.map(x=>x.toLowerCase());
+         slot.pokemon=meta.n;
+         if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.level=formatDefaultLevel(selectedFormat());slot.pokemon_id=meta.num;slot.tipos=meta.types.map(x=>x.toLowerCase());
          const linkedItem=requiredFormHeldItem(slot.pokemon);
          if(linkedItem)slot.item=linkedItem;
          else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
@@ -634,7 +636,8 @@
       }
     }
     if(!available.size){
-      if(hint)hint.textContent='Sem lista confirmada para esta espécie; não considere o time validado.';
+      slot.moves_available=[];slot.move_methods={};
+      if(current()===slot){updateMoveList([]);if(hint)hint.textContent='Sem lista confirmada para esta espécie; não considere o time validado.';}
       return;
     }
     slot.moves_available=[...available].sort();
@@ -902,6 +905,10 @@
     messages.push({ok:filled.length>0,text:`${filled.length}/${teamSize()} Pokémon`});
     const species=filled.map(s=>String(s.pokemon).toLowerCase()); if(f?.species_clause) messages.push({ok:new Set(species).size===species.length,text:'Species Clause'});
     const items=filled.map(s=>String(s.item||'').toLowerCase()).filter(Boolean); if(f?.item_clause) messages.push({ok:new Set(items).size===items.length,text:'Item Clause'});
+    const incompatibleSpecies=filled.filter(s=>speciesRestriction(s.pokemon));
+    if(incompatibleSpecies.length)messages.push({ok:false,text:'Pokémon incompatíveis: '+incompatibleSpecies.map(s=>pretty(s.pokemon)).join(', ')});
+    const illegalMoves=filled.filter(s=>s.moves_available?.length&&(s.moves||[]).some(m=>m&&!allowedMoves(s.moves_available).some(x=>moveKey(x)===moveKey(m))));
+    if(illegalMoves.length)messages.push({ok:false,text:'Revise os golpes: '+illegalMoves.map(s=>pretty(s.pokemon)).join(', ')});
     const invalidFormItems=filled.filter(s=>{const required=requiredFormHeldItem(s.pokemon);return required&&slug(s.item)!==required;});
     if(invalidFormItems.length)messages.push({ok:false,text:'Item obrigatório: '+invalidFormItems.map(s=>pretty(s.pokemon)).join(', ')});
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
@@ -1283,7 +1290,7 @@
     previousFormatCode=nextCode;
     if(active>=teamSize())active=0;
     renderEditor();refreshPokemonOptions();renderTabs();liveValidate();
-    if(current().pokemon)loadShowdownMovesForSlot(current());
+    slots.filter(s=>s.pokemon).forEach(loadShowdownMovesForSlot);
   }
   $('formatSelect').addEventListener('change',changeBuilderFormat);
   renderTabs();renderEditor();
