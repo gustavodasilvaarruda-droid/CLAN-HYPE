@@ -57,7 +57,7 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
 
     def test_import_showdown_two_charizards_and_invalid_evs(self):
         template = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
-        for marker in ('id="importShowdownBtn"', 'id="showdownImportDialog"',
+        for marker in ('id="importShowdownBtn"', 'id="importShowdownSidebarBtn"', 'id="showdownImportDialog"',
                        'id="showdownImportText"', 'id="showdownImportPreview"',
                        'id="confirmShowdownImport"', 'function parseShowdownTeam(raw)'):
             self.assertIn(marker, template)
