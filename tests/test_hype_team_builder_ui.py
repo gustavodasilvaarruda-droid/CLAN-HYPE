@@ -61,6 +61,40 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         self.assertIn('hype-team-action-grid', css)
         self.assertIn('@media (max-width:680px)', css)
 
+    def test_format_change_filters_roster_and_sets_level_defaults(self):
+        template = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        for marker in (
+                'function changeBuilderFormat()', 'previousFormatCode',
+                'const invalid=slots.map', 'speciesRestriction(s.pokemon)',
+                "if(!confirm('Mudar para '", 'invalid.forEach(x=>slots[x.i]=emptySlot())',
+                'slots.forEach(x=>{x.level=level;})',
+                'if(f.little_cup)return 5', 'formatDefaultLevel(selectedFormat())',
+                'pokemonNames.filter(n=>!speciesRestriction(n))',
+                'slots.filter(s=>s.pokemon).forEach(loadShowdownMovesForSlot)',
+                "if(!f)return ''", 'id="levelFormatHelp"'):
+            self.assertIn(marker, template)
+        self.assertIn("field.value=previousFormatCode;renderEditor();renderTabs();return;", template)
+
+    def test_move_selection_is_bilingual_legal_and_responsive(self):
+        template = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        css = (ROOT / 'static/hype_team_builder_modern.css').read_text(encoding='utf-8')
+        for marker in (
+                'id="abilityHelp"', 'hype-move-type-indicator', 'hype-move-details-toggle',
+                'hype-move-options', 'function renderMoveChoices(input)',
+                'function showMoveDetails(input)', 'function updateSelectedMoveVisuals()',
+                'function moveLearningMethod(move)', 'const moveEffectsPT=',
+                "leafstorm:'Causa dano", "amnesia:'Aumenta", 
+                "const abilityEffectsPT=", "drizzle:'Invoca chuva",
+                'const methodSources={}', 'move_methods=Object.fromEntries',
+                'function allowedMoves(list)', 'moveDisplayName(move)',
+                "fetch('https://play.pokemonshowdown.com/data/moves.json')"):
+            self.assertIn(marker, template)
+        for marker in ('.hype-move-grid', '.hype-move-info', '.hype-move-options',
+                       '.hype-move-option-type', 'max-width:720px', '.hype-ability-help'):
+            self.assertIn(marker, css)
+        # Os quatro campos são renderizados pelo laço Jinja original.
+        self.assertIn('{% for i in range(1,5) %}', template)
+
     def test_inline_javascript_parses_in_node_when_available(self):
         if not shutil.which('node'):
             self.skipTest('Node indisponível neste ambiente')
