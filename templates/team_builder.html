@@ -1,6 +1,6 @@
 {% extends 'builders_base.html' %}
 {% block title %}HYPE Team Builder{% endblock %}
-{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=2">{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=3">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool showdown-builder-page hype-v7-team-builder">
 <section class="dash-welcome showdown-hero hype-v7-team-hero">
@@ -120,20 +120,39 @@
         <div class="stat-editor" id="statEditor"></div>
         <div class="ev-total-line"><b>EVs usados:</b> <span id="evTotal">0</span>/510 · <b>Restantes:</b> <span id="evRemaining">510</span> <span id="evWarning"></span></div>
 
-        <label class="wide-note">Observação do set<textarea id="notesInput" placeholder="Ex.: preserve para o late game, funciona como win condition..."></textarea></label>
+        <label class="wide-note hype-builder-notes" for="notesInput">Observação do set<textarea id="notesInput" placeholder="Ex.: preserve para o late game, funciona como win condition..."></textarea></label>
 
-        <div class="build-actions v27-build-actions">
-          <label>Minha Build salva
-            <select id="savedBuildSelect"><option value="">Selecione...</option>{% for b in builds_pessoais %}<option value="{{b.id}}">{{b.nome}} — {{b.pokemon}}</option>{% endfor %}</select>
-          </label>
-          <button type="button" class="cta-dark" id="loadBuildBtn">Carregar</button>
-          <label>Build HYPE aprovada
-            <select id="hypeBuildSelect"><option value="">Selecione um guia...</option>{% for b in builds_hype %}<option value="{{b.id}}">{{b.pokemon}} — {{b.titulo}}</option>{% endfor %}</select>
-          </label>
-          <button type="button" class="cta-gold" id="loadHypeBuildBtn">Aplicar no slot</button>
-          <button type="button" class="cta-dark" id="duplicateSlotBtn">Duplicar set</button>
-          <button type="button" class="cta-gold" id="saveBuildBtn">Salvar como Build</button><button type="button" class="cta-dark" id="newBuildBtn">Nova Build</button>
-        </div>
+        <section class="hype-build-management" aria-labelledby="hypeBuildManagementTitle">
+          <div class="hype-builder-panel-heading">
+            <span class="breed-kicker">BIBLIOTECA DE SETS</span>
+            <h3 id="hypeBuildManagementTitle">Builds salvas</h3>
+            <p>Carregue um set pessoal ou use uma Build HYPE aprovada no Pokémon selecionado.</p>
+          </div>
+          <div class="hype-build-source-grid">
+            <div class="hype-build-source">
+              <label for="savedBuildSelect">Minhas builds</label>
+              <div class="hype-build-source-actions">
+                <select id="savedBuildSelect"><option value="">Selecione...</option>{% for b in builds_pessoais %}<option value="{{b.id}}">{{b.nome}} — {{b.pokemon}}</option>{% endfor %}</select>
+                <button type="button" class="cta-dark" id="loadBuildBtn">Carregar</button>
+              </div>
+            </div>
+            <div class="hype-build-source">
+              <label for="hypeBuildSelect">Builds HYPE aprovadas</label>
+              <div class="hype-build-source-actions">
+                <select id="hypeBuildSelect"><option value="">Selecione um guia...</option>{% for b in builds_hype %}<option value="{{b.id}}">{{b.pokemon}} — {{b.titulo}}</option>{% endfor %}</select>
+                <button type="button" class="cta-dark" id="loadHypeBuildBtn">Aplicar no slot</button>
+              </div>
+            </div>
+          </div>
+          <div class="hype-build-tools">
+            <div class="hype-build-tools-copy"><strong>Editar este Pokémon</strong><small>Duplique o set ou salve uma versão na sua biblioteca.</small></div>
+            <div class="hype-build-tools-actions">
+              <button type="button" class="cta-dark" id="duplicateSlotBtn">Duplicar set</button>
+              <button type="button" class="cta-dark" id="newBuildBtn">Nova Build</button>
+              <button type="button" class="cta-gold" id="saveBuildBtn">Salvar como Build</button>
+            </div>
+          </div>
+        </section>
       </section>
 
       <aside class="hype-v7-team-library-panel" aria-label="Biblioteca rápida de Pokémon">
@@ -152,12 +171,19 @@
       <div id="liveValidation" class="validation-pills"></div>
     </section>
 
-    <div class="builder-main-actions">
-      <button class="cta-gold" type="submit">{{ 'Atualizar time' if editing_team else 'Salvar time' }}</button>
-      <button class="cta-dark" type="button" id="reviewTeamBtn">Revisar os slots</button>
-      <button class="cta-gold" type="button" id="importShowdownBtn">Importar do Showdown</button>
-      <button class="cta-dark" type="button" id="exportShowdownBtn">Exportar para Showdown</button>
-    </div>
+    <section class="hype-team-actions" aria-labelledby="hypeTeamActionsTitle">
+      <div class="hype-builder-panel-heading">
+        <span class="breed-kicker">GERENCIAR EQUIPE</span>
+        <h3 id="hypeTeamActionsTitle">Ações do time</h3>
+        <p>Revise os seis slots e salve a equipe. A importação e a exportação não alteram seus times salvos automaticamente.</p>
+      </div>
+      <div class="builder-main-actions hype-team-action-grid">
+        <button class="cta-gold hype-save-team" type="submit">{{ 'Atualizar time' if editing_team else 'Salvar time' }}</button>
+        <button class="cta-dark" type="button" id="reviewTeamBtn">Revisar os slots</button>
+        <button class="cta-dark" type="button" id="importShowdownBtn">Importar do Showdown</button>
+        <button class="cta-dark" type="button" id="exportShowdownBtn">Exportar para Showdown</button>
+      </div>
+    </section>
     <p id="showdownImportStatus" class="hype-import-success" role="status" hidden></p>
   </form>
 

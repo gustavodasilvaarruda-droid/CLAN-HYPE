@@ -74,3 +74,60 @@
 .hype-v7-team-builder .hype-import-success{padding:12px 16px;border:1px solid #937545;border-radius:9px;color:#f5d990;background:#221f18}
 .hype-v7-team-builder #confirmShowdownImport:disabled{cursor:not-allowed;opacity:.5}
 @media(max-width:640px){.hype-v7-team-builder .hype-showdown-import{padding:14px}.hype-v7-team-builder .hype-showdown-import textarea{min-height:165px;font-size:14px}.hype-v7-team-builder .hype-showdown-import .hype-build-card-actions{flex-direction:column}.hype-v7-team-builder .hype-showdown-import .hype-build-card-actions button{width:100%}}
+
+
+/* Team Builder HYPE · ações organizadas por contexto (11/11/2026).
+   Somente apresentação: IDs e eventos existentes permanecem intactos. */
+.hype-v7-team-builder .hype-builder-notes {display:block;margin:16px 0 18px}
+.hype-v7-team-builder .hype-builder-notes textarea {display:block;width:100%;box-sizing:border-box;margin-top:8px;min-height:78px}
+.hype-v7-team-builder .hype-build-management,
+.hype-v7-team-builder .hype-team-actions {
+  min-width:0;padding:20px;border:1px solid rgba(239,196,72,.28);border-radius:15px;
+  background:linear-gradient(145deg,#12161e 0%,#0b0e14 64%,#14120d 100%);
+  box-shadow:0 10px 28px rgba(0,0,0,.18);
+}
+.hype-v7-team-builder .hype-builder-panel-heading {min-width:0;margin-bottom:18px}
+.hype-v7-team-builder .hype-builder-panel-heading .breed-kicker {font-size:.73rem;letter-spacing:.09em;color:#f5ca55}
+.hype-v7-team-builder .hype-builder-panel-heading h3 {margin:6px 0 5px;font-size:1.22rem;line-height:1.3;color:#f4e9c7}
+.hype-v7-team-builder .hype-builder-panel-heading p {margin:0;color:#b7b9bf;font-size:.88rem;line-height:1.55;max-width:72ch}
+.hype-v7-team-builder .hype-build-source-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;min-width:0}
+.hype-v7-team-builder .hype-build-source {min-width:0;padding:14px;border:1px solid rgba(233,200,116,.13);border-radius:12px;background:rgba(4,7,12,.64)}
+.hype-v7-team-builder .hype-build-source>label {display:block;color:#e9dcc1;font-size:.86rem;font-weight:700;margin:0 0 9px}
+.hype-v7-team-builder .hype-build-source-actions {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch;min-width:0}
+.hype-v7-team-builder .hype-build-source-actions select {width:100%;min-width:0;min-height:46px;max-width:100%;box-sizing:border-box;border:1px solid #51462f!important;border-radius:9px!important;padding:9px 12px!important;background:#090d13!important;color:#f5f0e5}
+.hype-v7-team-builder .hype-build-source-actions button {min-height:46px;white-space:nowrap;padding:10px 14px;margin:0;justify-content:center}
+.hype-v7-team-builder .hype-build-tools {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-top:15px;padding-top:16px;border-top:1px solid rgba(241,208,122,.17)}
+.hype-v7-team-builder .hype-build-tools-copy {display:grid;gap:3px;min-width:0}
+.hype-v7-team-builder .hype-build-tools-copy strong {font-size:.89rem;color:#f5e5be}
+.hype-v7-team-builder .hype-build-tools-copy small {font-size:.78rem;color:#aeb0b7;line-height:1.4}
+.hype-v7-team-builder .hype-build-tools-actions {display:flex;flex-wrap:wrap;gap:9px}
+.hype-v7-team-builder .hype-build-tools-actions button {min-height:45px;min-width:118px;margin:0;padding:10px 15px;justify-content:center}
+.hype-v7-team-builder .hype-build-tools-actions #saveBuildBtn {min-width:169px}
+.hype-v7-team-builder .builder-validation {display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;padding:18px 20px!important;border:1px solid rgba(239,196,72,.28)!important;border-radius:14px!important;background:linear-gradient(105deg,#151a20,#0c0e12)!important}
+.hype-v7-team-builder .builder-validation h2 {color:#f2cc60}
+.hype-v7-team-builder .builder-validation .validation-pills {display:flex;gap:8px;flex-wrap:wrap}
+.hype-v7-team-builder .hype-team-actions {padding:20px;margin-top:0}
+.hype-v7-team-builder .hype-team-action-grid {display:grid!important;grid-template-columns:minmax(0,1.2fr) repeat(3,minmax(0,1fr));gap:10px;justify-content:stretch;align-items:stretch}
+.hype-v7-team-builder .hype-team-action-grid>button {box-sizing:border-box;width:100%;min-width:0;min-height:52px;padding:11px 13px;margin:0;line-height:1.35;justify-content:center;text-align:center;white-space:normal}
+.hype-v7-team-builder .hype-team-action-grid .hype-save-team {font-size:.98rem;font-weight:800;box-shadow:0 6px 22px rgba(223,172,18,.2)}
+.hype-v7-team-builder .hype-build-source-actions button:focus-visible,
+.hype-v7-team-builder .hype-build-tools-actions button:focus-visible,
+.hype-v7-team-builder .hype-team-action-grid button:focus-visible {outline:3px solid #f6cc58;outline-offset:3px}
+@media (max-width:1150px) {
+  .hype-v7-team-builder .hype-build-source-grid {grid-template-columns:minmax(0,1fr)}
+  .hype-v7-team-builder .hype-team-action-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:680px) {
+  .hype-v7-team-builder .hype-build-management,
+  .hype-v7-team-builder .hype-team-actions {padding:14px;border-radius:12px}
+  .hype-v7-team-builder .hype-builder-panel-heading {margin-bottom:14px}
+  .hype-v7-team-builder .hype-build-source {padding:12px}
+  .hype-v7-team-builder .hype-build-source-actions {grid-template-columns:minmax(0,1fr)}
+  .hype-v7-team-builder .hype-build-source-actions button {width:100%}
+  .hype-v7-team-builder .hype-build-tools {align-items:stretch;flex-direction:column}
+  .hype-v7-team-builder .hype-build-tools-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .hype-v7-team-builder .hype-build-tools-actions button {min-width:0;width:100%;font-size:.84rem}
+  .hype-v7-team-builder .hype-build-tools-actions #saveBuildBtn {grid-column:1/-1;min-width:0}
+  .hype-v7-team-builder .hype-team-action-grid {grid-template-columns:minmax(0,1fr)}
+  .hype-v7-team-builder .builder-validation {padding:14px!important}
+}
