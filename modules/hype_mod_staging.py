@@ -62,10 +62,13 @@ def inspect_original(raw):
                 raise InvalidJar("Metadados Fabric inválidos.")
             module_id = metadata.get("id")
             version = metadata.get("version")
-            if module_id not in IDS:
+            if not isinstance(module_id, str) or module_id not in IDS:
                 raise InvalidJar("Módulo não cadastrado nesta primeira etapa.")
             if not isinstance(version, str) or not 0 < len(version) <= 120:
                 raise InvalidJar("Versão do mod inválida.")
+            depends = metadata.get("depends") or {}
+            if not isinstance(depends, dict):
+                raise InvalidJar("Dependências Fabric inválidas.")
             for entry in entries:
                 if not entry.is_dir():
                     with archive.open(entry) as stream:
@@ -78,7 +81,7 @@ def inspect_original(raw):
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "size_bytes": len(raw),
                 "has_mixins": bool(metadata.get("mixins")),
-                "requires_client": module_id == "hypeclient" or "hypeclient" in (metadata.get("depends") or {}),
+                "requires_client": module_id == "hypeclient" or "hypeclient" in depends,
             }
     except (BadZipFile, OSError, EOFError, RuntimeError, UnicodeError, json.JSONDecodeError) as exc:
         raise InvalidJar("JAR Fabric inválido ou corrompido.") from exc
@@ -114,7 +117,6 @@ def register_mod_release_routes(bp, is_admin, registrar_log):
                 "id,module_id,version,status,created_at,sha256"
             ).order("created_at", desc=True).limit(100).execute().data or [])
         except Exception:
-            bp.logger if hasattr(bp, "logger") else None
             drafts = []
             flash("Erro ao consultar rascunhos no banco.", "erro")
         return render_template("admin_hype_mod_releases.html", drafts=drafts)
