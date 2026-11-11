@@ -1,31 +1,53 @@
 {% extends 'hype_app_base.html' %}
-{% block title %}HYPE | Central de Publicação{% endblock %}
+{% block title %}HYPE | Análise de JARs{% endblock %}
 {% block content %}
 <section class="hype-v6-page" style="max-width:1080px;margin:25px auto;padding:20px;">
   <div class="hype-v6-panel" style="padding:26px;">
-    <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Controle de Módulos</a></p>
-    <span class="hype-v6-kicker">ACESSO ADMINISTRATIVO • STAGING</span>
+    <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Gerenciador de Módulos</a></p>
+    <span class="hype-v6-kicker">HYPE ADMIN • INSPEÇÃO SEGURA</span>
     <h1>Central de Publicação HYPE</h1>
-    <p>Envie o JAR original para análise e armazenamento privado. <strong>O arquivo NÃO será ofuscado, assinado ou distribuído nesta etapa.</strong></p>
-    <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
+    <p>Analise os metadados de um mod Fabric antes de publicar. <strong>Neste teste, nenhum JAR é guardado, ofuscado ou enviado aos jogadores.</strong></p>
+    <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label for="jar">Arquivo Fabric (.jar, máximo de 10 MiB)</label>
-      <input id="jar" name="jar" type="file" accept=".jar" required>
-      <button type="submit" class="hype-v6-btn gold">Guardar original</button>
+      <label for="jar_inspect">Arquivo Fabric (.jar, máximo de 10 MiB)</label>
+      <input id="jar_inspect" name="jar" type="file" accept=".jar" required>
+      <button type="submit" class="hype-v6-btn gold">Analisar arquivo</button>
     </form>
-    <div class="hype-v6-table-wrap">
-      <table class="hype-v6-table">
+    {% if error %}
+      <p role="alert" style="color:#f7b2b2;">{{ error }}</p>
+    {% endif %}
+    {% if report %}
+      <h2>Resultado da inspeção</h2>
+      <div class="hype-v6-table-wrap"><table class="hype-v6-table"><tbody>
+        <tr><th>Módulo</th><td>{{ report.name }}</td></tr>
+        <tr><th>ID Fabric</th><td><code>{{ report.module_id }}</code></td></tr>
+        <tr><th>Versão</th><td>{{ report.version }}</td></tr>
+        <tr><th>SHA-256</th><td style="overflow-wrap:anywhere;"><code>{{ report.sha256 }}</code></td></tr>
+        <tr><th>Tamanho</th><td>{{ report.size_bytes }} bytes</td></tr>
+        <tr><th>Depende do HYPE Client</th><td>{{ 'Sim' if report.requires_client else 'Não' }}</td></tr>
+        <tr><th>Declara Mixins</th><td>{{ 'Sim' if report.has_mixins else 'Não' }}</td></tr>
+      </tbody></table></div>
+      <p><small>O relatório não confirma que o mod funciona no Minecraft e não é prova de ofuscação ou assinatura.</small></p>
+    {% endif %}
+    {% if staging_enabled %}
+      <hr>
+      <h2>Armazenamento privado de originais (staging)</h2>
+      <p>Somente para homologação com banco e bucket privados configurados. Armazenar um original não publica o mod.</p>
+      <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="jar_upload">Arquivo original (.jar)</label>
+        <input id="jar_upload" name="jar" type="file" accept=".jar" required>
+        <button type="submit" class="hype-v6-btn gold">Guardar original em privado</button>
+      </form>
+      <div class="hype-v6-table-wrap"><table class="hype-v6-table">
         <thead><tr><th>Módulo</th><th>Versão</th><th>Status</th><th>Recebido</th><th>SHA-256</th></tr></thead>
-        <tbody>
-          {% for item in drafts %}
-            <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
-          {% else %}
-            <tr><td colspan="5">Nenhum arquivo enviado nesta central.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <p><small>Originais nunca são distribuídos. A publicação pública exigirá pipeline de ofuscação, teste no Minecraft, assinatura e aprovação administrativa em uma etapa futura.</small></p>
+        <tbody>{% for item in drafts %}
+          <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
+        {% else %}<tr><td colspan="5">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    {% else %}
+      <p><small>Armazenamento permanente e distribuição de mods desativados por segurança nesta fase.</small></p>
+    {% endif %}
   </div>
 </section>
 {% endblock %}
