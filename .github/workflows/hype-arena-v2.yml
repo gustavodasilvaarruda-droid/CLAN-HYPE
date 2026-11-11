@@ -12,6 +12,8 @@ on:
       - 'modules/arena_private_teams.py'
       - 'templates/arena_torneio_equipes.html'
       - 'templates/admin_arena_equipes.html'
+      - 'tests/test_hype_arena_admin_review.py'
+      - 'supabase/migrations/20261110_arena_aprovacao_inscricoes.sql'
       - 'static/hype_arena_private_teams.css'
       - 'tests/test_hype_arena_private_teams.py'
       - 'supabase/migrations/20261110_arena_3_equipes_privadas.sql'
@@ -37,6 +39,8 @@ on:
       - 'modules/arena_private_teams.py'
       - 'templates/arena_torneio_equipes.html'
       - 'templates/admin_arena_equipes.html'
+      - 'tests/test_hype_arena_admin_review.py'
+      - 'supabase/migrations/20261110_arena_aprovacao_inscricoes.sql'
       - 'static/hype_arena_private_teams.css'
       - 'tests/test_hype_arena_private_teams.py'
       - 'supabase/migrations/20261110_arena_3_equipes_privadas.sql'
@@ -59,5 +63,6 @@ jobs:
       - run: python -m py_compile app.py modules/events_v26.py modules/hype_tournament_formats.py modules/arena_private_teams.py modules/expansion_features.py
       - run: python -m unittest discover -s tests -p 'test_hype_arena_v2.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_arena_private_teams.py' -v
+      - run: python -m unittest discover -s tests -p 'test_hype_arena_admin_review.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_team_builder_ui.py' -v
       - run: python -m unittest discover -s tests -p 'test_arena_formatos_fk.py' -v
