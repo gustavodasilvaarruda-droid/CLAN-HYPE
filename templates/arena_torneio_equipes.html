@@ -12,7 +12,7 @@
     <span class="arena-private-eyebrow">ARENA HYPE 3.0 · TIMES PRIVADOS</span>
     <h1>{{torneio.titulo}}</h1>
     <p>Formato: <strong>{{torneio.formato}}</strong> ({{torneio_formato_codigo}}). Prepare até três equipes de {{tamanho_equipe}} Pokémon. Seus times enviados são visíveis somente para você e para os administradores autorizados.</p>
-    <p class="arena-private-alert">A checagem abaixo é preliminar. Enviar um time NÃO confirma inscrição, pagamento ou legalidade oficial. A aprovação só será disponibilizada após integração com a validação completa.</p>
+    <p class="arena-private-alert">Enviar um time não confirma sua inscrição. A administração fará a conferência preliminar, registrará o pagamento ou a dispensa e confirmará a inscrição. A legalidade completa ainda exige validação no Showdown.</p>
   </section>
   <section class="v26-panel">
     <div class="v26-section-head"><div><span>SEUS TIMES</span><h2>Três slots de competição</h2></div></div>
@@ -24,6 +24,7 @@
         {% if time %}
           <h3>{{time.nome}}</h3>
           <span class="arena-private-state">{{time.status|replace('_',' ')|capitalize}}</span>
+          {% if time.motivo_revisao %}<p class="arena-private-alert">Correção solicitada: {{time.motivo_revisao}}</p>{% endif %}
           <div class="arena-pokemon-icons">
           {% for p in time.equipe %}
             <span title="{{p.pokemon}}" class="arena-poke-mini">
