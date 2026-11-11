@@ -4226,6 +4226,37 @@ def criar_evento():
     return redirect(url_for('admin_conteudo'))
 
 
+def _garantir_formato_preset_no_banco(preset):
+    """Sincroniza apenas um preset conhecido para satisfazer a FK de torneios.
+
+    O catálogo oficial é validado por obter_formato() antes da chamada.
+    Nunca sobrescreve formatos personalizados já existentes no Supabase.
+    """
+    codigo = preset['codigo']
+    existente = (
+        supabase.table('formatos_competitivos')
+        .select('codigo').eq('codigo', codigo).limit(1).execute().data or []
+    )
+    if existente:
+        return
+    # Um novo formato pode chegar pelo snapshot Showdown antes de uma migração
+    # de dados. UPSERT com ignore_duplicates evita corrida entre admins e
+    # preserva eventuais edições feitas no painel de formatos.
+    supabase.table('formatos_competitivos').upsert({
+        'codigo': codigo,
+        'nome': preset['nome'],
+        'descricao': 'Preset oficial da Arena HYPE / Showdown; conferir legalidade no TeamValidator.',
+        'max_pokemon': max(1, min(6, int(preset.get('tamanho_equipe') or 6))),
+        'species_clause': bool(preset.get('species_clause', True)),
+        'item_clause': bool(preset.get('item_clause', False)),
+        'ativo': True,
+        'permite_mega': bool(preset.get('permite_mega', False)),
+        'permite_zmove': bool(preset.get('permite_zmove', False)),
+        'permite_tera': bool(preset.get('permite_tera', False)),
+        'permite_dynamax': bool(preset.get('permite_dynamax', False)),
+    }, on_conflict='codigo', ignore_duplicates=True).execute()
+
+
 @app.route('/admin/torneios/criar', methods=['POST'])
 @login_required
 def criar_torneio():
@@ -4238,6 +4269,8 @@ def criar_torneio():
         preset = obter_formato(codigo_preset) if codigo_preset else None
         if codigo_preset and preset is None:
             raise ValueError('Formato competitivo predefinido desconhecido.')
+        if preset:
+            _garantir_formato_preset_no_banco(preset)
         supabase.table('torneios').insert({
             'titulo': request.form.get('titulo', '').strip(),
             'descricao': request.form.get('descricao', '').strip(),
