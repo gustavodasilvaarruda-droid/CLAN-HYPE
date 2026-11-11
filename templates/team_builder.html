@@ -1,6 +1,6 @@
 {% extends 'builders_base.html' %}
 {% block title %}HYPE Team Builder{% endblock %}
-{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=1">{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=2">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool showdown-builder-page hype-v7-team-builder">
 <section class="dash-welcome showdown-hero hype-v7-team-hero">
@@ -154,8 +154,10 @@
     <div class="builder-main-actions">
       <button class="cta-gold" type="submit">{{ 'Atualizar time' if editing_team else 'Salvar time' }}</button>
       <button class="cta-dark" type="button" id="reviewTeamBtn">Revisar os slots</button>
+      <button class="cta-gold" type="button" id="importShowdownBtn">Importar do Showdown</button>
       <button class="cta-dark" type="button" id="exportShowdownBtn">Exportar para Showdown</button>
     </div>
+    <p id="showdownImportStatus" class="hype-import-success" role="status" hidden></p>
   </form>
 
   <form method="post" action="{{url_for('expansion.team_builder_salvar_build')}}" id="saveBuildForm" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -196,6 +198,23 @@
     </div>
   </section>
 
+  <dialog id="showdownImportDialog" class="hype-build-preview hype-showdown-import">
+    <h3>Importar equipe · Pokémon Showdown</h3>
+    <p>Cole um Pokémon ou até seis sets do Showdown. O HYPE reconhece item, habilidade, natureza, golpes, EVs, IVs e Mega Stone e mostra uma prévia antes de aplicar.</p>
+    <label for="showdownImportText">Texto da equipe</label>
+    <textarea id="showdownImportText" rows="13" aria-label="Cole a equipe do Pokémon Showdown" placeholder="Charizard @ Charizardite X&#10;Ability: Blaze&#10;EVs: 252 Atk / 4 SpD / 252 Spe&#10;Jolly Nature&#10;- Dragon Dance&#10;- Flare Blitz&#10;- Dragon Claw&#10;- Earthquake"></textarea>
+    <label for="showdownImportMode">Destino dos Pokémon</label>
+    <select id="showdownImportMode">
+      <option value="append">Preencher slots vazios (preservar o time atual)</option>
+      <option value="replace">Substituir os seis slots do editor</option>
+    </select>
+    <div id="showdownImportPreview" class="hype-import-preview" role="status" aria-live="polite">Cole um set para visualizar os Pokémon reconhecidos.</div>
+    <p>Importar não salva o time nem faz a inscrição no torneio. Depois, clique em <strong>Salvar time</strong> e envie o time pelo slot do torneio.</p>
+    <div class="hype-build-card-actions">
+      <button type="button" class="cta-gold" id="confirmShowdownImport" disabled>Adicionar ao Team Builder</button>
+      <button type="button" class="cta-dark" id="cancelShowdownImport">Cancelar</button>
+    </div>
+  </dialog>
   <dialog id="showdownExportDialog" class="hype-build-preview">
     <h3>Exportar equipe · Pokémon Showdown</h3>
     <p>Copie este texto para o Team Builder oficial do Showdown e valide o formato escolhido. A exportação não comprova a legalidade da equipe.</p>
@@ -676,6 +695,183 @@
     const name=prompt('Nome da cópia:', 'Cópia de '+b.nome);
     if(name?.trim())submitPersonalBuild(b.dados||{},name.trim(),null);
   }));
+
+  // Importação de sets texto do Pokémon Showdown (sem gravar ou inscrever automaticamente).
+  const showdownImportDialog = $('showdownImportDialog');
+  const showdownImportText = $('showdownImportText');
+  const showdownImportMode = $('showdownImportMode');
+  const showdownImportPreview = $('showdownImportPreview');
+  const showdownImportConfirm = $('confirmShowdownImport');
+
+  function parseShowdownTeam(raw) {
+    const errors = [], warnings = [], parsed = [];
+    const input = String(raw || '').replace(/\r/g, '').replace(/\uFEFF/g, '').trim();
+    if (!input) return {parsed, errors:['Cole o texto do Showdown para importar.'], warnings};
+    if (input.length > 25000) return {parsed, errors:['O texto excede o limite de 25 mil caracteres.'], warnings};
+
+    const fields = {hp:'hp', atk:'atk', def:'def', spa:'spa', spd:'spd', spe:'spe'};
+    const allowedText = /^[\p{L}\p{N} .:'()♀♂&-]{1,90}$/u;
+    const blocks = [];
+    let lines = [];
+    const isHeader = line => !line.startsWith('- ') &&
+      !/^(?:Ability|EVs|IVs|Level|Tera Type|Shiny|Happiness|Friendship|Gigantamax|Dynamax Level|Pokeball|Ball|Language|OT):/i.test(line) &&
+      !/^[A-Za-z]+\s+Nature$/i.test(line) &&
+      !line.includes(':') &&
+      /^[\p{L}\p{N}]/u.test(line);
+    for (const rawLine of input.split('\n')) {
+      const line = rawLine.trim();
+      if (!line) { if (lines.length) { blocks.push(lines); lines = []; } continue; }
+      if (isHeader(line) && lines.length) { blocks.push(lines); lines = []; }
+      if (!lines.length && !isHeader(line)) {
+        errors.push('Cada Pokémon precisa começar com o nome (ex.: Charizard @ Charizardite X).');
+        continue;
+      }
+      lines.push(line);
+    }
+    if (lines.length) blocks.push(lines);
+    if (!blocks.length) errors.push('Nenhum Pokémon reconhecido.');
+    if (blocks.length > 6) errors.push('A equipe pode ter no máximo seis Pokémon.');
+
+    for (const [index, block] of blocks.slice(0,6).entries()) {
+      const header = block[0].split(/\s+@\s+/);
+      let name = (header[0] || '').replace(/\s*\((?:M|F)\)\s*$/i, '').trim();
+      const nickname = name.match(/\(([^()]+)\)$/);
+      if (nickname) name = nickname[1].trim();
+      const item = (header.slice(1).join(' @ ') || '').trim();
+      const prefix = 'Pokémon ' + (index+1) + ': ';
+      if (!name || !allowedText.test(name)) { errors.push(prefix+'nome inválido.'); continue; }
+      if (item && !allowedText.test(item)) { errors.push(prefix+'item inválido.'); continue; }
+      const s = emptySlot();
+      const meta = speciesMeta(name);
+      s.pokemon = meta?.n || name;
+      s.pokemon_id = Number.isInteger(meta?.num) ? meta.num : null;
+      s.tipos = Array.isArray(meta?.types) ? meta.types.map(t=>String(t).toLowerCase()) : [];
+      if (s.pokemon_id > 0) s.sprite = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + s.pokemon_id + '.png';
+      s.item = item;
+      const stone = slug(item);
+      s.mecanica = megaStoneOwner[stone] && megaStoneOwner[stone] === slug(s.pokemon) ? 'mega' : 'nenhuma';
+      if (megaStoneOwner[stone] && s.mecanica !== 'mega') errors.push(prefix+'Mega Stone não pertence a '+s.pokemon+'.');
+      if (s.mecanica === 'mega' && selectedFormat() && !selectedFormat().permite_mega) {
+        errors.push(prefix+'Mega Evolution não é permitida neste formato. Escolha um formato compatível.');
+      }
+      if (showdownReady && !meta) warnings.push(prefix+s.pokemon+' não foi encontrado no catálogo da Arena.');
+      let moveCount = 0;
+
+      function readStats(value, destination, maximum) {
+        for (const part of value.split(/\s*\/\s*/)) {
+          const match = part.trim().match(/^(\d{1,3})\s+(HP|Atk|Def|SpA|SpD|Spe)$/i);
+          const key = match ? fields[match[2].toLowerCase()] : null;
+          if (!key || Number(match[1]) > maximum) {
+            errors.push(prefix+'valor de '+(destination === s.evs ? 'EV' : 'IV')+' inválido: '+part.trim()+'.');
+          } else destination[key] = Number(match[1]);
+        }
+      }
+
+      for (const line of block.slice(1)) {
+        if (line.startsWith('- ')) {
+          const move = line.slice(2).trim();
+          if (!move || !allowedText.test(move)) { errors.push(prefix+'golpe inválido.'); continue; }
+          if (moveCount >= 4) { errors.push(prefix+'máximo de quatro golpes.'); continue; }
+          s.moves[moveCount++] = move;
+        } else if (/^Ability:\s*/i.test(line)) {
+          s.ability = line.replace(/^Ability:\s*/i, '').trim();
+          if (!allowedText.test(s.ability)) errors.push(prefix+'habilidade inválida.');
+        } else if (/^EVs:\s*/i.test(line)) {
+          readStats(line.replace(/^EVs:\s*/i, ''), s.evs, 252);
+        } else if (/^IVs:\s*/i.test(line)) {
+          readStats(line.replace(/^IVs:\s*/i, ''), s.ivs, 31);
+        } else if (/^Level:\s*/i.test(line)) {
+          const level = Number(line.replace(/^Level:\s*/i, '').trim());
+          if (!Number.isInteger(level) || level < 1 || level > 100) errors.push(prefix+'level inválido.');
+          else s.level = level;
+        } else if (/^Tera Type:\s*/i.test(line)) {
+          const tera = line.replace(/^Tera Type:\s*/i, '').trim();
+          const allowed = types.find(t=>t.toLowerCase()===tera.toLowerCase());
+          if (!allowed) errors.push(prefix+'Tera Type inválido.');
+          else { s.tera_type = allowed; s.tera_ativa = true; }
+        } else {
+          const nature = line.match(/^([A-Za-z]+)\s+Nature$/i);
+          if (nature) {
+            s.nature = natures.find(n=>n.toLowerCase()===nature[1].toLowerCase()) || '';
+            if (!s.nature) errors.push(prefix+'natureza inválida.');
+          }
+          // Shiny, gênero e metadados extras não fazem parte do editor atual.
+        }
+      }
+      if (Object.values(s.evs).reduce((total,v)=>total+v,0) > 510) errors.push(prefix+'EVs acima de 510.');
+      if (selectedFormat()?.little_cup && s.level !== 5) errors.push(prefix+'Little Cup exige level 5.');
+      parsed.push(s);
+    }
+    return {parsed, errors, warnings};
+  }
+
+  function previewShowdownImport() {
+    const result = parseShowdownTeam(showdownImportText.value);
+    const available = showdownImportMode.value==='replace'
+      ? teamSize() : slots.slice(0,teamSize()).filter(s=>!s.pokemon).length;
+    if (result.parsed.length > available) {
+      result.errors.push('Há apenas '+available+' slot(s) disponível(is). Escolha substituir ou libere slots.');
+    }
+    const all = showdownImportMode.value==='replace'
+      ? result.parsed : slots.slice(0,teamSize()).filter(s=>s.pokemon).concat(result.parsed);
+    if (selectedFormat()?.species_clause) {
+      const names = all.map(s=>speciesKey(s.pokemon));
+      if (new Set(names).size !== names.length) {
+        result.warnings.push('Species Clause: existem espécies repetidas. Charizard X e Y não podem jogar juntos nesse formato.');
+      }
+    }
+    showdownImportPreview.replaceChildren();
+    const summary = document.createElement('p');
+    summary.textContent = result.parsed.length+' Pokémon reconhecido(s) · '+available+' slot(s) de destino';
+    showdownImportPreview.append(summary);
+    const list = document.createElement('ol');
+    for (const s of result.parsed) {
+      const row = document.createElement('li');
+      row.textContent = s.pokemon+(s.item?' · '+s.item:'')+(s.mecanica==='mega'?' · Mega':'')+
+        ' · '+s.moves.filter(Boolean).length+'/4 golpes';
+      list.append(row);
+    }
+    showdownImportPreview.append(list);
+    for (const message of result.errors) {
+      const p=document.createElement('p');p.className='hype-import-error';p.textContent=message;showdownImportPreview.append(p);
+    }
+    for (const message of result.warnings) {
+      const p=document.createElement('p');p.className='hype-import-warning';p.textContent=message;showdownImportPreview.append(p);
+    }
+    showdownImportConfirm.disabled = !!result.errors.length || !result.parsed.length;
+    return result;
+  }
+
+  $('importShowdownBtn').addEventListener('click',()=>{
+    saveEditor();
+    showdownImportText.value='';
+    showdownImportMode.value='append';
+    previewShowdownImport();
+    showdownImportDialog.showModal();
+    showdownImportText.focus();
+  });
+  showdownImportText.addEventListener('input',previewShowdownImport);
+  showdownImportMode.addEventListener('change',previewShowdownImport);
+  $('cancelShowdownImport').addEventListener('click',()=>showdownImportDialog.close());
+  showdownImportConfirm.addEventListener('click',()=>{
+    saveEditor();
+    const result = previewShowdownImport();
+    if (showdownImportConfirm.disabled) return;
+    if (showdownImportMode.value==='replace') {
+      if (slots.some(s=>s.pokemon) && !confirm('Substituir os Pokémon que estão neste editor? Times já salvos não serão modificados até clicar em Salvar time.')) return;
+      slots=Array.from({length:6},emptySlot);
+    }
+    const destinations = slots.map((s,i)=>i<teamSize()&&!s.pokemon?i:-1).filter(i=>i>=0);
+    result.parsed.forEach((s,i)=>{slots[destinations[i]]=s;});
+    active=destinations[0];
+    renderEditor();renderTabs();liveValidate();
+    if (current().pokemon) loadShowdownMovesForSlot(current());
+    showdownImportDialog.close();
+    const info=$('showdownImportStatus');
+    info.textContent=result.parsed.length+' Pokémon importado(s) para os slots '+result.parsed.map((_,i)=>destinations[i]+1).join(', ')+'. Revise e clique em Salvar time.';
+    info.hidden=false;
+    document.querySelector('.showdown-workspace').scrollIntoView({behavior:'smooth',block:'start'});
+  });
 
   function exportShowdownText(){
     const named={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};

@@ -55,6 +55,66 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
                               capture_output=True, timeout=12)
         self.assertEqual(result.returncode,0,result.stderr)
 
+    def test_import_showdown_two_charizards_and_invalid_evs(self):
+        template = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        for marker in ('id="importShowdownBtn"', 'id="showdownImportDialog"',
+                       'id="showdownImportText"', 'id="showdownImportPreview"',
+                       'id="confirmShowdownImport"', 'function parseShowdownTeam(raw)'):
+            self.assertIn(marker, template)
+        if not shutil.which('node'):
+            self.skipTest('Node indisponível neste ambiente')
+        parser = ('function parseShowdownTeam(raw) {' +
+                  template.split('  function parseShowdownTeam(raw) {', 1)[1]
+                  .split('\n  function previewShowdownImport()', 1)[0])
+        harness = r"""
+const types=['Fire','Water','Grass'];
+const natures=['Jolly','Timid','Adamant'];
+const emptySlot=()=>({level:100,pokemon:'',pokemon_id:null,tipos:[],sprite:'',
+item:'',ability:'',nature:'',papel:'',mecanica:'nenhuma',tera_ativa:false,tera_type:'',
+moves:['','','',''],evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},
+ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31}});
+const speciesMeta=name=>({n:name,num:6,types:['Fire','Flying']});
+const slug=v=>String(v||'').toLowerCase().trim().replaceAll(' ','-').replace(/[^a-z0-9-]/g,'');
+const megaStoneOwner={'charizardite-x':'charizard','charizardite-y':'charizard'};
+const selectedFormat=()=>({permite_mega:true,little_cup:false});
+const showdownReady=true;
+"""
+        checks = r"""
+const source=[
+'Charizard @ Charizardite X',
+'Ability: Blaze',
+'EVs: 252 Atk / 4 SpD / 252 Spe',
+'Jolly Nature',
+'- Dragon Dance',
+'- Flare Blitz',
+'- Dragon Claw',
+'- Earthquake',
+'Charizard @ Charizardite Y',
+'Ability: Blaze',
+'EVs: 252 SpA / 4 SpD / 252 Spe',
+'IVs: 0 Atk',
+'Timid Nature',
+'- Flamethrower',
+'- Solar Beam',
+'- Focus Blast',
+'- Roost'
+].join('\n');
+const result=parseShowdownTeam(source);
+if(result.errors.length)throw Error(JSON.stringify(result.errors));
+if(result.parsed.length!==2)throw Error('Não reconheceu os dois Pokémon.');
+if(result.parsed[0].item!=='Charizardite X')throw Error('Perdeu a Mega Stone X.');
+if(result.parsed[1].item!=='Charizardite Y')throw Error('Perdeu a Mega Stone Y.');
+if(result.parsed[0].mecanica!=='mega'||result.parsed[1].mecanica!=='mega')throw Error('Mega não reconhecida.');
+if(result.parsed[0].evs.atk!==252||result.parsed[1].evs.spa!==252)throw Error('EVs incorretos.');
+if(result.parsed[1].ivs.atk!==0||result.parsed[1].nature!=='Timid')throw Error('IV ou Nature incorretos.');
+if(result.parsed[1].moves[3]!=='Roost')throw Error('Quarto golpe perdido.');
+if(parseShowdownTeam(source.replace('252 SpA','300 SpA')).errors.length===0)throw Error('EV inválido não foi rejeitado.');
+if(parseShowdownTeam('Charizard @ <img src=x>').errors.length===0)throw Error('Item inseguro não foi rejeitado.');
+"""
+        result = subprocess.run(['node', '-'], input=harness+parser+checks, text=True,
+                                capture_output=True, timeout=12)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_tournament_format_is_frozen_after_private_team(self):
         app=(ROOT / 'app.py').read_text(encoding='utf-8')
         self.assertIn("'formato_codigo': preset['codigo'] if preset else", app)

@@ -60,3 +60,17 @@
 /* Pesquisa por sugestões do Pokémon com catálogo alternativo explícito. */
 .hype-v7-team-builder .hype-item-mode{display:flex;align-items:center;gap:8px;color:#e2d4ae;font-size:.78rem;cursor:pointer;margin-top:5px}
 .hype-v7-team-builder .hype-item-mode input{width:16px;height:16px;accent-color:#d9ad4d;flex:none}
+
+/* Importação Showdown — prévia responsiva sem ocultar os seis slots do time. */
+.hype-v7-team-builder .hype-showdown-import{width:min(650px,calc(100% - 24px));max-height:85vh;overflow:auto}
+.hype-v7-team-builder .hype-showdown-import>label{display:block;margin:10px 0 6px;color:#efdfaf;font-weight:700}
+.hype-v7-team-builder .hype-showdown-import textarea{box-sizing:border-box;width:100%;min-height:190px;max-height:36vh;resize:vertical;background:#10151d;color:#f3ebd7;border:1px solid #a98b48;border-radius:10px;padding:12px;font:500 .89rem/1.6 ui-monospace,SFMono-Regular,Consolas,monospace}
+.hype-v7-team-builder .hype-showdown-import select{box-sizing:border-box;width:100%;min-height:45px;border-radius:10px;border:1px solid #a98b48;background:#141a23;color:#f8ebcd;padding:9px}
+.hype-v7-team-builder .hype-import-preview{margin:14px 0;padding:14px;border:1px solid #5c5646;background:#111821;border-radius:10px;color:#eee8da}
+.hype-v7-team-builder .hype-import-preview p{margin:4px 0 8px}
+.hype-v7-team-builder .hype-import-preview ol{margin:6px 0;padding-left:22px;line-height:1.6}
+.hype-v7-team-builder .hype-import-preview .hype-import-error{color:#ff9898;font-weight:650}
+.hype-v7-team-builder .hype-import-preview .hype-import-warning{color:#f5cc78}
+.hype-v7-team-builder .hype-import-success{padding:12px 16px;border:1px solid #937545;border-radius:9px;color:#f5d990;background:#221f18}
+.hype-v7-team-builder #confirmShowdownImport:disabled{cursor:not-allowed;opacity:.5}
+@media(max-width:640px){.hype-v7-team-builder .hype-showdown-import{padding:14px}.hype-v7-team-builder .hype-showdown-import textarea{min-height:165px;font-size:14px}.hype-v7-team-builder .hype-showdown-import .hype-build-card-actions{flex-direction:column}.hype-v7-team-builder .hype-showdown-import .hype-build-card-actions button{width:100%}}
