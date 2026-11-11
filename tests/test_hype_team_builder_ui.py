@@ -85,7 +85,7 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
                 'function moveLearningMethod(move)', 'const moveEffectsPT=',
                 "leafstorm:'Causa dano", "amnesia:'Aumenta", 
                 "const abilityEffectsPT=", "drizzle:'Invoca chuva",
-                'const methodSources={}', 'move_methods=Object.fromEntries',
+                'methodSources={}', 'move_methods=Object.fromEntries',
                 'function allowedMoves(list)', 'moveDisplayName(move)',
                 "fetch('https://play.pokemonshowdown.com/data/moves.json')"):
             self.assertIn(marker, template)
