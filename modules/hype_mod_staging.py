@@ -97,13 +97,14 @@ def assert_private_bucket(storage):
 
 def register_mod_release_routes(bp, is_admin, registrar_log):
     """Register routes only when explicit staging flag is enabled."""
-    if os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() not in ("1", "true", "yes"):
-        return
-    service_key = os.getenv("HYPE_RELEASE_SUPABASE_SERVICE_ROLE_KEY", "")
-    server_url = os.getenv("SUPABASE_URL", "")
-    if not server_url or not service_key:
-        raise RuntimeError("Configure SUPABASE_URL e a service-role privada no staging.")
-    db = create_client(server_url, service_key)
+    enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
+    db = None
+    if enabled:
+        service_key = os.getenv("HYPE_RELEASE_SUPABASE_SERVICE_ROLE_KEY", "")
+        server_url = os.getenv("SUPABASE_URL", "")
+        if not server_url or not service_key:
+            raise RuntimeError("Configure SUPABASE_URL e a service-role privada no staging.")
+        db = create_client(server_url, service_key)
 
     def admin_only():
         if not session.get("usuario_email") or not is_admin():
@@ -112,14 +113,35 @@ def register_mod_release_routes(bp, is_admin, registrar_log):
     @bp.get("/admin/modulos/releases")
     def mod_releases():
         admin_only()
+        drafts = []
+        if db is not None:
+            try:
+                drafts = (db.table(TABLE).select(
+                    "id,module_id,version,status,created_at,sha256"
+                ).order("created_at", desc=True).limit(100).execute().data or [])
+            except Exception:
+                flash("Erro ao consultar rascunhos no banco.", "erro")
+        return render_template("admin_hype_mod_releases.html", drafts=drafts,
+                               report=None, staging_enabled=enabled)
+
+    @bp.post("/admin/modulos/releases/inspecionar")
+    def mod_release_inspect():
+        admin_only()
+        file = request.files.get("jar")
+        if not file or not (file.filename or "").lower().endswith(".jar"):
+            flash("Escolha um arquivo .jar.", "erro")
+            return redirect(url_for("hype_mod_admin.mod_releases"))
         try:
-            drafts = (db.table(TABLE).select(
-                "id,module_id,version,status,created_at,sha256"
-            ).order("created_at", desc=True).limit(100).execute().data or [])
-        except Exception:
-            drafts = []
-            flash("Erro ao consultar rascunhos no banco.", "erro")
-        return render_template("admin_hype_mod_releases.html", drafts=drafts)
+            report = inspect_original(file.stream.read(MAX_UPLOAD + 1))
+        except InvalidJar as exc:
+            flash(str(exc), "erro")
+            return redirect(url_for("hype_mod_admin.mod_releases"))
+        # No file bytes or paths persist in this safe inspection route.
+        return render_template("admin_hype_mod_releases.html", drafts=[],
+                               report=report, staging_enabled=enabled)
+
+    if not enabled:
+        return
 
     @bp.post("/admin/modulos/releases/upload")
     def mod_release_upload():
