@@ -75,7 +75,7 @@
               <button type="button" id="clearItemBtn" class="hype-item-clear" aria-label="Remover item">×</button>
             </div>
             <div id="itemOptions" class="hype-item-options" role="listbox" hidden></div>
-            <small id="itemHelp" class="hype-item-help">Pesquise pelo nome e escolha um item com imagem.</small>
+            <small id="itemHelp" class="hype-item-help" aria-live="polite">Pesquise pelo nome e escolha um item com imagem.</small>
             <label class="hype-item-mode"><input type="checkbox" id="showAllItems"> Mostrar outros itens equipáveis</label>
           </div>
           <label>Level
@@ -302,7 +302,30 @@
   };
   // Lista de itens equipáveis competitivos. Não equivale à legalidade completa por formato.
   const heldItemCodes = `air-balloon assault-vest black-sludge blunder-policy booster-energy bright-powder charcoal choice-band choice-scarf choice-specs clear-amulet covert-cloak damp-rock dragon-fang eject-button eject-pack electric-seed eviolite expert-belt flame-orb focus-band focus-sash grassy-seed hard-stone heat-rock heavy-duty-boots icy-rock iron-ball kings-rock lagging-tail leftovers life-orb light-ball light-clay loaded-dice luminous-moss magnet mental-herb metal-coat metronome miracle-seed mirror-herb misty-seed muscle-band mystic-water never-melt-ice normal-gem poison-barb power-herb protective-pads psychic-seed quick-claw razor-claw razor-fang red-card rocky-helmet room-service safety-goggles scope-lens sharp-beak shed-shell shell-bell silk-scarf silver-powder sitrus-berry smooth-rock soft-sand spell-tag sticky-barb terrain-extender thick-club throat-spray toxic-orb twisted-spoon weakness-policy white-herb wide-lens wise-glasses zoom-lens adamant-orb lustrous-orb griseous-orb soul-dew leek deep-sea-scale deep-sea-tooth lucky-punch metal-powder quick-powder stick berry-juice leftovers black-belt black-glasses big-root binding-band absorb-bulb cell-battery chilan-berry chople-berry cobaberry colbur-berry haban-berry kasib-berry kebia-berry occa-berry passho-berry payapa-berry rindo-berry roseli-berry shuca-berry tanga-berry wacan-berry yache-berry babiri-berry charti-berry enigma-berry custap-berry figy-berry aguav-berry iapapa-berry mago-berry wiki-berry lum-berry leppa-berry oran-berry salac-berry petaya-berry liechi-berry ganlon-berry apicot-berry starf-berry kee-berry maranga-berry jaboca-berry rowap-berry pinch-berry choice-band charizardite-x charizardite-y venusaurite blastoisinite gengarite lucarionite metagrossite salamencite mawilite kangaskhanite scizorite tyranitarite garchompite alakazite gyaradosite sablenite latiosite latiasite lopunnite medichamite beedrillite pinsirite aerodactylite slowbronite heracronite galladite absolite swampertite sceptilite blazikenite gardevoirite aggronite ampharosite diancite altarianite cameruptite sharpedonite banettite audinite steelixite houndoominite manectite glalitite abomasite venusaurite firium-z waterium-z grassium-z electrium-z icium-z fightinium-z poisonium-z groundium-z flyinium-z psychium-z buginium-z rockium-z ghostium-z dragonium-z darkinium-z steelium-z fairium-z normalium-z ultranecrozium-z`.split(/\s+/);
-  let itemNames = [...new Set(heldItemCodes)].sort();
+
+  // Formas que só existem em batalha com um item específico equipado.
+  const arceusPlateByType = Object.freeze({
+    bug:'insect-plate',dark:'dread-plate',dragon:'draco-plate',
+    electric:'zap-plate',fairy:'pixie-plate',fighting:'fist-plate',
+    fire:'flame-plate',flying:'sky-plate',ghost:'spooky-plate',
+    grass:'meadow-plate',ground:'earth-plate',ice:'icicle-plate',
+    poison:'toxic-plate',psychic:'mind-plate',rock:'stone-plate',
+    steel:'iron-plate',water:'splash-plate'
+  });
+  function requiredFormHeldItem(pokemon){
+    const name=String(pokemon||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    if(name.startsWith('arceus-'))return arceusPlateByType[name.slice(7)]||'';
+    return {'kyogre-primal':'blue-orb','groudon-primal':'red-orb'}[name]||'';
+  }
+  // A fusão é feita com item-chave fora da batalha; esse item não é equipável.
+  function fusionItemInfo(pokemon){
+    const name=String(pokemon||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    if(name==='calyrex-shadow'||name==='calyrex-ice')return 'Fusão: Reins of Unity é um item-chave, não um item equipável.';
+    if(name==='kyurem-black'||name==='kyurem-white')return 'Fusão: DNA Splicers é um item-chave, não um item equipável.';
+    if(name==='necrozma-dusk-mane'||name==='necrozma-dawn-wings')return 'Fusão: N-Solarizer / N-Lunarizer são itens-chave, não equipáveis.';
+    return '';
+  }
+  let itemNames = [...new Set([...heldItemCodes,...Object.values(arceusPlateByType),'blue-orb','red-orb'])].sort();
   let debounce = null;
 
   const $ = id => document.getElementById(id);
@@ -375,12 +398,14 @@
     lucario:['lucarionite','life-orb','focus-sash','choice-band'],
     kyurem:['heavy-duty-boots','choice-specs','leftovers','loaded-dice'],
     rillaboom:['choice-band','assault-vest','grassy-seed','miracle-seed'],
+    'calyrex-shadow':['choice-specs','choice-scarf','focus-sash','life-orb'],
+    'calyrex-ice':['clear-amulet','weakness-policy','leftovers','life-orb'],
   };
   let showAllHeldItems=false;
   function allowedHeldItems(){
     const f=selectedFormat(), ban=new Set((f?.itens_proibidos||[]).map(slug));
-    const base=basePokemon();
-    return itemNames.filter(code=>!ban.has(slug(code))&&
+    const base=basePokemon(), required=requiredFormHeldItem(base);
+    return itemNames.filter(code=>(!required||code===required)&&!ban.has(slug(code))&&
       (!megaStoneOwner[code]||(megaStoneOwner[code]===base&&(!f||f.permite_mega===true)&&!megaStoneRestriction(code)))&&
       (!code.endsWith('-z')||!f||f.permite_zmove===true)&&
       (mechanicSelect.value!=='mega'||megaStoneOwner[code]===base)&&
@@ -414,10 +439,15 @@
   function updateItemPreview(){
     const chosen=knownHeldItem(itemInput.value), value=itemInput.value.trim();
     const species=basePokemon(), recommendations=recommendedItems[species]||[];
+    const required=requiredFormHeldItem(species), fusionInfo=fusionItemInfo(species);
     itemIcon.hidden=!chosen;
     if(chosen){itemIcon.src=itemIconUrl(chosen);itemIcon.alt=pretty(chosen);}
-    itemHelp.textContent=!value?(recommendations.length?'Primeiras opções: sugestões para '+pretty(species)+'. Pesquise outros itens equipáveis.':'Pesquise itens equipáveis permitidos no formato.'):(chosen?'Selecionado: '+pretty(chosen):'Escolha uma das opções da lista para usar este item.');
-    itemHelp.classList.toggle('hype-item-error',!!value&&!chosen);
+    const normalHelp=!value?(recommendations.length?'Primeiras opções: sugestões para '+pretty(species)+'. Pesquise outros itens equipáveis.':'Pesquise itens equipáveis permitidos no formato.'):(chosen?'Selecionado: '+pretty(chosen):'Escolha uma das opções da lista para usar este item.');
+    const requiredAllowed=required&&allowedHeldItems().includes(required);
+    itemHelp.textContent=required
+      ? (requiredAllowed?'Forma '+pretty(species)+': '+pretty(required)+' é obrigatório e será sugerido automaticamente.':'O item '+pretty(required)+' não está permitido no formato selecionado. Confira as regras.')
+      : (fusionInfo?fusionInfo+' '+normalHelp:normalHelp);
+    itemHelp.classList.toggle('hype-item-error',!!value&&!chosen||!!required&&!requiredAllowed);
   }
   function closeItemChoices(){itemResults.hidden=true;itemInput.setAttribute('aria-expanded','false');}
   function chooseItem(code){
@@ -454,7 +484,7 @@
     for(const code of options){
       const btn=document.createElement('button'); btn.type='button'; btn.className='hype-item-option'; btn.setAttribute('role','option');
       const img=document.createElement('img');img.src=itemIconUrl(code);img.alt='';img.loading='lazy';img.addEventListener('error',()=>img.hidden=true);
-      const label=document.createElement('span');label.textContent=pretty(code);
+      const label=document.createElement('span');label.textContent=pretty(code)+(code===requiredFormHeldItem(basePokemon())?' · Obrigatório para esta forma':'');
       btn.append(img,label);btn.addEventListener('pointerdown',e=>e.preventDefault());btn.addEventListener('click',()=>chooseItem(code));itemResults.append(btn);
     }
     if(!options.length){const note=document.createElement('p');note.textContent='Nenhum item competitivo encontrado.';itemResults.append(note);}
@@ -493,6 +523,7 @@
 
   function renderEditor(){
     const s=current();
+    if(s.pokemon&&!s.item&&requiredFormHeldItem(s.pokemon))s.item=requiredFormHeldItem(s.pokemon);
     $('slotLabel').textContent=`SLOT ${active+1}`;
     $('editorPokemonName').textContent=s.pokemon?pretty(s.pokemon):'Escolha um Pokémon';
     levelInput.value=selectedFormat()?.little_cup?5:(s.level||100);
@@ -527,7 +558,11 @@
       if(!r.ok)throw new Error('No PokeAPI data');
       const p=await r.json();if(current()!==origin)return;
       if(speciesRestriction(name)){pokemonInput.value=current().pokemon||'';return;}
-      const slot=current();slot.pokemon=meta?.n||p.name;slot.pokemon_id=meta?.num||p.id;
+      const slot=current(),previousPokemon=slot.pokemon;
+       slot.pokemon=meta?.n||p.name;slot.pokemon_id=meta?.num||p.id;
+       const linkedItem=requiredFormHeldItem(slot.pokemon);
+       if(linkedItem)slot.item=linkedItem;
+       else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
       slot.tipos=p.types.map(x=>x.type.name);
       slot.sprite=p.sprites?.other?.['official-artwork']?.front_default||p.sprites?.front_default||'';
       slot.abilities=p.abilities.map(x=>x.ability.name);
@@ -539,7 +574,11 @@
       loadShowdownMovesForSlot(slot);
     }catch(e){
       if(meta&&current()===origin){
-        const slot=current();slot.pokemon=meta.n;slot.pokemon_id=meta.num;slot.tipos=meta.types.map(x=>x.toLowerCase());
+        const slot=current(),previousPokemon=slot.pokemon;
+         slot.pokemon=meta.n;slot.pokemon_id=meta.num;slot.tipos=meta.types.map(x=>x.toLowerCase());
+         const linkedItem=requiredFormHeldItem(slot.pokemon);
+         if(linkedItem)slot.item=linkedItem;
+         else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
         slot.sprite=meta.num>0?'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+meta.num+'.png':'';
         slot.moves_available=[];slot.abilities=[];
         pokemonInput.value=slot.pokemon;renderEditor();saveEditor();renderTabs();loadShowdownMovesForSlot(slot);
@@ -618,6 +657,8 @@
     messages.push({ok:filled.length>0,text:`${filled.length}/${teamSize()} Pokémon`});
     const species=filled.map(s=>String(s.pokemon).toLowerCase()); if(f?.species_clause) messages.push({ok:new Set(species).size===species.length,text:'Species Clause'});
     const items=filled.map(s=>String(s.item||'').toLowerCase()).filter(Boolean); if(f?.item_clause) messages.push({ok:new Set(items).size===items.length,text:'Item Clause'});
+    const invalidFormItems=filled.filter(s=>{const required=requiredFormHeldItem(s.pokemon);return required&&slug(s.item)!==required;});
+    if(invalidFormItems.length)messages.push({ok:false,text:'Item obrigatório: '+invalidFormItems.map(s=>pretty(s.pokemon)).join(', ')});
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
     const mechanics=filled.filter(s=>s.mecanica&&s.mecanica!=='nenhuma'); if(mechanics.length){ const invalid=mechanics.some(s=>f && !f[`permite_${s.mecanica}`]); messages.push({ok:!invalid,text:'Mecânicas do formato'}); }
     $('liveValidation').innerHTML=messages.map(m=>`<span class="validation-pill ${m.ok?'ok':'warn'}">${m.ok?'✓':'!'} ${m.text}</span>`).join('');
