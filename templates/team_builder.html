@@ -552,7 +552,7 @@
     document.querySelectorAll('.moveInput').forEach((el,i)=>el.value=(s.moves||[])[i]||'');
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
-    updateMoveList(s.moves_available||[]); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate(); refreshMegaDisplay();
+    updateMoveList(s.moves_available||[]);refreshAbilityHelp(); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate(); refreshMegaDisplay();
   }
 
   function saveEditor(){
@@ -630,7 +630,7 @@
       for(const [move,sources] of Object.entries(learn)){
         if(!Array.isArray(sources))continue;
         const legal=sources.filter(src=>natdex?/^[1-9]/.test(src):/^9/.test(src));
-        if(legal.length){available.add(move);(methodSources[move]||(methodSources[move]=new Set())).add(...legal.map(src=>src.slice(1,2)));}
+        if(legal.length){available.add(move);const m=methodSources[move]||(methodSources[move]=new Set());legal.forEach(src=>m.add(src.slice(1,2)));}
       }
     }
     if(!available.size){
@@ -705,7 +705,7 @@
     }
     return [...dedup.values()].sort((a,b)=>moveDisplayName(a).localeCompare(moveDisplayName(b),'en'));
   }
-  function moveDexEntry(move){return showdownMoveDex[moveKey(move)]||moveMetaCache.get(moveKey(move))||null;}
+  function moveDexEntry(move){return Object.assign({},showdownMoveDex[moveKey(move)]||{},moveMetaCache.get(moveKey(move))||{});}
   function moveDisplayName(move){return moveDexEntry(move)?.name||pretty(move);}
   function moveCategoryPT(v){return {physical:'Físico',special:'Especial',status:'Status'}[String(v||'').toLowerCase()]||'Não informado';}
   function moveLearningMethod(move){
@@ -777,6 +777,111 @@
       if(current()===slot)updateSelectedMoveVisuals();
     }catch(e){/* Sem conexão: metadados do Showdown e resumo local permanecem. */}
   }
+  function closeMoveChoices(){
+    document.querySelectorAll('.hype-move-options').forEach(box=>box.hidden=true);
+    document.querySelectorAll('.moveInput').forEach(el=>el.setAttribute('aria-expanded','false'));
+  }
+  function hideMoveDetails(){
+    document.querySelectorAll('.hype-move-info').forEach(box=>box.hidden=true);
+  }
+  function renderMoveChoices(input){
+    if(!input)return;
+    closeMoveChoices();hideMoveDetails();
+    const field=input.closest('.hype-move-field'),box=field?.querySelector('.hype-move-options');
+    if(!box)return;
+    const query=moveKey(input.value);
+    const matches=allowedMoves(current().moves_available||[]).filter(x=>moveKey(x).includes(query)).slice(0,18);
+    box.replaceChildren();
+    for(const move of matches){
+      const detail=moveInfo(move);
+      const button=document.createElement('button');button.type='button';button.className='hype-move-option';button.setAttribute('role','option');
+      const main=document.createElement('span');main.className='hype-move-option-main';
+      const name=document.createElement('strong');name.textContent=moveDisplayName(move);
+      const sub=document.createElement('small');sub.textContent=moveCategoryPT(detail.category)+' · '+moveLearningMethod(move)+(detail.power?' · '+detail.power+' poder':'');
+      const badge=document.createElement('span');badge.className='hype-move-option-type';badge.textContent=moveTypesPT[detail.type]||'—';
+      badge.style.setProperty('--option-color',moveTypeColors[detail.type]||'#746c58');
+      main.append(name,sub);button.append(main,badge);
+      button.title=effectPortuguese(move);
+      button.addEventListener('pointerdown',e=>e.preventDefault());
+      button.addEventListener('click',()=>{
+        input.value=moveDisplayName(move);
+        closeMoveChoices();hideMoveDetails();updateSelectedMoveVisuals();
+        input.dispatchEvent(new Event('change',{bubbles:true}));
+        showMoveDetails(input);
+      });
+      box.append(button);
+    }
+    if(!matches.length){
+      const note=document.createElement('p');
+      note.textContent=current().moves_available?.length?'Nenhum golpe compatível com a pesquisa.':'Aguarde a lista do Pokémon no Showdown.';
+      box.append(note);
+    }
+    box.hidden=false;input.setAttribute('aria-expanded','true');
+    bootMoveDex();
+  }
+  function drawMoveDetails(input){
+    const field=input.closest('.hype-move-field'),info=field?.querySelector('.hype-move-info');
+    if(!info||!input.value.trim())return;
+    const d=moveInfo(input.value),name=document.createElement('strong'),stats=document.createElement('div'),effect=document.createElement('p');
+    info.replaceChildren();
+    name.textContent=moveDisplayName(input.value)+' · '+(moveTypesPT[d.type]||'Tipo a confirmar');
+    stats.className='hype-move-info-stats';
+    const accuracy=d.accuracy===true?'Sempre':d.accuracy===null||d.accuracy===undefined?'—':d.accuracy+'%';
+    for(const value of [moveCategoryPT(d.category),'Poder: '+(d.power??'—'),'Precisão: '+accuracy,'PP: '+(d.pp??'—'),moveLearningMethod(input.value)]){
+      const chip=document.createElement('span');chip.textContent=value;stats.append(chip);
+    }
+    effect.textContent=effectPortuguese(input.value);
+    info.append(name,stats,effect);
+    info.hidden=false;
+    field.style.setProperty('--move-color',moveTypeColors[d.type]||'#b8934e');
+  }
+  function showMoveDetails(input){
+    if(!input.value.trim())return;
+    closeMoveChoices();hideMoveDetails();drawMoveDetails(input);
+    const selected=moveKey(input.value),slot=current();
+    loadMoveMeta(input.value).then(()=>{
+      if(current()===slot&&moveKey(input.value)===selected&&!input.closest('.hype-move-field').querySelector('.hype-move-info').hidden)
+        drawMoveDetails(input);
+    });
+  }
+  function refreshAbilityHelp(){
+    const help=$('abilityHelp'),ability=abilitySelect.value,key=moveKey(ability);
+    if(!ability){help.textContent='Escolha uma habilidade para ver o efeito em português.';return;}
+    help.textContent=pretty(ability)+' — '+(abilityMetaCache.get(key)||abilityEffectsPT[key]||'A descrição detalhada em português não está disponível nesta base.');
+    if(abilityMetaCache.has(key))return;
+    fetch('https://pokeapi.co/api/v2/ability/'+encodeURIComponent(slug(ability)))
+      .then(r=>r.ok?r.json():null)
+      .then(data=>{
+        const text=(data?.effect_entries||[]).find(x=>['pt','pt-br'].includes(x.language?.name))?.effect||
+          (data?.flavor_text_entries||[]).find(x=>['pt','pt-br'].includes(x.language?.name))?.flavor_text;
+        if(text)abilityMetaCache.set(key,text.replace(/\s+/g,' '));
+        if(abilitySelect.value===ability&&text)
+          help.textContent=pretty(ability)+' — '+abilityMetaCache.get(key);
+      }).catch(()=>{});
+  }
+  document.querySelectorAll('.moveInput').forEach(input=>{
+    const field=input.closest('.hype-move-field'),detail=field.querySelector('.hype-move-details-toggle');
+    input.addEventListener('focus',()=>renderMoveChoices(input));
+    input.addEventListener('input',()=>{renderMoveChoices(input);updateSelectedMoveVisuals();});
+    input.addEventListener('keydown',event=>{
+      const list=field.querySelector('.hype-move-options');
+      if(event.key==='Escape'){closeMoveChoices();hideMoveDetails();return;}
+      if(event.key==='ArrowDown'&&!list.hidden){event.preventDefault();list.querySelector('button')?.focus();}
+      if(event.key==='Enter'&&!list.hidden){
+        const btn=list.querySelector('button');if(btn){event.preventDefault();btn.click();}
+      }
+    });
+    input.addEventListener('blur',()=>setTimeout(closeMoveChoices,150));
+    input.addEventListener('mouseenter',()=>{if(input.value&&!document.activeElement?.isSameNode(input))showMoveDetails(input);});
+    detail.addEventListener('mouseenter',()=>showMoveDetails(input));
+    detail.addEventListener('focus',()=>showMoveDetails(input));
+    detail.addEventListener('click',()=>{
+      const info=field.querySelector('.hype-move-info');
+      if(!info.hidden)hideMoveDetails();else showMoveDetails(input);
+    });
+    field.addEventListener('mouseleave',hideMoveDetails);
+  });
+  abilitySelect.addEventListener('change',refreshAbilityHelp);
   function updateEvTotal(){ const total=evFields().reduce((a,x)=>a+capInt(x.value,0,252,0),0); $('evTotal').textContent=total; $('evRemaining').textContent=Math.max(0,510-total); $('evWarning').textContent=total>510?'— ajuste EVs antigos':(total===510?'— completo':''); $('evWarning').className=total>510?'bad-text':'good-text'; updateEvLimits(); }
   function updateMechanicVisibility(){
     const f=selectedFormat(), allowed=!f||f.permite_tera===true;
@@ -1174,7 +1279,7 @@
     }
     invalid.forEach(x=>slots[x.i]=emptySlot());
     const level=formatDefaultLevel(selectedFormat());
-    slots.forEach(x=>{if(x.pokemon)x.level=level;});
+    slots.forEach(x=>{x.level=level;});
     previousFormatCode=nextCode;
     if(active>=teamSize())active=0;
     renderEditor();refreshPokemonOptions();renderTabs();liveValidate();
@@ -1182,6 +1287,7 @@
   }
   $('formatSelect').addEventListener('change',changeBuilderFormat);
   renderTabs();renderEditor();
+  bootMoveDex();
   bootLists().then(()=>{
     if(prefillBuild&&prefillBuild._slot){
       slots[0]=Object.assign(emptySlot(),prefillBuild._slot);active=0;renderEditor();renderTabs();
