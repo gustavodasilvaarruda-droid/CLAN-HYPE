@@ -95,6 +95,12 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         # Os quatro campos são renderizados pelo laço Jinja original.
         self.assertIn('{% for i in range(1,5) %}', template)
 
+    def test_saved_teams_rehydrate_learnsets_on_open(self):
+        template=(ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        self.assertIn('slots.filter(s=>s.pokemon).forEach(loadShowdownMovesForSlot);', template)
+        self.assertIn('if(current().pokemon&&!current().abilities?.length)loadPokemonDetails(current().pokemon);', template)
+        self.assertIn('if(!current().abilities?.length)loadPokemonDetails(current().pokemon);else loadShowdownMovesForSlot(current());', template)
+
     def test_inline_javascript_parses_in_node_when_available(self):
         if not shutil.which('node'):
             self.skipTest('Node indisponível neste ambiente')
