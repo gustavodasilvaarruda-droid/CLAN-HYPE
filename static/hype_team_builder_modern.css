@@ -131,3 +131,41 @@
   .hype-v7-team-builder .hype-team-action-grid {grid-template-columns:minmax(0,1fr)}
   .hype-v7-team-builder .builder-validation {padding:14px!important}
 }
+
+
+/* Atualização Team Builder HYPE: golpes visuais, 18 tipos e ajuda em português. */
+.hype-v7-team-builder .hype-format-level-help,
+.hype-v7-team-builder .hype-ability-help{display:block;color:#c6bca7;font-size:.76rem;line-height:1.5;margin-top:5px}
+.hype-v7-team-builder .hype-ability-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.hype-v7-team-builder .hype-ability-field>label{font-weight:700;color:#e9d8aa}
+.hype-v7-team-builder .hype-ability-field>select{min-height:46px;width:100%;min-width:0}
+.hype-v7-team-builder .hype-move-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;overflow:visible}
+.hype-v7-team-builder .hype-move-field{position:relative;min-width:0;--move-color:#b8934e}
+.hype-v7-team-builder .hype-move-field>label{display:block;color:#e9d8aa;font-weight:700;font-size:.84rem;margin-bottom:7px}
+.hype-v7-team-builder .hype-move-input-wrap{display:flex;align-items:center;min-height:49px;gap:6px;padding:4px 7px;border:1px solid #695636;border-left:4px solid var(--move-color);border-radius:12px;background:linear-gradient(110deg,#111720,#1d2230);box-shadow:0 5px 12px #0004}
+.hype-v7-team-builder .hype-move-input-wrap:focus-within{border-color:#edc464;box-shadow:0 0 0 3px #efc96524}
+.hype-v7-team-builder .hype-move-input-wrap .moveInput{flex:1;min-width:0;width:100%;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;color:#f7f1e7!important;padding:7px!important;font-size:.92rem}
+.hype-v7-team-builder .hype-move-type-indicator{flex:none;border-radius:7px;padding:6px 8px;font-size:.65rem;font-weight:850;color:#fff;letter-spacing:.02em;background:var(--move-color)}
+.hype-v7-team-builder .hype-move-details-toggle{flex:none;background:#32323b;color:#e6d2a0;border:0;border-radius:7px;cursor:pointer;min-width:32px;min-height:32px;font-size:20px}
+.hype-v7-team-builder .hype-move-details-toggle:hover,
+.hype-v7-team-builder .hype-move-details-toggle:focus-visible{background:#514028;color:#fff;outline:2px solid #cda85c}
+.hype-v7-team-builder .hype-move-options{position:absolute;z-index:85;left:0;right:0;top:calc(100% - 1px);max-height:290px;overflow-y:auto;overscroll-behavior:contain;background:#111720;border:1px solid #987342;border-radius:11px;padding:5px;box-shadow:0 20px 40px #000d}
+.hype-v7-team-builder .hype-move-options[hidden],.hype-v7-team-builder .hype-move-info[hidden],.hype-v7-team-builder .hype-move-type-indicator[hidden]{display:none!important}
+.hype-v7-team-builder .hype-move-option{display:flex;gap:9px;align-items:center;width:100%;padding:10px 8px;min-height:48px;background:transparent;border:0;border-radius:8px;color:#f9f4e9;text-align:left;cursor:pointer}
+.hype-v7-team-builder .hype-move-option:hover,
+.hype-v7-team-builder .hype-move-option:focus-visible{background:#3b3329;outline:1px solid #b39252}
+.hype-v7-team-builder .hype-move-option-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.hype-v7-team-builder .hype-move-option-main strong{font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hype-v7-team-builder .hype-move-option-main small{font-size:.71rem;color:#b9b9bf}
+.hype-v7-team-builder .hype-move-option-type{flex:none;font-size:.68rem;color:#fff;background:var(--option-color,#444);border-radius:6px;padding:6px 8px;font-weight:800}
+.hype-v7-team-builder .hype-move-options p{margin:0;padding:12px;color:#d5c5a3}
+.hype-v7-team-builder .hype-move-info{position:absolute;z-index:90;left:0;right:0;top:100%;max-width:440px;background:linear-gradient(135deg,#1b222e,#111318);color:#eee6d8;border:1px solid var(--move-color);box-shadow:0 20px 42px #000e;border-radius:12px;padding:13px;font-size:.85rem;line-height:1.55}
+.hype-v7-team-builder .hype-move-info strong{color:#ffdc90;font-size:1rem}
+.hype-v7-team-builder .hype-move-info .hype-move-info-stats{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.hype-v7-team-builder .hype-move-info-stats span{border-radius:7px;border:1px solid #655235;padding:4px 7px;background:#0b1018;font-size:.75rem}
+.hype-v7-team-builder .hype-move-info p{margin:7px 0 0;color:#ded6c9}
+@media (max-width:720px){
+ .hype-v7-team-builder .hype-move-grid{grid-template-columns:minmax(0,1fr);gap:13px}
+ .hype-v7-team-builder .hype-move-options{max-height:230px}
+ .hype-v7-team-builder .hype-move-info{max-width:100%}
+}

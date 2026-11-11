@@ -1,6 +1,6 @@
 {% extends 'builders_base.html' %}
 {% block title %}HYPE Team Builder{% endblock %}
-{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=3">{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=4">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool showdown-builder-page hype-v7-team-builder">
 <section class="dash-welcome showdown-hero hype-v7-team-hero">
@@ -80,10 +80,13 @@
           </div>
           <label>Level
             <input id="levelInput" type="number" min="1" max="100" value="100" inputmode="numeric">
+            <small id="levelFormatHelp" class="hype-format-level-help" aria-live="polite">Nível livre até 100</small>
           </label>
-          <label>Ability
+          <div class="hype-ability-field">
+            <label for="abilitySelect">Ability</label>
             <select id="abilitySelect"><option value="">Escolha o Pokémon primeiro</option></select>
-          </label>
+            <small id="abilityHelp" class="hype-ability-help" aria-live="polite">Nome da habilidade em inglês e efeito em português.</small>
+          </div>
           <label>Nature
             <select id="natureSelect"></select>
           </label>
@@ -111,8 +114,19 @@
 
         <div class="builder-section-title"><h3>Moves</h3><small>Os golpes são filtrados pelo aprendizado registrado no Showdown; o validador oficial decide a legalidade final.</small></div>
         <p id="moveHelp" class="hype-rule-note">Selecione um Pokémon para consultar o aprendizado.</p>
-        <div class="move-grid">
-          {% for i in range(1,5) %}<label>Move {{i}}<input class="moveInput" data-index="{{i-1}}" list="moveList" autocomplete="off" placeholder="Escolha um golpe"></label>{% endfor %}
+        <div class="move-grid hype-move-grid">
+          {% for i in range(1,5) %}
+          <div class="hype-move-field" data-slot="{{i-1}}">
+            <label for="moveInput{{i}}">Move {{i}}</label>
+            <div class="hype-move-input-wrap">
+              <span class="hype-move-type-indicator" data-index="{{i-1}}" hidden></span>
+              <input id="moveInput{{i}}" class="moveInput" data-index="{{i-1}}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="moveOptions{{i}}" placeholder="Pesquisar golpe...">
+              <button type="button" class="hype-move-details-toggle" data-index="{{i-1}}" aria-label="Ver efeito do golpe" title="Informações em português">ⓘ</button>
+            </div>
+            <div class="hype-move-options" id="moveOptions{{i}}" data-index="{{i-1}}" role="listbox" hidden></div>
+            <div class="hype-move-info" data-index="{{i-1}}" role="status" hidden></div>
+          </div>
+          {% endfor %}
           <datalist id="moveList"></datalist>
         </div>
 
@@ -277,6 +291,7 @@
   let slots = Array.from({length:6}, emptySlot);
   if(editingTeam && Array.isArray(editingTeam.slots)){ editingTeam.slots.slice(0,6).forEach((x,i)=>{ slots[i]=Object.assign(emptySlot(),x||{}); }); }
   let active = 0;
+  let previousFormatCode = document.getElementById("formatSelect").value;
   let pokemonNames = [];
   const pokemonSpriteIds = new Map();
   const levelInput=document.getElementById('levelInput');
@@ -517,7 +532,7 @@
 
   function renderTabs(){
     $('slotTabs').innerHTML = slots.slice(0,teamSize()).map((s,i)=>`<button type="button" class="slot-tab ${i===active?'active':''}" data-slot="${i}">${s.sprite?`<img src="${s.sprite}" alt="">`:'<span class="slot-number">'+(i+1)+'</span>'}<span><b>${s.pokemon?pretty(s.pokemon):'Slot '+(i+1)}</b><small>${s.item?pretty(s.item):'Vazio'}</small></span></button>`).join('');
-    document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderEditor();renderTabs();}));
+    document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderEditor();renderTabs();if(current().pokemon&&showdownLearnsets)loadShowdownMovesForSlot(current());}));
     $('teamCount').textContent = `${slots.slice(0,teamSize()).filter(s=>s.pokemon).length}/${teamSize()}`;
   }
 
@@ -527,6 +542,7 @@
     $('slotLabel').textContent=`SLOT ${active+1}`;
     $('editorPokemonName').textContent=s.pokemon?pretty(s.pokemon):'Escolha um Pokémon';
     levelInput.value=selectedFormat()?.little_cup?5:(s.level||100);
+    $('levelFormatHelp').textContent=selectedFormat()?.little_cup?'Level 5 — regra do Little Cup':selectedFormat()?('Padrão ao selecionar: Level '+formatDefaultLevel(selectedFormat())+' · ajuste manual permitido'):'Formato livre · escolha de 1 a 100';
     levelInput.max=String(selectedFormat()?.nivel_maximo||100);
     levelInput.disabled=!!selectedFormat()?.little_cup;
     pokemonInput.value=s.pokemon||''; itemInput.value=s.item||''; natureSelect.value=s.nature||''; roleSelect.value=s.papel||''; mechanicSelect.value=s.mecanica==='tera'?'nenhuma':s.mecanica||'nenhuma'; teraSelect.value=s.tera_type||''; teraEnabled.checked=!!s.tera_ativa||s.mecanica==='tera'; notesInput.value=s.observacao||'';
@@ -536,7 +552,7 @@
     document.querySelectorAll('.moveInput').forEach((el,i)=>el.value=(s.moves||[])[i]||'');
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
-    updateMoveList(s.moves_available||[]); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate(); refreshMegaDisplay();
+    updateMoveList(s.moves_available||[]);refreshAbilityHelp(); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate(); refreshMegaDisplay();
   }
 
   function saveEditor(){
@@ -559,7 +575,8 @@
       const p=await r.json();if(current()!==origin)return;
       if(speciesRestriction(name)){pokemonInput.value=current().pokemon||'';return;}
       const slot=current(),previousPokemon=slot.pokemon;
-       slot.pokemon=meta?.n||p.name;slot.pokemon_id=meta?.num||p.id;
+       slot.pokemon=meta?.n||p.name;
+       if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.level=formatDefaultLevel(selectedFormat());slot.pokemon_id=meta?.num||p.id;
        const linkedItem=requiredFormHeldItem(slot.pokemon);
        if(linkedItem)slot.item=linkedItem;
        else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
@@ -575,7 +592,8 @@
     }catch(e){
       if(meta&&current()===origin){
         const slot=current(),previousPokemon=slot.pokemon;
-         slot.pokemon=meta.n;slot.pokemon_id=meta.num;slot.tipos=meta.types.map(x=>x.toLowerCase());
+         slot.pokemon=meta.n;
+         if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.level=formatDefaultLevel(selectedFormat());slot.pokemon_id=meta.num;slot.tipos=meta.types.map(x=>x.toLowerCase());
          const linkedItem=requiredFormHeldItem(slot.pokemon);
          if(linkedItem)slot.item=linkedItem;
          else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
@@ -608,34 +626,265 @@
       if(prevo)queue.push(prevo);
       if(base&&base!==mon)queue.push(base);
     }
-    const available=new Set();
+    const available=new Set(),methodSources={};
     for(const mon of mons){
       const learn=data[mon]?.learnset||data[mon]||{};
       for(const [move,sources] of Object.entries(learn)){
         if(!Array.isArray(sources))continue;
-        if(sources.some(src=>natdex?/^[1-9]/.test(src):/^9/.test(src)))available.add(move);
+        const legal=sources.filter(src=>natdex?/^[1-9]/.test(src):/^9/.test(src));
+        if(legal.length){available.add(move);const m=methodSources[move]||(methodSources[move]=new Set());legal.forEach(src=>m.add(src.slice(1,2)));}
       }
     }
     if(!available.size){
-      if(hint)hint.textContent='Sem lista confirmada para esta espécie; não considere o time validado.';
+      slot.moves_available=[];slot.move_methods={};
+      if(current()===slot){updateMoveList([]);if(hint)hint.textContent='Sem lista confirmada para esta espécie; não considere o time validado.';}
       return;
     }
     slot.moves_available=[...available].sort();
+    slot.move_methods=Object.fromEntries(Object.entries(methodSources).map(([key,val])=>[key,[...val]]));
     if(current()===slot){
-      updateMoveList(slot.moves_available);
+      updateMoveList(slot.moves_available);updateSelectedMoveVisuals();
       if(hint)hint.textContent=slot.moves_available.length+' golpes encontrados no aprendizado da geração'+(natdex?' e de gerações anteriores':' 9')+'. A legalidade final exige Showdown.';
     }
   }
+  // Movimentos: nomes ingleses, grupos de aprendizado e informações em português.
+  const moveTypesPT={normal:'Normal',fire:'Fogo',water:'Água',electric:'Elétrico',grass:'Planta',ice:'Gelo',fighting:'Lutador',poison:'Veneno',ground:'Terra',flying:'Voador',psychic:'Psíquico',bug:'Inseto',rock:'Pedra',ghost:'Fantasma',dragon:'Dragão',dark:'Sombrio',steel:'Aço',fairy:'Fada'};
+  const moveTypeColors={normal:'#9199a1',fire:'#e98245',water:'#5396d6',electric:'#d6b633',grass:'#58a868',ice:'#6abfc7',fighting:'#ce4a55',poison:'#9c66bb',ground:'#b99545',flying:'#7d9bcf',psychic:'#d66790',bug:'#87a93a',rock:'#a69a60',ghost:'#7664b0',dragon:'#696ccc',dark:'#6b687b',steel:'#6e9db0',fairy:'#d889bb'};
+  const moveEffectsPT={
+    leafstorm:'Causa dano e reduz o Ataque Especial do usuário em dois estágios.',
+    dracometeor:'Causa dano e reduz o Ataque Especial do usuário em dois estágios.',
+    overheat:'Causa dano e reduz o Ataque Especial do usuário em dois estágios.',
+    amnesia:'Aumenta a Defesa Especial do usuário em dois estágios.',
+    swordsdance:'Aumenta o Ataque do usuário em dois estágios.',
+    nastyplot:'Aumenta o Ataque Especial do usuário em dois estágios.',
+    calmmind:'Aumenta o Ataque Especial e a Defesa Especial em um estágio.',
+    dragondance:'Aumenta o Ataque e a Velocidade em um estágio.',
+    protect:'Protege o usuário da maioria dos golpes por um turno; usos consecutivos podem falhar.',
+    substitute:'Consome parte do HP para criar um substituto que absorve golpes.',
+    recover:'Restaura parte do HP máximo do usuário.',
+    roost:'Recupera HP; o usuário perde temporariamente o tipo Voador durante esse turno.',
+    stealthrock:'Coloca pedras no campo adversário, causando dano ao entrar conforme a tipagem.',
+    rapidspin:'Remove obstáculos do lado do usuário e aumenta sua Velocidade.',
+    uturn:'Ataca e permite trocar de Pokémon após causar dano.',
+    voltswitch:'Ataca e permite trocar de Pokémon após causar dano.',
+    trickroom:'Inverte por cinco turnos a ordem normal de atuação por Velocidade, salvo prioridades.',
+    raindance:'Ativa chuva por cinco turnos, podendo durar mais com o item adequado.',
+    sunnyday:'Ativa sol forte por cinco turnos, podendo durar mais com o item adequado.',
+    thunderwave:'Paralisa o alvo, se ele for afetado pelo golpe.',
+    willowoisp:'Causa queimadura no alvo, se o golpe for eficaz.',
+    defog:'Remove perigos de campo e efeitos relacionados; reduz a evasão do alvo.',
+    toxic:'Envenena gravemente o alvo, aumentando o dano a cada turno.',
+    leechseed:'Planta sementes que drenam HP do alvo a cada turno.',
+    earthquake:'Golpe físico de Terra que atinge Pokémon próximos, inclusive aliados em batalhas de duplas.',
+    grassyglide:'Ataque de Planta que recebe prioridade no Grassy Terrain.',
+  };
+  const abilityEffectsPT={
+    drizzle:'Invoca chuva automaticamente quando o Pokémon entra em campo.',
+    drought:'Invoca sol forte automaticamente quando o Pokémon entra em campo.',
+    grassysurge:'Cria Grassy Terrain quando o Pokémon entra em campo.',
+    electricsurge:'Cria Electric Terrain quando o Pokémon entra em campo.',
+    psychicsurge:'Cria Psychic Terrain quando o Pokémon entra em campo.',
+    mistysurge:'Cria Misty Terrain quando o Pokémon entra em campo.',
+    hadronengine:'Cria Electric Terrain e reforça o Ataque Especial sob Electric Terrain.',
+    intimidate:'Reduz o Ataque dos adversários próximos quando o Pokémon entra em campo.',
+    levitate:'Dá imunidade aos golpes do tipo Terra que dependem de contato com o chão, salvo exceções.',
+    overgrow:'Fortalece os golpes do tipo Planta quando o HP está baixo.',
+    blaze:'Fortalece os golpes do tipo Fogo quando o HP está baixo.',
+    torrent:'Fortalece os golpes do tipo Água quando o HP está baixo.',
+    chlorophyll:'Dobra a Velocidade do Pokémon sob sol forte.',
+    swiftswim:'Dobra a Velocidade do Pokémon na chuva.',
+    prankster:'Dá prioridade aos golpes de status; há restrições contra alvos do tipo Sombrio.',
+    magicbounce:'Reflete vários golpes de status direcionados ao Pokémon.',
+  };
+  let showdownMoveDex={},showdownMoveDexPromise=null;
+  const moveMetaCache=new Map(),abilityMetaCache=new Map();
+  function moveKey(v){return speciesKey(v);}
+  function allowedMoves(list){
+    const ban=new Set((selectedFormat()?.golpes_proibidos||[]).map(moveKey));
+    const dedup=new Map();
+    for(const name of list||[]){
+      const key=moveKey(name);
+      if(key&&!ban.has(key)&&!dedup.has(key))dedup.set(key,name);
+    }
+    return [...dedup.values()].sort((a,b)=>moveDisplayName(a).localeCompare(moveDisplayName(b),'en'));
+  }
+  function moveDexEntry(move){return Object.assign({},showdownMoveDex[moveKey(move)]||{},moveMetaCache.get(moveKey(move))||{});}
+  function moveDisplayName(move){return moveDexEntry(move)?.name||pretty(move);}
+  function moveCategoryPT(v){return {physical:'Físico',special:'Especial',status:'Status'}[String(v||'').toLowerCase()]||'Não informado';}
+  function moveLearningMethod(move){
+    const sources=(current().move_methods||{})[moveKey(move)]||(current().move_methods||{})[move]||[];
+    const labels={L:'Nível',M:'TM/HM',T:'Tutor',E:'Ovo',S:'Evento',D:'Dream World',V:'Transferência',R:'Transferência'};
+    return [...new Set(sources.map(x=>labels[x]||'Outro método'))].join(' · ')||'Método a conferir';
+  }
+  function moveInfo(move){
+    const d=moveDexEntry(move)||{},s=current(),key=moveKey(move);
+    return {name:d.name||moveDisplayName(move),type:String(d.type||s.move_types?.[move]||s.move_types?.[slug(move)]||'').toLowerCase(),
+      category:String(d.category||s.move_categories?.[move]||s.move_categories?.[slug(move)]||'').toLowerCase(),
+      power:d.basePower??d.power??null,accuracy:d.accuracy??null,pp:d.pp??null,descPT:d.descPT||moveEffectsPT[key]||''};
+  }
+  function effectPortuguese(move){
+    const d=moveInfo(move);
+    if(d.descPT)return d.descPT;
+    if(d.category==='physical'||d.category==='special')
+      return 'Golpe '+moveCategoryPT(d.category).toLowerCase()+' de '+(moveTypesPT[d.type]||'tipo não informado')+'. Consulte o validador oficial para efeitos adicionais, interações e restrições.';
+    return 'Golpe de status. A descrição detalhada ainda não está disponível em português; confirme o efeito no Showdown.';
+  }
   function updateMoveList(list){
-    const f=selectedFormat(); const banned=new Set((f?.golpes_proibidos||[]).map(slug));
-    $('moveList').innerHTML=(list||[]).filter(x=>!banned.has(slug(x))).slice(0,900).map(x=>`<option value="${x}">${pretty(x)}</option>`).join('');
+    const moves=allowedMoves(list);
+    $('moveList').replaceChildren();
+    for(const move of moves.slice(0,900)){
+      const option=document.createElement('option');option.value=moveDisplayName(move);$('moveList').append(option);
+    }
+    updateSelectedMoveVisuals();
+  }
+  function updateSelectedMoveVisuals(){
+    document.querySelectorAll('.moveInput').forEach(el=>{
+      const field=el.closest('.hype-move-field'),chip=field?.querySelector('.hype-move-type-indicator');
+      if(!field||!chip)return;
+      const detail=moveInfo(el.value),selected=!!el.value.trim();
+      field.style.setProperty('--move-color',moveTypeColors[detail.type]||'#b8934e');
+      chip.hidden=!selected||!detail.type;
+      chip.textContent=moveTypesPT[detail.type]||pretty(detail.type);
+      el.title=selected?effectPortuguese(el.value):'Digite para pesquisar os golpes permitidos';
+    });
+  }
+  async function bootMoveDex(){
+    if(showdownMoveDexPromise)return showdownMoveDexPromise;
+    showdownMoveDexPromise=fetch('https://play.pokemonshowdown.com/data/moves.json')
+      .then(r=>{if(!r.ok)throw Error('moves dex');return r.json();})
+      .then(data=>{showdownMoveDex=data||{};updateSelectedMoveVisuals();
+        document.querySelectorAll('.hype-move-options:not([hidden])').forEach(el=>renderMoveChoices(document.querySelector('.moveInput[data-index="'+el.dataset.index+'"]')));
+        return data;})
+      .catch(()=>null);
+    return showdownMoveDexPromise;
   }
   async function loadMoveMeta(move){
-    const key=slug(move); if(!key) return;
-    const s=current(); s.move_types=s.move_types||{}; s.move_categories=s.move_categories||{};
-    if(s.move_types[move] && s.move_categories[move]) return;
-    try{ const r=await fetch(`https://pokeapi.co/api/v2/move/${encodeURIComponent(key)}`); if(!r.ok) return; const d=await r.json(); s.move_types[move]=d.type?.name||''; s.move_types[key]=d.type?.name||''; s.move_categories[move]=d.damage_class?.name||''; s.move_categories[key]=d.damage_class?.name||''; }catch(e){}
+    const key=moveKey(move);if(!key)return;
+    const slot=current();slot.move_types=slot.move_types||{};slot.move_categories=slot.move_categories||{};
+    const d=moveDexEntry(move);
+    if(d?.type){slot.move_types[move]=String(d.type).toLowerCase();slot.move_categories[move]=String(d.category||'').toLowerCase();}
+    if(moveMetaCache.has(key))return;
+    // A PokéAPI pode fornecer descrições já traduzidas; jamais mostrar inglês como português.
+    try{
+      const apiName=(d?.name||move).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+      const r=await fetch('https://pokeapi.co/api/v2/move/'+encodeURIComponent(apiName));
+      if(!r.ok)return;
+      const api=await r.json();
+      const pt=(api.flavor_text_entries||[]).find(x=>['pt','pt-br'].includes(x.language?.name));
+      const detail={name:d?.name||move,type:api.type?.name||d?.type||'',
+        category:api.damage_class?.name||d?.category||'',basePower:api.power,
+        accuracy:api.accuracy,pp:api.pp,descPT:pt?.flavor_text?.replace(/\s+/g,' ')||''};
+      moveMetaCache.set(key,detail);
+      slot.move_types[move]=String(detail.type).toLowerCase();
+      slot.move_categories[move]=String(detail.category).toLowerCase();
+      if(current()===slot)updateSelectedMoveVisuals();
+    }catch(e){/* Sem conexão: metadados do Showdown e resumo local permanecem. */}
   }
+  function closeMoveChoices(){
+    document.querySelectorAll('.hype-move-options').forEach(box=>box.hidden=true);
+    document.querySelectorAll('.moveInput').forEach(el=>el.setAttribute('aria-expanded','false'));
+  }
+  function hideMoveDetails(){
+    document.querySelectorAll('.hype-move-info').forEach(box=>box.hidden=true);
+  }
+  function renderMoveChoices(input){
+    if(!input)return;
+    closeMoveChoices();hideMoveDetails();
+    const field=input.closest('.hype-move-field'),box=field?.querySelector('.hype-move-options');
+    if(!box)return;
+    const query=moveKey(input.value);
+    const matches=allowedMoves(current().moves_available||[]).filter(x=>moveKey(x).includes(query)).slice(0,18);
+    box.replaceChildren();
+    for(const move of matches){
+      const detail=moveInfo(move);
+      const button=document.createElement('button');button.type='button';button.className='hype-move-option';button.setAttribute('role','option');
+      const main=document.createElement('span');main.className='hype-move-option-main';
+      const name=document.createElement('strong');name.textContent=moveDisplayName(move);
+      const sub=document.createElement('small');sub.textContent=moveCategoryPT(detail.category)+' · '+moveLearningMethod(move)+(detail.power?' · '+detail.power+' poder':'');
+      const badge=document.createElement('span');badge.className='hype-move-option-type';badge.textContent=moveTypesPT[detail.type]||'—';
+      badge.style.setProperty('--option-color',moveTypeColors[detail.type]||'#746c58');
+      main.append(name,sub);button.append(main,badge);
+      button.title=effectPortuguese(move);
+      button.addEventListener('pointerdown',e=>e.preventDefault());
+      button.addEventListener('click',()=>{
+        input.value=moveDisplayName(move);
+        closeMoveChoices();hideMoveDetails();updateSelectedMoveVisuals();
+        input.dispatchEvent(new Event('change',{bubbles:true}));
+        showMoveDetails(input);
+      });
+      box.append(button);
+    }
+    if(!matches.length){
+      const note=document.createElement('p');
+      note.textContent=current().moves_available?.length?'Nenhum golpe compatível com a pesquisa.':'Aguarde a lista do Pokémon no Showdown.';
+      box.append(note);
+    }
+    box.hidden=false;input.setAttribute('aria-expanded','true');
+    bootMoveDex();
+  }
+  function drawMoveDetails(input){
+    const field=input.closest('.hype-move-field'),info=field?.querySelector('.hype-move-info');
+    if(!info||!input.value.trim())return;
+    const d=moveInfo(input.value),name=document.createElement('strong'),stats=document.createElement('div'),effect=document.createElement('p');
+    info.replaceChildren();
+    name.textContent=moveDisplayName(input.value)+' · '+(moveTypesPT[d.type]||'Tipo a confirmar');
+    stats.className='hype-move-info-stats';
+    const accuracy=d.accuracy===true?'Sempre':d.accuracy===null||d.accuracy===undefined?'—':d.accuracy+'%';
+    for(const value of [moveCategoryPT(d.category),'Poder: '+(d.power??'—'),'Precisão: '+accuracy,'PP: '+(d.pp??'—'),moveLearningMethod(input.value)]){
+      const chip=document.createElement('span');chip.textContent=value;stats.append(chip);
+    }
+    effect.textContent=effectPortuguese(input.value);
+    info.append(name,stats,effect);
+    info.hidden=false;
+    field.style.setProperty('--move-color',moveTypeColors[d.type]||'#b8934e');
+  }
+  function showMoveDetails(input){
+    if(!input.value.trim())return;
+    closeMoveChoices();hideMoveDetails();drawMoveDetails(input);
+    const selected=moveKey(input.value),slot=current();
+    loadMoveMeta(input.value).then(()=>{
+      if(current()===slot&&moveKey(input.value)===selected&&!input.closest('.hype-move-field').querySelector('.hype-move-info').hidden)
+        drawMoveDetails(input);
+    });
+  }
+  function refreshAbilityHelp(){
+    const help=$('abilityHelp'),ability=abilitySelect.value,key=moveKey(ability);
+    if(!ability){help.textContent='Escolha uma habilidade para ver o efeito em português.';return;}
+    help.textContent=pretty(ability)+' — '+(abilityMetaCache.get(key)||abilityEffectsPT[key]||'A descrição detalhada em português não está disponível nesta base.');
+    if(abilityMetaCache.has(key))return;
+    fetch('https://pokeapi.co/api/v2/ability/'+encodeURIComponent(slug(ability)))
+      .then(r=>r.ok?r.json():null)
+      .then(data=>{
+        const text=(data?.effect_entries||[]).find(x=>['pt','pt-br'].includes(x.language?.name))?.effect||
+          (data?.flavor_text_entries||[]).find(x=>['pt','pt-br'].includes(x.language?.name))?.flavor_text;
+        if(text)abilityMetaCache.set(key,text.replace(/\s+/g,' '));
+        if(abilitySelect.value===ability&&text)
+          help.textContent=pretty(ability)+' — '+abilityMetaCache.get(key);
+      }).catch(()=>{});
+  }
+  document.querySelectorAll('.moveInput').forEach(input=>{
+    const field=input.closest('.hype-move-field'),detail=field.querySelector('.hype-move-details-toggle');
+    input.addEventListener('focus',()=>renderMoveChoices(input));
+    input.addEventListener('input',()=>{renderMoveChoices(input);updateSelectedMoveVisuals();});
+    input.addEventListener('keydown',event=>{
+      const list=field.querySelector('.hype-move-options');
+      if(event.key==='Escape'){closeMoveChoices();hideMoveDetails();return;}
+      if(event.key==='ArrowDown'&&!list.hidden){event.preventDefault();list.querySelector('button')?.focus();}
+      if(event.key==='Enter'&&!list.hidden){
+        const btn=list.querySelector('button');if(btn){event.preventDefault();btn.click();}
+      }
+    });
+    input.addEventListener('blur',()=>setTimeout(closeMoveChoices,150));
+    input.addEventListener('mouseenter',()=>{if(input.value&&!document.activeElement?.isSameNode(input))showMoveDetails(input);});
+    detail.addEventListener('mouseenter',()=>showMoveDetails(input));
+    detail.addEventListener('focus',()=>showMoveDetails(input));
+    detail.addEventListener('click',()=>{
+      const info=field.querySelector('.hype-move-info');
+      if(!info.hidden)hideMoveDetails();else showMoveDetails(input);
+    });
+    field.addEventListener('mouseleave',hideMoveDetails);
+  });
+  abilitySelect.addEventListener('change',refreshAbilityHelp);
   function updateEvTotal(){ const total=evFields().reduce((a,x)=>a+capInt(x.value,0,252,0),0); $('evTotal').textContent=total; $('evRemaining').textContent=Math.max(0,510-total); $('evWarning').textContent=total>510?'— ajuste EVs antigos':(total===510?'— completo':''); $('evWarning').className=total>510?'bad-text':'good-text'; updateEvLimits(); }
   function updateMechanicVisibility(){
     const f=selectedFormat(), allowed=!f||f.permite_tera===true;
@@ -648,8 +897,7 @@
   function selectedFormat(){ return formatos.find(f=>f.codigo===$('formatSelect').value)||null; }
   function teamSize(){ const n=Number(selectedFormat()?.tamanho_equipe||6); return Number.isInteger(n)&&n>=1&&n<=6?n:6; }
   function refreshPokemonOptions(){
-    const f=selectedFormat(), banned=new Set((f?.pokemons_proibidos||[]).map(slug));
-    $('pokemonList').innerHTML=pokemonNames.filter(n=>!banned.has(slug(n))).map(n=>`<option value="${n}">${pretty(n)}</option>`).join('');
+    $('pokemonList').innerHTML=pokemonNames.filter(n=>!speciesRestriction(n)).map(n=>`<option value="${n}">${pretty(n)}</option>`).join('');
     updateMoveList(current().moves_available||[]);
   }
   function liveValidate(){
@@ -657,6 +905,10 @@
     messages.push({ok:filled.length>0,text:`${filled.length}/${teamSize()} Pokémon`});
     const species=filled.map(s=>String(s.pokemon).toLowerCase()); if(f?.species_clause) messages.push({ok:new Set(species).size===species.length,text:'Species Clause'});
     const items=filled.map(s=>String(s.item||'').toLowerCase()).filter(Boolean); if(f?.item_clause) messages.push({ok:new Set(items).size===items.length,text:'Item Clause'});
+    const incompatibleSpecies=filled.filter(s=>speciesRestriction(s.pokemon));
+    if(incompatibleSpecies.length)messages.push({ok:false,text:'Pokémon incompatíveis: '+incompatibleSpecies.map(s=>pretty(s.pokemon)).join(', ')});
+    const illegalMoves=filled.filter(s=>s.moves_available?.length&&(s.moves||[]).some(m=>m&&!allowedMoves(s.moves_available).some(x=>moveKey(x)===moveKey(m))));
+    if(illegalMoves.length)messages.push({ok:false,text:'Revise os golpes: '+illegalMoves.map(s=>pretty(s.pokemon)).join(', ')});
     const invalidFormItems=filled.filter(s=>{const required=requiredFormHeldItem(s.pokemon);return required&&slug(s.item)!==required;});
     if(invalidFormItems.length)messages.push({ok:false,text:'Item obrigatório: '+invalidFormItems.map(s=>pretty(s.pokemon)).join(', ')});
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
@@ -1003,8 +1255,46 @@
     }
   }
 
-  $('formatSelect').addEventListener('change',()=>{saveEditor();if(active>=teamSize())active=0;if(selectedFormat()?.little_cup)slots.forEach(slot=>slot.level=5);renderEditor();syncMechanics();refreshPokemonOptions();updateItemPreview();renderTabs();liveValidate();});
+  // Uma troca de formato nunca altera os times já salvos no servidor.
+  function formatDefaultLevel(f){
+    if(!f)return 100;
+    if(f.little_cup)return 5;
+    return /vgc|battlestadium|battle.?stadium/i.test(String(f.codigo||'')+' '+String(f.nome||''))?50:100;
+  }
+  function changeBuilderFormat(){
+    const field=$('formatSelect'), nextCode=field.value;
+    if(nextCode===previousFormatCode)return;
+    // O editor ainda mostra o formato novo: salva primeiro com o anterior
+    // para impedir que o LC transforme o nível do Pokémon antes da confirmação.
+    field.value=previousFormatCode;saveEditor();field.value=nextCode;
+    if(selectedFormat()&&!showdownReady){
+      alert('O catálogo competitivo ainda não carregou. Aguarde e tente mudar o formato novamente.');
+      field.value=previousFormatCode;return;
+    }
+    const invalid=slots.map((s,i)=>{
+      if(!s.pokemon)return null;
+      const reason=i>=teamSize()?'Slot fora do tamanho da equipe':speciesRestriction(s.pokemon);
+      return reason?{i,reason,name:s.pokemon}:null;
+    }).filter(Boolean);
+    if(invalid.length){
+      const summary=invalid.map(x=>(x.i+1)+'. '+pretty(x.name)+' — '+x.reason).join('\n');
+      if(!confirm('Mudar para '+(selectedFormat()?.nome||'Formato livre')+'?\n\n'+
+        invalid.length+' Pokémon incompatível(is) serão removidos dos slots:\n'+summary+
+        '\n\nOs times já salvos permanecem inalterados até você salvar novamente.')){
+        field.value=previousFormatCode;renderEditor();renderTabs();return;
+      }
+    }
+    invalid.forEach(x=>slots[x.i]=emptySlot());
+    const level=formatDefaultLevel(selectedFormat());
+    slots.forEach(x=>{x.level=level;});
+    previousFormatCode=nextCode;
+    if(active>=teamSize())active=0;
+    renderEditor();refreshPokemonOptions();renderTabs();liveValidate();
+    slots.filter(s=>s.pokemon).forEach(loadShowdownMovesForSlot);
+  }
+  $('formatSelect').addEventListener('change',changeBuilderFormat);
   renderTabs();renderEditor();
+  bootMoveDex();
   bootLists().then(()=>{
     if(prefillBuild&&prefillBuild._slot){
       slots[0]=Object.assign(emptySlot(),prefillBuild._slot);active=0;renderEditor();renderTabs();
