@@ -105,7 +105,10 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         if not codigo:
             flash('Este torneio ainda não possui um formato compatível com o envio privado.', 'erro')
             return redirect(url_for('events26.torneio_detalhe', torneio_id=torneio_id))
-        pode_enviar = bool(torneio.get('inscricoes_abertas') and
+        # Após a inscrição oficial, todos os slots ficam congelados, inclusive vazios.
+        esta_inscrito = bool(safe_table('inscricoes_torneio', 'id',
+                                       torneio_id=torneio_id, usuario_email=email))
+        pode_enviar = bool(not esta_inscrito and torneio.get('inscricoes_abertas') and
                            torneio.get('status_torneio') == 'inscricoes')
         enviados_lista = safe_table('arena_torneio_equipes', '*',
                                    torneio_id=torneio_id, usuario_email=email)
@@ -176,7 +179,8 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
             selecionado = None
         return render_template('arena_torneio_equipes.html', torneio=torneio,
                                enviados=enviados, meus_times=meus_times,
-                               pode_enviar=pode_enviar, tamanho_equipe=tamanho_equipe,
+                               pode_enviar=pode_enviar, esta_inscrito=esta_inscrito,
+                               tamanho_equipe=tamanho_equipe,
                                torneio_formato_codigo=codigo, time_selecionado_id=selecionado)
 
     def revisao_aberta(torneio):
