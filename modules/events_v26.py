@@ -176,10 +176,18 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
                                pode_enviar=pode_enviar, tamanho_equipe=tamanho_equipe,
                                torneio_formato_codigo=codigo, time_selecionado_id=selecionado)
 
+    def revisao_aberta(torneio):
+        return bool(torneio and torneio.get('publicado')
+                    and torneio.get('inscricoes_abertas')
+                    and torneio.get('status_torneio') == 'inscricoes')
+
+    def voltar_revisao(torneio_id):
+        return redirect(url_for('events26.admin_equipes_torneio', torneio_id=torneio_id))
+
     @bp.route('/admin/torneios/<int:torneio_id>/equipes')
     @login_required
     def admin_equipes_torneio(torneio_id):
-        """Somente administrador acessa os sets e o histórico integral."""
+        """Fila sigilosa por jogador: revisão de cada time, pagamento e inscrição."""
         if not admin_ok():
             flash('Acesso restrito à administração.', 'erro')
             return redirect(url_for('painel'))
@@ -191,6 +199,12 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         historico = safe_table('arena_torneio_equipes_historico', '*', torneio_id=torneio_id)
         perfis = {str(u.get('email') or '').lower(): u.get('nick_jogo')
                   for u in safe_table('usuarios_clan', 'email,nick_jogo')}
+        controles = {str(c.get('usuario_email') or '').lower(): c
+                     for c in safe_table('arena_torneio_inscricoes_controle', '*',
+                                         torneio_id=torneio_id)}
+        inscritos = {str(i.get('usuario_email') or '').lower()
+                     for i in safe_table('inscricoes_torneio', 'usuario_email',
+                                         torneio_id=torneio_id)}
         grupos = {}
         for equipe in enviados:
             endereco = str(equipe.get('usuario_email') or '').lower()
@@ -199,8 +213,149 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         for times in grupos.values():
             times.sort(key=lambda x: int(x.get('slot') or 0))
         historico.sort(key=lambda x: str(x.get('criado_em') or ''), reverse=True)
+        pendentes = sum(1 for email, times in grupos.items()
+                        if email not in inscritos
+                        and (any(t.get('status') != 'aprovado' for t in times)
+                             or controles.get(email, {}).get('pagamento_status')
+                                not in ('confirmado', 'dispensado')))
         return render_template('admin_arena_equipes.html', torneio=torneio,
-                               grupos=grupos, historico=historico)
+                               grupos=grupos, historico=historico,
+                               controles=controles, inscritos=inscritos,
+                               pendentes=pendentes, pode_revisar=revisao_aberta(torneio))
+
+    @bp.route('/admin/torneios/<int:torneio_id>/equipes/<int:equipe_id>/revisar',
+              methods=['POST'])
+    @login_required
+    def admin_revisar_equipe(torneio_id, equipe_id):
+        if not admin_ok():
+            flash('Acesso restrito à administração.', 'erro')
+            return redirect(url_for('painel'))
+        torneio = one('torneios', id=torneio_id)
+        if not revisao_aberta(torneio):
+            flash('A revisão está fechada para este torneio.', 'erro')
+            return voltar_revisao(torneio_id)
+        equipe = one('arena_torneio_equipes', id=equipe_id, torneio_id=torneio_id)
+        if not equipe or equipe.get('status') == 'aprovado':
+            flash('Time não encontrado ou já aprovado; não é possível alterá-lo.', 'erro')
+            return voltar_revisao(torneio_id)
+        acao = (request.form.get('acao') or '').strip()
+        motivo = (request.form.get('motivo') or '').strip()
+        if acao == 'aprovar':
+            codigo = codigo_formato_do_torneio(torneio.get('regras'))
+            if not codigo or equipe.get('formato_codigo') != codigo:
+                flash('Formato do time não corresponde ao torneio.', 'erro')
+                return voltar_revisao(torneio_id)
+            erros = validar_equipe_basica(equipe.get('equipe'), codigo)
+            if erros:
+                flash('O time não passou na checagem preliminar: ' + ' | '.join(erros[:3]), 'erro')
+                return voltar_revisao(torneio_id)
+            novo_status = 'aprovado'
+            motivo = ''
+        elif acao == 'corrigir':
+            if len(motivo) < 8 or len(motivo) > 500:
+                flash('Informe um motivo de correção de 8 a 500 caracteres.', 'erro')
+                return voltar_revisao(torneio_id)
+            novo_status = 'correcao_solicitada'
+        else:
+            flash('Ação de revisão inválida.', 'erro')
+            return voltar_revisao(torneio_id)
+        try:
+            resultado = (supabase.table('arena_torneio_equipes')
+                         .update({'status': novo_status, 'motivo_revisao': motivo or None,
+                                  'revisado_por': session.get('usuario_email'),
+                                  'revisado_em': datetime.now(timezone.utc).isoformat(),
+                                  'atualizado_em': datetime.now(timezone.utc).isoformat()})
+                         .eq('id', equipe_id).eq('torneio_id', torneio_id)
+                         .eq('status', equipe['status']).execute().data or [])
+            if not resultado:
+                flash('O time mudou durante a revisão. Atualize a página.', 'erro')
+                return voltar_revisao(torneio_id)
+        except Exception:
+            flash('Falha ao registrar a revisão. Verifique a migração da Arena.', 'erro')
+            return voltar_revisao(torneio_id)
+        if novo_status == 'aprovado':
+            mensagem = f'Seu time do slot {equipe["slot"]} foi aprovado na conferência preliminar.'
+        else:
+            mensagem = f'Seu time do slot {equipe["slot"]} precisa de correção: {motivo}'
+        try:
+            criar_notificacao(equipe['usuario_email'], 'Revisão do torneio HYPE', mensagem,
+                              'torneio', url_for('events26.equipes_torneio', torneio_id=torneio_id))
+        except Exception:
+            pass
+        flash('Revisão registrada no histórico.', 'sucesso')
+        return voltar_revisao(torneio_id)
+
+    @bp.route('/admin/torneios/<int:torneio_id>/pagamento', methods=['POST'])
+    @login_required
+    def admin_pagamento_torneio(torneio_id):
+        if not admin_ok():
+            flash('Acesso restrito à administração.', 'erro')
+            return redirect(url_for('painel'))
+        torneio = one('torneios', id=torneio_id)
+        if not revisao_aberta(torneio):
+            flash('Não é possível alterar pagamentos de inscrições encerradas.', 'erro')
+            return voltar_revisao(torneio_id)
+        email = (request.form.get('usuario_email') or '').strip().lower()
+        status = (request.form.get('acao') or '').strip()
+        if status not in ('pendente', 'confirmado', 'dispensado') or not email:
+            flash('Pagamento ou jogador inválido.', 'erro')
+            return voltar_revisao(torneio_id)
+        if not safe_table('arena_torneio_equipes', 'id', torneio_id=torneio_id,
+                          usuario_email=email):
+            flash('Este jogador não enviou times a este torneio.', 'erro')
+            return voltar_revisao(torneio_id)
+        if safe_table('inscricoes_torneio', 'id', torneio_id=torneio_id,
+                      usuario_email=email):
+            flash('A inscrição já foi confirmada; o pagamento está bloqueado.', 'erro')
+            return voltar_revisao(torneio_id)
+        try:
+            supabase.table('arena_torneio_inscricoes_controle').upsert({
+                'torneio_id': torneio_id, 'usuario_email': email,
+                'pagamento_status': status,
+                'pagamento_por': session.get('usuario_email') if status != 'pendente' else None,
+                'pagamento_em': datetime.now(timezone.utc).isoformat()
+                                if status != 'pendente' else None,
+                'atualizado_em': datetime.now(timezone.utc).isoformat(),
+            }, on_conflict='torneio_id,usuario_email').execute()
+        except Exception:
+            flash('Não foi possível salvar o pagamento. Verifique a migração da Arena.', 'erro')
+            return voltar_revisao(torneio_id)
+        flash('Situação do pagamento atualizada com registro de auditoria.', 'sucesso')
+        return voltar_revisao(torneio_id)
+
+    @bp.route('/admin/torneios/<int:torneio_id>/confirmar-inscricao', methods=['POST'])
+    @login_required
+    def admin_confirmar_inscricao_torneio(torneio_id):
+        if not admin_ok():
+            flash('Acesso restrito à administração.', 'erro')
+            return redirect(url_for('painel'))
+        email = (request.form.get('usuario_email') or '').strip().lower()
+        if not email:
+            flash('Selecione o jogador.', 'erro')
+            return voltar_revisao(torneio_id)
+        try:
+            resultado = supabase.rpc('hype_arena_confirmar_inscricao', {
+                'p_torneio_id': torneio_id,
+                'p_usuario_email': email,
+                'p_admin_email': session.get('usuario_email'),
+            }).execute().data
+        except Exception:
+            flash('Não foi possível confirmar: verifique times, pagamento, vagas e se as inscrições estão abertas.', 'erro')
+            return voltar_revisao(torneio_id)
+        if resultado == 'inscricao_confirmada':
+            torneio = one('torneios', id=torneio_id) or {}
+            try:
+                criar_notificacao(email, 'Inscrição confirmada na Arena HYPE',
+                                  f'Sua inscrição no torneio {torneio.get("titulo", "")} foi confirmada pela administração.',
+                                  'torneio', url_for('events26.torneio_detalhe', torneio_id=torneio_id))
+            except Exception:
+                pass
+            flash('Inscrição oficial confirmada! O jogador já conta como participante.', 'sucesso')
+        elif resultado == 'ja_inscrito':
+            flash('Este jogador já está inscrito.', 'info')
+        else:
+            flash('A inscrição não pôde ser confirmada. Atualize e confira os requisitos.', 'erro')
+        return voltar_revisao(torneio_id)
 
     @bp.route('/admin/eventos/<int:item_id>/v26', methods=['POST'])
     @login_required
