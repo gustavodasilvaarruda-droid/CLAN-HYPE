@@ -1,6 +1,6 @@
 {% extends 'builders_base.html' %}
 {% block title %}HYPE Team Builder{% endblock %}
-{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=3">{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=4">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool showdown-builder-page hype-v7-team-builder">
 <section class="dash-welcome showdown-hero hype-v7-team-hero">
@@ -82,9 +82,11 @@
             <input id="levelInput" type="number" min="1" max="100" value="100" inputmode="numeric">
             <small id="levelFormatHelp" class="hype-format-level-help" aria-live="polite">Nível livre até 100</small>
           </label>
-          <label>Ability
+          <div class="hype-ability-field">
+            <label for="abilitySelect">Ability</label>
             <select id="abilitySelect"><option value="">Escolha o Pokémon primeiro</option></select>
-          </label>
+            <small id="abilityHelp" class="hype-ability-help" aria-live="polite">Nome da habilidade em inglês e efeito em português.</small>
+          </div>
           <label>Nature
             <select id="natureSelect"></select>
           </label>
@@ -112,8 +114,19 @@
 
         <div class="builder-section-title"><h3>Moves</h3><small>Os golpes são filtrados pelo aprendizado registrado no Showdown; o validador oficial decide a legalidade final.</small></div>
         <p id="moveHelp" class="hype-rule-note">Selecione um Pokémon para consultar o aprendizado.</p>
-        <div class="move-grid">
-          {% for i in range(1,5) %}<label>Move {{i}}<input class="moveInput" data-index="{{i-1}}" list="moveList" autocomplete="off" placeholder="Escolha um golpe"></label>{% endfor %}
+        <div class="move-grid hype-move-grid">
+          {% for i in range(1,5) %}
+          <div class="hype-move-field" data-slot="{{i-1}}">
+            <label for="moveInput{{i}}">Move {{i}}</label>
+            <div class="hype-move-input-wrap">
+              <span class="hype-move-type-indicator" data-index="{{i-1}}" hidden></span>
+              <input id="moveInput{{i}}" class="moveInput" data-index="{{i-1}}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="moveOptions{{i}}" placeholder="Pesquisar golpe...">
+              <button type="button" class="hype-move-details-toggle" data-index="{{i-1}}" aria-label="Ver efeito do golpe" title="Informações em português">ⓘ</button>
+            </div>
+            <div class="hype-move-options" id="moveOptions{{i}}" data-index="{{i-1}}" role="listbox" hidden></div>
+            <div class="hype-move-info" data-index="{{i-1}}" role="status" hidden></div>
+          </div>
+          {% endfor %}
           <datalist id="moveList"></datalist>
         </div>
 
