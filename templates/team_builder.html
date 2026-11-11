@@ -44,6 +44,7 @@
       <aside class="showdown-roster" aria-label="Slots do time">
         <div class="roster-head"><b>Seu time</b><span id="teamCount">0/6</span></div>
         <div id="slotTabs" class="slot-tabs"></div>
+        <button type="button" class="cta-gold full-btn" id="importShowdownSidebarBtn">Importar equipe do Showdown</button>
         <button type="button" class="cta-dark full-btn" id="clearTeamBtn">Limpar time</button>
       </aside>
 
@@ -842,14 +843,16 @@
     return result;
   }
 
-  $('importShowdownBtn').addEventListener('click',()=>{
+  function openShowdownImporter(){
     saveEditor();
     showdownImportText.value='';
     showdownImportMode.value='append';
     previewShowdownImport();
     showdownImportDialog.showModal();
     showdownImportText.focus();
-  });
+  }
+  $('importShowdownBtn').addEventListener('click',openShowdownImporter);
+  $('importShowdownSidebarBtn').addEventListener('click',openShowdownImporter);
   showdownImportText.addEventListener('input',previewShowdownImport);
   showdownImportMode.addEventListener('change',previewShowdownImport);
   $('cancelShowdownImport').addEventListener('click',()=>showdownImportDialog.close());
