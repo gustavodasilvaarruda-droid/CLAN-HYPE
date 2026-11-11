@@ -45,6 +45,22 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         for marker in ('evRemaining', 'limitEvInput', 'selectableItems', 'data-edit-build', 'data-preview-build', 'data-duplicate-build', 'id="teraEnabled"', 'recommendedItems', 'teamSize', 'refreshMegaDisplay'):
             self.assertIn(marker, template)
 
+    def test_build_actions_are_grouped_and_all_existing_controls_remain(self):
+        template = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        css = (ROOT / 'static/hype_team_builder_modern.css').read_text(encoding='utf-8')
+        self.assertIn('id="hypeBuildManagementTitle">Builds salvas', template)
+        self.assertIn('id="hypeTeamActionsTitle">Ações do time', template)
+        self.assertIn('id="builderValidation"', template)
+        self.assertIn('hype_team_builder_modern.css', template)
+        for action in ('savedBuildSelect', 'loadBuildBtn', 'hypeBuildSelect',
+                       'loadHypeBuildBtn', 'duplicateSlotBtn', 'saveBuildBtn',
+                       'newBuildBtn', 'reviewTeamBtn', 'importShowdownBtn',
+                       'exportShowdownBtn'):
+            self.assertEqual(template.count(f'id="{action}"'), 1, action)
+        self.assertIn('hype-build-source-grid', css)
+        self.assertIn('hype-team-action-grid', css)
+        self.assertIn('@media (max-width:680px)', css)
+
     def test_inline_javascript_parses_in_node_when_available(self):
         if not shutil.which('node'):
             self.skipTest('Node indisponível neste ambiente')
