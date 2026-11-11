@@ -88,7 +88,7 @@
           {% if pagamento != 'pendente' %}<button type="submit" name="acao" value="pendente" class="v26-btn ghost">Marcar pendente</button>{% endif %}
         </form>
         <form method="post" action="{{url_for('events26.admin_confirmar_inscricao_torneio', torneio_id=torneio.id)}}" class="arena-review-finalize"
-              onsubmit="return confirm('Confirmar a inscrição oficial de {{(times[0].nick_jogo or email)|e}}?')">
+              onsubmit="return confirm('Confirmar a inscrição oficial deste jogador?')">
           <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
           <input type="hidden" name="usuario_email" value="{{email}}">
           <button type="submit" class="v26-btn gold" {% if not pronto %}disabled aria-disabled="true"{% endif %}>Confirmar inscrição oficial</button>
