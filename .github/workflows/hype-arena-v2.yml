@@ -22,6 +22,7 @@ on:
       - 'templates/torneios.html'
       - 'static/hype_arena_v2.css'
       - 'tests/test_hype_arena_v2.py'
+      - 'tests/test_arena_formatos_fk.py'
       - '.github/workflows/hype-arena-v2.yml'
   push:
     branches: [main]
@@ -45,6 +46,7 @@ on:
       - 'templates/torneio_detalhe.html'
       - 'templates/torneios.html'
       - 'tests/test_hype_arena_v2.py'
+      - 'tests/test_arena_formatos_fk.py'
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -58,3 +60,4 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_hype_arena_v2.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_arena_private_teams.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_team_builder_ui.py' -v
+      - run: python -m unittest discover -s tests -p 'test_arena_formatos_fk.py' -v
