@@ -94,6 +94,8 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
         erro = None
         try:
             modulos = consultar("hype_modulos", "codigo,nome,descricao,estado,versao,visivel,ordem")
+            # Trainer IA é um módulo legado; não deve aparecer no painel do site.
+            modulos = [m for m in modulos if m.get("codigo") != "trainer_ai"]
             modulos.sort(key=lambda m: (m.get("ordem") or 0, m.get("nome") or ""))
             cargos = [r for r in consultar("cargos", "id,nome_cargo")
                       if r.get("id") not in {"membro", "membro_hype", "visitante", "pedri"}]
