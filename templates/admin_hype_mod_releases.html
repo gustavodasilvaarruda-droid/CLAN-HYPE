@@ -3,29 +3,50 @@
 {% block content %}
 <section class="hype-v6-page" style="max-width:1080px;margin:25px auto;padding:20px;">
   <div class="hype-v6-panel" style="padding:26px;">
-    <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Controle de Módulos</a></p>
-    <span class="hype-v6-kicker">ACESSO ADMINISTRATIVO • STAGING</span>
+    <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Gerenciador de Módulos</a></p>
+    <span class="hype-v6-kicker">HYPE ADMIN • TESTE SEGURO</span>
     <h1>Central de Publicação HYPE</h1>
-    <p>Envie o JAR original para análise e armazenamento privado. <strong>O arquivo NÃO será ofuscado, assinado ou distribuído nesta etapa.</strong></p>
-    <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
+    <p>Confira o ID, a versão e o SHA-256 de um arquivo Fabric antes de preparar a publicação. <strong>Na inspeção o JAR não é armazenado, ofuscado ou distribuído.</strong></p>
+    <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label for="jar">Arquivo Fabric (.jar, máximo de 10 MiB)</label>
-      <input id="jar" name="jar" type="file" accept=".jar" required>
-      <button type="submit" class="hype-v6-btn gold">Guardar original</button>
+      <label for="inspect-jar">JAR Fabric (até 10 MiB)</label>
+      <input id="inspect-jar" name="jar" type="file" accept=".jar" required>
+      <button type="submit" class="hype-v6-btn gold">Analisar arquivo</button>
     </form>
-    <div class="hype-v6-table-wrap">
+    {% if report %}
+    <section class="hype-v6-panel" aria-label="Resultado da análise" style="padding:20px;border:1px solid #b99748;margin:24px 0">
+      <h2>Resultado da análise</h2>
+      <p><strong>{{ report.name }}</strong> — {{ report.version }}</p>
+      <p><strong>ID:</strong> <code>{{ report.module_id }}</code></p>
+      <p><strong>Tamanho:</strong> {{ report.size_bytes }} bytes</p>
+      <p><strong>Exige HYPE Client:</strong> {{ 'Sim' if report.requires_client else 'Ainda não' }}</p>
+      <p><strong>Usa Mixins:</strong> {{ 'Sim' if report.has_mixins else 'Não informado' }}</p>
+      <p style="overflow-wrap:anywhere"><strong>SHA-256:</strong> <code>{{ report.sha256 }}</code></p>
+      <p><small>Foi verificada a estrutura ZIP e integridade CRC dos arquivos. Isso não prova ausência de código malicioso e não significa publicação.</small></p>
+    </section>
+    {% endif %}
+    {% if staging_enabled %}
+    <hr style="margin:28px 0">
+    <h2>Guardar original privado (staging)</h2>
+    <p>Disponível somente com armazenamento seguro configurado no backend. <strong>Guardar não publica nem aplica ofuscação.</strong></p>
+    <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="store-jar">JAR original</label>
+      <input id="store-jar" name="jar" type="file" accept=".jar" required>
+      <button type="submit" class="hype-v6-btn secondary">Guardar em privado</button>
+    </form>
+    <div class="hype-v6-table-wrap" style="margin-top:20px">
       <table class="hype-v6-table">
         <thead><tr><th>Módulo</th><th>Versão</th><th>Status</th><th>Recebido</th><th>SHA-256</th></tr></thead>
         <tbody>
-          {% for item in drafts %}
-            <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
-          {% else %}
-            <tr><td colspan="5">Nenhum arquivo enviado nesta central.</td></tr>
-          {% endfor %}
+        {% for item in drafts %}
+          <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
+        {% else %}<tr><td colspan="5">Nenhum arquivo original armazenado.</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
-    <p><small>Originais nunca são distribuídos. A publicação pública exigirá pipeline de ofuscação, teste no Minecraft, assinatura e aprovação administrativa em uma etapa futura.</small></p>
+    {% endif %}
+    <p><small>Próximas fases: armazenamento privado, ofuscação específica para Fabric, testes no Minecraft, assinatura digital e aprovação administrativa.</small></p>
   </div>
 </section>
 {% endblock %}
