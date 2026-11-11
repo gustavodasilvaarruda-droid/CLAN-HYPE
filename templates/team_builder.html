@@ -80,6 +80,7 @@
           </div>
           <label>Level
             <input id="levelInput" type="number" min="1" max="100" value="100" inputmode="numeric">
+            <small id="levelFormatHelp" class="hype-format-level-help" aria-live="polite">Nível livre até 100</small>
           </label>
           <label>Ability
             <select id="abilitySelect"><option value="">Escolha o Pokémon primeiro</option></select>
@@ -277,6 +278,7 @@
   let slots = Array.from({length:6}, emptySlot);
   if(editingTeam && Array.isArray(editingTeam.slots)){ editingTeam.slots.slice(0,6).forEach((x,i)=>{ slots[i]=Object.assign(emptySlot(),x||{}); }); }
   let active = 0;
+  let previousFormatCode = document.getElementById("formatSelect").value;
   let pokemonNames = [];
   const pokemonSpriteIds = new Map();
   const levelInput=document.getElementById('levelInput');
@@ -527,6 +529,7 @@
     $('slotLabel').textContent=`SLOT ${active+1}`;
     $('editorPokemonName').textContent=s.pokemon?pretty(s.pokemon):'Escolha um Pokémon';
     levelInput.value=selectedFormat()?.little_cup?5:(s.level||100);
+    $('levelFormatHelp').textContent=selectedFormat()?.little_cup?'Level 5 — regra do Little Cup':selectedFormat()?('Padrão ao selecionar: Level '+formatDefaultLevel(selectedFormat())+' · ajuste manual permitido'):'Formato livre · escolha de 1 a 100';
     levelInput.max=String(selectedFormat()?.nivel_maximo||100);
     levelInput.disabled=!!selectedFormat()?.little_cup;
     pokemonInput.value=s.pokemon||''; itemInput.value=s.item||''; natureSelect.value=s.nature||''; roleSelect.value=s.papel||''; mechanicSelect.value=s.mecanica==='tera'?'nenhuma':s.mecanica||'nenhuma'; teraSelect.value=s.tera_type||''; teraEnabled.checked=!!s.tera_ativa||s.mecanica==='tera'; notesInput.value=s.observacao||'';
@@ -648,8 +651,7 @@
   function selectedFormat(){ return formatos.find(f=>f.codigo===$('formatSelect').value)||null; }
   function teamSize(){ const n=Number(selectedFormat()?.tamanho_equipe||6); return Number.isInteger(n)&&n>=1&&n<=6?n:6; }
   function refreshPokemonOptions(){
-    const f=selectedFormat(), banned=new Set((f?.pokemons_proibidos||[]).map(slug));
-    $('pokemonList').innerHTML=pokemonNames.filter(n=>!banned.has(slug(n))).map(n=>`<option value="${n}">${pretty(n)}</option>`).join('');
+    $('pokemonList').innerHTML=pokemonNames.filter(n=>!speciesRestriction(n)).map(n=>`<option value="${n}">${pretty(n)}</option>`).join('');
     updateMoveList(current().moves_available||[]);
   }
   function liveValidate(){
@@ -1003,7 +1005,44 @@
     }
   }
 
-  $('formatSelect').addEventListener('change',()=>{saveEditor();if(active>=teamSize())active=0;if(selectedFormat()?.little_cup)slots.forEach(slot=>slot.level=5);renderEditor();syncMechanics();refreshPokemonOptions();updateItemPreview();renderTabs();liveValidate();});
+  // Uma troca de formato nunca altera os times já salvos no servidor.
+  function formatDefaultLevel(f){
+    if(!f)return 100;
+    if(f.little_cup)return 5;
+    return /vgc|battlestadium|battle.?stadium/i.test(String(f.codigo||'')+' '+String(f.nome||''))?50:100;
+  }
+  function changeBuilderFormat(){
+    const field=$('formatSelect'), nextCode=field.value;
+    if(nextCode===previousFormatCode)return;
+    // O editor ainda mostra o formato novo: salva primeiro com o anterior
+    // para impedir que o LC transforme o nível do Pokémon antes da confirmação.
+    field.value=previousFormatCode;saveEditor();field.value=nextCode;
+    if(selectedFormat()&&!showdownReady){
+      alert('O catálogo competitivo ainda não carregou. Aguarde e tente mudar o formato novamente.');
+      field.value=previousFormatCode;return;
+    }
+    const invalid=slots.map((s,i)=>{
+      if(!s.pokemon)return null;
+      const reason=i>=teamSize()?'Slot fora do tamanho da equipe':speciesRestriction(s.pokemon);
+      return reason?{i,reason,name:s.pokemon}:null;
+    }).filter(Boolean);
+    if(invalid.length){
+      const summary=invalid.map(x=>(x.i+1)+'. '+pretty(x.name)+' — '+x.reason).join('\n');
+      if(!confirm('Mudar para '+(selectedFormat()?.nome||'Formato livre')+'?\n\n'+
+        invalid.length+' Pokémon incompatível(is) serão removidos dos slots:\n'+summary+
+        '\n\nOs times já salvos permanecem inalterados até você salvar novamente.')){
+        field.value=previousFormatCode;renderEditor();renderTabs();return;
+      }
+    }
+    invalid.forEach(x=>slots[x.i]=emptySlot());
+    const level=formatDefaultLevel(selectedFormat());
+    slots.forEach(x=>{if(x.pokemon)x.level=level;});
+    previousFormatCode=nextCode;
+    if(active>=teamSize())active=0;
+    renderEditor();refreshPokemonOptions();renderTabs();liveValidate();
+    if(current().pokemon)loadShowdownMovesForSlot(current());
+  }
+  $('formatSelect').addEventListener('change',changeBuilderFormat);
   renderTabs();renderEditor();
   bootLists().then(()=>{
     if(prefillBuild&&prefillBuild._slot){
