@@ -14,6 +14,7 @@
   <nav class="hmod-quick" aria-label="Navegação administrativa">
     <a href="{{ url_for('admin_cargos') }}">Cargos do clã</a>
     <a href="{{ url_for('admin_logs') }}">Auditoria</a>
+    {% if staging_enabled %}<a href="{{ url_for('hype_mod_admin.mod_releases') }}">Central de Publicação (teste)</a>{% endif %}
   </nav>
   {% if erro %}
   <div class="hmod-alert" role="alert">{{ erro }}</div>

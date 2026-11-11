@@ -4,6 +4,7 @@ Toda gravação passa pela sessão web, permissão administrativa e CSRF global
 do app.py. A API do mod continua separada e somente de leitura.
 """
 import calendar
+import os
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -114,7 +115,8 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
             erro = "Não foi possível carregar o controle de módulos. Execute a migração SQL desta atualização."
             modulos, cargos, grupos, acessos = [], [], [], []
         return render_template(
-            "admin_hype_modulos.html", modulos=modulos, cargos=cargos,
+            "admin_hype_modulos.html", staging_enabled=os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes"),
+            modulos=modulos, cargos=cargos,
             grupos=grupos, acessos=acessos, erro=erro,
             grupos_virtuais=[
                 {"id": "membro", "nome_cargo": "Membro (qualquer conta cadastrada)"},
@@ -222,5 +224,9 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
         except Exception:
             flash("Não foi possível encerrar a permissão.", "erro")
         return voltar(codigo)
+
+    # Admin-only release drafts. Feature flag is OFF by default.
+    from modules.hype_mod_staging import register_mod_release_routes
+    register_mod_release_routes(bp, is_admin, registrar_log)
 
     return bp

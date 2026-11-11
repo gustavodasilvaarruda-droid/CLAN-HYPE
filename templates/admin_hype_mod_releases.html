@@ -1,0 +1,31 @@
+{% extends 'hype_app_base.html' %}
+{% block title %}HYPE | Central de Publicação{% endblock %}
+{% block content %}
+<section class="hype-v6-page" style="max-width:1080px;margin:25px auto;padding:20px;">
+  <div class="hype-v6-panel" style="padding:26px;">
+    <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Controle de Módulos</a></p>
+    <span class="hype-v6-kicker">ACESSO ADMINISTRATIVO • STAGING</span>
+    <h1>Central de Publicação HYPE</h1>
+    <p>Envie o JAR original para análise e armazenamento privado. <strong>O arquivo NÃO será ofuscado, assinado ou distribuído nesta etapa.</strong></p>
+    <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="jar">Arquivo Fabric (.jar, máximo de 10 MiB)</label>
+      <input id="jar" name="jar" type="file" accept=".jar" required>
+      <button type="submit" class="hype-v6-btn gold">Guardar original</button>
+    </form>
+    <div class="hype-v6-table-wrap">
+      <table class="hype-v6-table">
+        <thead><tr><th>Módulo</th><th>Versão</th><th>Status</th><th>Recebido</th><th>SHA-256</th></tr></thead>
+        <tbody>
+          {% for item in drafts %}
+            <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
+          {% else %}
+            <tr><td colspan="5">Nenhum arquivo enviado nesta central.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p><small>Originais nunca são distribuídos. A publicação pública exigirá pipeline de ofuscação, teste no Minecraft, assinatura e aprovação administrativa em uma etapa futura.</small></p>
+  </div>
+</section>
+{% endblock %}
