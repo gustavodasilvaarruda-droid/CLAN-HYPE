@@ -41,6 +41,7 @@
       <div class="v26-card-actions arena-admin-links">
         <a href="{{url_for('events26.torneio_detalhe',torneio_id=t.id)}}">Página pública</a>
         <a href="{{url_for('participantes_torneio',item_id=t.id)}}">Inscrições</a>
+        {% if 'Identificador Pokémon Showdown:' in (t.regras or '') %}<a href="{{url_for('events26.admin_equipes_torneio',torneio_id=t.id)}}">Revisar times e aprovar inscrições</a>{% endif %}
         <a href="{{url_for('admin_chave_torneio',torneio_id=t.id)}}">Chaves e resultados</a>
       </div>
       <form method="post" action="{{url_for('events26.admin_torneio_v26',item_id=t.id)}}" class="v26-inline-form arena-status-form">
