@@ -18,3 +18,40 @@
 .arena-admin-team small{color:#f0c976;font-weight:700}
 .arena-history{padding:10px;border-bottom:1px solid #55472c}
 .arena-history pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
+
+/* Arena HYPE: revisão administrativa responsiva */
+.arena-review-player{overflow:hidden}
+.arena-review-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.arena-review-heading h2{margin:6px 0}
+.arena-review-heading small,.arena-review-meta{color:#aaa4a0;overflow-wrap:anywhere}
+.arena-review-stats{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.arena-review-stats span,.arena-review-status{border:1px solid #73613f;border-radius:100px;padding:7px 12px;background:#27251f;color:#efcf83;font-size:.9rem;font-weight:700}
+.arena-review-status.is-confirmed{border-color:#358c62;color:#a0efc5;background:#1a302a}
+.arena-review-hint{color:#cfc5af;line-height:1.55}
+.arena-admin-team{min-width:0}
+.arena-review-summary{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;cursor:pointer;list-style:none;padding:6px 0}
+.arena-review-summary::-webkit-details-marker{display:none}
+.arena-review-summary::before{content:'▸';color:#efcf83;margin-right:6px}
+.arena-admin-team[open]>.arena-review-summary::before{content:'▾'}
+.arena-review-actions{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0;align-items:end}
+.arena-review-actions form{flex:1 1 210px;min-width:0}
+.arena-review-actions button{white-space:normal;min-height:44px}
+.arena-correction-form label{display:grid;gap:6px}
+.arena-correction-form textarea{display:block;box-sizing:border-box;width:100%;padding:11px;border-radius:10px;background:#171920;border:1px solid #79623c;color:#fff;resize:vertical}
+.arena-review-checkout{margin-top:22px;padding:16px;background:#17191f;border:1px solid #675532;border-radius:12px}
+.arena-review-checkout h3{margin-top:0}
+.arena-review-finalize{display:grid;gap:8px;margin-top:18px}
+.arena-review-finalize .v26-btn{min-height:46px}
+.arena-review-finalize button:disabled{opacity:.5;cursor:not-allowed}
+.arena-review-finalize small{color:#cfc5af}
+.arena-private-card{min-width:0;overflow:hidden}
+.arena-private-card>div{overflow-wrap:anywhere;margin:6px 0}
+@media(max-width:640px){
+ .arena-review-heading{display:grid;gap:8px}
+ .arena-review-actions{display:grid;grid-template-columns:minmax(0,1fr)}
+ .arena-review-actions form,.arena-review-actions button{width:100%}
+ .arena-review-stats{display:grid}
+ .arena-review-checkout{padding:12px}
+ .arena-private-grid{grid-template-columns:minmax(0,1fr)}
+ .arena-pokemon-icons{grid-template-columns:repeat(3,minmax(0,1fr))}
+}

@@ -1,35 +1,116 @@
 {% extends 'hype_app_base.html' %}
-{% block title %}Equipes privadas · Administração Arena HYPE{% endblock %}
+{% block title %}Aprovação de inscrições · Arena HYPE{% endblock %}
 {% block body_class %}hype-tournament-detail-page hype-v26-events{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{url_for('static',filename='hype_arena_private_teams.css')}}">{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{url_for('static', filename='hype_arena_private_teams.css')}}?v=2">
+{% endblock %}
 {% block content %}
 <div class="v26-event-shell arena-private-shell">
-  <a class="v26-back" href="{{url_for('events26.torneio_detalhe',torneio_id=torneio.id)}}">← Torneio</a>
-  <section class="v26-panel"><span class="arena-private-eyebrow">ACESSO RESTRITO · ADMINISTRAÇÃO</span>
-    <h1>Equipes enviadas · {{torneio.titulo}}</h1>
-    <p>Dados sigilosos. Não há confirmação automática de inscrição ou pagamento. Histórico preservado para auditoria.</p>
-  </section>
-  {% for email, times in grupos.items() %}
+  <a class="v26-back" href="{{url_for('events26.torneio_detalhe', torneio_id=torneio.id)}}">← Voltar ao torneio</a>
   <section class="v26-panel">
-    <h2>{{times[0].nick_jogo or email}}</h2>
+    <span class="arena-private-eyebrow">ADMINISTRAÇÃO · ARENA HYPE</span>
+    <h1>Inscrições e conferência de times</h1>
+    <p><strong>{{torneio.titulo}}</strong> · {{grupos|length}} jogador(es) enviaram times · {{pendentes}} aguardando decisão ou pagamento.</p>
+    <p class="arena-review-hint">Revise cada time, registre o pagamento ou a dispensa de cobrança e só depois confirme a inscrição oficial. A conferência de regras é preliminar; a legalidade completa ainda depende do TeamValidator/Showdown.</p>
+    {% if not pode_revisar %}
+      <p class="arena-private-alert">O torneio não está com inscrições abertas. A revisão é somente para consulta.</p>
+    {% endif %}
+  </section>
+
+  {% for email, times in grupos.items() %}
+  {% set controle = controles.get(email, {}) %}
+  {% set pagamento = controle.get('pagamento_status', 'pendente') %}
+  {% set cadastrado = email in inscritos %}
+  {% set aprovados = times|selectattr('status','equalto','aprovado')|list|length %}
+  {% set pronto = times|length > 0 and aprovados == times|length and pagamento in ['confirmado','dispensado'] %}
+  <section class="v26-panel arena-review-player">
+    <div class="arena-review-heading">
+      <div>
+        <span class="arena-private-eyebrow">JOGADOR</span>
+        <h2>{{times[0].nick_jogo or email}}</h2>
+        <small>{{email}}</small>
+      </div>
+      <span class="arena-review-status {{'is-confirmed' if cadastrado else ''}}">{{'Inscrição confirmada' if cadastrado else 'Aguardando confirmação'}}</span>
+    </div>
+    <div class="arena-review-stats">
+      <span>{{aprovados}}/{{times|length}} times aprovados</span>
+      <span>Pagamento: {{'Confirmado' if pagamento == 'confirmado' else 'Dispensado' if pagamento == 'dispensado' else 'Pendente'}}</span>
+    </div>
+
     {% for time in times %}
-    <article class="arena-admin-team">
-      <h3>Slot {{time.slot}} · {{time.nome}} · {{time.status|replace('_',' ')}}</h3>
+    <details class="arena-admin-team" {% if time.status != 'aprovado' %}open{% endif %}>
+      <summary class="arena-review-summary">
+        <strong>Slot {{time.slot}} · {{time.nome}}</strong>
+        <span class="arena-private-state">{{'Aprovado' if time.status == 'aprovado' else 'Correção solicitada' if time.status == 'correcao_solicitada' else 'Aguardando revisão'}}</span>
+      </summary>
+      {% if time.motivo_revisao %}<p class="arena-review-hint">Motivo da correção: {{time.motivo_revisao}}</p>{% endif %}
       <div class="arena-private-grid">
         {% for p in time.equipe %}
-        <div class="arena-private-card"><strong>{{p.pokemon}}</strong>
-          <div><small>Ability</small> {{p.ability}}</div><div><small>Item</small> {{p.item}}</div>
-          <div><small>Nature</small> {{p.nature}}</div><div><small>Moves</small> {{p.moves|join(', ')}}</div>
-          <div><small>EVs</small> {{p.evs}}</div><div><small>IVs</small> {{p.ivs}}</div>
+        <div class="arena-private-card">
+          <strong>{{p.pokemon}}</strong>
+          <div><small>Habilidade</small> {{p.ability}}</div>
+          <div><small>Item</small> {{p.item}}</div>
+          <div><small>Natureza</small> {{p.nature}}</div>
+          <div><small>Golpes</small> {{p.moves|join(', ')}}</div>
+          <div><small>EVs</small> {{p.evs}}</div>
+          <div><small>IVs</small> {{p.ivs}}</div>
         </div>
         {% endfor %}
       </div>
-    </article>
+      {% if pode_revisar and not cadastrado and time.status != 'aprovado' %}
+      <div class="arena-review-actions">
+        <form method="post" action="{{url_for('events26.admin_revisar_equipe', torneio_id=torneio.id, equipe_id=time.id)}}">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+          <button class="v26-btn gold" name="acao" value="aprovar" type="submit" onclick="return confirm('Aprovar a conferência preliminar deste time?')">Aprovar time</button>
+        </form>
+        <form method="post" action="{{url_for('events26.admin_revisar_equipe', torneio_id=torneio.id, equipe_id=time.id)}}" class="arena-correction-form">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+          <label>Solicitar correção
+            <textarea name="motivo" required minlength="8" maxlength="500" rows="2" placeholder="Explique o que precisa mudar neste time"></textarea>
+          </label>
+          <button class="v26-btn ghost" name="acao" value="corrigir" type="submit">Enviar correção ao jogador</button>
+        </form>
+      </div>
+      {% endif %}
+      {% if time.revisado_em %}<p class="arena-review-meta">Última revisão: {{time.revisado_em|data_br}}{% if time.revisado_por %} · {{time.revisado_por}}{% endif %}</p>{% endif %}
+    </details>
     {% endfor %}
+
+    <div class="arena-review-checkout">
+      <h3>Pagamento e inscrição</h3>
+      <p>O site ainda não possui valor de inscrição configurado por torneio. Confirme o pagamento somente após conferir o recebimento; use "Sem cobrança" apenas em torneios gratuitos.</p>
+      {% if pode_revisar and not cadastrado %}
+        <form method="post" action="{{url_for('events26.admin_pagamento_torneio', torneio_id=torneio.id)}}" class="arena-review-actions">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+          <input type="hidden" name="usuario_email" value="{{email}}">
+          <button type="submit" name="acao" value="confirmado" class="v26-btn compact" onclick="return confirm('Você conferiu e recebeu o pagamento?')">Confirmar pagamento</button>
+          <button type="submit" name="acao" value="dispensado" class="v26-btn ghost" onclick="return confirm('Confirmar que este jogador está dispensado do pagamento?')">Sem cobrança</button>
+          {% if pagamento != 'pendente' %}<button type="submit" name="acao" value="pendente" class="v26-btn ghost">Marcar pendente</button>{% endif %}
+        </form>
+        <form method="post" action="{{url_for('events26.admin_confirmar_inscricao_torneio', torneio_id=torneio.id)}}" class="arena-review-finalize"
+              onsubmit="return confirm('Confirmar a inscrição oficial deste jogador?')">
+          <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
+          <input type="hidden" name="usuario_email" value="{{email}}">
+          <button type="submit" class="v26-btn gold" {% if not pronto %}disabled aria-disabled="true"{% endif %}>Confirmar inscrição oficial</button>
+          {% if not pronto %}<small>Disponível após aprovação de todos os times enviados e confirmação ou dispensa do pagamento.</small>{% endif %}
+        </form>
+      {% elif cadastrado %}
+        <p class="arena-review-status is-confirmed">Inscrição oficial registrada. O jogador aparece na lista de participantes.</p>
+      {% endif %}
+    </div>
   </section>
-  {% else %}<section class="v26-panel"><p>Nenhum time enviado.</p></section>{% endfor %}
-  <section class="v26-panel"><h2>Histórico de alterações ({{historico|length}})</h2>
-    {% for h in historico %}<details class="arena-history"><summary>{{h.criado_em}} · {{h.usuario_email}} · Slot {{h.slot}} · {{h.operacao}}</summary><pre>{{h.registro|tojson(indent=2)}}</pre></details>{% else %}<p>Sem alterações registradas.</p>{% endfor %}
+  {% else %}
+    <section class="v26-panel"><p>Nenhum time enviado para este torneio.</p></section>
+  {% endfor %}
+
+  <section class="v26-panel">
+    <div class="v26-section-head"><div><span>AUDITORIA</span><h2>Histórico de alterações dos times ({{historico|length}})</h2></div></div>
+    {% for h in historico %}
+      <details class="arena-history">
+        <summary>{{h.criado_em}} · {{h.usuario_email}} · Slot {{h.slot}} · {{h.operacao}}</summary>
+        <pre>{{h.registro|tojson(indent=2)}}</pre>
+      </details>
+    {% else %}<p>Sem alterações registradas.</p>{% endfor %}
   </section>
 </div>
 {% endblock %}
