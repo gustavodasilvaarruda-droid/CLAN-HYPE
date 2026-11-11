@@ -66,6 +66,10 @@ class ArenaInscricoesAdminTest(unittest.TestCase):
         user = events[events.index('def equipes_torneio('):
                       events.index("def admin_equipes_torneio(")]
         self.assertIn("'status': 'aguardando_verificacao'", user)
+        self.assertIn('esta_inscrito = bool(safe_table', user)
+        self.assertIn('not esta_inscrito', user)
+        self.assertIn('times do torneio estão bloqueados',
+                      source('templates/arena_torneio_equipes.html'))
         self.assertNotIn("table('inscricoes_torneio').insert", user)
         self.assertNotIn("hype_arena_confirmar_inscricao", user)
 
