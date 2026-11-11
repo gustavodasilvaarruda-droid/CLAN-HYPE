@@ -532,7 +532,7 @@
 
   function renderTabs(){
     $('slotTabs').innerHTML = slots.slice(0,teamSize()).map((s,i)=>`<button type="button" class="slot-tab ${i===active?'active':''}" data-slot="${i}">${s.sprite?`<img src="${s.sprite}" alt="">`:'<span class="slot-number">'+(i+1)+'</span>'}<span><b>${s.pokemon?pretty(s.pokemon):'Slot '+(i+1)}</b><small>${s.item?pretty(s.item):'Vazio'}</small></span></button>`).join('');
-    document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderEditor();renderTabs();if(current().pokemon&&showdownLearnsets)loadShowdownMovesForSlot(current());}));
+    document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderEditor();renderTabs();if(current().pokemon){if(!current().abilities?.length)loadPokemonDetails(current().pokemon);else loadShowdownMovesForSlot(current());}}));
     $('teamCount').textContent = `${slots.slice(0,teamSize()).filter(s=>s.pokemon).length}/${teamSize()}`;
   }
 
@@ -1300,6 +1300,12 @@
       slots[0]=Object.assign(emptySlot(),prefillBuild._slot);active=0;renderEditor();renderTabs();
       if(slots[0].pokemon)loadPokemonDetails(slots[0].pokemon);
     }else if(prefillPokemon){pokemonInput.value=prefillPokemon;loadPokemonDetails(prefillPokemon);}
+    else {
+      // Times antigos armazenam os quatro golpes, mas não a lista temporária de aprendizado.
+      // Reidratar o catálogo sem apagar habilidades, EVs, itens ou moves existentes.
+      slots.filter(s=>s.pokemon).forEach(loadShowdownMovesForSlot);
+      if(current().pokemon&&!current().abilities?.length)loadPokemonDetails(current().pokemon);
+    }
   });
 })();
 </script>
