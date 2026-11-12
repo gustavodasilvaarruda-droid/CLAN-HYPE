@@ -47,6 +47,7 @@ class StrategyAnalysisTests(unittest.TestCase):
         self.assertEqual(len(a['funcoes']), 6)
         roles = {m['pokemon']: ' | '.join(m['funcoes']) for m in a['funcoes']}
         self.assertIn('Ativador do sol', roles['Charizard'])
+        self.assertEqual(a['funcoes'][0]['pokemon_exibicao'], 'Charizard Mega Y')
         self.assertIn('Aproveita sol', roles['Venusaur'])
         self.assertIn('Atacante físico', roles['Garchomp'])
         self.assertIn('Pivô', roles['Rotom-Wash'])
@@ -58,6 +59,15 @@ class StrategyAnalysisTests(unittest.TestCase):
         self.assertTrue(any('Stealth Rock' in x for x in a['riscos']))
         self.assertTrue(any('Excadrill' in x for x in a['plano']))
         self.assertTrue(any('Venusaur' in x for x in a['sinergias']))
+
+    def test_mega_y_drought_is_detected_from_item_even_with_pre_mega_ability(self):
+        team = self.sun_team()
+        team[0]['ability'] = 'Blaze'
+        a = analisar_estrategia(team)
+        self.assertIn('Sol', a['estrategia'])
+        self.assertIn('Ativador do sol', a['funcoes'][0]['funcoes'])
+        self.assertIn('IV 0 Atk', ' | '.join(a['funcoes'][0]['evidencias']))
+        self.assertEqual(team[0]['ability'], 'Blaze')
 
     def test_rain_team_is_detected_without_hardcoded_species(self):
         team = [
