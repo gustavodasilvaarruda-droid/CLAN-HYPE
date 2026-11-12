@@ -259,6 +259,32 @@ if(!parseShowdownTeam(dragon.replace('Dragon Ascent','Protect')).errors.length)
         self.assertEqual(validar_equipe_basica(data, 'gen9nationaldexubers'), [])
 
 
+    def test_post_mega_abilities_are_validated_for_the_matching_stone(self):
+        slots = []
+        for name, item, ability, mechanic in (
+            ('Charizard', 'Charizardite Y', 'Drought', 'mega'),
+            ('Mewtwo', 'Mewtwonite Y', 'Insomnia', 'mega'),
+            ('Pidgeot', 'Pidgeotite', 'No Guard', 'mega'),
+            ('Dialga', 'Leftovers', 'Pressure', 'nenhuma'),
+            ('Palkia', 'Leftovers', 'Pressure', 'nenhuma'),
+            ('Lugia', 'Leftovers', 'Pressure', 'nenhuma'),
+        ):
+            slots.append({
+                'pokemon': name, 'item': item, 'ability': ability,
+                'mecanica': mechanic, 'nature': 'Timid',
+                'moves': ['Protect', 'Rest', 'Sleep Talk', 'Recover'],
+                'evs': {k: 0 for k in ('hp', 'atk', 'def', 'spa', 'spd', 'spe')},
+                'ivs': {k: 31 for k in ('hp', 'atk', 'def', 'spa', 'spd', 'spe')},
+            })
+        errors = validar_equipe_basica(slots, 'gen9nationaldexubers')
+        self.assertEqual(errors, [], errors)
+        slots[0]['ability'] = 'Wonder Guard'
+        self.assertTrue(any('não pertence' in e for e in validar_equipe_basica(slots, 'gen9nationaldexubers')))
+        slots[0]['ability'] = 'Drought'
+        slots[0]['item'] = 'Charizardite X'
+        self.assertTrue(any('não pertence' in e for e in validar_equipe_basica(slots, 'gen9nationaldexubers')))
+
+
 
 class TestHypeMobileAdmin(unittest.TestCase):
     def test_dashboard_and_leader_navigation(self):
