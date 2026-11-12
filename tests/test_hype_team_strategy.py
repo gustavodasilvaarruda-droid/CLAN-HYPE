@@ -112,7 +112,7 @@ class StrategyAnalysisTests(unittest.TestCase):
         ast.parse(module)
         self.assertIn("methods=['POST']", module)
         self.assertIn('def previa_estrategia():', module)
-        self.assertIn('analisar_estrategia(slots, formato_codigo)', module)
+        self.assertIn('analisar_estrategia(slots, formato_codigo, adversario)', module)
         self.assertIn("'estrategia_inteligente': inteligente", module)
         builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
         report = (ROOT / 'templates/team_analise.html').read_text(encoding='utf-8')
