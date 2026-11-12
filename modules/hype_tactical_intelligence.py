@@ -11,7 +11,7 @@ import json
 import math
 import re
 
-from modules.hype_tournament_formats import obter_especie_showdown, obter_formato
+from modules.hype_tournament_formats import obter_especie_showdown, obter_formato, obter_regras_especie_showdown
 
 
 @lru_cache(maxsize=1)
@@ -115,6 +115,8 @@ def _form(slot):
     name=str(slot.get('pokemon') or '').strip()[:90]
     item=_id(slot.get('item'))
     original=_id(name)
+    if original=='rayquaza' and str(slot.get('mecanica') or '')=='mega':
+        return 'Rayquaza-Mega'
     if original in {'charizard','mewtwo'} and item in {
         'charizarditex','charizarditey','mewtwonitex','mewtwonitey'} and item.startswith(original):
         return name+'-Mega-'+item[-1].upper()
@@ -127,10 +129,11 @@ def _form(slot):
 
 def _ability(slot):
     name=_id(_form(slot))
-    if name=='charizardmegay':return 'drought'
-    if name=='charizardmegax':return 'toughclaws'
-    if name=='venusaurmega':return 'thickfat'
-    if name=='garchompmega':return 'sandforce'
+    if 'mega' in name:
+        rules=obter_regras_especie_showdown(name) or {}
+        abilities=rules.get('abilities') or []
+        if len(abilities)==1:
+            return _id(abilities[0])
     return _id(slot.get('ability'))
 
 
