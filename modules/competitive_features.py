@@ -1,5 +1,7 @@
 from collections import Counter
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+
+from modules.hype_team_strategy import analisar_estrategia
 
 
 def create_competitive_blueprint(supabase, login_required, safe_table, is_admin, registrar_log, criar_notificacao):
@@ -31,7 +33,10 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
         avisos, ok, coach = [], [], []
         pokemons = [str(s.get('pokemon') or '').strip() for s in slots if s.get('pokemon')]
         itens = [str(s.get('item') or '').strip() for s in slots if s.get('item')]
-        papeis = [str(s.get('papel') or '').strip().casefold() for s in slots if s.get('papel')]
+        # Papéis automáticos: a análise não depende mais do campo manual.
+        inteligente = analisar_estrategia(slots, formato_codigo)
+        papeis = [' | '.join(x['funcoes']).casefold()
+                  for x in inteligente['funcoes']]
 
         limite = int((formato or {}).get('max_pokemon') or 6)
         if len(pokemons) > limite:
@@ -61,18 +66,18 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             'velocidade': ('speed control', 'controle de velocidade', 'tailwind', 'trick room', 'scarf'),
             'defensiva': ('wall', 'tank', 'defensivo', 'defesa', 'bulky'),
             'hazards': ('hazard', 'rocks', 'stealth rock', 'spikes', 'toxic spikes'),
-            'remocao': ('removal', 'defog', 'rapid spin', 'remoção', 'remocao'),
+            'remocao': ('removal', 'removedor', 'defog', 'rapid spin', 'remoção', 'remocao'),
         }
         texto_papeis = ' | '.join(papeis)
         cobertura = {nome: any(chave in texto_papeis for chave in chaves) for nome, chaves in categorias.items()}
         if cobertura['ofensiva']:
-            ok.append('Há pelo menos um papel ofensivo declarado.')
+            ok.append('Há pelo menos uma função ofensiva reconhecida automaticamente.')
         else:
-            avisos.append('Nenhum papel ofensivo foi declarado nos slots.')
+            avisos.append('Nenhuma função ofensiva foi identificada com confiança a partir das builds.')
         if cobertura['suporte']:
-            ok.append('Há suporte/pivot declarado.')
+            ok.append('Há suporte/pivot identificado nas builds.')
         else:
-            avisos.append('Considere declarar pelo menos um papel de suporte/pivot.')
+            avisos.append('Não foi identificado suporte/pivot; avalie essa função na composição.')
 
         # Validação dos sets no estilo de um teambuilder competitivo.
         for s in slots:
@@ -154,14 +159,14 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             coach.append(f'Uma das melhores coberturas defensivas do time é contra {tipo.title()}, com {qtd} resistência(s)/imunidade(s) registradas.')
 
         if cobertura['hazards'] and cobertura['remocao']:
-            coach.append('Você declarou pressão de hazards e também remoção: isso dá flexibilidade para controlar o campo durante a partida.')
+            coach.append('O sistema detectou pressão de hazards e também remoção: isso dá flexibilidade para controlar o campo durante a partida.')
         elif cobertura['hazards'] and not cobertura['remocao']:
-            coach.append('Seu time pressiona com hazards, mas não declarou remoção. Tome cuidado contra equipes que também empilham hazards.')
+            coach.append('Seu time pressiona com hazards, mas não foi detectada remoção. Tome cuidado contra equipes que também empilham hazards.')
         elif not cobertura['hazards'] and cobertura['remocao']:
-            coach.append('Você possui remoção de hazards, mas não declarou hazards próprios; isso favorece um plano mais reativo ou ofensivo.')
+            coach.append('Você possui remoção de hazards, mas não foram detectados hazards próprios; isso favorece um plano mais reativo ou ofensivo.')
 
         if cobertura['velocidade']:
-            coach.append('Há controle de velocidade declarado. Tente preservá-lo para o meio/final da partida, quando revenge kills ficam mais importantes.')
+            coach.append('Foi detectado controle de velocidade. Tente preservá-lo para o meio/final da partida, quando revenge kills ficam mais importantes.')
         else:
             coach.append('Não foi identificado controle de velocidade. Times rápidos ou setup sweepers podem exigir posicionamento mais cuidadoso.')
 
@@ -223,6 +228,7 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             'cobertura_ofensiva': cobertura_ofensiva_rows,
             'perfil_ofensivo': dict(perfil_ofensivo),
             'perfil_velocidade': perfil_velocidade,
+            'estrategia_inteligente': inteligente,
         }
 
     @bp.route('/pokedex-competitiva')
@@ -453,6 +459,22 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
         builds = [x for x in safe_table('builds_pokemon') if x.get('id') in ids and x.get('publicado') and str(x.get('moderacao_status') or 'visivel') != 'oculto']
         builds.sort(key=lambda x: x.get('created_at') or '', reverse=True)
         return render_template('builds_favoritos.html', builds=builds)
+
+    @bp.route('/team-builder/analisar-previa', methods=['POST'])
+    @login_required
+    def previa_estrategia():
+        """Analisa o editor sem salvar time nem consultar dados particulares."""
+        dados = request.get_json(silent=True)
+        if not isinstance(dados, dict):
+            return jsonify({'erro': 'Envie um time em JSON.'}), 400
+        slots = dados.get('slots')
+        if not isinstance(slots, list) or len(slots) > 6:
+            return jsonify({'erro': 'Envie até seis Pokémon.'}), 400
+        if not all(isinstance(s, dict) for s in slots):
+            return jsonify({'erro': 'Slot inválido.'}), 400
+        # Limita o corpo já processado pelo Flask, e o formato não confere legalidade.
+        formato_codigo = str(dados.get('formato_codigo') or '')[:90]
+        return jsonify({'estrategia': analisar_estrategia(slots, formato_codigo)})
 
     @bp.route('/team-builder/<int:team_id>/analisar')
     @login_required
