@@ -29,6 +29,20 @@ def itens_showdown():
     return deepcopy(_ITEMS)
 
 
+_SPECIES_RULES_PATH = Path(__file__).resolve().parents[1] / 'data' / 'hype_showdown_species_rules.json'
+with _SPECIES_RULES_PATH.open(encoding='utf-8') as handle:
+    _SPECIES_RULES = json.load(handle)['species']
+
+
+def obter_regras_especie_showdown(nome):
+    """Habilidades e itens de forma do Pokédex oficial versionado."""
+    import re
+    chave = re.sub(r'[^a-z0-9]', '', str(nome or '').casefold())
+    if chave.endswith('base') and chave[:-4] in _SPECIES_RULES:
+        chave = chave[:-4]
+    return deepcopy(_SPECIES_RULES.get(chave))
+
+
 _FORMATS = {row['codigo']: {**row, 'validacao_completa': False} for row in _SNAPSHOT['formatos']}
 # Formatos extras confirmados pela comunidade Smogon. São identificadores
 # de catálogo, NÃO um substituto pelo TeamValidator (banlists podem mudar).
