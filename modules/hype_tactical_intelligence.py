@@ -116,7 +116,7 @@ def _form(slot):
     item=_id(slot.get('item'))
     original=_id(name)
     if original in {'charizard','mewtwo'} and item in {
-        original+'itex',original+'itey'}:
+        'charizarditex','charizarditey','mewtwonitex','mewtwonitey'} and item.startswith(original):
         return name+'-Mega-'+item[-1].upper()
     if item.endswith('ite') and not original.endswith('mega'):
         candidate=name+'-Mega'
@@ -305,7 +305,7 @@ def _interactions(slots,weather):
         stat,_=_stats(s)
         ev=s.get('evs') if isinstance(s.get('evs'),dict) else {}
         atk=_num(ev.get('atk'));spa=_num(ev.get('spa'))
-        status=[m for m in moves if (meta:=_get_move(m)) and meta['c']=='S' and meta['p']==0]
+        status=[m for m in moves if (meta:=_get_move(m)) and meta['c']=='T']
         if item=='assaultvest' and status:
             add('alerta','Assault Vest impede golpes de status',
                 name+' tem '+', '.join(status[:3])+', que não podem ser selecionados com Assault Vest.',name)
