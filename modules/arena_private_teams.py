@@ -42,6 +42,48 @@ MEGA_STONE_OWNERS = {
 }
 
 
+
+# Banlists explícitas de cláusulas de validação no rulesets.ts do Pokémon
+# Showdown (consultado em 2026-11-11). O snapshot possui o nome da cláusula,
+# mas não expande automaticamente o que ela proíbe: fazê-lo aqui evita brechas.
+_CLAUSULAS_BANS = {
+    'sleepmovesclause': {
+        'golpes': ('Dark Void', 'Grass Whistle', 'Hypnosis', 'Lovely Kiss',
+                   'Sing', 'Sleep Powder', 'Spore', 'Yawn'),
+    },
+    'evasionabilitiesclause': {
+        'habilidades': ('Sand Veil', 'Snow Cloak'),
+    },
+    'evasionitemsclause': {
+        'itens': ('Bright Powder', 'Lax Incense'),
+    },
+    'evasionmovesclause': {
+        'golpes': ('Acupressure', 'Minimize', 'Double Team'),
+    },
+    'accuracymovesclause': {
+        'golpes': ('Flash', 'Kinesis', 'Leaf Tornado', 'Mirror Shot',
+                   'Mud Bomb', 'Mud-Slap', 'Muddy Water', 'Night Daze',
+                   'Octazooka', 'Sand Attack', 'Smokescreen'),
+    },
+    'ohkoclause': {
+        'golpes': ('Fissure', 'Guillotine', 'Horn Drill', 'Sheer Cold'),
+    },
+}
+
+
+def _bans_de_clausulas(formato):
+    """Expande banlists simples; cláusulas de batalha continuam no Showdown."""
+    resultado = {'golpes': set(), 'itens': set(), 'habilidades': set()}
+    regras = (*formato.get('clausulas', ()), *formato.get('regras_showdown', ()))
+    existentes = {_chave(regra) for regra in regras if not str(regra).strip().startswith('!')}
+    if 'evasionclause' in existentes:
+        existentes.update(('evasionabilitiesclause', 'evasionitemsclause', 'evasionmovesclause'))
+    for clausula in existentes:
+        for grupo, nomes in _CLAUSULAS_BANS.get(clausula, {}).items():
+            resultado[grupo].update(_chave(x) for x in nomes)
+    return resultado
+
+
 def codigo_formato_do_torneio(regras):
     texto = str(regras or '')
     match = re.search(r'^Identificador Pokémon Showdown:\s*([a-z0-9]+)\s*$', texto, re.I | re.M)
@@ -173,9 +215,10 @@ def validar_equipe_basica(slots, codigo_formato):
         return [f'O time desse formato precisa conter exatamente {tamanho} Pokémon.']
 
     banidos = {_id_especie(p) for p in formato.get('pokemons_proibidos', ())}
-    golpes_banidos = {_chave(m) for m in formato.get('golpes_proibidos', ())}
-    itens_banidos = {_chave(m) for m in formato.get('itens_proibidos', ())}
-    habilidades_banidas = {_chave(m) for m in formato.get('habilidades_proibidas', ())}
+    clausulas = _bans_de_clausulas(formato)
+    golpes_banidos = {_chave(m) for m in formato.get('golpes_proibidos', ())} | clausulas['golpes']
+    itens_banidos = {_chave(m) for m in formato.get('itens_proibidos', ())} | clausulas['itens']
+    habilidades_banidas = {_chave(m) for m in formato.get('habilidades_proibidas', ())} | clausulas['habilidades']
     usados = set()
     itens_usados = set()
     tipos_em_comum = None
