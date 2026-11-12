@@ -22,7 +22,8 @@
   {% set pagamento = controle.get('pagamento_status', 'pendente') %}
   {% set cadastrado = email in inscritos %}
   {% set aprovados = times|selectattr('status','equalto','aprovado')|list|length %}
-  {% set pronto = times|length > 0 and aprovados == times|length and pagamento in ['confirmado','dispensado'] %}
+  {% set irregularidades = times|selectattr('regras_alertas')|list|length %}
+  {% set pronto = times|length > 0 and aprovados == times|length and irregularidades == 0 and pagamento in ['confirmado','dispensado'] %}
   <section class="v26-panel arena-review-player">
     <div class="arena-review-heading">
       <div>
@@ -44,6 +45,13 @@
         <span class="arena-private-state">{{'Aprovado' if time.status == 'aprovado' else 'Correção solicitada' if time.status == 'correcao_solicitada' else 'Aguardando revisão'}}</span>
       </summary>
       {% if time.motivo_revisao %}<p class="arena-review-hint">Motivo da correção: {{time.motivo_revisao}}</p>{% endif %}
+      {% if time.regras_alertas %}
+        <div class="arena-rule-issues" role="alert">
+          <strong>⚠ Checagem preliminar reprovada — não aprovar</strong>
+          <ul>{% for erro in time.regras_alertas[:8] %}<li>{{erro}}</li>{% endfor %}</ul>
+          <small>Solicite correção. O time original não foi modificado.</small>
+        </div>
+      {% endif %}
       <div class="arena-private-grid">
         {% for p in time.equipe %}
         <div class="arena-private-card">
@@ -61,7 +69,7 @@
       <div class="arena-review-actions">
         <form method="post" action="{{url_for('events26.admin_revisar_equipe', torneio_id=torneio.id, equipe_id=time.id)}}">
           <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
-          <button class="v26-btn gold" name="acao" value="aprovar" type="submit" onclick="return confirm('Aprovar a conferência preliminar deste time?')">Aprovar time</button>
+          <button class="v26-btn gold" name="acao" value="aprovar" type="submit" {% if time.regras_alertas %}disabled aria-disabled="true"{% endif %} onclick="return confirm('Aprovar a conferência preliminar deste time?')">Aprovar time</button>
         </form>
         <form method="post" action="{{url_for('events26.admin_revisar_equipe', torneio_id=torneio.id, equipe_id=time.id)}}" class="arena-correction-form">
           <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
@@ -92,7 +100,7 @@
           <input type="hidden" name="csrf_token" value="{{csrf_token()}}">
           <input type="hidden" name="usuario_email" value="{{email}}">
           <button type="submit" class="v26-btn gold" {% if not pronto %}disabled aria-disabled="true"{% endif %}>Confirmar inscrição oficial</button>
-          {% if not pronto %}<small>Disponível após aprovação de todos os times enviados e confirmação ou dispensa do pagamento.</small>{% endif %}
+          {% if not pronto %}<small>Disponível após aprovação de todos os times enviados sem erros de formato e confirmação ou dispensa do pagamento.</small>{% endif %}
         </form>
       {% elif cadastrado %}
         <p class="arena-review-status is-confirmed">Inscrição oficial registrada. O jogador aparece na lista de participantes.</p>
