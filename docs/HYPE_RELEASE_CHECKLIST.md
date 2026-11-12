@@ -31,3 +31,11 @@ Instale cryptography somente no computador offline ou ambiente de build confiáv
 - Testar que um manifesto com assinatura falsa ou JAR alterado é recusado.
 - Ofuscação é outra etapa, NÃO é fornecida por este assinador; antes de ofuscar, testar Fabric entrypoints, mixins e compatibilidade.
 - Nenhum procedimento descrito aqui autoriza publicação antecipada.
+
+## Rotacao local de chave (quando o dono so tem o JAR)
+
+- Preparar offline um novo cliente com chave publica Ed25519 diferente e instalar **manualmente** esse cliente numa instancia de teste confiavel antes de habilitar qualquer release. A chave privada deve ser gerada e guardada **na maquina do responsavel**, nao no site, chat, GitHub ou Render.
+- Apos a instalacao manual do cliente atualizado, usar o assinador com `--trusted-client-jar CAMINHO_CLIENTE_TESTADO.jar` para comparar a chave privada local com a chave PUBLICA que o novo cliente realmente contem. Sem esse argumento, o assinador continua exigindo a chave antiga e falha de forma segura.
+- Exemplo (somente apos os testes em Minecraft): `python tools/hype_sign_release.py --jar NOVO_HYPECLIENT.jar --key CAMINHO_PRIVADO/chave.pem --trusted-client-jar CAMINHO_INSTALADO/HYPE-CLIENT-CHAVE-NOVA-TESTE.jar --release 8 --out CAMINHO_PRIVADO/preparado-r8`.
+- A flag `--trusted-client-jar` NAO autentica o JAR de referencia: o responsavel deve conferir sua origem e hash antes de usa-lo. Nunca usar um cliente enviado por terceiros como âncora de confianca.
+- Esta ferramenta continua criando arquivos **locais**, sem publicar nada. O painel administrador, distribuição e rollback em Minecraft ainda precisam ser validados separadamente.
