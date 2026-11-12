@@ -5,7 +5,7 @@ NÃO substitui o validador oficial de legalidade do Pokémon Showdown e nunca
 autoriza inscrição/aprovação automática.
 """
 import re
-from modules.hype_tournament_formats import obter_formato, obter_especie_showdown
+from modules.hype_tournament_formats import obter_formato, obter_especie_showdown, obter_item_showdown
 
 STATS = ('hp', 'atk', 'def', 'spa', 'spd', 'spe')
 
@@ -258,6 +258,15 @@ def validar_equipe_basica(slots, codigo_formato):
         item_id = _chave(item)
         if item_id in BOLAS_CAPTURA:
             erros.append(f'Slot {indice}: {item} é uma Poké Ball de captura e não está disponível na Arena HYPE.')
+        elif item_id:
+            meta_item = obter_item_showdown(item_id)
+            if not meta_item:
+                erros.append(f'Slot {indice}: item {item} não existe no catálogo de itens do Showdown.')
+            elif meta_item.get('num', 0) < 0 or meta_item.get('nonstandard') in ('CAP', 'Custom', 'Future', 'Unobtainable', 'LGPE'):
+                erros.append(f'Slot {indice}: item {item} não está disponível neste formato.')
+            elif ('nationaldex' not in formato['codigo']
+                  and (meta_item.get('gen', 0) > 9 or meta_item.get('nonstandard') == 'Past')):
+                erros.append(f'Slot {indice}: item {item} não está disponível na Geração 9 padrão.')
         if item_id in itens_banidos:
             erros.append(f'Slot {indice}: o item {item} é proibido no formato.')
         if item_id and formato.get('item_clause'):
