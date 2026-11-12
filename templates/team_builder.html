@@ -346,6 +346,32 @@
     return '';
   }
   let itemNames = [...new Set([...heldItemCodes,...Object.values(arceusPlateByType),'blue-orb','red-orb','hearthflame-mask','wellspring-mask','cornerstone-mask'])].sort();
+  let heldItemCatalog = null;
+  const captureBallIds=new Set('pokeball greatball ultraball masterball premierball healball luxuryball friendball levelball lureball heavyball loveball moonball fastball sportball safariball duskball diveball netball nestball timerball repeatball quickball dreamball beastball cherishball parkball'.split(' '));
+  function itemAvailableForFormat(code){
+    const meta=heldItemCatalog?.[speciesKey(code)],f=selectedFormat();
+    if(captureBallIds.has(speciesKey(code)))return false;
+    if(!meta)return !heldItemCatalog;
+    if(Number(meta.num)<0||Number(meta.gen)>9)return false;
+    if(['CAP','Custom','Future','Unobtainable','LGPE'].includes(meta.nonstandard))return false;
+    if(f&&!f.codigo.includes('nationaldex')&&meta.nonstandard==='Past')return false;
+    return true;
+  }
+  async function bootItemsCatalog(){
+    try{
+      const response=await fetch('{{url_for("expansion.team_builder_items_snapshot")}}',{credentials:'same-origin'});
+      if(!response.ok)throw Error('Item catalog unavailable');
+      const data=await response.json();
+      const catalog=data.items||{};
+      if(Object.keys(catalog).length<500)throw Error('Incomplete item catalog');
+      heldItemCatalog=catalog;
+      itemNames=[...new Set(Object.values(catalog).map(meta=>slug(meta.name)))].sort();
+      updateItemPreview();
+    }catch(e){
+      // Sem catálogo externo: manter lista anterior de sugestões e não declarar legalidade.
+      itemHelp.textContent='Catálogo completo de itens temporariamente indisponível. Regras finais exigem Showdown.';
+    }
+  }
   let debounce = null;
 
   const $ = id => document.getElementById(id);
@@ -425,7 +451,7 @@
   function allowedHeldItems(){
     const f=selectedFormat(), ban=new Set((f?.itens_proibidos||[]).map(slug));
     const base=basePokemon(), required=requiredFormHeldItem(base);
-    return itemNames.filter(code=>(!required||code===required)&&!ban.has(slug(code))&&
+    return itemNames.filter(code=>itemAvailableForFormat(code)&&(!required||code===required)&&!ban.has(slug(code))&&
       (!megaStoneOwner[code]||(megaStoneOwner[code]===base&&(!f||f.permite_mega===true)&&!megaStoneRestriction(code)))&&
       (!code.endsWith('-z')||!f||f.permite_zmove===true)&&
       (mechanicSelect.value!=='mega'||megaStoneOwner[code]===base)&&
@@ -1345,6 +1371,7 @@
   $('formatSelect').addEventListener('change',changeBuilderFormat);
   renderTabs();renderEditor();
   bootMoveDex();
+  bootItemsCatalog();
   bootLists().then(()=>{
     if(prefillBuild&&prefillBuild._slot){
       slots[0]=Object.assign(emptySlot(),prefillBuild._slot);active=0;renderEditor();renderTabs();
