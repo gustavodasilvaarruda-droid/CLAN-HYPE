@@ -113,6 +113,12 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         enviados_lista = safe_table('arena_torneio_equipes', '*',
                                    torneio_id=torneio_id, usuario_email=email)
         enviados = {int(t['slot']): t for t in enviados_lista if t.get('slot') is not None}
+        # Times antigos: mostrar irregularidades sem apagar ou alterar equipes enviadas.
+        for equipe_enviada in enviados.values():
+            equipe_enviada['regras_alertas'] = (
+                validar_equipe_basica(equipe_enviada.get('equipe'), codigo)
+                if equipe_enviada.get('formato_codigo') == codigo
+                else ['O formato registrado difere do torneio.'])
 
         if request.method == 'POST':
             if not pode_enviar:
@@ -173,6 +179,8 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         meus_times = [t for t in safe_table('times_pokemon', '*', usuario_email=email)
                       if not t.get('publico') and isinstance(t.get('slots'), list)
                       and str(t.get('formato_codigo') or '').lower() == codigo]
+        for t in meus_times:
+            t['regras_alertas'] = validar_equipe_basica(t.get('slots'), codigo)
         meus_times.sort(key=lambda t: str(t.get('updated_at') or ''), reverse=True)
         selecionado = request.args.get('team_id', type=int)
         if not any(t.get('id') == selecionado for t in meus_times):
@@ -203,6 +211,12 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
             flash('Torneio não encontrado.', 'erro')
             return redirect(url_for('admin_conteudo'))
         enviados = safe_table('arena_torneio_equipes', '*', torneio_id=torneio_id)
+        codigo = codigo_formato_do_torneio(torneio.get('regras'))
+        for equipe_enviada in enviados:
+            equipe_enviada['regras_alertas'] = (
+                validar_equipe_basica(equipe_enviada.get('equipe'), codigo)
+                if codigo and equipe_enviada.get('formato_codigo') == codigo
+                else ['O formato registrado difere do torneio.'])
         historico = safe_table('arena_torneio_equipes_historico', '*', torneio_id=torneio_id)
         perfis = {str(u.get('email') or '').lower(): u.get('nick_jogo')
                   for u in safe_table('usuarios_clan', 'email,nick_jogo')}
@@ -340,6 +354,24 @@ def create_events_v26_blueprint(supabase, login_required, safe_table, is_admin, 
         if not email:
             flash('Selecione o jogador.', 'erro')
             return voltar_revisao(torneio_id)
+        # A função SQL confere aprovações e pagamento; a checagem de
+        # regras também é obrigatória aqui para impedir a inscrição
+        # de equipes antigas aprovadas antes desta atualização.
+        torneio = one('torneios', id=torneio_id)
+        codigo = codigo_formato_do_torneio((torneio or {}).get('regras'))
+        enviados = safe_table('arena_torneio_equipes', '*',
+                              torneio_id=torneio_id, usuario_email=email)
+        if not codigo or not enviados:
+            flash('Não há formato válido ou equipes para confirmar.', 'erro')
+            return voltar_revisao(torneio_id)
+        for t in enviados:
+            erros = (validar_equipe_basica(t.get('equipe'), codigo)
+                     if t.get('formato_codigo') == codigo
+                     else ['O formato não coincide com o torneio.'])
+            if erros:
+                flash('O slot ' + str(t.get('slot') or '?') +
+                      ' está fora das regras: ' + ' | '.join(erros[:3]), 'erro')
+                return voltar_revisao(torneio_id)
         try:
             resultado = supabase.rpc('hype_arena_confirmar_inscricao', {
                 'p_torneio_id': torneio_id,
