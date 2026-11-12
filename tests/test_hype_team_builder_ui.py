@@ -9,7 +9,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from modules.arena_private_teams import validar_equipe_basica
-from modules.hype_tournament_formats import obter_formato
+from modules.hype_tournament_formats import obter_formato, obter_regras_especie_showdown
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -183,7 +183,7 @@ if(parseShowdownTeam('Charizard @ <img src=x>').errors.length===0)throw Error('I
         data = []
         for p in ('Dialga', 'Palkia', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh'):
             data.append({
-                'pokemon': p, 'ability': 'Pressure', 'nature': 'Timid',
+                'pokemon': p, 'ability': obter_regras_especie_showdown(p)['abilities'][0], 'nature': 'Timid',
                 'item': 'Leftovers',
                 'moves': ['Recover', 'Protect', 'Rest', 'Sleep Talk'],
                 'evs': {k: 0 for k in ('hp', 'atk', 'def', 'spa', 'spd', 'spe')},
