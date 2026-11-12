@@ -448,10 +448,32 @@
     'calyrex-ice':['clear-amulet','weakness-policy','leftovers','life-orb'],
   };
   let showAllHeldItems=false;
+  // Mesmas banlists de cláusulas simples usadas na checagem do servidor.
+  // Derivadas do rulesets.ts do Pokémon Showdown (snapshot de 11/11/2026).
+  const clauseBanLists={
+    sleepmovesclause:{moves:'Dark Void|Grass Whistle|Hypnosis|Lovely Kiss|Sing|Sleep Powder|Spore|Yawn'},
+    evasionabilitiesclause:{abilities:'Sand Veil|Snow Cloak'},
+    evasionitemsclause:{items:'Bright Powder|Lax Incense'},
+    evasionmovesclause:{moves:'Acupressure|Minimize|Double Team'},
+    accuracymovesclause:{moves:'Flash|Kinesis|Leaf Tornado|Mirror Shot|Mud Bomb|Mud-Slap|Muddy Water|Night Daze|Octazooka|Sand Attack|Smokescreen'},
+    ohkoclause:{moves:'Fissure|Guillotine|Horn Drill|Sheer Cold'}
+  };
+  function formatBanIds(kind){
+    const f=selectedFormat();
+    const explicit={moves:f?.golpes_proibidos||[],items:f?.itens_proibidos||[],abilities:f?.habilidades_proibidas||[]}[kind]||[];
+    const ids=new Set(explicit.map(speciesKey));
+    const clauses=new Set([...(f?.clausulas||[]),...(f?.regras_showdown||[])].filter(x=>!String(x).trim().startsWith('!')).map(speciesKey));
+    if(clauses.has('evasionclause'))['evasionabilitiesclause','evasionitemsclause','evasionmovesclause'].forEach(x=>clauses.add(x));
+    for(const clause of clauses){
+      const raw=clauseBanLists[clause]?.[kind];
+      if(raw)raw.split('|').forEach(x=>ids.add(speciesKey(x)));
+    }
+    return ids;
+  }
   function allowedHeldItems(){
-    const f=selectedFormat(), ban=new Set((f?.itens_proibidos||[]).map(slug));
+    const f=selectedFormat(), ban=formatBanIds('items');
     const base=basePokemon(), required=requiredFormHeldItem(base);
-    return itemNames.filter(code=>itemAvailableForFormat(code)&&(!required||code===required)&&!ban.has(slug(code))&&
+    return itemNames.filter(code=>itemAvailableForFormat(code)&&(!required||code===required)&&!ban.has(speciesKey(code))&&
       (!megaStoneOwner[code]||(megaStoneOwner[code]===base&&(!f||f.permite_mega===true)&&!megaStoneRestriction(code)))&&
       (!code.endsWith('-z')||!f||f.permite_zmove===true)&&
       (mechanicSelect.value!=='mega'||megaStoneOwner[code]===base)&&
@@ -731,7 +753,7 @@
   const moveMetaCache=new Map(),abilityMetaCache=new Map();
   function moveKey(v){return speciesKey(v);}
   function allowedMoves(list){
-    const ban=new Set((selectedFormat()?.golpes_proibidos||[]).map(moveKey));
+    const ban=formatBanIds('moves');
     const dedup=new Map();
     for(const name of list||[]){
       const key=moveKey(name);
@@ -976,9 +998,9 @@
     const illegalMoves=filled.filter(s=>s.moves_available?.length&&(s.moves||[]).some(m=>m&&!allowedMoves(s.moves_available).some(x=>moveKey(x)===moveKey(m))));
     if(illegalMoves.length)messages.push({ok:false,text:'Revise os golpes: '+illegalMoves.map(s=>pretty(s.pokemon)).join(', ')});
     const invalidFormItems=filled.filter(s=>{const required=requiredFormHeldItem(s.pokemon);return required&&slug(s.item)!==required;});
-    const invalidHeldItems=filled.filter(s=>s.item&&(f?.itens_proibidos||[]).some(x=>slug(x)===slug(s.item)));
+    const invalidHeldItems=filled.filter(s=>s.item&&(!itemAvailableForFormat(slug(s.item))||formatBanIds('items').has(speciesKey(s.item))));
     if(invalidHeldItems.length)messages.push({ok:false,text:'Itens proibidos: '+invalidHeldItems.map(s=>pretty(s.pokemon)).join(', ')});
-    const invalidAbilities=filled.filter(s=>s.ability&&(f?.habilidades_proibidas||[]).some(x=>speciesKey(x)===speciesKey(s.ability)));
+    const invalidAbilities=filled.filter(s=>s.ability&&formatBanIds('abilities').has(speciesKey(s.ability)));
     if(invalidAbilities.length)messages.push({ok:false,text:'Habilidades proibidas: '+invalidAbilities.map(s=>pretty(s.pokemon)).join(', ')});
     if(invalidFormItems.length)messages.push({ok:false,text:'Item obrigatório: '+invalidFormItems.map(s=>pretty(s.pokemon)).join(', ')});
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
@@ -1028,8 +1050,8 @@
       alert('Este golpe não consta no aprendizado disponível para este Pokémon no pré-filtro do Showdown.');
       el.value='';saveEditor();return;
     }
-    const banned=new Set((selectedFormat()?.golpes_proibidos||[]).map(slug));
-    if(banned.has(slug(el.value))){alert('Esse golpe é proibido pelo regulamento resumido deste formato.');el.value='';saveEditor();return;}
+    const banned=formatBanIds('moves');
+    if(banned.has(speciesKey(el.value))){alert('Esse golpe é proibido pelo regulamento resumido deste formato.');el.value='';saveEditor();return;}
     await loadMoveMeta(el.value.trim()); saveEditor();
   }));
 
