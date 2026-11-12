@@ -296,6 +296,7 @@
   const pokemonSpriteIds = new Map();
   const levelInput=document.getElementById('levelInput');
   let showdownSpecies={}, showdownReady=false;
+  let speciesRuleDex=null;
   let showdownLearnsets=null, showdownLearnsetsPromise=null;
   // Cada Mega Stone pertence a uma única espécie. Mega não é um item genérico.
   const megaStoneOwner = {
@@ -337,6 +338,35 @@
       'ogerpon-cornerstone':'cornerstone-mask'
     }[name]||'';
   }
+  function requiredFormHeldItems(pokemon){
+    const key=speciesKey(pokemon),row=speciesRuleDex?.[key];
+    if(row?.requiredItems?.length){
+      const choices=row.requiredItems.map(slug);
+      if(key==='giratinaorigin'&&selectedFormat()?.codigo?.includes('nationaldex'))choices.push('griseous-orb');
+      return [...new Set(choices)];
+    }
+    const fallback=requiredFormHeldItem(pokemon);
+    return fallback?[fallback]:[];
+  }
+  function allowedSpeciesAbilities(pokemon){
+    const base=speciesMeta(pokemon)?.base;
+    return speciesRuleDex?.[speciesKey(pokemon)]?.abilities||
+      speciesRuleDex?.[speciesKey(base)]?.abilities||[];
+  }
+  async function bootSpeciesRules(){
+    try{
+      const response=await fetch('{{url_for("expansion.team_builder_species_rules_snapshot")}}',{credentials:'same-origin'});
+      if(!response.ok)throw Error('Species rules unavailable');
+      const data=await response.json(),rules=data.species||{};
+      if(Object.keys(rules).length<1400)throw Error('Species rules incomplete');
+      speciesRuleDex=rules;
+      renderEditor();liveValidate();
+    }catch(e){
+      // Se o catálogo não carregar, as restrições básicas continuam disponíveis.
+      console.warn('Pré-filtro de habilidades indisponível; conferência oficial necessária.');
+    }
+  }
+
   // A fusão é feita com item-chave fora da batalha; esse item não é equipável.
   function fusionItemInfo(pokemon){
     const name=String(pokemon||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -472,8 +502,8 @@
   }
   function allowedHeldItems(){
     const f=selectedFormat(), ban=formatBanIds('items');
-    const base=basePokemon(), required=requiredFormHeldItem(base);
-    return itemNames.filter(code=>itemAvailableForFormat(code)&&(!required||code===required)&&!ban.has(speciesKey(code))&&
+    const base=basePokemon(), required=requiredFormHeldItems(base);
+    return itemNames.filter(code=>itemAvailableForFormat(code)&&(!required.length||required.includes(code))&&!ban.has(speciesKey(code))&&
       (!megaStoneOwner[code]||(megaStoneOwner[code]===base&&(!f||f.permite_mega===true)&&!megaStoneRestriction(code)))&&
       (!code.endsWith('-z')||!f||f.permite_zmove===true)&&
       (mechanicSelect.value!=='mega'||megaStoneOwner[code]===base)&&
@@ -507,15 +537,15 @@
   function updateItemPreview(){
     const chosen=knownHeldItem(itemInput.value), value=itemInput.value.trim();
     const species=basePokemon(), recommendations=recommendedItems[species]||[];
-    const required=requiredFormHeldItem(species), fusionInfo=fusionItemInfo(species);
+    const requiredOptions=requiredFormHeldItems(species), fusionInfo=fusionItemInfo(species);
     itemIcon.hidden=!chosen;
     if(chosen){itemIcon.src=itemIconUrl(chosen);itemIcon.alt=pretty(chosen);}
     const normalHelp=!value?(recommendations.length?'Primeiras opções: sugestões para '+pretty(species)+'. Pesquise outros itens equipáveis.':'Pesquise itens equipáveis permitidos no formato.'):(chosen?'Selecionado: '+pretty(chosen):'Escolha uma das opções da lista para usar este item.');
-    const requiredAllowed=required&&allowedHeldItems().includes(required);
-    itemHelp.textContent=required
-      ? (requiredAllowed?'Forma '+pretty(species)+': '+pretty(required)+' é obrigatório e será sugerido automaticamente.':'O item '+pretty(required)+' não está permitido no formato selecionado. Confira as regras.')
+    const requiredAllowed=requiredOptions.length&&requiredOptions.some(x=>allowedHeldItems().includes(x));
+    itemHelp.textContent=requiredOptions.length
+      ? (requiredAllowed?'Forma '+pretty(species)+': escolha '+requiredOptions.map(pretty).join(' ou ')+'.':'Os itens exigidos por '+pretty(species)+' não estão permitidos no formato selecionado. Confira as regras.')
       : (fusionInfo?fusionInfo+' '+normalHelp:normalHelp);
-    itemHelp.classList.toggle('hype-item-error',!!value&&!chosen||!!required&&!requiredAllowed);
+    itemHelp.classList.toggle('hype-item-error',!!value&&!chosen||!!requiredOptions.length&&!requiredAllowed);
   }
   function closeItemChoices(){itemResults.hidden=true;itemInput.setAttribute('aria-expanded','false');}
   function chooseItem(code){
@@ -591,7 +621,7 @@
 
   function renderEditor(){
     const s=current();
-    if(s.pokemon&&!s.item&&requiredFormHeldItem(s.pokemon))s.item=requiredFormHeldItem(s.pokemon);
+    if(s.pokemon&&!s.item&&requiredFormHeldItems(s.pokemon).length)s.item=requiredFormHeldItems(s.pokemon)[0];
     $('slotLabel').textContent=`SLOT ${active+1}`;
     $('editorPokemonName').textContent=s.pokemon?pretty(s.pokemon):'Escolha um Pokémon';
     levelInput.value=selectedFormat()?.little_cup?5:(s.level||100);
@@ -630,8 +660,8 @@
       const slot=current(),previousPokemon=slot.pokemon;
        slot.pokemon=meta?.n||p.name;
        if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.level=formatDefaultLevel(selectedFormat());slot.pokemon_id=meta?.num||p.id;
-       const linkedItem=requiredFormHeldItem(slot.pokemon);
-       if(linkedItem)slot.item=linkedItem;
+       const linkedItem=requiredFormHeldItems(slot.pokemon)[0];
+       if(linkedItem&&(!slot.item||speciesKey(previousPokemon)!==speciesKey(slot.pokemon)))slot.item=linkedItem;
        else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
       slot.tipos=p.types.map(x=>x.type.name);
       slot.sprite=p.sprites?.other?.['official-artwork']?.front_default||p.sprites?.front_default||'';
@@ -647,8 +677,8 @@
         const slot=current(),previousPokemon=slot.pokemon;
          slot.pokemon=meta.n;
          if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.level=formatDefaultLevel(selectedFormat());slot.pokemon_id=meta.num;slot.tipos=meta.types.map(x=>x.toLowerCase());
-         const linkedItem=requiredFormHeldItem(slot.pokemon);
-         if(linkedItem)slot.item=linkedItem;
+         const linkedItem=requiredFormHeldItems(slot.pokemon)[0];
+         if(linkedItem&&(!slot.item||speciesKey(previousPokemon)!==speciesKey(slot.pokemon)))slot.item=linkedItem;
          else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
         slot.sprite=meta.num>0?'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+meta.num+'.png':'';
         slot.moves_available=[];slot.abilities=[];
@@ -997,11 +1027,21 @@
     if(incompatibleSpecies.length)messages.push({ok:false,text:'Pokémon incompatíveis: '+incompatibleSpecies.map(s=>pretty(s.pokemon)).join(', ')});
     const illegalMoves=filled.filter(s=>s.moves_available?.length&&(s.moves||[]).some(m=>m&&!allowedMoves(s.moves_available).some(x=>moveKey(x)===moveKey(m))));
     if(illegalMoves.length)messages.push({ok:false,text:'Revise os golpes: '+illegalMoves.map(s=>pretty(s.pokemon)).join(', ')});
-    const invalidFormItems=filled.filter(s=>{const required=requiredFormHeldItem(s.pokemon);return required&&slug(s.item)!==required;});
+    const invalidFormItems=filled.filter(s=>{
+      const required=requiredFormHeldItems(s.pokemon);
+      return required.length&&!required.includes(slug(s.item));
+    });
     const invalidHeldItems=filled.filter(s=>s.item&&(!itemAvailableForFormat(slug(s.item))||formatBanIds('items').has(speciesKey(s.item))));
     if(invalidHeldItems.length)messages.push({ok:false,text:'Itens proibidos: '+invalidHeldItems.map(s=>pretty(s.pokemon)).join(', ')});
     const invalidAbilities=filled.filter(s=>s.ability&&formatBanIds('abilities').has(speciesKey(s.ability)));
     if(invalidAbilities.length)messages.push({ok:false,text:'Habilidades proibidas: '+invalidAbilities.map(s=>pretty(s.pokemon)).join(', ')});
+    if(speciesRuleDex){
+      const invalidSpeciesAbilities=filled.filter(s=>{
+        const permitted=allowedSpeciesAbilities(s.pokemon);
+        return s.ability&&permitted.length&&!permitted.some(x=>speciesKey(x)===speciesKey(s.ability));
+      });
+      if(invalidSpeciesAbilities.length)messages.push({ok:false,text:'Habilidades que não pertencem ao Pokémon: '+invalidSpeciesAbilities.map(s=>pretty(s.pokemon)).join(', ')});
+    }
     if(invalidFormItems.length)messages.push({ok:false,text:'Item obrigatório: '+invalidFormItems.map(s=>pretty(s.pokemon)).join(', ')});
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
     const mechanics=filled.filter(s=>s.mecanica&&s.mecanica!=='nenhuma'); if(mechanics.length){ const invalid=mechanics.some(s=>f && !f[`permite_${s.mecanica}`]); messages.push({ok:!invalid,text:'Mecânicas do formato'}); }
@@ -1394,6 +1434,7 @@
   renderTabs();renderEditor();
   bootMoveDex();
   bootItemsCatalog();
+  bootSpeciesRules();
   bootLists().then(()=>{
     if(prefillBuild&&prefillBuild._slot){
       slots[0]=Object.assign(emptySlot(),prefillBuild._slot);active=0;renderEditor();renderTabs();
