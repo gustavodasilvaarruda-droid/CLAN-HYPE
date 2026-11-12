@@ -252,7 +252,7 @@ def analisar_estrategia(slots, formato_codigo=''):
     estrategia = labels.get(active_weather, 'Composição personalizada')
     if not active_weather and defense >= 4 and offense <= 2:
         estrategia = 'Defensive Balance / Stall'
-    elif not active_weather and setup and offense >= 3:
+    elif not active_weather and setup and offense >= 2:
         estrategia = 'Ofensiva com setup'
     elif not active_weather and hazards and offense >= 3:
         estrategia = 'Ofensiva com hazards'
