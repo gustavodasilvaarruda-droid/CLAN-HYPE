@@ -20,10 +20,18 @@
 - Alterar formato continua solicitando confirmação antes de remover espécies incompatíveis; builds já salvas não são apagadas automaticamente.
 - Administração e jogador visualizam o motivo quando um time já enviado não passou na checagem.
 
+## Revisão complementar: habilidades e formas
+- Metadados versionados de **1.480 espécies e formas** em `data/hype_showdown_species_rules.json` (fonte `data/pokedex.ts` do Showdown).
+- O servidor agora compara habilidades dos times com as habilidades declaradas para aquela espécie/forma; informa quais são as opções.
+- Itens alternativos para formas são aceitos, quando legítimos no formato (por exemplo, Arceus-Bug com Insect Plate **ou** Buginium Z no National Dex AG).
+- Itens próprios de Giratina-Origin, Dialga-Origin, Palkia-Origin, Zacian-Crowned, Genesect e outras formas usam dados versionados, com fallback do catálogo anterior.
+- O editor mostra alertas antes do envio e não deve sobrescrever campos que o jogador esteja digitando quando os metadados carregarem.
+- Corrigida a confusão da palavra "mega" dentro de nomes comuns como Meganium.
+
 ## Limitações e trabalho pendente
 A checagem é **preliminar**, não uma validação competitiva completa. Não deve substituir o **TeamValidator oficial do Pokémon Showdown**, que continua necessário antes de aprovar um time para jogo.
 1. Checar correspondência exata de **golpes por espécie, geração e origem**, incluindo tutores, ovos, transferências, eventos, egg moves e combinações de moves.
-2. Checar **habilidades reais por espécie/forma**, hidden abilities, restrições de origem e evolução.
+2. Conferir **origem de habilidades especiais, HA e disponibilidade em eventos/gerações**. A lista geral de habilidades por espécie/forma já tem pré-checagem, mas não certifica se um Pokémon individual poderia obtê-la no formato.
 3. Resolver bans e unbans herdados complexos, times com regras customizadas e legalidade de **forma + item + habilidade + golpe** em todas as gerações.
 4. Implementar cláusulas dependentes de **combinações e efeitos de batalha** (ex.: Gravity Sleep Clause, Endless Battle Clause); não inferir sua validação apenas por texto.
 5. Vincular resultado rastreável do TeamValidator à revisão administrativa, conforme formato exato do torneio. **Não automatizar aprovação final** sem esse passo.
