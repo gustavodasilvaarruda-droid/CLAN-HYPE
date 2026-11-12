@@ -140,6 +140,8 @@ class TestArenaPrivateTeams(unittest.TestCase):
                             validar_equipe_basica(team, 'gen9nationaldexag')))
         team[1]['pokemon'] = 'Palkia'
         team[1]['item'] = 'Leftovers'
+        # A espécie Kyogre original ocupava o slot 3; não duplicar sua forma Primal.
+        team[2]['pokemon'] = 'Reshiram'
         team[0]['pokemon'] = 'Kyogre-Primal'
         team[0]['item'] = 'Leftovers'
         self.assertTrue(any('blueorb' in e for e in
