@@ -1141,7 +1141,7 @@
       const grid=strategyElement('div','hype-strategy-mon-grid');
       for(const mon of strategy.funcoes){
         const card=strategyElement('article','hype-strategy-mon');
-        card.append(strategyElement('h4','',mon.pokemon),
+        card.append(strategyElement('h4','',mon.pokemon_exibicao||mon.pokemon),
                     strategyElement('p','hype-strategy-meta',(mon.ability||'Sem habilidade')+' · '+(mon.item||'Sem item')));
         const tags=strategyElement('div','hype-strategy-tags');
         (mon.funcoes||[]).forEach(role=>tags.append(strategyElement('span','',role)));
