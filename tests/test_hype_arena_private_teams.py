@@ -5,9 +5,18 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from modules.arena_private_teams import codigo_formato_do_torneio, validar_equipe_basica
-from modules.hype_tournament_formats import obter_formato, regulamento_congelado
+from modules.hype_tournament_formats import obter_formato, regulamento_congelado, obter_regras_especie_showdown
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def capacidade(pokemon):
+    return obter_regras_especie_showdown(pokemon)['abilities'][0]
+
+
+def configurar_especie(slot, pokemon):
+    slot['pokemon'] = pokemon
+    slot['ability'] = capacidade(pokemon)
 
 
 def equipe_valida():
@@ -15,7 +24,7 @@ def equipe_valida():
     return [
         {
             'pokemon': p,
-            'ability': 'Pressure', 'nature': 'Timid',
+            'ability': capacidade(p), 'nature': 'Timid',
             'item': 'Leftovers',
             'moves': ['Recover', 'Protect', 'Rest', 'Sleep Talk'],
             'evs': {k: 0 for k in ('hp','atk','def','spa','spd','spe')},
@@ -58,13 +67,13 @@ class TestArenaPrivateTeams(unittest.TestCase):
         team[0]['mecanica'] = 'tera'
         team[0]['tera_type'] = 'Fire'
         self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexubers'), [])
-        team[0]['pokemon'] = 'Metagross'
+        configurar_especie(team[0], 'Metagross')
         team[0]['mecanica'] = 'mega'
         team[0]['item'] = 'Metagrossite'
         self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexubers'), [])
         team[0]['item'] = 'Abomasite'
         self.assertTrue(any('não corresponde' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
-        team[0]['pokemon'] = 'Gengar'
+        configurar_especie(team[0], 'Gengar')
         team[0]['item'] = 'Gengarite'
         self.assertTrue(any('AG' in e for e in validar_equipe_basica(team, 'gen9nationaldexubers')))
 
@@ -82,12 +91,12 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertTrue(validar_equipe_basica(equipe_valida(), 'gen91v1'))
         trio = equipe_valida()[:3]
         for slot, especie in zip(trio, ('Metagross', 'Garchomp', 'Venusaur')):
-            slot['pokemon'] = especie
+            configurar_especie(slot, especie)
         self.assertEqual(validar_equipe_basica(trio, 'gen91v1'), [])
 
     def test_tera_separated_and_special_format_restrictions(self):
         slots=equipe_valida()
-        slots[0]['pokemon']='Metagross'
+        configurar_especie(slots[0], 'Metagross')
         slots[0]['mecanica']='mega'
         slots[0]['item']='Metagrossite'
         slots[0]['tera_ativa']=True
@@ -105,7 +114,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
                             for p in especies))
         team = equipe_valida()
         for slot, p in zip(team, especies):
-            slot['pokemon'] = p
+            configurar_especie(slot, p)
         self.assertEqual(validar_equipe_basica(team, 'gen9monotype'), [])
         # Reproduz a imagem do usuário: Venusaur e Charizard quebram o time Água.
         team[0]['pokemon'] = 'Venusaur'
@@ -117,7 +126,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
         team = equipe_valida()
         for slot, pokemon in zip(team, ('Arcanine', 'Torkoal', 'Infernape',
                                        'Chandelure', 'Skeledirge', 'Charizard')):
-            slot['pokemon'] = pokemon
+            configurar_especie(slot, pokemon)
         self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexmonotype'), [])
         team[-1]['item'] = 'Charizardite X'
         team[-1]['mecanica'] = 'mega'
@@ -128,21 +137,21 @@ class TestArenaPrivateTeams(unittest.TestCase):
 
     def test_arceus_primal_ogerpon_required_items(self):
         team = equipe_valida()
-        team[0]['pokemon'] = 'Arceus-Bug'
+        configurar_especie(team[0], 'Arceus-Bug')
         team[0]['item'] = 'Leftovers'
         self.assertTrue(any('item de sua forma' in e for e in
                             validar_equipe_basica(team, 'gen9nationaldexag')))
         team[0]['item'] = 'Insect Plate'
         self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexag'), [])
-        team[1]['pokemon'] = 'Arceus-Fire'
+        configurar_especie(team[1], 'Arceus-Fire')
         team[1]['item'] = 'Flame Plate'
         self.assertTrue(any('espécies repetidas' in e for e in
                             validar_equipe_basica(team, 'gen9nationaldexag')))
-        team[1]['pokemon'] = 'Palkia'
+        configurar_especie(team[1], 'Palkia')
         team[1]['item'] = 'Leftovers'
         # A espécie Kyogre original ocupava o slot 3; não duplicar sua forma Primal.
-        team[2]['pokemon'] = 'Reshiram'
-        team[0]['pokemon'] = 'Kyogre-Primal'
+        configurar_especie(team[2], 'Reshiram')
+        configurar_especie(team[0], 'Kyogre-Primal')
         team[0]['item'] = 'Leftovers'
         self.assertTrue(any('blueorb' in e for e in
                             validar_equipe_basica(team, 'gen9nationaldexag')))
@@ -150,7 +159,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexag'), [])
 
         team = equipe_valida()
-        team[0]['pokemon'] = 'Ogerpon-Hearthflame'
+        configurar_especie(team[0], 'Ogerpon-Hearthflame')
         team[0]['item'] = 'Leftovers'
         self.assertTrue(any('hearthflamemask' in e for e in
                             validar_equipe_basica(team, 'gen9ubers')))
@@ -163,7 +172,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
         # a cláusula herdada pelo formato precisa proibir ambos.
         team = equipe_valida()
         for slot, p in zip(team, ('Charizard','Garchomp','Venusaur','Metagross','Pelipper','Blastoise')):
-            slot['pokemon'] = p
+            configurar_especie(slot, p)
         team[0]['moves'][0] = 'Sleep Powder'
         team[1]['ability'] = 'Sand Veil'
         errors = ' '.join(validar_equipe_basica(team, 'gen9ou'))
@@ -171,7 +180,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertIn('Sand Veil', errors)
         trio = equipe_valida()[:3]
         for slot, p in zip(trio, ('Garchomp', 'Metagross', 'Venusaur')):
-            slot['pokemon'] = p
+            configurar_especie(slot, p)
         for move in ('Fissure', 'Flash', 'Double Team'):
             trio[0]['moves'][0] = move
             self.assertTrue(any(move in e for e in
@@ -189,7 +198,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
         team = equipe_valida()
         especies = ['Bulbasaur','Charmander','Squirtle','Pikachu','Mudkip','Turtwig']
         for slot, p in zip(team, especies):
-            slot['pokemon'] = p
+            configurar_especie(slot, p)
             slot['level'] = 5
         # Alguns desta lista podem ser restringidos pela tier; o erro
         # específico de nível não depende da permissividade da espécie.
@@ -238,6 +247,49 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertIn('Corrigir regras antes do envio', user_view)
         self.assertIn('Checagem preliminar reprovada', admin_view)
         self.assertIn('irregularidades == 0', admin_view)
+
+
+    def test_ability_must_belong_to_species_and_form(self):
+        from modules.hype_tournament_formats import obter_regras_especie_showdown
+        meta = obter_regras_especie_showdown('Bulbasaur')
+        self.assertIn('Overgrow', meta['abilities'])
+        self.assertIn('Chlorophyll', meta['abilities'])
+        team = equipe_valida()
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexubers'), [])
+        team[2]['ability'] = 'Pressure'  # Kyogre usa Drizzle, não Pressure.
+        invalid = validar_equipe_basica(team, 'gen9nationaldexubers')
+        self.assertTrue(any('habilidade Pressure não pertence a Kyogre' in e
+                            and 'Drizzle' in e for e in invalid), invalid)
+        team[2]['ability'] = 'Drizzle'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexubers'), [])
+
+    def test_required_form_items_have_showdown_alternatives(self):
+        team = equipe_valida()
+        configurar_especie(team[0], 'Arceus-Bug')
+        team[0]['item'] = 'Buginium Z'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexag'), [])
+        team[0]['item'] = 'Insect Plate'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexag'), [])
+        team[0]['item'] = 'Leftovers'
+        self.assertTrue(any('item de sua forma' in e for e in
+                            validar_equipe_basica(team, 'gen9nationaldexag')))
+        configurar_especie(team[0], 'Dialga-Origin')
+        team[0]['item'] = 'Adamant Crystal'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexag'), [])
+        team[0]['item'] = 'Leftovers'
+        self.assertTrue(any('adamantcrystal' in e for e in
+                            validar_equipe_basica(team, 'gen9nationaldexag')))
+        configurar_especie(team[0], 'Zacian-Crowned')
+        team[0]['item'] = 'Rusted Sword'
+        self.assertFalse(any('item de sua forma' in e for e in
+                             validar_equipe_basica(team, 'gen9nationaldexag')))
+
+    def test_meganium_is_not_a_mega_evolution(self):
+        team = equipe_valida()
+        configurar_especie(team[0], 'Meganium')
+        team[0]['item'] = ''
+        self.assertFalse(any('Mega' in e for e in
+                             validar_equipe_basica(team, 'gen9nationaldexubers')))
 
     def test_never_automatically_confirms_registration(self):
         app = (ROOT / 'app.py').read_text(encoding='utf-8')

@@ -9,7 +9,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from modules.arena_private_teams import validar_equipe_basica
-from modules.hype_tournament_formats import obter_formato
+from modules.hype_tournament_formats import obter_formato, obter_regras_especie_showdown
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -101,6 +101,20 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         self.assertIn('if(current().pokemon&&!current().abilities?.length)loadPokemonDetails(current().pokemon);', template)
         self.assertIn('if(!current().abilities?.length)loadPokemonDetails(current().pokemon);else loadShowdownMovesForSlot(current());', template)
 
+    def test_species_rules_and_ability_preview_are_integrated(self):
+        from modules.hype_tournament_formats import obter_regras_especie_showdown
+        self.assertIn('Chlorophyll', obter_regras_especie_showdown('Bulbasaur')['abilities'])
+        self.assertIn('Buginium Z', obter_regras_especie_showdown('Arceus-Bug')['requiredItems'])
+        template=(ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        routes=(ROOT / 'modules/expansion_features.py').read_text(encoding='utf-8')
+        for marker in ('function bootSpeciesRules()', 'function allowedSpeciesAbilities(pokemon)',
+                       'function requiredFormHeldItems(pokemon)',
+                       'Habilidades que não pertencem ao Pokémon:',
+                       'requiredFormHeldItems(s.pokemon)',
+                       'bootSpeciesRules();'):
+            self.assertIn(marker, template)
+        self.assertIn('def team_builder_species_rules_snapshot():', routes)
+
     def test_inline_javascript_parses_in_node_when_available(self):
         if not shutil.which('node'):
             self.skipTest('Node indisponível neste ambiente')
@@ -183,7 +197,7 @@ if(parseShowdownTeam('Charizard @ <img src=x>').errors.length===0)throw Error('I
         data = []
         for p in ('Dialga', 'Palkia', 'Kyogre', 'Groudon', 'Lugia', 'Ho-Oh'):
             data.append({
-                'pokemon': p, 'ability': 'Pressure', 'nature': 'Timid',
+                'pokemon': p, 'ability': obter_regras_especie_showdown(p)['abilities'][0], 'nature': 'Timid',
                 'item': 'Leftovers',
                 'moves': ['Recover', 'Protect', 'Rest', 'Sleep Talk'],
                 'evs': {k: 0 for k in ('hp', 'atk', 'def', 'spa', 'spd', 'spe')},
