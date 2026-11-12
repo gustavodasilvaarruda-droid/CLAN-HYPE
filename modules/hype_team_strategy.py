@@ -8,6 +8,7 @@ from collections import Counter
 import re
 
 from modules.hype_tournament_formats import obter_especie_showdown
+from modules.hype_tactical_intelligence import analisar_avancado
 
 
 def _id(value):
@@ -241,14 +242,16 @@ def _slot_info(slot):
     }
 
 
-def analisar_estrategia(slots, formato_codigo=''):
+def analisar_estrategia(slots, formato_codigo='', adversario=None):
     """Gera diagnóstico contextual em português. Não escreve nem altera sets."""
     if not isinstance(slots, list):
         slots = []
+    avancada = analisar_avancado(slots, formato_codigo, adversario)
     team = [_slot_info(s) for s in slots[:6] if isinstance(s, dict) and s.get('pokemon')]
     if not team:
         return {'estilo': 'Time vazio', 'estrategia': 'Adicione Pokémon para analisar.',
                 'resumo': 'A análise aparece automaticamente após montar ou importar uma equipe.',
+                'avancada': avancada,
                 'funcoes': [], 'fortes': [], 'riscos': [], 'sinergias': [],
                 'melhorias': [], 'plano': [], 'formato_codigo': str(formato_codigo or '')[:90]}
 
@@ -396,4 +399,5 @@ def analisar_estrategia(slots, formato_codigo=''):
         'fortes': fortes[:6], 'riscos': riscos[:7],
         'sinergias': sinergias[:5], 'melhorias': melhorias[:5],
         'plano': plano[:5], 'formato_codigo': str(formato_codigo or '')[:90],
+        'avancada': avancada,
     }
