@@ -1,6 +1,6 @@
 {% extends 'builders_base.html' %}
 {% block title %}Análise de Time - HYPE{% endblock %}
-{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='hype_team_strategy.css') }}?v=1">{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='hype_team_strategy.css') }}?v=2">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool">
 <section class="dash-welcome"><div><span class="breed-kicker">HYPE TEAM ANALYZER</span><h1>{{time.nome}}</h1><p>{{(analise.formato or {}).nome or time.formato or 'Formato livre'}} · {{analise.total_pokemon}} Pokémon</p></div></section>
