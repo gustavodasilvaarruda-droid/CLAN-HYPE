@@ -464,6 +464,9 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
     @login_required
     def previa_estrategia():
         """Analisa o editor sem salvar time nem consultar dados particulares."""
+        # Evita abuso de CPU/memória no cálculo, sem afetar um time Showdown normal.
+        if request.content_length and request.content_length > 60000:
+            return jsonify({'erro': 'O texto enviado excede o tamanho permitido.'}), 413
         dados = request.get_json(silent=True)
         if not isinstance(dados, dict):
             return jsonify({'erro': 'Envie um time em JSON.'}), 400
@@ -472,9 +475,23 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             return jsonify({'erro': 'Envie até seis Pokémon.'}), 400
         if not all(isinstance(s, dict) for s in slots):
             return jsonify({'erro': 'Slot inválido.'}), 400
-        # Limita o corpo já processado pelo Flask, e o formato não confere legalidade.
+        # Opcional: outro time importado do Showdown para comparação não persistente.
+        adversario = dados.get('adversario', [])
+        if not isinstance(adversario, list) or len(adversario) > 6 or not all(
+                isinstance(s, dict) for s in adversario):
+            return jsonify({'erro': 'Time adversário inválido (máximo 6 Pokémon).'}), 400
+        # Limite estrutural: cada set inclui no máximo quatro golpes e seis EVs/IVs.
+        for slot in slots + adversario:
+            moves = slot.get('moves') or []
+            if (not isinstance(moves, list) or len(moves) > 4 or
+                    len(str(slot.get('pokemon') or '')) > 100 or
+                    any(len(str(m)) > 100 for m in moves) or
+                    any(not isinstance(slot.get(key) or {}, dict) or
+                        len(slot.get(key) or {}) > 6 for key in ('evs', 'ivs'))):
+                return jsonify({'erro': 'Um dos sets possui campos inválidos.'}), 400
+        # Formato não equivale a validação oficial de legalidade.
         formato_codigo = str(dados.get('formato_codigo') or '')[:90]
-        return jsonify({'estrategia': analisar_estrategia(slots, formato_codigo)})
+        return jsonify({'estrategia': analisar_estrategia(slots, formato_codigo, adversario)})
 
     @bp.route('/team-builder/<int:team_id>/analisar')
     @login_required

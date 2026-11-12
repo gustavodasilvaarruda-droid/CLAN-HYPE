@@ -1,6 +1,6 @@
 {% extends 'builders_base.html' %}
 {% block title %}HYPE Team Builder{% endblock %}
-{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=4"><link rel="stylesheet" href="{{url_for('static',filename='hype_team_strategy.css')}}?v=2">{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=4"><link rel="stylesheet" href="{{url_for('static',filename='hype_team_strategy.css')}}?v=3">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool showdown-builder-page hype-v7-team-builder">
 <section class="dash-welcome showdown-hero hype-v7-team-hero">
@@ -208,6 +208,23 @@
         </div>
         <p class="hype-strategy-loading" id="hypeStrategyStatus" role="status" aria-live="polite">Abra a aba para analisar o time.</p>
         <div id="hypeStrategyContent" hidden></div>
+        <details class="hype-strategy-disclosure hype-opponent-panel" id="hypeOpponentPanel">
+          <summary class="hype-strategy-disclosure-title">
+            <span>⚔ Confrontar outro time</span>
+            <small>Importar adversário</small>
+            <span class="hype-strategy-disclosure-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="hype-opponent-editor">
+            <label for="hypeOpponentText">Equipe adversária no formato Pokémon Showdown</label>
+            <textarea id="hypeOpponentText" rows="7" maxlength="25000" placeholder="Cole aqui até seis Pokémon do outro jogador, com itens, habilidades, EVs, IVs e golpes."></textarea>
+            <p class="hype-opponent-hint">Esta comparação usa os dois times informados. Percentuais de dano são estimativas para golpes simples, não simulação de turnos nem cálculo oficial.</p>
+            <div class="hype-opponent-actions">
+              <button type="button" class="cta-gold" id="hypeOpponentAnalyzeBtn">Analisar confronto</button>
+              <button type="button" class="cta-dark" id="hypeOpponentClearBtn">Limpar adversário</button>
+            </div>
+            <p id="hypeOpponentStatus" role="status" aria-live="polite">Nenhum time adversário carregado.</p>
+          </div>
+        </details>
         <div class="hype-strategy-compare-tools">
           <button type="button" id="hypeStrategyBaselineBtn" class="cta-dark" disabled>Marcar análise como referência</button>
           <div id="hypeStrategyComparison" class="hype-strategy-comparison" role="status" aria-live="polite">Marque uma referência para comparar as próximas alterações do time, sem modificar suas builds.</div>
@@ -450,6 +467,7 @@
   let debounce = null;
   let strategyTimer = null, strategySequence = 0, strategyAbort = null;
   let latestStrategy = null, strategyReference = null;
+  let strategyOpponentSlots = [], latestBuildSignature = null, strategyReferenceSignature = null;
 
   const $ = id => document.getElementById(id);
   const pokemonResults = $('pokemonOptions');
@@ -1162,6 +1180,8 @@
     }
     const past=strategyReference, next=latestStrategy;
     const changes=[];
+    if(strategyReferenceSignature && latestBuildSignature && strategyReferenceSignature!==latestBuildSignature)
+      changes.push('As configurações de pelo menos um set mudaram (Pokémon, item, golpes, EVs, IVs, habilidade ou Nature).');
     if(past.estilo!==next.estilo)changes.push('Estilo: '+past.estilo+' → '+next.estilo+'.');
     if(past.estrategia!==next.estrategia)changes.push('Estratégia: '+past.estrategia+' → '+next.estrategia+'.');
     const beforeMons=new Set((past.funcoes||[]).map(x=>speciesKey(x.pokemon)+'|'+slug(x.item)));
@@ -1184,6 +1204,151 @@
     if(!changes.length)panel.append(strategyElement('p','','Nenhuma diferença estratégica detectada pelas regras atuais.'));
     else changes.forEach(line=>panel.append(strategyElement('p','',line)));
     panel.append(strategyElement('small','','Comparação de indicadores heurísticos; não é medição de dano nem simulação de batalha.'));
+  }
+  function advancedStatRow(mon){
+    const article=strategyElement('article','hype-advanced-stat-row');
+    article.append(strategyElement('h4','',mon.forma||mon.pokemon));
+    article.append(strategyElement('small','', 'Nível '+mon.nivel+' · '+mon.nature+
+      ' · Base stats: Pokémon Showdown'));
+    const grid=strategyElement('div','hype-advanced-stats-grid');
+    for(const [key,label] of [['hp','HP'],['atk','Atk'],['def','Def'],['spa','SpA'],['spd','SpD'],['spe','Spe']]){
+      const cell=strategyElement('div');
+      cell.append(strategyElement('small','',label),strategyElement('strong','',mon.stats?.[key]??'?'));
+      grid.append(cell);
+    }
+    article.append(grid);
+    article.append(strategyElement('p','hype-advanced-speed','Speed no cenário analisado: '+mon.speed_efetiva+
+      ' · '+mon.speed_condicao+'.'));
+    return article;
+  }
+  function advancedDefenseTable(data){
+    const wrapper=strategyElement('div','hype-type-table-wrap');
+    const intro=strategyElement('p','hype-strategy-micro','Fraquezas e resistências defensivas com habilidades e itens reconhecidos; Tera só conta quando ativado em batalha.');
+    wrapper.append(intro);
+    const table=strategyElement('table','hype-type-table');
+    const header=strategyElement('thead'), tr=strategyElement('tr');
+    for(const name of ['Tipo atacante','Fracos','Resistem','Imunes','Neutros'])
+      tr.append(strategyElement('th','',name));
+    header.append(tr);table.append(header);
+    const body=strategyElement('tbody');
+    for(const row of data.defesa_tipos||[]){
+      const line=strategyElement('tr');
+      if(row.fracos>=3)line.className='hype-type-risk';
+      for(const value of [row.nome,row.fracos,row.resistem,row.imunes,row.neutros])
+        line.append(strategyElement('td','',value));
+      const desc=['Fracos: '+(row.nomes_fracos||[]).join(', '),
+                  'Resistem: '+(row.nomes_resistem||[]).join(', '),
+                  'Imunes: '+(row.nomes_imunes||[]).join(', ')].join(' · ');
+      line.title=desc;
+      body.append(line);
+    }
+    table.append(body);wrapper.append(table);
+    const note=strategyElement('p','hype-strategy-micro',data.nota_tera||'');
+    wrapper.append(note);
+    return wrapper;
+  }
+  function advancedStrategySections(content,data,openKeys,firstRender){
+    if(!data)return;
+    const summary=strategyElement('div','hype-advanced-subhead');
+    summary.append(strategyElement('h3','','Inteligência competitiva avançada'),
+                   strategyElement('p','','Atributos calculados, resistências, interações de itens e confrontos reais ou ilustrativos.'));
+    content.append(summary);
+    const stats=strategyElement('div','hype-advanced-stats');
+    (data.atributos||[]).forEach(mon=>stats.append(advancedStatRow(mon)));
+    if(!data.atributos?.length)stats.append(strategyElement('p','','Base stats insuficientes para este time.'));
+    content.append(strategyDisclosure('advanced-stats','Atributos e velocidade calculada',
+      stats,openKeys,firstRender,false,String((data.atributos||[]).length)));
+    content.append(strategyDisclosure('advanced-defenses','Matriz dos 18 tipos e imunidades',
+      advancedDefenseTable(data),openKeys,firstRender,false,'18 tipos'));
+    const interactions=strategyElement('div','hype-advanced-interactions');
+    for(const entry of data.interacoes||[]){
+      const line=strategyElement('article',entry.tipo==='alerta'?
+        'hype-advanced-interaction risk':'hype-advanced-interaction positive');
+      line.append(strategyElement('strong','',entry.titulo),
+                  strategyElement('p','',entry.explicacao));
+      interactions.append(line);
+    }
+    if(!data.interacoes?.length)interactions.append(strategyElement('p','','Nenhuma interação específica reconhecida.'));
+    content.append(strategyDisclosure('advanced-interactions','Itens, habilidades e conflitos',
+      interactions,openKeys,firstRender,false,String((data.interacoes||[]).length)));
+    const coverage=strategyElement('div','hype-advanced-coverage');
+    for(const row of data.cobertura_ofensiva||[]){
+      const chip=strategyElement('span');
+      chip.append(strategyElement('strong','',row.nome),
+                  strategyElement('small','',row.golpes+' golpe(s)'));
+      coverage.append(chip);
+    }
+    if(!data.cobertura_ofensiva?.length)coverage.append(strategyElement('p','','Nenhum golpe ofensivo identificado no catálogo.'));
+    content.append(strategyDisclosure('advanced-coverage','Cobertura ofensiva por tipo',
+      coverage,openKeys,firstRender,false,String((data.cobertura_ofensiva||[]).length)));
+    if(data.tera_cenarios?.length){
+      const teraList=strategyElement('div','hype-advanced-interactions');
+      for(const scenario of data.tera_cenarios){
+        const row=strategyElement('article','hype-advanced-interaction positive');
+        row.append(strategyElement('strong','',scenario.pokemon+' · Tera '+scenario.tera),
+                   strategyElement('p','','Melhora contra: '+(scenario.melhorias||[]).join(', ')+'.'),
+                   strategyElement('p','','Piora contra: '+(scenario.riscos||[]).join(', ')+'.'),
+                   strategyElement('small','',scenario.nota||''));
+        teraList.append(row);
+      }
+      content.append(strategyDisclosure('advanced-tera','Impacto defensivo do Tera (hipotético)',
+        teraList,openKeys,firstRender,false,String(data.tera_cenarios.length)));
+    }
+    const threats=strategyElement('div','hype-advanced-threats');
+    threats.append(strategyElement('p','hype-strategy-micro',data.nota_ameacas||''));
+    for(const threat of data.ameacas_referencia||[]){
+      const line=strategyElement('article','hype-advanced-threat');
+      line.append(strategyElement('strong','',threat.pokemon+' · exemplo de '+threat.tipo_ameaca),
+                  strategyElement('p','',threat.explicacao));
+      if(threat.expostos?.length)line.append(strategyElement('small','',
+        'Expostos por tipo: '+threat.expostos.join(', ')));
+      if(threat.respostas_por_tipo?.length)line.append(strategyElement('small','',
+        'Resistências/imunidades: '+threat.respostas_por_tipo.join(', ')));
+      threats.append(line);
+    }
+    if(!data.ameacas_referencia?.length)threats.append(strategyElement('p','','Sem ameaças de referência identificadas.'));
+    content.append(strategyDisclosure('advanced-threats','Ameaças de referência',
+      threats,openKeys,firstRender,false,String((data.ameacas_referencia||[]).length)));
+    const rec=strategyElement('div','hype-advanced-recs');
+    for(const item of data.recomendacoes||[]){
+      const row=strategyElement('article');
+      row.append(strategyElement('strong','',item.titulo),
+                 strategyElement('p','',item.explicacao));
+      rec.append(row);
+    }
+    for(const warning of data.riscos_estruturais||[])
+      rec.append(strategyElement('p','hype-strategy-micro',warning));
+    if(!rec.children.length)rec.append(strategyElement('p','','Nenhuma orientação adicional identificada.'));
+    content.append(strategyDisclosure('advanced-recs','Diagnóstico e melhorias profundas',
+      rec,openKeys,firstRender,false,
+      String((data.recomendacoes||[]).length+(data.riscos_estruturais||[]).length)));
+    if(data.adversarios){
+      const matchups=strategyElement('div','hype-advanced-matchups');
+      for(const duel of data.confrontos||[]){
+        const line=strategyElement('article','hype-advanced-duel');
+        line.append(strategyElement('strong','',duel.atacante+' → '+duel.contra),
+                    strategyElement('p','',duel.move+' ('+duel.tipo+'): '+
+                      duel.min_pct+'%–'+duel.max_pct+'% de HP estimado.'),
+                    strategyElement('small','',duel.resultado));
+        matchups.append(line);
+      }
+      if(!data.confrontos?.length)
+        matchups.append(strategyElement('p','','Não há golpes de potência fixa suficientes para calcular esses confrontos com segurança.'));
+      matchups.append(strategyElement('h4','hype-matchup-secondary-title','Dano que seu time pode receber'));
+      for(const duel of data.confrontos_recebidos||[]){
+        const line=strategyElement('article','hype-advanced-duel');
+        line.append(strategyElement('strong','',duel.atacante+' → '+duel.contra),
+                    strategyElement('p','',duel.move+' ('+duel.tipo+'): '+
+                      duel.min_pct+'%–'+duel.max_pct+'% do seu HP estimado.'),
+                    strategyElement('small','',duel.resultado));
+        matchups.append(line);
+      }
+      if(!data.confrontos_recebidos?.length)
+        matchups.append(strategyElement('p','','Sem dano adversário calculável para os golpes informados.'));
+      matchups.append(strategyElement('p','hype-strategy-micro',data.nota_dano||''));
+      content.append(strategyDisclosure('advanced-duels','Cálculos de dano contra o adversário',
+        matchups,openKeys,firstRender,true,String(data.adversarios)+' Pokémon'));
+    }
   }
   function displayStrategyPreview(strategy){
     const content=$('hypeStrategyContent');
@@ -1230,6 +1395,7 @@
     plan.append(list);
     content.append(strategyDisclosure('plan','Como jogar com este time',plan,
       openKeys,firstRender,true,String((strategy.plano||[]).length)+' etapas'));
+    advancedStrategySections(content,strategy.avancada,openKeys,firstRender);
     content.hidden=false;
     latestStrategy=strategy;
     $('hypeStrategyBaselineBtn').disabled=false;
@@ -1259,14 +1425,17 @@
           headers:{'Content-Type':'application/json',
                    'X-CSRFToken':document.querySelector('#teamForm [name="csrf_token"]').value},
           body:JSON.stringify({slots:occupied.map(cleanForStorage),
+                               adversario:strategyOpponentSlots,
                                formato_codigo:$('formatSelect').value})
         });
         if(!response.ok)throw Error('Analisador temporariamente indisponível.');
         const data=await response.json();
         if(sequence!==strategySequence||!$('hypeStrategyPreview').open)return;
         if(!data.estrategia)throw Error('Resposta da análise inválida.');
+        latestBuildSignature=JSON.stringify(occupied.map(cleanForStorage));
         displayStrategyPreview(data.estrategia);
-        $('hypeStrategyStatus').textContent='Diagnóstico atualizado · '+occupied.length+' Pokémon.';
+        $('hypeStrategyStatus').textContent='Diagnóstico atualizado · '+occupied.length+' Pokémon'+
+          (strategyOpponentSlots.length?' · '+strategyOpponentSlots.length+' adversários':'')+'.';
       }catch(error){
         if(sequence!==strategySequence||error.name==='AbortError')return;
         $('hypeStrategyStatus').textContent='Não foi possível atualizar a estratégia. Feche e abra a aba para tentar novamente.';
@@ -1284,8 +1453,32 @@
   $('hypeStrategyBaselineBtn').addEventListener('click',()=>{
     if(!latestStrategy)return;
     strategyReference=JSON.parse(JSON.stringify(latestStrategy));
+    strategyReferenceSignature=latestBuildSignature;
     $('hypeStrategyBaselineBtn').textContent='Atualizar referência da comparação';
     renderStrategyComparison();
+  });
+
+  $('hypeOpponentAnalyzeBtn').addEventListener('click',()=>{
+    const raw=$('hypeOpponentText').value.trim();
+    if(!raw){
+      $('hypeOpponentStatus').textContent='Cole o time adversário antes de comparar.';
+      return;
+    }
+    const parsed=parseShowdownTeam(raw);
+    if(parsed.errors.length||!parsed.parsed.length){
+      $('hypeOpponentStatus').textContent='Corrija o texto adversário: '+(parsed.errors[0]||'Nenhum Pokémon reconhecido.');
+      return;
+    }
+    strategyOpponentSlots=parsed.parsed.map(cleanForStorage);
+    $('hypeOpponentStatus').textContent=strategyOpponentSlots.length+
+      ' Pokémon adversário(s) carregado(s). Recalculando confrontos...';
+    scheduleStrategyPreview();
+  });
+  $('hypeOpponentClearBtn').addEventListener('click',()=>{
+    strategyOpponentSlots=[];
+    $('hypeOpponentText').value='';
+    $('hypeOpponentStatus').textContent='Time adversário removido; as builds do seu time permanecem iguais.';
+    scheduleStrategyPreview();
   });
 
   $('showAllItems').addEventListener('change',event=>{

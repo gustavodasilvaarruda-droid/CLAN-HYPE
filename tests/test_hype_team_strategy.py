@@ -112,7 +112,7 @@ class StrategyAnalysisTests(unittest.TestCase):
         ast.parse(module)
         self.assertIn("methods=['POST']", module)
         self.assertIn('def previa_estrategia():', module)
-        self.assertIn('analisar_estrategia(slots, formato_codigo)', module)
+        self.assertIn('analisar_estrategia(slots, formato_codigo, adversario)', module)
         self.assertIn("'estrategia_inteligente': inteligente", module)
         builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
         report = (ROOT / 'templates/team_analise.html').read_text(encoding='utf-8')
@@ -135,7 +135,7 @@ class TacticalAccordionTests(unittest.TestCase):
     def test_accordion_is_closed_by_default_and_keeps_all_team_controls(self):
         builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
         start = builder.index('<details class="dash-card hype-strategy-panel hype-strategy-accordion"')
-        section = builder[start:builder.index('</details>', start) + len('</details>')]
+        section = builder[start:builder.index('</details>\n\n    <section class="hype-team-actions"', start) + len('</details>')]
         self.assertIn('id="hypeStrategyPreview"', section)
         self.assertNotIn(' open>', section.split('<summary', 1)[0])
         self.assertIn('<summary class="hype-strategy-toggle"', section)
@@ -182,7 +182,7 @@ class TacticalAccordionTests(unittest.TestCase):
             self.assertIn(selector, css)
         builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
         self.assertIn('hype_team_strategy.css', builder)
-        self.assertIn("hype_team_strategy.css') }}?v=2", (ROOT / 'templates/team_analise.html').read_text(encoding='utf-8'))
+        self.assertIn("hype_team_strategy.css') }}?v=3", (ROOT / 'templates/team_analise.html').read_text(encoding='utf-8'))
         env = Environment(loader=FileSystemLoader(str(ROOT / 'templates')), autoescape=True)
         for filename in ('team_builder.html', 'team_analise.html'):
             self.assertIsNotNone(env.get_template(filename))

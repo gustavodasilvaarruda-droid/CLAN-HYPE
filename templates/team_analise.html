@@ -1,6 +1,6 @@
 {% extends 'builders_base.html' %}
 {% block title %}Análise de Time - HYPE{% endblock %}
-{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='hype_team_strategy.css') }}?v=2">{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='hype_team_strategy.css') }}?v=3">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool">
 <section class="dash-welcome"><div><span class="breed-kicker">HYPE TEAM ANALYZER</span><h1>{{time.nome}}</h1><p>{{(analise.formato or {}).nome or time.formato or 'Formato livre'}} · {{analise.total_pokemon}} Pokémon</p></div></section>
@@ -38,7 +38,68 @@
       <section><h3>Melhorias sugeridas</h3>{% for item in auto.melhorias %}<p>{{ item }}</p>{% else %}<p>Nenhuma troca específica sugerida com os dados atuais.</p>{% endfor %}</section>
     </div>
     <section class="hype-strategy-plan"><h3>Plano recomendado de batalha</h3><ol>{% for etapa in auto.plano %}<li>{{ etapa }}</li>{% endfor %}</ol></section>
-    <p class="hype-strategy-disclaimer">Análise estratégica por heurísticas, não previsão de vitória nem validação oficial de legalidade. Confira as regras e o TeamValidator do Pokémon Showdown antes dos torneios.</p>
+    {% set advanced = auto.avancada %}
+    {% if advanced %}
+    <div class="hype-advanced-subhead"><h3>Inteligência tática 3.0</h3>
+      <p>Atributos calculados pelos dados do Showdown, defesa coletiva com habilidades e interações de itens. Nenhum set foi modificado.</p></div>
+    <details class="hype-strategy-disclosure">
+      <summary>Atributos e velocidade calculada</summary>
+      <div class="hype-advanced-stats">
+      {% for mon in advanced.atributos %}
+        <article class="hype-advanced-stat-row">
+          <h4>{{ mon.forma }}</h4>
+          <small>Level {{mon.nivel}} · {{mon.nature}} · {{mon.fonte}}</small>
+          <div class="hype-advanced-stats-grid">
+            {% for key,label in [('hp','HP'),('atk','Atk'),('def','Def'),('spa','SpA'),('spd','SpD'),('spe','Spe')] %}
+            <div><small>{{label}}</small><strong>{{mon.stats[key]}}</strong></div>
+            {% endfor %}
+          </div>
+          <p class="hype-advanced-speed">Speed no cenário: {{ mon.speed_efetiva }} · {{ mon.speed_condicao }}</p>
+        </article>
+      {% else %}<p>Stats indisponíveis para as formas informadas.</p>{% endfor %}
+      </div>
+    </details>
+    <details class="hype-strategy-disclosure">
+      <summary>Matriz dos 18 tipos e imunidades</summary>
+      <div class="hype-type-table-wrap">
+        <p class="hype-strategy-micro">Tipos atuais e imunidades conhecidas; Tera não é presumido ativo.</p>
+        <table class="hype-type-table"><thead><tr><th>Tipo</th><th>Fracos</th><th>Resistem</th><th>Imunes</th><th>Neutros</th></tr></thead><tbody>
+          {% for row in advanced.defesa_tipos %}
+          <tr class="{{ 'hype-type-risk' if row.fracos >= 3 else '' }}">
+            <td>{{row.nome}}</td><td>{{row.fracos}}</td><td>{{row.resistem}}</td><td>{{row.imunes}}</td><td>{{row.neutros}}</td>
+          </tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </details>
+    <details class="hype-strategy-disclosure">
+      <summary>Interações de itens e habilidades</summary>
+      <div class="hype-advanced-interactions">
+        {% for entry in advanced.interacoes %}
+        <article class="hype-advanced-interaction {{'risk' if entry.tipo == 'alerta' else 'positive'}}">
+          <strong>{{ entry.titulo }}</strong><p>{{entry.explicacao}}</p>
+        </article>
+        {% else %}<p>Nenhum padrão específico detectado nas builds.</p>{% endfor %}
+      </div>
+    </details>
+    <details class="hype-strategy-disclosure">
+      <summary>Possíveis ameaças e melhorias</summary>
+      <div class="hype-advanced-threats">
+        <p class="hype-strategy-micro">{{advanced.nota_ameacas}}</p>
+        {% for row in advanced.ameacas_referencia %}
+        <article class="hype-advanced-threat">
+          <strong>{{row.pokemon}} · {{row.tipo_ameaca}}</strong>
+          <p>{{row.explicacao}}</p>
+          <small>Vulneráveis: {{row.expostos|join(', ')}}</small>
+          {% if row.respostas_por_tipo %}<small>Respostas defensivas por tipo: {{row.respostas_por_tipo|join(', ')}}</small>{% endif %}
+        </article>{% endfor %}
+        {% for risk in advanced.riscos_estruturais %}<p class="hype-strategy-micro">{{risk}}</p>{% endfor %}
+        {% for item in advanced.recomendacoes %}
+        <article class="hype-advanced-threat"><strong>{{item.titulo}}</strong><p>{{item.explicacao}}</p></article>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+    <p class="hype-strategy-disclaimer">Análise tática baseada em regras e estimativas; não garante vitória, simulação de turnos ou validação oficial. Consulte o TeamValidator do Pokémon Showdown antes de torneios.</p>
   </section>
 
   <section class="dash-card"><h2>Composição</h2><div class="team-grid">{% for s in time.slots %}<article class="team-card detailed-set-card"><div class="set-card-top">{% if s.sprite %}<img src="{{s.sprite}}" alt="{{s.pokemon}}">{% endif %}<div><h3>{{s.pokemon}}</h3><p>{{(s.tipos or [])|join(' / ')}}</p></div></div><p><b>Item:</b> {{s.item or '-'}}</p><p><b>Ability:</b> {{s.ability or '-'}}</p><p><b>Nature:</b> {{s.nature or '-'}}</p><p><b>Papel:</b> {{s.papel or '-'}}</p><p><b>Mecânica:</b> {{s.mecanica or 'nenhuma'}}</p>{% if s.moves %}<div class="set-moves">{% for m in s.moves if m %}<span>{{m}}</span>{% endfor %}</div>{% endif %}{% if s.observacao %}<small>{{s.observacao}}</small>{% endif %}</article>{% endfor %}</div></section>
