@@ -97,6 +97,64 @@ def _disponibilidade(especie, formato):
 
 
 
+# Itens de formas que precisam permanecer equipados durante a batalha.
+# Itens-chave de fusão (Reins of Unity, DNA Splicers etc.) não são held items.
+_PLATES_ARCEUS = {
+    'bug': 'insectplate', 'dark': 'dreadplate', 'dragon': 'dracoplate',
+    'electric': 'zapplate', 'fairy': 'pixieplate', 'fighting': 'fistplate',
+    'fire': 'flameplate', 'flying': 'skyplate', 'ghost': 'spookyplate',
+    'grass': 'meadowplate', 'ground': 'earthplate', 'ice': 'icicleplate',
+    'poison': 'toxicplate', 'psychic': 'mindplate', 'rock': 'stoneplate',
+    'steel': 'ironplate', 'water': 'splashplate',
+}
+_ITENS_FORMA = {
+    'kyogreprimal': 'blueorb', 'groudonprimal': 'redorb',
+    'ogerponhearthflame': 'hearthflamemask',
+    'ogerponwellspring': 'wellspringmask',
+    'ogerponcornerstone': 'cornerstonemask',
+}
+
+
+def item_obrigatorio_forma(especie):
+    """Retorna o ID normalizado do held item exigido por esta forma."""
+    codigo = _chave(especie)
+    if codigo.startswith('arceus'):
+        return _PLATES_ARCEUS.get(codigo[6:], '')
+    return _ITENS_FORMA.get(codigo, '')
+
+
+def _especie_base_clause(especie):
+    """Species Clause compara a espécie-base, não a grafia de cada forma."""
+    meta = obter_especie_showdown(especie)
+    return _id_especie(meta.get('base') or meta.get('n') or especie) if meta else _id_especie(especie)
+
+
+def _tipos_monotype(slot):
+    """Interseção de tipos do Pokémon e de sua Mega/Ultra forma, como no Showdown."""
+    meta = obter_especie_showdown(slot.get('pokemon'))
+    if not meta or not meta.get('types'):
+        return set()
+    tipos = {_chave(t) for t in meta['types']}
+    item_id = _chave(slot.get('item'))
+    especie_id = _chave(slot.get('pokemon'))
+    base_id = _chave(meta.get('base') or meta.get('n') or slot.get('pokemon'))
+    if MEGA_STONE_OWNERS.get(item_id) == base_id:
+        forma = base_id + 'mega' + (item_id[-1] if item_id in ('charizarditex', 'charizarditey') else '')
+        mega = obter_especie_showdown(forma)
+        if mega and mega.get('types'):
+            tipos.intersection_update(_chave(t) for t in mega['types'])
+    if item_id == 'ultranecroziumz' and base_id == 'necrozma':
+        ultra = obter_especie_showdown('necrozmaultra')
+        if ultra and ultra.get('types'):
+            tipos.intersection_update(_chave(t) for t in ultra['types'])
+    return tipos
+
+
+def _exige_tipo_comum(formato):
+    regras = (*formato.get('clausulas', ()), *formato.get('regras_showdown', ()))
+    return any(_chave(regra) == 'sametypeclause' for regra in regras)
+
+
 def motivo_pokemon_indisponivel(especie, codigo_formato):
     """Filtro preliminar para a lista visual. Nunca certifica legalidade plena."""
     formato = obter_formato(codigo_formato)
@@ -119,6 +177,8 @@ def validar_equipe_basica(slots, codigo_formato):
     itens_banidos = {_chave(m) for m in formato.get('itens_proibidos', ())}
     habilidades_banidas = {_chave(m) for m in formato.get('habilidades_proibidas', ())}
     usados = set()
+    itens_usados = set()
+    tipos_em_comum = None
     erros = []
     for indice, slot in enumerate(slots, 1):
         if not isinstance(slot, dict):
@@ -134,20 +194,40 @@ def validar_equipe_basica(slots, codigo_formato):
             restricao = _disponibilidade(especie, formato)
             if restricao:
                 erros.append(f'Slot {indice}: {especie} {restricao}.')
-        if formato.get('species_clause', True) and chave in usados:
-            erros.append(f'Slot {indice}: espécies repetidas não são permitidas.')
-        usados.add(chave)
+        especie_clausula = _especie_base_clause(especie)
+        if formato.get('species_clause', True) and especie_clausula in usados:
+            erros.append(f'Slot {indice}: espécies repetidas (incluindo formas diferentes) não são permitidas.')
+        usados.add(especie_clausula)
+        if _exige_tipo_comum(formato) and chave:
+            tipos = _tipos_monotype(slot)
+            if tipos_em_comum is None:
+                tipos_em_comum = tipos
+            else:
+                tipos_em_comum.intersection_update(tipos)
 
         nivel_max = int(formato.get('nivel_maximo') or 100)
         nivel = slot.get('level', 5 if formato.get('little_cup') else 100)
         if type(nivel) is not int or not 1 <= nivel <= nivel_max:
             erros.append(f'Slot {indice}: nível fora do limite de {nivel_max} do formato.')
+        elif formato.get('little_cup') and nivel != 5:
+            erros.append(f'Slot {indice}: Little Cup exige nível 5.')
         item = str(slot.get('item') or '').strip()
         item_id = _chave(item)
         if item_id in BOLAS_CAPTURA:
             erros.append(f'Slot {indice}: {item} é uma Poké Ball de captura e não está disponível na Arena HYPE.')
         if item_id in itens_banidos:
             erros.append(f'Slot {indice}: o item {item} é proibido no formato.')
+        if item_id and formato.get('item_clause'):
+            if item_id in itens_usados:
+                erros.append(f'Slot {indice}: Item Clause não permite repetir {item}.')
+            itens_usados.add(item_id)
+        item_exigido = item_obrigatorio_forma(especie)
+        if item_exigido and item_id != item_exigido:
+            erros.append(f'Slot {indice}: {especie} precisa equipar o item de sua forma ({item_exigido}).')
+        if item_id in MEGA_STONE_OWNERS and not formato.get('permite_mega', False):
+            erros.append(f'Slot {indice}: Mega Stones não são permitidas neste formato.')
+        if item_id.endswith('z') and item_id not in ('') and not formato.get('permite_zmove', False):
+            erros.append(f'Slot {indice}: Z-Crystals não são permitidos neste formato.')
         base = chave.split('mega')[0] if 'mega' in chave else chave
         if item_id in MEGA_STONE_OWNERS and base != MEGA_STONE_OWNERS[item_id]:
             erros.append(f'Slot {indice}: {item} é proibido para {especie}: a pedra não corresponde à espécie.')
@@ -206,4 +286,6 @@ def validar_equipe_basica(slots, codigo_formato):
                     total += valor
             if campo == 'evs' and total > 510:
                 erros.append(f'Slot {indice}: mais de 510 EVs.')
+    if _exige_tipo_comum(formato) and not tipos_em_comum:
+        erros.insert(0, 'Monotype (Same Type Clause): todos os Pokémon precisam compartilhar pelo menos um tipo; inclua as mudanças de tipagem por Mega Evolution.')
     return erros[:25]
