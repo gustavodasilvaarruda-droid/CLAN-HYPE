@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 CLIENT_PUBLIC_SPKI_B64 = "MCowBQYDK2VwAyEAmC+/PJEh4q/O+WTqQdR6Z1fQibpKTy9zn0qYcuMQx/o="
 CLIENT_PUBLIC_SPKI = base64.b64decode(CLIENT_PUBLIC_SPKI_B64)
+UPDATER_CLASS = "br/clanhype/client/update/HypeAutoUpdate.class"
 OFFICIAL_SITE = "https://clan-hype.onrender.com"
 FIELDS = ("release", "version", "url", "sha256", "size", "minecraft", "mod_id", "channel")
 MAX_JAR = 10 * 1024 * 1024  # Staging's limit; keep this step consistent
@@ -107,7 +108,33 @@ def canonical(fields: dict) -> bytes:
     return "".join(field + "=" + fields[field] + "\n" for field in FIELDS).encode("utf-8")
 
 
-def load_matching_private_key(path: Path) -> Ed25519PrivateKey:
+def public_key_embedded_in_client(jar: Path) -> bytes:
+    """Read the Ed25519 public SPKI pinned inside an explicitly TRUSTED client JAR.
+
+    Use only a HYPE Client that was installed manually from a trusted source.
+    This never changes any key: it verifies the pinned public key in the client.
+    """
+    inspect_jar(jar)
+    with ZipFile(jar) as archive:
+        if UPDATER_CLASS not in archive.namelist():
+            raise ReleaseError("Trusted JAR is missing the HYPE updater class.")
+        bytecode = archive.read(UPDATER_CLASS)
+    if not bytecode.startswith(b"\\xca\\xfe\\xba\\xbe"):
+        raise ReleaseError("Trusted JAR has invalid Java bytecode.")
+    keys = set(re.findall(
+        rb"MCowBQYDK2VwAyEA[A-Za-z0-9+/]{43}=", bytecode
+    ))
+    if len(keys) != 1:
+        raise ReleaseError("Expected exactly one Ed25519 verifier key in trusted client.")
+    candidate = base64.b64decode(next(iter(keys)), validate=True)
+    if len(candidate) != 44 or candidate[:12] != CLIENT_PUBLIC_SPKI[:12]:
+        raise ReleaseError("Unsupported trusted client Ed25519 key encoding.")
+    return candidate
+
+
+def load_matching_private_key(
+    path: Path, trusted_public_spki: bytes = CLIENT_PUBLIC_SPKI
+) -> Ed25519PrivateKey:
     if path.is_symlink() or not path.is_file():
         raise ReleaseError("Private key must be a local file outside the repository.")
     try:
@@ -120,7 +147,7 @@ def load_matching_private_key(path: Path) -> Ed25519PrivateKey:
         encoding=serialization.Encoding.DER,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    if pub != CLIENT_PUBLIC_SPKI:
+    if pub != trusted_public_spki:
         raise ReleaseError(
             "PRIVATE KEY DOES NOT MATCH the public key pinned in the installed "
             "HYPE Client. Do not publish: locate the original matching key or "
@@ -129,11 +156,14 @@ def load_matching_private_key(path: Path) -> Ed25519PrivateKey:
     return key
 
 
-def prepare(jar: Path, key_path: Path, out_dir: Path, release: int) -> dict:
+def prepare(jar: Path, key_path: Path, out_dir: Path, release: int,
+            trusted_client_jar: Path | None = None) -> dict:
     if not 1 <= release <= 1000000000:
         raise ReleaseError("Release number outside supported range.")
     info = inspect_jar(jar)
-    key = load_matching_private_key(key_path)  # Fail before writing any output.
+    expected_key = (public_key_embedded_in_client(trusted_client_jar)
+                    if trusted_client_jar is not None else CLIENT_PUBLIC_SPKI)
+    key = load_matching_private_key(key_path, expected_key)  # Fail before output.
     fields = {
         "release": str(release),
         "version": info["version"],
@@ -170,6 +200,8 @@ def main() -> int:
     parser.add_argument("--jar", required=True, type=Path)
     parser.add_argument("--inspect", action="store_true", help="Inspect only; no signing or writing")
     parser.add_argument("--key", type=Path, help="Existing PEM private key matching installed client")
+    parser.add_argument("--trusted-client-jar", type=Path,
+                        help="Manually installed and trusted client JAR after LOCAL key rotation")
     parser.add_argument("--release", type=int, help="Strictly increasing numeric release id")
     parser.add_argument("--out", type=Path, help="New empty local output directory")
     args = parser.parse_args()
@@ -179,7 +211,8 @@ def main() -> int:
         else:
             if args.key is None or args.release is None or args.out is None:
                 parser.error("Signing requires --key, --release, and --out.")
-            print(json.dumps(prepare(args.jar, args.key, args.out, args.release), indent=2))
+            print(json.dumps(prepare(args.jar, args.key, args.out, args.release,
+                                     args.trusted_client_jar), indent=2))
     except (ReleaseError, OSError) as exc:
         parser.exit(2, "ERROR: " + str(exc) + "\n")
     return 0
