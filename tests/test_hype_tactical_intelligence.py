@@ -47,6 +47,19 @@ class TacticalIntelligenceTests(unittest.TestCase):
         self.assertEqual(report['atributos'][1]['speed_efetiva'],518)
         self.assertEqual(venusaur['ability'],'Chlorophyll')
 
+    def test_generic_mega_form_ability_uses_species_rules(self):
+        from modules.hype_tactical_intelligence import _ability, _form
+        gengar=mon('Gengar','Gengarite','Cursed Body','Timid',
+                   ['Shadow Ball'],{'spa':252,'spe':252})
+        self.assertEqual(_form(gengar),'Gengar-Mega')
+        self.assertEqual(_ability(gengar),'shadowtag')
+        self.assertEqual(_stats(gengar)[0]['spa'],439)
+        ray=mon('Rayquaza','Life Orb','Air Lock','Jolly',
+                ['Dragon Ascent'],{'atk':252,'spe':252})
+        ray['mecanica']='mega'
+        self.assertEqual(_form(ray),'Rayquaza-Mega')
+        self.assertEqual(_ability(ray),'deltastream')
+
     def test_defense_immunities_and_tera_are_conditional(self):
         rotom=mon('Rotom-Wash','Leftovers','Levitate')
         ferrothorn=mon('Ferrothorn','Leftovers','Iron Barbs')
