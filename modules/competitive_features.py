@@ -472,9 +472,14 @@ def create_competitive_blueprint(supabase, login_required, safe_table, is_admin,
             return jsonify({'erro': 'Envie até seis Pokémon.'}), 400
         if not all(isinstance(s, dict) for s in slots):
             return jsonify({'erro': 'Slot inválido.'}), 400
+        # Opcional: outro time importado do Showdown para comparação não persistente.
+        adversario = dados.get('adversario', [])
+        if not isinstance(adversario, list) or len(adversario) > 6 or not all(
+                isinstance(s, dict) for s in adversario):
+            return jsonify({'erro': 'Time adversário inválido (máximo 6 Pokémon).'}), 400
         # Limita o corpo já processado pelo Flask, e o formato não confere legalidade.
         formato_codigo = str(dados.get('formato_codigo') or '')[:90]
-        return jsonify({'estrategia': analisar_estrategia(slots, formato_codigo)})
+        return jsonify({'estrategia': analisar_estrategia(slots, formato_codigo, adversario)})
 
     @bp.route('/team-builder/<int:team_id>/analisar')
     @login_required
