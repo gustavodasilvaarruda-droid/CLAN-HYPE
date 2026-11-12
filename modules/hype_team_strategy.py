@@ -96,10 +96,16 @@ def _slot_info(slot):
     moves = {_id(m) for m in (slot.get('moves') or []) if isinstance(m, str)}
     ability = _id(slot.get('ability'))
     item = _id(slot.get('item'))
+    # No Charizard Mega Y a habilidade em batalha é Drought, mesmo quando
+    # o texto do Showdown informa a habilidade pré-Mega (Blaze/Solar Power).
+    effective_ability = ('drought' if
+                         (_id(name) in {'charizard', 'charizardmegay'} and item == 'charizarditey')
+                         else ability)
     evs = slot.get('evs') if isinstance(slot.get('evs'), dict) else {}
     atk, spa, spe = (_num(evs.get(key)) for key in ('atk', 'spa', 'spe'))
     hp, defe, spd = (_num(evs.get(key)) for key in ('hp', 'def', 'spd'))
     nature = _id(slot.get('nature'))
+    ivs = slot.get('ivs') if isinstance(slot.get('ivs'), dict) else {}
     meta = _species_data(slot)
     types = [str(t).lower() for t in meta.get('types', [])] or [
         str(t).lower() for t in (slot.get('tipos') or []) if isinstance(t, str)]
@@ -119,6 +125,10 @@ def _slot_info(slot):
         mark('Atacante especial', 2, 'golpes especiais na build')
     if physical >= 2 and physical > special:
         mark('Atacante físico', 2, 'golpes físicos na build')
+    if spa >= 160 and nature in {'timid', 'modest', 'mild', 'rash', 'quiet'}:
+        mark('Atacante especial', 1, 'natureza favorável ao ataque especial/velocidade')
+    if atk >= 160 and nature in {'jolly', 'adamant', 'brave', 'lonely', 'naughty'}:
+        mark('Atacante físico', 1, 'natureza favorável ao ataque físico/velocidade')
     if item == 'choicespecs':
         mark('Atacante especial', 3, 'Choice Specs')
     elif item == 'choiceband':
@@ -146,22 +156,22 @@ def _slot_info(slot):
     if moves & SPEED_MOVES:
         mark('Controle de velocidade', 2, 'golpes que influenciam a velocidade')
     weather = set()
-    if ability in SUN_SETTERS or 'sunnyday' in moves:
+    if effective_ability in SUN_SETTERS or 'sunnyday' in moves:
         weather.add('sol')
         mark('Ativador do sol', 6, 'Drought/sol ou Sunny Day')
-    if ability in RAIN_SETTERS or 'raindance' in moves:
+    if effective_ability in RAIN_SETTERS or 'raindance' in moves:
         weather.add('chuva')
         mark('Ativador da chuva', 6, 'Drizzle/chuva ou Rain Dance')
-    if ability in SAND_SETTERS or 'sandstorm' in moves:
+    if effective_ability in SAND_SETTERS or 'sandstorm' in moves:
         weather.add('areia')
         mark('Ativador de areia', 6, 'Sand Stream ou Sandstorm')
-    if ability in SNOW_SETTERS or 'snowscape' in moves:
+    if effective_ability in SNOW_SETTERS or 'snowscape' in moves:
         weather.add('neve')
         mark('Ativador de neve', 6, 'Snow Warning ou Snowscape')
-    beneficiary = ('sol' if ability in SUN_ABILITIES else
-                   'chuva' if ability in RAIN_ABILITIES else
-                   'areia' if ability in SAND_ABILITIES else
-                   'neve' if ability in SNOW_ABILITIES else '')
+    beneficiary = ('sol' if effective_ability in SUN_ABILITIES else
+                   'chuva' if effective_ability in RAIN_ABILITIES else
+                   'areia' if effective_ability in SAND_ABILITIES else
+                   'neve' if effective_ability in SNOW_ABILITIES else '')
     if beneficiary:
         mark('Aproveita ' + beneficiary, 4, 'habilidade ' + str(slot.get('ability') or ''))
     if not scores:
@@ -182,6 +192,22 @@ def _slot_info(slot):
         guide.append('Busque um turno favorável para usar o golpe de setup, sem se expor desnecessariamente.')
     if beneficiary:
         guide.append('Priorize a entrada enquanto ' + beneficiary + ' estiver ativo.')
+    if 'growth' in moves and beneficiary == 'sol':
+        guide.append('Growth dá +2 estágios de Ataque e Ataque Especial sob o sol; use em turno seguro.')
+    if 'solarbeam' in moves and ('sol' in weather or effective_ability in SUN_ABILITIES):
+        guide.append('Solar Beam pode ser usado sem carregar enquanto o sol estiver ativo.')
+    if 'weatherball' in moves and beneficiary == 'sol':
+        guide.append('Weather Ball vira Fogo e recebe o bônus do sol.')
+    if 'weatherball' in moves and beneficiary == 'chuva':
+        guide.append('Weather Ball vira Água e é fortalecido na chuva.')
+    if item == 'lifeorb':
+        guide.append('Life Orb aumenta o dano, mas consome parte do HP ao acertar ataques.')
+    if _id(slot.get('ability')) == 'roughskin' and item == 'rockyhelmet':
+        guide.append('Rough Skin e Rocky Helmet punem ataques de contato recebidos.')
+    if isinstance(ivs.get('atk'), (int, str)) and str(ivs.get('atk')) == '0' and spa >= 160:
+        evidence.setdefault('Atacante especial', []).append('IV 0 Atk reduz dano recebido por Foul Play')
+    if str(ivs.get('spe', '')) == '0' and 'trickroom' in moves:
+        guide.append('IV 0 Speed pode favorecer a atuação sob Trick Room.')
     if not guide and ('Atacante físico' in roles or 'Atacante especial' in roles):
         guide.append('Entre em campo após uma troca favorável e pressione com seus melhores golpes.')
     if not guide:
@@ -192,12 +218,16 @@ def _slot_info(slot):
                  item in DEFENSIVE_ITEMS and not offensive)
     return {
         'pokemon': name,
+        'pokemon_exibicao': (name + ' Mega Y' if
+                            _id(name) == 'charizard' and item == 'charizarditey'
+                            else name + ' Mega X' if _id(name) == 'charizard' and item == 'charizarditex'
+                            else name),
         'item': str(slot.get('item') or ''),
         'ability': str(slot.get('ability') or ''),
         'tipos': types,
         'funcoes': roles,
         'evidencias': [piece for key in roles for piece in evidence[key]][:5],
-        'como_jogar': ' '.join(guide[:3]),
+        'como_jogar': ' '.join(guide[:4]),
         'ofensivo': offensive, 'defensivo': defensive,
         '_moves': moves, '_item': item, '_ability': ability,
         '_weather': weather, '_beneficiary': beneficiary,
