@@ -25,7 +25,7 @@
     <div class="hype-strategy-mon-grid">
       {% for mon in auto.funcoes %}
       <article class="hype-strategy-mon">
-        <h4>{{ mon.pokemon }}</h4>
+        <h4>{{ mon.pokemon_exibicao or mon.pokemon }}</h4>
         <p class="hype-strategy-meta">{{ mon.ability or 'Habilidade não informada' }} · {{ mon.item or 'Sem item' }}</p>
         <div class="hype-strategy-tags">{% for papel in mon.funcoes %}<span>{{ papel }}</span>{% endfor %}</div>
         <p>{{ mon.como_jogar }}</p>
