@@ -107,7 +107,7 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         self.assertIn('Buginium Z', obter_regras_especie_showdown('Arceus-Bug')['requiredItems'])
         template=(ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
         routes=(ROOT / 'modules/expansion_features.py').read_text(encoding='utf-8')
-        for marker in ('function bootSpeciesRules()', 'function allowedSpeciesAbilities(pokemon)',
+        for marker in ('function bootSpeciesRules()', "function allowedSpeciesAbilities(pokemon,item='',mechanic='')",
                        'function requiredFormHeldItems(pokemon)',
                        'Habilidades que não pertencem ao Pokémon:',
                        'requiredFormHeldItems(s.pokemon)',
