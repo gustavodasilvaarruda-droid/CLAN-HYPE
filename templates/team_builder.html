@@ -208,6 +208,23 @@
         </div>
         <p class="hype-strategy-loading" id="hypeStrategyStatus" role="status" aria-live="polite">Abra a aba para analisar o time.</p>
         <div id="hypeStrategyContent" hidden></div>
+        <details class="hype-strategy-disclosure hype-opponent-panel" id="hypeOpponentPanel">
+          <summary class="hype-strategy-disclosure-title">
+            <span>⚔ Confrontar outro time</span>
+            <small>Importar adversário</small>
+            <span class="hype-strategy-disclosure-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="hype-opponent-editor">
+            <label for="hypeOpponentText">Equipe adversária no formato Pokémon Showdown</label>
+            <textarea id="hypeOpponentText" rows="7" maxlength="25000" placeholder="Cole aqui até seis Pokémon do outro jogador, com itens, habilidades, EVs, IVs e golpes."></textarea>
+            <p class="hype-opponent-hint">Esta comparação usa os dois times informados. Percentuais de dano são estimativas para golpes simples, não simulação de turnos nem cálculo oficial.</p>
+            <div class="hype-opponent-actions">
+              <button type="button" class="cta-gold" id="hypeOpponentAnalyzeBtn">Analisar confronto</button>
+              <button type="button" class="cta-dark" id="hypeOpponentClearBtn">Limpar adversário</button>
+            </div>
+            <p id="hypeOpponentStatus" role="status" aria-live="polite">Nenhum time adversário carregado.</p>
+          </div>
+        </details>
         <div class="hype-strategy-compare-tools">
           <button type="button" id="hypeStrategyBaselineBtn" class="cta-dark" disabled>Marcar análise como referência</button>
           <div id="hypeStrategyComparison" class="hype-strategy-comparison" role="status" aria-live="polite">Marque uma referência para comparar as próximas alterações do time, sem modificar suas builds.</div>
@@ -450,6 +467,7 @@
   let debounce = null;
   let strategyTimer = null, strategySequence = 0, strategyAbort = null;
   let latestStrategy = null, strategyReference = null;
+  let strategyOpponentSlots = [], latestBuildSignature = null, strategyReferenceSignature = null;
 
   const $ = id => document.getElementById(id);
   const pokemonResults = $('pokemonOptions');
@@ -1162,6 +1180,8 @@
     }
     const past=strategyReference, next=latestStrategy;
     const changes=[];
+    if(strategyReferenceSignature && latestBuildSignature && strategyReferenceSignature!==latestBuildSignature)
+      changes.push('As configurações de pelo menos um set mudaram (Pokémon, item, golpes, EVs, IVs, habilidade ou Nature).');
     if(past.estilo!==next.estilo)changes.push('Estilo: '+past.estilo+' → '+next.estilo+'.');
     if(past.estrategia!==next.estrategia)changes.push('Estratégia: '+past.estrategia+' → '+next.estrategia+'.');
     const beforeMons=new Set((past.funcoes||[]).map(x=>speciesKey(x.pokemon)+'|'+slug(x.item)));
@@ -1259,14 +1279,17 @@
           headers:{'Content-Type':'application/json',
                    'X-CSRFToken':document.querySelector('#teamForm [name="csrf_token"]').value},
           body:JSON.stringify({slots:occupied.map(cleanForStorage),
+                               adversario:strategyOpponentSlots,
                                formato_codigo:$('formatSelect').value})
         });
         if(!response.ok)throw Error('Analisador temporariamente indisponível.');
         const data=await response.json();
         if(sequence!==strategySequence||!$('hypeStrategyPreview').open)return;
         if(!data.estrategia)throw Error('Resposta da análise inválida.');
+        latestBuildSignature=JSON.stringify(occupied.map(cleanForStorage));
         displayStrategyPreview(data.estrategia);
-        $('hypeStrategyStatus').textContent='Diagnóstico atualizado · '+occupied.length+' Pokémon.';
+        $('hypeStrategyStatus').textContent='Diagnóstico atualizado · '+occupied.length+' Pokémon'+
+          (strategyOpponentSlots.length?' · '+strategyOpponentSlots.length+' adversários':'')+'.';
       }catch(error){
         if(sequence!==strategySequence||error.name==='AbortError')return;
         $('hypeStrategyStatus').textContent='Não foi possível atualizar a estratégia. Feche e abra a aba para tentar novamente.';
@@ -1284,8 +1307,32 @@
   $('hypeStrategyBaselineBtn').addEventListener('click',()=>{
     if(!latestStrategy)return;
     strategyReference=JSON.parse(JSON.stringify(latestStrategy));
+    strategyReferenceSignature=latestBuildSignature;
     $('hypeStrategyBaselineBtn').textContent='Atualizar referência da comparação';
     renderStrategyComparison();
+  });
+
+  $('hypeOpponentAnalyzeBtn').addEventListener('click',()=>{
+    const raw=$('hypeOpponentText').value.trim();
+    if(!raw){
+      $('hypeOpponentStatus').textContent='Cole o time adversário antes de comparar.';
+      return;
+    }
+    const parsed=parseShowdownTeam(raw);
+    if(parsed.errors.length||!parsed.parsed.length){
+      $('hypeOpponentStatus').textContent='Corrija o texto adversário: '+(parsed.errors[0]||'Nenhum Pokémon reconhecido.');
+      return;
+    }
+    strategyOpponentSlots=parsed.parsed.map(cleanForStorage);
+    $('hypeOpponentStatus').textContent=strategyOpponentSlots.length+
+      ' Pokémon adversário(s) carregado(s). Recalculando confrontos...';
+    scheduleStrategyPreview();
+  });
+  $('hypeOpponentClearBtn').addEventListener('click',()=>{
+    strategyOpponentSlots=[];
+    $('hypeOpponentText').value='';
+    $('hypeOpponentStatus').textContent='Time adversário removido; as builds do seu time permanecem iguais.';
+    scheduleStrategyPreview();
   });
 
   $('showAllItems').addEventListener('change',event=>{
