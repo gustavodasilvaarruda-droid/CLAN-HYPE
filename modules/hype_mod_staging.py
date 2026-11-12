@@ -14,7 +14,6 @@ from uuid import uuid4
 from zipfile import ZipFile, BadZipFile
 
 from flask import abort, flash, redirect, render_template, request, session, url_for
-from supabase import create_client
 
 BUCKET = "hype-mod-originals"
 TABLE = "hype_mod_release_drafts"
@@ -95,16 +94,14 @@ def assert_private_bucket(storage):
         raise RuntimeError("Bucket de originais não é comprovadamente privado.")
 
 
-def register_mod_release_routes(bp, is_admin, registrar_log):
+def register_mod_release_routes(bp, is_admin, registrar_log, db):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
-    db = None
-    if staging_enabled:
-        service_key = os.getenv("HYPE_RELEASE_SUPABASE_SERVICE_ROLE_KEY", "")
-        server_url = os.getenv("SUPABASE_URL", "")
-        if not server_url or not service_key:
-            raise RuntimeError("Configure SUPABASE_URL e a service-role privada no staging.")
-        db = create_client(server_url, service_key)
+    # Reuse the site's existing server-side Supabase connection. Staging
+    # stays disabled unless explicitly enabled in the Render environment.
+    # No database credentials are exposed to templates or JAR files.
+    if not staging_enabled:
+        db = None
 
     def admin_only():
         if not session.get("usuario_email") or not is_admin():

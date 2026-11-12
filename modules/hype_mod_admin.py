@@ -229,6 +229,6 @@ def create_hype_mod_admin_blueprint(db, login_required, is_admin, registrar_log)
 
     # Admin-only release drafts. Feature flag is OFF by default.
     from modules.hype_mod_staging import register_mod_release_routes
-    register_mod_release_routes(bp, is_admin, registrar_log)
+    register_mod_release_routes(bp, is_admin, registrar_log, db)
 
     return bp
