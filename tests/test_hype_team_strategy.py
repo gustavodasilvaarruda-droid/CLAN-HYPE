@@ -182,7 +182,7 @@ class TacticalAccordionTests(unittest.TestCase):
             self.assertIn(selector, css)
         builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
         self.assertIn('hype_team_strategy.css', builder)
-        self.assertIn("hype_team_strategy.css') }}?v=2", (ROOT / 'templates/team_analise.html').read_text(encoding='utf-8'))
+        self.assertIn("hype_team_strategy.css') }}?v=3", (ROOT / 'templates/team_analise.html').read_text(encoding='utf-8'))
         env = Environment(loader=FileSystemLoader(str(ROOT / 'templates')), autoescape=True)
         for filename in ('team_builder.html', 'team_analise.html'):
             self.assertIsNotNone(env.get_template(filename))
