@@ -119,7 +119,7 @@ def public_key_embedded_in_client(jar: Path) -> bytes:
         if UPDATER_CLASS not in archive.namelist():
             raise ReleaseError("Trusted JAR is missing the HYPE updater class.")
         bytecode = archive.read(UPDATER_CLASS)
-    if not bytecode.startswith(b"\\xca\\xfe\\xba\\xbe"):
+    if not bytecode.startswith(b"\xca\xfe\xba\xbe"):
         raise ReleaseError("Trusted JAR has invalid Java bytecode.")
     keys = set(re.findall(
         rb"MCowBQYDK2VwAyEA[A-Za-z0-9+/]{43}=", bytecode
