@@ -370,6 +370,16 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         response.headers['Cache-Control'] = 'private, max-age=3600'
         return response
 
+    @bp.route('/team-builder/species-rules-snapshot')
+    @login_required
+    def team_builder_species_rules_snapshot():
+        """Metadados oficiais de abilities e itens de formas, sem dados de jogadores."""
+        directory = Path(__file__).resolve().parents[1] / 'data'
+        response = send_from_directory(directory, 'hype_showdown_species_rules.json',
+                                       mimetype='application/json')
+        response.headers['Cache-Control'] = 'private, max-age=3600'
+        return response
+
     @bp.route('/team-builder', methods=['GET', 'POST'])
     @login_required
     def team_builder():
