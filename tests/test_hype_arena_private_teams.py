@@ -15,7 +15,7 @@ def capacidade(pokemon):
 
 
 def configurar_especie(slot, pokemon):
-    configurar_especie(slot, p)okemon
+    slot['pokemon'] = pokemon
     slot['ability'] = capacidade(pokemon)
 
 
