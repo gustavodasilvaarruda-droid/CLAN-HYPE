@@ -126,7 +126,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
         team = equipe_valida()
         for slot, pokemon in zip(team, ('Arcanine', 'Torkoal', 'Infernape',
                                        'Chandelure', 'Skeledirge', 'Charizard')):
-            configurar_especie(slot, p)okemon
+            configurar_especie(slot, pokemon)
         self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexmonotype'), [])
         team[-1]['item'] = 'Charizardite X'
         team[-1]['mecanica'] = 'mega'
