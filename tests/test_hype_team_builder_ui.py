@@ -97,9 +97,71 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
 
     def test_saved_teams_rehydrate_learnsets_on_open(self):
         template=(ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
-        self.assertIn('slots.filter(s=>s.pokemon).forEach(loadShowdownMovesForSlot);', template)
-        self.assertIn('if(current().pokemon&&!current().abilities?.length)loadPokemonDetails(current().pokemon);', template)
-        self.assertIn('if(!current().abilities?.length)loadPokemonDetails(current().pokemon);else loadShowdownMovesForSlot(current());', template)
+        self.assertIn('function hydrateSlotMetadata(slot)', template)
+        self.assertIn('function renderRestoredSlot()', template)
+        self.assertIn('slots.filter(s=>s.pokemon).forEach(s=>{hydrateSlotMetadata(s);loadShowdownMovesForSlot(s);});', template)
+        self.assertIn('active=Number(b.dataset.slot);renderRestoredSlot();', template)
+        # Abrir um slot ou carregar uma build salva não pode disparar a seleção
+        # assíncrona de Pokémon, que substituía Charizardite Y por Charizardite X.
+        tab_handler=template.split("document.querySelectorAll('.slot-tab').forEach",1)[1].split("\n",1)[0]
+        self.assertNotIn('loadPokemonDetails(',tab_handler)
+        self.assertIn('slots[active]=Object.assign(emptySlot(),dados);renderRestoredSlot();',template)
+        self.assertIn('slots[active]=Object.assign(emptySlot(),row._slot||{}); renderRestoredSlot();',template)
+
+    def test_mega_y_is_preserved_when_imported_team_slots_are_reopened(self):
+        if not shutil.which('node'):
+            self.skipTest('Node indisponível neste ambiente')
+        template=(ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        assignment='function assignMegaStone(){'+template.split('  function assignMegaStone(){',1)[1].split('\n  function updateItemPreview()',1)[0]
+        hydrate='function hydrateSlotMetadata(slot){'+template.split('  function hydrateSlotMetadata(slot){',1)[1].split('\n  function renderTabs()',1)[0]
+        harness=r"""
+const assert=require('node:assert/strict');
+const slug=v=>String(v||'').toLowerCase().trim().replaceAll(' ','-').replace(/[^a-z0-9-]/g,'');
+const megaStoneOwner={'charizardite-x':'charizard','charizardite-y':'charizard'};
+const mechanicSelect={value:'mega'};
+const itemInput={value:'Charizardite Y'};
+const basePokemon=()=> 'charizard';
+const selectableItems=()=> ['charizardite-x','charizardite-y']; // X apareceria primeiro
+const updateItemPreview=()=>{};
+const alert=()=>{throw Error('Nenhuma pedra válida foi encontrada')};
+const speciesMeta=p=>p==='Charizard'?{num:6,types:['Fire','Flying']}:null;
+const allowedSpeciesAbilities=()=>['Blaze','Solar Power','Drought'];
+"""
+        checks=r"""
+assignMegaStone();
+assert.equal(itemInput.value,'Charizardite Y','Y não pode virar X ao reabrir Charizard');
+itemInput.value='Charizardite X';
+assignMegaStone();
+assert.equal(itemInput.value,'Charizardite X','X também deve ser preservada');
+itemInput.value='';
+assignMegaStone();
+assert.equal(itemInput.value,'charizardite-x','escolha padrão apenas sem pedra');
+
+const roster=[
+ {pokemon:'Charizard',item:'Charizardite Y',ability:'Drought',nature:'Timid',mecanica:'mega',
+  level:100,moves:['Flamethrower','Solar Beam','Focus Blast','Roost'],
+  evs:{spa:252,spd:4,spe:252},ivs:{atk:0}},
+ {pokemon:'Venusaur',item:'Life Orb',ability:'Chlorophyll',nature:'Modest',mecanica:'nenhuma',
+  moves:['Giga Drain','Sludge Bomb','Weather Ball','Growth'],evs:{spa:252,spd:4,spe:252}},
+ {pokemon:'Garchomp',item:'Rocky Helmet',ability:'Rough Skin',nature:'Jolly',mecanica:'nenhuma',
+  moves:['Earthquake','Scale Shot','Fire Fang','Swords Dance']},
+ {pokemon:'Rotom-Wash',item:'Leftovers',ability:'Levitate',nature:'Bold',mecanica:'nenhuma',
+  moves:['Volt Switch','Hydro Pump','Will-O-Wisp','Pain Split']},
+ {pokemon:'Ferrothorn',item:'Leftovers',ability:'Iron Barbs',nature:'Impish',mecanica:'nenhuma',
+  moves:['Stealth Rock','Leech Seed','Power Whip','Knock Off']},
+ {pokemon:'Excadrill',item:'Heavy-Duty Boots',ability:'Mold Breaker',nature:'Jolly',mecanica:'nenhuma',
+  moves:['Earthquake','Iron Head','Rapid Spin','Toxic']}
+];
+const preserved=roster.map(s=>Object.fromEntries(
+ Object.entries(s).filter(([k])=>!['sprite','tipos','pokemon_id','abilities'].includes(k))));
+for(let round=0;round<3;round++)for(const slot of roster)hydrateSlotMetadata(slot);
+roster.forEach((slot,i)=>assert.deepEqual(
+ Object.fromEntries(Object.entries(slot).filter(([k])=>!['sprite','tipos','pokemon_id','abilities'].includes(k))),
+ preserved[i],'abrir os slots não pode modificar os seis sets'));
+"""
+        proc=subprocess.run(['node','-'],input=harness+'\n'+assignment+'\n'+hydrate+'\n'+checks,
+                            text=True,capture_output=True,timeout=12)
+        self.assertEqual(proc.returncode,0,proc.stderr)
 
     def test_species_rules_and_ability_preview_are_integrated(self):
         from modules.hype_tournament_formats import obter_regras_especie_showdown

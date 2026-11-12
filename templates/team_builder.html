@@ -544,7 +544,11 @@
   }
   function assignMegaStone(){
     if(mechanicSelect.value!=='mega')return;
-    const stone=selectableItems().find(code=>megaStoneOwner[code]===basePokemon());
+    const base=basePokemon(), equipped=slug(itemInput.value);
+    // O item que veio do Showdown ou de uma build salva é a fonte da verdade.
+    // Charizardite Y não pode ser substituída pela X só por abrir o slot.
+    if(megaStoneOwner[equipped]===base)return;
+    const stone=selectableItems().find(code=>megaStoneOwner[code]===base);
     if(!stone){mechanicSelect.value='nenhuma';alert('Mega Evolution indisponível para este Pokémon neste formato.');return;}
     itemInput.value=stone;updateItemPreview();
   }
@@ -627,9 +631,25 @@
   }
   function cleanForStorage(s){ return {level:s.level||100,pokemon:s.pokemon||'',pokemon_id:Number.isInteger(s.pokemon_id)?s.pokemon_id:null,tipos:Array.isArray(s.tipos)?s.tipos.slice(0,2):[],sprite:s.sprite||'',item:s.item||'',ability:s.ability||'',nature:s.nature||'',papel:s.papel||'',mecanica:s.mecanica||'nenhuma',tera_ativa:!!s.tera_ativa,tera_type:s.tera_type||'',moves:Array.isArray(s.moves)?s.moves.slice(0,4):[],evs:s.evs||{},ivs:s.ivs||{},base_stats:s.base_stats||{},move_types:s.move_types||{},move_categories:s.move_categories||{},observacao:s.observacao||''}; }
 
+  // Reidratação apenas de metadados de exibição; nunca altera uma build restaurada.
+  function hydrateSlotMetadata(slot){
+    if(!slot?.pokemon)return;
+    const meta=speciesMeta(slot.pokemon);
+    if(meta){
+      if(!slot.pokemon_id && Number(meta.num)>0)slot.pokemon_id=Number(meta.num);
+      if((!Array.isArray(slot.tipos)||!slot.tipos.length)&&Array.isArray(meta.types))
+        slot.tipos=meta.types.map(type=>String(type).toLowerCase());
+      if(!slot.sprite && Number(meta.num)>0)
+        slot.sprite='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+meta.num+'.png';
+    }
+    if(!Array.isArray(slot.abilities)||!slot.abilities.length){
+      slot.abilities=[...new Set([...allowedSpeciesAbilities(slot.pokemon,slot.item,slot.mecanica),...(slot.ability?[slot.ability]:[])])];
+    }
+  }
+
   function renderTabs(){
     $('slotTabs').innerHTML = slots.slice(0,teamSize()).map((s,i)=>`<button type="button" class="slot-tab ${i===active?'active':''}" data-slot="${i}">${s.sprite?`<img src="${s.sprite}" alt="">`:'<span class="slot-number">'+(i+1)+'</span>'}<span><b>${s.pokemon?pretty(s.pokemon):'Slot '+(i+1)}</b><small>${s.item?pretty(s.item):'Vazio'}</small></span></button>`).join('');
-    document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderEditor();renderTabs();if(current().pokemon){if(!current().abilities?.length)loadPokemonDetails(current().pokemon);else loadShowdownMovesForSlot(current());}}));
+    document.querySelectorAll('.slot-tab').forEach(b=>b.addEventListener('click',()=>{saveEditor();active=Number(b.dataset.slot);renderRestoredSlot();}));
     $('teamCount').textContent = `${slots.slice(0,teamSize()).filter(s=>s.pokemon).length}/${teamSize()}`;
   }
 
@@ -651,6 +671,13 @@
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
     updateMoveList(s.moves_available||[]);refreshAbilityHelp(); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate(); refreshMegaDisplay();
+  }
+
+  function renderRestoredSlot(){
+    const slot=current();
+    hydrateSlotMetadata(slot);
+    renderEditor();renderTabs();
+    if(slot.pokemon)loadShowdownMovesForSlot(slot);
   }
 
   function saveEditor(){
@@ -1115,8 +1142,8 @@
   $('clearTeamBtn').addEventListener('click',()=>{if(confirm('Limpar todos os seis slots?')){slots=Array.from({length:6},emptySlot);active=0;renderEditor();renderTabs();}});
   $('duplicateSlotBtn').addEventListener('click',()=>{saveEditor();const target=slots.findIndex((s,i)=>i!==active&&!s.pokemon);if(target<0){alert('Não há slot vazio para duplicar.');return;} slots[target]=JSON.parse(JSON.stringify(current()));active=target;renderEditor();renderTabs();});
 
-  $('loadBuildBtn').addEventListener('click',()=>{const id=Number($('savedBuildSelect').value);const row=savedBuilds.find(x=>Number(x.id)===id);if(!row){alert('Selecione uma Build salva.');return;} const dados=row.dados||{}; slots[active]=Object.assign(emptySlot(),dados);renderEditor();renderTabs();if(slots[active].pokemon) loadPokemonDetails(slots[active].pokemon);});
-  function applyHypeBuild(id){ const row=hypeBuilds.find(x=>Number(x.id)===Number(id)); if(!row){alert('Selecione uma Build HYPE.');return;} slots[active]=Object.assign(emptySlot(),row._slot||{}); renderEditor(); renderTabs(); if(slots[active].pokemon) loadPokemonDetails(slots[active].pokemon); }
+  $('loadBuildBtn').addEventListener('click',()=>{const id=Number($('savedBuildSelect').value);const row=savedBuilds.find(x=>Number(x.id)===id);if(!row){alert('Selecione uma Build salva.');return;} const dados=row.dados||{}; slots[active]=Object.assign(emptySlot(),dados);renderRestoredSlot();});
+  function applyHypeBuild(id){ const row=hypeBuilds.find(x=>Number(x.id)===Number(id)); if(!row){alert('Selecione uma Build HYPE.');return;} slots[active]=Object.assign(emptySlot(),row._slot||{}); renderRestoredSlot(); }
   $('loadHypeBuildBtn').addEventListener('click',()=>applyHypeBuild($('hypeBuildSelect').value));
   document.querySelectorAll('.v27-apply-build').forEach(btn=>btn.addEventListener('click',()=>{applyHypeBuild(btn.dataset.buildId); window.scrollTo({top:document.querySelector('.showdown-workspace').offsetTop-80,behavior:'smooth'});}));
   function submitPersonalBuild(data,name,id){
@@ -1155,7 +1182,7 @@
     const b=personalBuild(btn);if(!b)return;
     saveEditor();slots[active]=Object.assign(emptySlot(),b.dados||{});
     editingBuildId=Number(b.id);$('saveBuildBtn').textContent='Salvar alterações da Build';
-    renderEditor();renderTabs();
+    renderRestoredSlot();
     document.querySelector('.showdown-workspace').scrollIntoView({behavior:'smooth'});
   }));
   document.querySelectorAll('[data-duplicate-build]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -1349,8 +1376,7 @@
     const destinations = slots.map((s,i)=>i<teamSize()&&!s.pokemon?i:-1).filter(i=>i>=0);
     result.parsed.forEach((s,i)=>{slots[destinations[i]]=s;});
     active=destinations[0];
-    renderEditor();renderTabs();liveValidate();
-    if (current().pokemon) loadShowdownMovesForSlot(current());
+    renderRestoredSlot();liveValidate();
     showdownImportDialog.close();
     const info=$('showdownImportStatus');
     info.textContent=result.parsed.length+' Pokémon importado(s) para os slots '+result.parsed.map((_,i)=>destinations[i]+1).join(', ')+'. Revise e clique em Salvar time.';
@@ -1468,14 +1494,13 @@
   bootSpeciesRules();
   bootLists().then(()=>{
     if(prefillBuild&&prefillBuild._slot){
-      slots[0]=Object.assign(emptySlot(),prefillBuild._slot);active=0;renderEditor();renderTabs();
-      if(slots[0].pokemon)loadPokemonDetails(slots[0].pokemon);
+      slots[0]=Object.assign(emptySlot(),prefillBuild._slot);active=0;renderRestoredSlot();
     }else if(prefillPokemon){pokemonInput.value=prefillPokemon;loadPokemonDetails(prefillPokemon);}
     else {
       // Times antigos armazenam os quatro golpes, mas não a lista temporária de aprendizado.
-      // Reidratar o catálogo sem apagar habilidades, EVs, itens ou moves existentes.
-      slots.filter(s=>s.pokemon).forEach(loadShowdownMovesForSlot);
-      if(current().pokemon&&!current().abilities?.length)loadPokemonDetails(current().pokemon);
+      // Nunca re-selecionar espécies durante a abertura: preserva Mega Y, itens e habilidades.
+      slots.filter(s=>s.pokemon).forEach(s=>{hydrateSlotMetadata(s);loadShowdownMovesForSlot(s);});
+      renderTabs();
     }
   });
 })();
