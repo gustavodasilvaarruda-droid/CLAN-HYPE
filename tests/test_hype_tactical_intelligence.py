@@ -94,6 +94,17 @@ class TacticalIntelligenceTests(unittest.TestCase):
         self.assertTrue(_damage(ground,levitate,'Earthquake')['imune'])
         self.assertIsNone(_damage(ground,target,'Scale Shot'))
 
+    def test_tera_conditional_differences_are_reported_separately(self):
+        team=[mon('Charizard','Charizardite Y','Drought','Timid',
+                  ['Flamethrower'],{'spa':252,'spe':252},tera_type='Water')]
+        report=analisar_avancado(team)
+        self.assertEqual(len(report['tera_cenarios']),1)
+        scenario=report['tera_cenarios'][0]
+        self.assertEqual(scenario['tera'],'Water')
+        self.assertIn('Pedra',scenario['melhorias'])
+        self.assertIn('Planta',scenario['riscos'])
+        self.assertIn('hipotética',scenario['nota'])
+
     def test_custom_opponent_team_renders_factual_duels(self):
         us=[
             mon('Charizard','Charizardite Y','Drought','Timid',
@@ -110,6 +121,8 @@ class TacticalIntelligenceTests(unittest.TestCase):
         report=analisar_avancado(us,'gen9nationaldexou',enemy)
         self.assertEqual(report['adversarios'],2)
         self.assertTrue(report['confrontos'])
+        self.assertTrue(report['confrontos_recebidos'])
+        self.assertTrue(any(c['contra']=='Charizard' for c in report['confrontos_recebidos']))
         self.assertTrue(any(c['contra']=='Ferrothorn' and c['atacante']=='Charizard'
                             for c in report['confrontos']))
         self.assertTrue(report['nota_dano'].startswith('Estimativa simplificada'))
