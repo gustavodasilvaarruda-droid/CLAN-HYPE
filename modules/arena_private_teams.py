@@ -5,7 +5,7 @@ NÃO substitui o validador oficial de legalidade do Pokémon Showdown e nunca
 autoriza inscrição/aprovação automática.
 """
 import re
-from modules.hype_tournament_formats import obter_formato, obter_especie_showdown, obter_item_showdown
+from modules.hype_tournament_formats import obter_formato, obter_especie_showdown, obter_item_showdown, obter_regras_especie_showdown
 
 STATS = ('hp', 'atk', 'def', 'spa', 'spd', 'spe')
 
@@ -165,6 +165,31 @@ def item_obrigatorio_forma(especie):
     return _ITENS_FORMA.get(codigo, '')
 
 
+
+def _itens_permitidos_forma(especie, formato):
+    """Itens de forma: aceita alternativas oficiais (ex.: Arceus + Z-Crystal)."""
+    regra = obter_regras_especie_showdown(especie) or {}
+    requeridos = {_chave(nome) for nome in regra.get('requiredItems', ()) if nome}
+    if not requeridos:
+        fallback = item_obrigatorio_forma(especie)
+        requeridos = {fallback} if fallback else set()
+    # National Dex mantém o item histórico de Giratina-Origin em certos jogos.
+    if _chave(especie) == 'giratinaorigin' and 'nationaldex' in formato['codigo']:
+        requeridos.add('griseousorb')
+    return requeridos
+
+
+def _habilidades_permitidas_especie(especie):
+    """Lista oficial exata da forma; usa a base quando a forma herda abilities."""
+    ficha = obter_regras_especie_showdown(especie) or {}
+    nomes = ficha.get('abilities') or []
+    if not nomes:
+        meta = obter_especie_showdown(especie) or {}
+        ficha = obter_regras_especie_showdown(meta.get('base')) or {}
+        nomes = ficha.get('abilities') or []
+    return nomes
+
+
 def _especie_base_clause(especie):
     """Species Clause compara a espécie-base, não a grafia de cada forma."""
     meta = obter_especie_showdown(especie)
@@ -273,14 +298,17 @@ def validar_equipe_basica(slots, codigo_formato):
             if item_id in itens_usados:
                 erros.append(f'Slot {indice}: Item Clause não permite repetir {item}.')
             itens_usados.add(item_id)
-        item_exigido = item_obrigatorio_forma(especie)
-        if item_exigido and item_id != item_exigido:
-            erros.append(f'Slot {indice}: {especie} precisa equipar o item de sua forma ({item_exigido}).')
+        itens_exigidos = _itens_permitidos_forma(especie, formato)
+        if itens_exigidos and item_id not in itens_exigidos:
+            alternativas = ', '.join(sorted(itens_exigidos))
+            erros.append(f'Slot {indice}: {especie} precisa equipar o item de sua forma ({alternativas}).')
         if item_id in MEGA_STONE_OWNERS and not formato.get('permite_mega', False):
             erros.append(f'Slot {indice}: Mega Stones não são permitidas neste formato.')
         if item_id.endswith('z') and item_id not in ('') and not formato.get('permite_zmove', False):
             erros.append(f'Slot {indice}: Z-Crystals não são permitidos neste formato.')
-        base = chave.split('mega')[0] if 'mega' in chave else chave
+        # Nunca dividir pelo trecho "mega": Meganium não é uma forma Mega.
+        meta_especie = obter_especie_showdown(especie) or {}
+        base = _chave(meta_especie.get('base') or especie)
         if item_id in MEGA_STONE_OWNERS and base != MEGA_STONE_OWNERS[item_id]:
             erros.append(f'Slot {indice}: {item} é proibido para {especie}: a pedra não corresponde à espécie.')
         mecanica = _chave(slot.get('mecanica') or 'nenhuma')
@@ -311,6 +339,14 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: Terastalização não é permitida neste formato.')
         if _chave(slot.get('ability')) in habilidades_banidas:
             erros.append(f"Slot {indice}: habilidade {slot.get('ability')} proibida no formato.")
+        habilidade = str(slot.get('ability') or '').strip()
+        habilidades_oficiais = _habilidades_permitidas_especie(especie)
+        if habilidade and habilidades_oficiais and _chave(habilidade) not in {
+                _chave(valor) for valor in habilidades_oficiais}:
+            erros.append(
+                f'Slot {indice}: habilidade {habilidade} não pertence a {especie}. '
+                f'Permitidas: {", ".join(habilidades_oficiais)}.'
+            )
         for campo, rotulo in (('ability', 'habilidade'), ('nature', 'natureza')):
             valor = str(slot.get(campo) or '').strip()
             if not valor or len(valor) > 100:
