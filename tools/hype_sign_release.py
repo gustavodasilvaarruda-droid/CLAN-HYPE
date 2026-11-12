@@ -74,7 +74,8 @@ def inspect_jar(path: Path) -> dict:
                             pass  # Also validates per-member CRC.
     except (BadZipFile, OSError, EOFError, UnicodeError, json.JSONDecodeError) as exc:
         raise ReleaseError("Invalid or damaged Fabric JAR.") from exc
-    digest = hashlib.file_digest(path.open("rb"), "sha256").hexdigest()
+    with path.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
     return {"version": version, "size": size, "sha256": digest, "mod_id": "hypeclient"}
 
 
@@ -155,7 +156,9 @@ def prepare(jar: Path, key_path: Path, out_dir: Path, release: int) -> dict:
     target_jar.parent.mkdir(parents=True, exist_ok=True)
     # This creates only LOCAL release artifacts; no server upload or auto-publish.
     shutil.copyfile(jar, target_jar)
-    if hashlib.file_digest(target_jar.open("rb"), "sha256").hexdigest() != info["sha256"]:
+    with target_jar.open("rb") as stream:
+        copied_sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
+    if copied_sha256 != info["sha256"]:
         target_jar.unlink(missing_ok=True)
         raise ReleaseError("Copied JAR hash mismatch.")
     target_manifest.write_bytes(manifest)
