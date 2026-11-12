@@ -90,3 +90,70 @@
 @media(prefers-reduced-motion:reduce){
   .hype-strategy-toggle-chevron,.hype-strategy-disclosure-chevron{transition:none}
 }
+
+
+/* HYPE Tática 3.0 · detalhes avançados com foco em legibilidade mobile. */
+.hype-advanced-subhead{margin:23px 0 8px;padding-top:14px;border-top:1px solid #5a4d37}
+.hype-advanced-subhead h3{color:#f3d186;font-size:1.12rem;margin:0 0 7px}
+.hype-advanced-subhead p,.hype-strategy-micro{color:#bab5ac;font-size:.76rem;line-height:1.55;margin:7px 0 13px}
+.hype-strategy-disclosure>.hype-advanced-stats,
+.hype-strategy-disclosure>.hype-advanced-interactions,
+.hype-strategy-disclosure>.hype-advanced-threats,
+.hype-strategy-disclosure>.hype-advanced-matchups,
+.hype-strategy-disclosure>.hype-advanced-recs,
+.hype-strategy-disclosure>.hype-advanced-coverage,
+.hype-strategy-disclosure>.hype-type-table-wrap{
+ padding:14px;border-top:1px solid #4b483d;background:#0b1018;min-width:0
+}
+.hype-advanced-stats{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.hype-advanced-stat-row{min-width:0;padding:12px;border:1px solid #54503d;background:#171b21;border-radius:11px}
+.hype-advanced-stat-row h4{margin:0 0 3px;color:#f4dc9b;font-size:.98rem}
+.hype-advanced-stat-row>small{display:block;color:#b8b5aa;font-size:.73rem;margin-bottom:10px}
+.hype-advanced-stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.hype-advanced-stats-grid>div{display:flex;flex-direction:column;gap:3px;text-align:center;border-radius:7px;padding:7px 4px;background:#0b121b;border:1px solid #49463b}
+.hype-advanced-stats-grid small{color:#bda673;font-size:.66rem}
+.hype-advanced-stats-grid strong{color:#f0ede8;font-size:.98rem;word-break:break-word}
+.hype-advanced-speed{color:#bde2ca!important;margin:10px 0 0!important;border:0!important;padding:0!important;font-size:.8rem!important}
+.hype-type-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.hype-type-table{width:100%;min-width:370px;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.8rem}
+.hype-type-table th{color:#f3d18c;background:#20211f;font-weight:700;text-align:center;padding:8px 5px;white-space:nowrap}
+.hype-type-table td{border-bottom:1px solid #34383d;color:#e3dfd5;text-align:center;padding:8px 5px}
+.hype-type-table td:first-child,.hype-type-table th:first-child{text-align:left}
+.hype-type-table .hype-type-risk{background:rgba(174,76,60,.12)}
+.hype-advanced-interaction,.hype-advanced-threat,.hype-advanced-duel,
+.hype-advanced-recs article{border:1px solid #505044;border-radius:10px;padding:12px;margin-bottom:10px;background:#151c23}
+.hype-advanced-interaction.risk{border-left:3px solid #d48a63}
+.hype-advanced-interaction.positive{border-left:3px solid #81bc9d}
+.hype-advanced-interaction strong,.hype-advanced-threat strong,
+.hype-advanced-duel strong,.hype-advanced-recs strong{display:block;color:#f1d58d;font-size:.87rem}
+.hype-advanced-interaction p,.hype-advanced-threat p,.hype-advanced-duel p,
+.hype-advanced-recs p{color:#dedbd3;margin:6px 0;font-size:.82rem;line-height:1.6}
+.hype-advanced-threat small,.hype-advanced-duel small{display:block;font-size:.74rem;color:#b4c9d9;line-height:1.5;margin-top:5px}
+.hype-advanced-coverage{display:flex;gap:8px;flex-wrap:wrap}
+.hype-advanced-coverage span{display:flex;flex-direction:column;gap:4px;color:#f1d18c;
+ border:1px solid #78623c;background:#272113;border-radius:10px;padding:8px 12px}
+.hype-advanced-coverage small{color:#d0c4ab;font-size:.71rem}
+.hype-opponent-editor{padding:15px;background:#0b1119;border-top:1px solid #504a40}
+.hype-opponent-editor>label{display:block;color:#ead29f;font-weight:700;margin:0 0 8px;font-size:.86rem}
+.hype-opponent-editor textarea{width:100%;min-height:130px;box-sizing:border-box;background:#10151f;
+ border:1px solid #796139;border-radius:10px;padding:12px;color:#f0e9db;
+ font:500 .84rem/1.5 ui-monospace,Consolas,monospace;resize:vertical}
+.hype-opponent-editor textarea:focus-visible{outline:2px solid #f1c96e;outline-offset:2px}
+.hype-opponent-hint{font-size:.77rem;line-height:1.5;color:#b7b6af;margin:9px 0}
+.hype-opponent-actions{display:flex;flex-wrap:wrap;gap:10px}
+.hype-opponent-actions button{min-height:44px}
+#hypeOpponentStatus{font-size:.79rem;color:#d9c99f;line-height:1.5}
+.hype-strategy-disclosure>.hype-opponent-editor{background:#111923}
+@media(max-width:760px){.hype-advanced-stats{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:560px){
+ .hype-strategy-disclosure>.hype-advanced-stats,
+ .hype-strategy-disclosure>.hype-advanced-interactions,
+ .hype-strategy-disclosure>.hype-advanced-threats,
+ .hype-strategy-disclosure>.hype-advanced-matchups,
+ .hype-strategy-disclosure>.hype-advanced-recs,
+ .hype-strategy-disclosure>.hype-advanced-coverage,
+ .hype-strategy-disclosure>.hype-type-table-wrap{padding:10px}
+ .hype-opponent-editor{padding:11px}
+ .hype-opponent-actions{flex-direction:column}
+ .hype-opponent-actions button{width:100%}
+}
