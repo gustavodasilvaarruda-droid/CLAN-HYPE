@@ -135,7 +135,7 @@ class TacticalAccordionTests(unittest.TestCase):
     def test_accordion_is_closed_by_default_and_keeps_all_team_controls(self):
         builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
         start = builder.index('<details class="dash-card hype-strategy-panel hype-strategy-accordion"')
-        section = builder[start:builder.index('</details>', start) + len('</details>')]
+        section = builder[start:builder.index('</details>\n\n    <section class="hype-team-actions"', start) + len('</details>')]
         self.assertIn('id="hypeStrategyPreview"', section)
         self.assertNotIn(' open>', section.split('<summary', 1)[0])
         self.assertIn('<summary class="hype-strategy-toggle"', section)
