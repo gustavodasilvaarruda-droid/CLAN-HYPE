@@ -360,7 +360,8 @@
       const data=await response.json(),rules=data.species||{};
       if(Object.keys(rules).length<1400)throw Error('Species rules incomplete');
       speciesRuleDex=rules;
-      renderEditor();liveValidate();
+      // Não re-renderizar os campos durante a digitação do jogador.
+      updateItemPreview();liveValidate();
     }catch(e){
       // Se o catálogo não carregar, as restrições básicas continuam disponíveis.
       console.warn('Pré-filtro de habilidades indisponível; conferência oficial necessária.');
