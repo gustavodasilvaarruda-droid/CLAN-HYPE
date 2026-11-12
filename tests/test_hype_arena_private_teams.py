@@ -147,7 +147,7 @@ class TestArenaPrivateTeams(unittest.TestCase):
         team[1]['item'] = 'Flame Plate'
         self.assertTrue(any('espécies repetidas' in e for e in
                             validar_equipe_basica(team, 'gen9nationaldexag')))
-        team[1]['pokemon'] = 'Palkia'
+        configurar_especie(team[1], 'Palkia')
         team[1]['item'] = 'Leftovers'
         # A espécie Kyogre original ocupava o slot 3; não duplicar sua forma Primal.
         configurar_especie(team[2], 'Reshiram')
