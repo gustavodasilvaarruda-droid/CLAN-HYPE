@@ -483,6 +483,27 @@ def analisar_avancado(slots,formato_codigo='',adversario=None):
     synergy=_interactions(slots,weather)
     offense=_offensive(slots,weather)
     current_risks=[]
+    if adversario:
+        opposing_weather=_weather(adversario)
+        if opposing_weather and opposing_weather!=weather:
+            current_risks.append('O adversário pode ativar um clima diferente e interromper a sua estratégia. '
+                                 'A ordem das entradas em campo define qual clima prevalece.')
+    tera_cenarios=[]
+    for slot in slots:
+        if not slot.get('tera_ativa') or str(slot.get('tera_type') or '').lower() not in TYPES:
+            continue
+        improved=[];worsened=[]
+        for typ in TYPES:
+            current=_type_multiplier(typ,slot)
+            transformed=_type_multiplier(typ,slot,as_tera=True)
+            if current is None or transformed is None:continue
+            if transformed<current:improved.append(TYPE_NAMES[typ])
+            if transformed>current:worsened.append(TYPE_NAMES[typ])
+        tera_cenarios.append({'pokemon':str(slot.get('pokemon')),
+                              'tera':str(slot.get('tera_type')),
+                              'melhorias':improved,'riscos':worsened,
+                              'nota':'Condição hipotética: a terastalização não é assumida ativa.'})
+
     if weak:
         current_risks.append('Concentração de vulnerabilidades: '+
                              ', '.join(x['nome']+' ('+str(x['fracos'])+')' for x in weak[:4])+'.')
@@ -506,11 +527,13 @@ def analisar_avancado(slots,formato_codigo='',adversario=None):
                              ' e nenhuma resistência/imunidade entre os membros identificados.'})
     threat=_benchmark_threats(slots,formato_codigo,defense)
     duel=_duels(slots,adversario,weather) if adversario else []
+    inbound=_duels(adversario,slots,weather) if adversario else []
     return {
         'fonte':'Pokémon Showdown · snapshot local de base stats e movimentos',
         'clima':climate, 'clima_codigo':weather,
         'atributos':attrib,'defesa_tipos':defense,'cobertura_ofensiva':offense,
         'interacoes':synergy,'ameacas_referencia':threat,'confrontos':duel,
+        'confrontos_recebidos':inbound,'tera_cenarios':tera_cenarios,
         'recomendacoes':recommendations[:8],'riscos_estruturais':current_risks[:8],
         'adversarios':len(adversario),'velocidade_top':[
             {'pokemon':name,'velocidade':speed} for speed,name in
