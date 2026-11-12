@@ -91,7 +91,7 @@ class HypeReleaseTests(unittest.TestCase):
                     "id": "hypeclient", "version": "R7.19-CHAVE-TESTE",
                 }))
                 archive.writestr(release.UPDATER_CLASS,
-                                 b"\\xca\\xfe\\xba\\xbe" + b"test-bytecode" +
+                                 b"\xca\xfe\xba\xbe" + b"test-bytecode" +
                                  base64.b64encode(spki) + os.urandom(2200))
             self.assertEqual(release.public_key_embedded_in_client(trusted), spki)
             private = Path(folder) / "local-private.pem"
