@@ -1281,6 +1281,19 @@
     if(!data.cobertura_ofensiva?.length)coverage.append(strategyElement('p','','Nenhum golpe ofensivo identificado no catálogo.'));
     content.append(strategyDisclosure('advanced-coverage','Cobertura ofensiva por tipo',
       coverage,openKeys,firstRender,false,String((data.cobertura_ofensiva||[]).length)));
+    if(data.tera_cenarios?.length){
+      const teraList=strategyElement('div','hype-advanced-interactions');
+      for(const scenario of data.tera_cenarios){
+        const row=strategyElement('article','hype-advanced-interaction positive');
+        row.append(strategyElement('strong','',scenario.pokemon+' · Tera '+scenario.tera),
+                   strategyElement('p','','Melhora contra: '+(scenario.melhorias||[]).join(', ')+'.'),
+                   strategyElement('p','','Piora contra: '+(scenario.riscos||[]).join(', ')+'.'),
+                   strategyElement('small','',scenario.nota||''));
+        teraList.append(row);
+      }
+      content.append(strategyDisclosure('advanced-tera','Impacto defensivo do Tera (hipotético)',
+        teraList,openKeys,firstRender,false,String(data.tera_cenarios.length)));
+    }
     const threats=strategyElement('div','hype-advanced-threats');
     threats.append(strategyElement('p','hype-strategy-micro',data.nota_ameacas||''));
     for(const threat of data.ameacas_referencia||[]){
@@ -1321,6 +1334,17 @@
       }
       if(!data.confrontos?.length)
         matchups.append(strategyElement('p','','Não há golpes de potência fixa suficientes para calcular esses confrontos com segurança.'));
+      matchups.append(strategyElement('h4','hype-matchup-secondary-title','Dano que seu time pode receber'));
+      for(const duel of data.confrontos_recebidos||[]){
+        const line=strategyElement('article','hype-advanced-duel');
+        line.append(strategyElement('strong','',duel.atacante+' → '+duel.contra),
+                    strategyElement('p','',duel.move+' ('+duel.tipo+'): '+
+                      duel.min_pct+'%–'+duel.max_pct+'% do seu HP estimado.'),
+                    strategyElement('small','',duel.resultado));
+        matchups.append(line);
+      }
+      if(!data.confrontos_recebidos?.length)
+        matchups.append(strategyElement('p','','Sem dano adversário calculável para os golpes informados.'));
       matchups.append(strategyElement('p','hype-strategy-micro',data.nota_dano||''));
       content.append(strategyDisclosure('advanced-duels','Cálculos de dano contra o adversário',
         matchups,openKeys,firstRender,true,String(data.adversarios)+' Pokémon'));
