@@ -130,5 +130,63 @@ class StrategyAnalysisTests(unittest.TestCase):
             self.assertIsNotNone(env.get_template(template))
 
 
+
+class TacticalAccordionTests(unittest.TestCase):
+    def test_accordion_is_closed_by_default_and_keeps_all_team_controls(self):
+        builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        start = builder.index('<details class="dash-card hype-strategy-panel hype-strategy-accordion"')
+        section = builder[start:builder.index('</details>', start) + len('</details>')]
+        self.assertIn('id="hypeStrategyPreview"', section)
+        self.assertNotIn(' open>', section.split('<summary', 1)[0])
+        self.assertIn('<summary class="hype-strategy-toggle"', section)
+        self.assertIn('id="hypeStrategyPreviewTitle">Análise Tática', section)
+        self.assertIn('id="hypeStrategyContent" hidden', section)
+        self.assertIn('id="hypeStrategyBaselineBtn"', section)
+        self.assertIn('id="hypeStrategyComparison"', section)
+        self.assertIn('type="button" id="hypeStrategyBaselineBtn"', section)
+        for important in ('id="slotTabs"', 'id="teamForm"', 'id="saveBuildBtn"',
+                          'id="importShowdownBtn"', 'id="exportShowdownBtn"',
+                          'id="showdownImportDialog"', 'id="formatSelect"'):
+            self.assertIn(important, builder)
+
+    def test_live_strategy_is_lazy_and_preserves_internal_disclosures(self):
+        builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        for marker in (
+            "function strategyDisclosure(key, label, child, openKeys, firstRender",
+            "detail.dataset.strategySection=key",
+            "detail.open=firstRender?initiallyOpen:openKeys.has(key)",
+            "const openKeys=new Set([...previous].filter(el=>el.open)",
+            "if(!$('hypeStrategyPreview').open)return;",
+            "$('hypeStrategyPreview').addEventListener('toggle'",
+            "if(sequence!==strategySequence||!$('hypeStrategyPreview').open)return;",
+            "function renderStrategyComparison()",
+            "strategyReference=JSON.parse(JSON.stringify(latestStrategy))",
+            "strategyReference = null",
+            "function scheduleStrategyPreview()",
+            "competitive.previa_estrategia",
+        ):
+            self.assertIn(marker, builder, marker)
+        for key in ('strengths', 'risks', 'roles', 'synergy',
+                    'improvements', 'plan'):
+            self.assertIn("strategyDisclosure('"+key+"'", builder)
+        self.assertNotIn("content.innerHTML=", builder)
+
+    def test_responsive_accessible_css_and_templates(self):
+        css = (ROOT / 'static/hype_team_strategy.css').read_text(encoding='utf-8')
+        for selector in ('.hype-strategy-toggle:focus-visible',
+                         '.hype-strategy-disclosure>summary:focus-visible',
+                         '.hype-strategy-accordion[open]',
+                         '@media(max-width:560px)',
+                         '@media(prefers-reduced-motion:reduce)',
+                         '.hype-strategy-compare-tools'):
+            self.assertIn(selector, css)
+        builder = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        self.assertIn('hype_team_strategy.css', builder)
+        self.assertIn("hype_team_strategy.css') }}?v=2", (ROOT / 'templates/team_analise.html').read_text(encoding='utf-8'))
+        env = Environment(loader=FileSystemLoader(str(ROOT / 'templates')), autoescape=True)
+        for filename in ('team_builder.html', 'team_analise.html'):
+            self.assertIsNotNone(env.get_template(filename))
+
+
 if __name__ == '__main__':
     unittest.main()

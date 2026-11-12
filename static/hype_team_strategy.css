@@ -34,3 +34,59 @@
 .hype-strategy-panel [hidden]{display:none!important}
 @media(max-width:780px){.hype-strategy-columns,.hype-strategy-mon-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:560px){.hype-strategy-panel{padding:14px!important;border-radius:13px!important}.hype-strategy-summary{grid-template-columns:minmax(0,1fr)}.hype-strategy-heading .hype-strategy-signal{font-size:.65rem}.hype-strategy-columns>section,.hype-strategy-mon{padding:12px}}
+
+
+/* Análise Tática · aba fechada por padrão, conteúdo progressivo em acordeões. */
+.hype-v7-team-builder .hype-strategy-accordion{padding:0!important;overflow:hidden;min-width:0}
+.hype-v7-team-builder .hype-strategy-accordion:not([open]){box-shadow:0 10px 24px rgba(0,0,0,.22)}
+.hype-strategy-accordion>summary::-webkit-details-marker,
+.hype-strategy-disclosure>summary::-webkit-details-marker{display:none}
+.hype-strategy-accordion>summary::marker,
+.hype-strategy-disclosure>summary::marker{content:''}
+.hype-strategy-toggle{display:flex;align-items:center;gap:15px;list-style:none;cursor:pointer;min-height:88px;box-sizing:border-box;padding:18px 21px;color:#e9ddc6;user-select:none}
+.hype-strategy-toggle:hover{background:rgba(236,196,92,.055)}
+.hype-strategy-toggle:focus-visible,.hype-strategy-disclosure>summary:focus-visible{outline:3px solid #f5d477;outline-offset:-4px;border-radius:12px}
+.hype-strategy-toggle-emblem{flex:none;width:50px;height:50px;display:grid;place-items:center;border:1px solid #a78947;border-radius:14px;color:#ffda7d;background:linear-gradient(140deg,#373023,#201b12);font-size:26px;box-shadow:0 0 22px #e7b75b16}
+.hype-strategy-toggle-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.hype-strategy-toggle-copy>.breed-kicker{color:#d9b86a;font-size:.65rem;letter-spacing:.08em}
+.hype-strategy-toggle-title{color:#ffdda1;font-size:1.24rem;font-weight:850;line-height:1.2}
+.hype-strategy-toggle-subtitle{font-size:.83rem;line-height:1.4;color:#c5beb0}
+.hype-strategy-toggle-action{flex:none;display:flex;gap:10px;align-items:center;color:#f4d18b;font-size:.79rem;font-weight:750}
+.hype-strategy-toggle-chevron{display:inline-grid;place-items:center;width:31px;height:31px;border-radius:50%;border:1px solid #866d3c;font-size:23px;line-height:1;transition:transform .18s}
+.hype-strategy-accordion[open] .hype-strategy-toggle-chevron{transform:rotate(180deg)}
+.hype-strategy-expanded{border-top:1px solid #56462b;padding:21px}
+.hype-strategy-disclosure{border:1px solid #56503f;border-radius:11px;background:#111820;margin:10px 0;overflow:hidden;min-width:0}
+.hype-strategy-disclosure>summary{cursor:pointer;padding:14px 15px;display:flex;align-items:center;gap:10px;list-style:none;color:#f0d59b;font-size:.93rem;font-weight:750;min-height:48px;box-sizing:border-box}
+.hype-strategy-disclosure>summary:hover{background:#24241f}
+.hype-strategy-disclosure>summary>span:first-child{flex:1;min-width:0}
+.hype-strategy-disclosure>summary small{color:#c7b790;font-size:.72rem;font-weight:600;white-space:nowrap}
+.hype-strategy-disclosure-chevron{font-size:19px;line-height:1;transition:transform .18s}
+.hype-strategy-disclosure[open] .hype-strategy-disclosure-chevron{transform:rotate(180deg)}
+.hype-strategy-disclosure>section,.hype-strategy-disclosure>.hype-strategy-mon-grid{padding:15px;border-top:1px solid #4b483d;margin:0}
+.hype-strategy-disclosure>section>h3{color:#f1d792;margin:0 0 12px;font-size:.94rem}
+.hype-strategy-disclosure>section>p{margin:0 0 12px;color:#dcd7cc;line-height:1.6;font-size:.86rem;border-left:2px solid #a18a50;padding-left:11px}
+.hype-strategy-disclosure>.hype-strategy-mon-grid{background:#0b1017}
+.hype-strategy-disclosure>.hype-strategy-plan{border:0;border-radius:0;background:#1b1a17}
+.hype-strategy-compare-tools{border:1px solid #5e563f;border-radius:12px;margin-top:19px;padding:15px;background:rgba(9,14,20,.66);display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.hype-strategy-compare-tools>button{min-height:45px;max-width:100%;white-space:normal}
+.hype-strategy-compare-tools>button:disabled{opacity:.5;cursor:not-allowed}
+.hype-strategy-comparison{flex:1;min-width:min(100%,240px);font-size:.81rem;line-height:1.58;color:#c8c5bc}
+.hype-strategy-comparison strong{display:block;color:#f0d28c;margin-bottom:8px}
+.hype-strategy-comparison p{margin:0 0 8px}
+.hype-strategy-comparison small{display:block;color:#aab2ba;margin-top:7px}
+@media(max-width:560px){
+  .hype-strategy-toggle{padding:14px 12px;gap:10px;min-height:78px}
+  .hype-strategy-toggle-emblem{width:38px;height:38px;font-size:21px;border-radius:10px}
+  .hype-strategy-toggle-title{font-size:1.06rem}
+  .hype-strategy-toggle-subtitle{font-size:.72rem}
+  .hype-strategy-toggle-action-label{display:none}
+  .hype-strategy-toggle-chevron{width:29px;height:29px;font-size:20px}
+  .hype-strategy-expanded{padding:13px}
+  .hype-strategy-disclosure>summary{padding:13px 11px;font-size:.84rem}
+  .hype-strategy-disclosure>section,.hype-strategy-disclosure>.hype-strategy-mon-grid{padding:11px}
+  .hype-strategy-compare-tools{padding:12px}
+  .hype-strategy-compare-tools>button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  .hype-strategy-toggle-chevron,.hype-strategy-disclosure-chevron{transition:none}
+}
