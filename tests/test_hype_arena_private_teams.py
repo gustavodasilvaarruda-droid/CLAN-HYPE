@@ -203,6 +203,28 @@ class TestArenaPrivateTeams(unittest.TestCase):
         self.assertTrue(any('Z-Crystals' in e for e in
                             validar_equipe_basica(team, 'gen9ubers')))
 
+    def test_showdown_item_catalog_rejects_unknown_and_past_in_gen9(self):
+        from modules.hype_tournament_formats import obter_item_showdown, itens_showdown
+        catalogo = itens_showdown()
+        self.assertGreaterEqual(len(catalogo), 550)
+        for item in ('leftovers', 'blueorb', 'insectplate',
+                     'hearthflamemask', 'wellspringmask', 'cornerstonemask'):
+            self.assertIsNotNone(obter_item_showdown(item), item)
+        team = equipe_valida()
+        team[0]['item'] = 'Fake Legendary Stone'
+        self.assertTrue(any('não existe no catálogo' in e for e in
+                            validar_equipe_basica(team, 'gen9nationaldexubers')))
+        team[0]['item'] = 'Blue Orb'
+        self.assertTrue(any('Geração 9 padrão' in e for e in
+                            validar_equipe_basica(team, 'gen9ubers')))
+        self.assertFalse(any('Geração 9 padrão' in e for e in
+                             validar_equipe_basica(team, 'gen9nationaldexubers')))
+        source = (ROOT / 'modules/expansion_features.py').read_text(encoding='utf-8')
+        template = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        self.assertIn('def team_builder_items_snapshot():', source)
+        self.assertIn('function bootItemsCatalog()', template)
+        self.assertIn('function formatBanIds(kind)', template)
+
     def test_legacy_teams_show_errors_and_cannot_be_confirmed(self):
         events = (ROOT / 'modules/events_v26.py').read_text(encoding='utf-8')
         self.assertIn("equipe_enviada['regras_alertas']", events)
