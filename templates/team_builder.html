@@ -1,6 +1,6 @@
 {% extends 'builders_base.html' %}
 {% block title %}HYPE Team Builder{% endblock %}
-{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=4">{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{url_for('static',filename='hype_team_builder_modern.css')}}?v=4"><link rel="stylesheet" href="{{url_for('static',filename='hype_team_strategy.css')}}?v=1">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool showdown-builder-page hype-v7-team-builder">
 <section class="dash-welcome showdown-hero hype-v7-team-hero">
@@ -183,6 +183,19 @@
     <section class="dash-card builder-validation" id="builderValidation">
       <div><span class="breed-kicker">VALIDAÇÃO AO VIVO</span><h2>Resumo do time</h2></div>
       <div id="liveValidation" class="validation-pills"></div>
+    </section>
+
+    <section class="dash-card hype-strategy-panel" id="hypeStrategyPreview" aria-labelledby="hypeStrategyPreviewTitle">
+      <div class="hype-strategy-heading">
+        <div><span class="breed-kicker">HYPE · ANÁLISE AUTOMÁTICA</span>
+          <h2 id="hypeStrategyPreviewTitle">Treinador estratégico</h2>
+          <p>Monte ou importe sua equipe. A análise identifica funções, estilo e riscos sem usar o campo manual “Papel no time”.</p>
+        </div>
+        <span class="hype-strategy-signal">◆ AO VIVO</span>
+      </div>
+      <p class="hype-strategy-loading" id="hypeStrategyStatus" role="status" aria-live="polite">Adicione um Pokémon para começar a análise automática.</p>
+      <div id="hypeStrategyContent" hidden></div>
+      <p class="hype-strategy-disclaimer">Análise estratégica informativa, não garante vitória nem substitui a validação oficial do formato no Pokémon Showdown. Nenhuma build será alterada.</p>
     </section>
 
     <section class="hype-team-actions" aria-labelledby="hypeTeamActionsTitle">
@@ -417,6 +430,7 @@
     }
   }
   let debounce = null;
+  let strategyTimer = null, strategySequence = 0, strategyAbort = null;
 
   const $ = id => document.getElementById(id);
   const pokemonResults = $('pokemonOptions');
@@ -670,7 +684,7 @@
     document.querySelectorAll('.moveInput').forEach((el,i)=>el.value=(s.moves||[])[i]||'');
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
-    updateMoveList(s.moves_available||[]);refreshAbilityHelp(); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate(); refreshMegaDisplay();
+    updateMoveList(s.moves_available||[]);refreshAbilityHelp(); syncMechanics(); updateItemPreview(); closeItemChoices(); closePokemonChoices(); updateEvTotal(); liveValidate(); refreshMegaDisplay(); scheduleStrategyPreview();
   }
 
   function renderRestoredSlot(){
@@ -685,7 +699,7 @@
     s.moves=[...document.querySelectorAll('.moveInput')].map(x=>x.value.trim());
     s.evs={}; document.querySelectorAll('.evInput').forEach(el=>s.evs[el.dataset.stat]=capInt(el.value,0,252,0));
     s.ivs={}; document.querySelectorAll('.ivInput').forEach(el=>s.ivs[el.dataset.stat]=capInt(el.value,0,31,31));
-    renderTabs(); liveValidate();
+    renderTabs(); liveValidate(); scheduleStrategyPreview();
   }
 
   async function loadPokemonDetails(name){
@@ -1089,6 +1103,98 @@
     const evBad=filled.some(s=>Object.values(s.evs||{}).reduce((a,v)=>a+(Number(v)||0),0)>510); messages.push({ok:!evBad,text:'EVs válidos'});
     const mechanics=filled.filter(s=>s.mecanica&&s.mecanica!=='nenhuma'); if(mechanics.length){ const invalid=mechanics.some(s=>f && !f[`permite_${s.mecanica}`]); messages.push({ok:!invalid,text:'Mecânicas do formato'}); }
     $('liveValidation').innerHTML=messages.map(m=>`<span class="validation-pill ${m.ok?'ok':'warn'}">${m.ok?'✓':'!'} ${m.text}</span>`).join('');
+  }
+
+  // Prévia dinâmica: apenas consulta o motor de estratégia; não salva nem altera slots.
+  function strategyElement(tag, className, value){
+    const el=document.createElement(tag);
+    if(className)el.className=className;
+    if(value!==undefined)el.textContent=String(value);
+    return el;
+  }
+  function strategyTextList(title, rows, fallback){
+    const section=strategyElement('section');
+    section.append(strategyElement('h3','',title));
+    if(!rows?.length)section.append(strategyElement('p','',fallback));
+    else rows.forEach(row=>section.append(strategyElement('p','',row)));
+    return section;
+  }
+  function displayStrategyPreview(strategy){
+    const content=$('hypeStrategyContent');
+    content.replaceChildren();
+    const summary=strategyElement('div','hype-strategy-summary');
+    for(const [label,value] of [['ESTILO DO TIME',strategy.estilo],['ESTRATÉGIA IDENTIFICADA',strategy.estrategia]]){
+      const box=strategyElement('div');box.append(strategyElement('small','',label),strategyElement('strong','',value||'—'));summary.append(box);
+    }
+    content.append(summary,strategyElement('p','hype-strategy-desc',strategy.resumo||''));
+    const columns=strategyElement('div','hype-strategy-columns');
+    columns.append(
+      strategyTextList('✓ Pontos fortes',strategy.fortes,'Ainda não há vantagens reconhecidas.'),
+      strategyTextList('⚠ Riscos',strategy.riscos,'Nenhum risco específico identificado.')
+    );
+    content.append(columns);
+    if(strategy.funcoes?.length){
+      const heading=strategyElement('div','hype-strategy-subhead');
+      heading.append(strategyElement('h3','','Funções detectadas automaticamente'),
+                     strategyElement('p','','Cada Pokémon é avaliado pela build escolhida.'));
+      content.append(heading);
+      const grid=strategyElement('div','hype-strategy-mon-grid');
+      for(const mon of strategy.funcoes){
+        const card=strategyElement('article','hype-strategy-mon');
+        card.append(strategyElement('h4','',mon.pokemon_exibicao||mon.pokemon),
+                    strategyElement('p','hype-strategy-meta',(mon.ability||'Sem habilidade')+' · '+(mon.item||'Sem item')));
+        const tags=strategyElement('div','hype-strategy-tags');
+        (mon.funcoes||[]).forEach(role=>tags.append(strategyElement('span','',role)));
+        card.append(tags,strategyElement('p','',mon.como_jogar||''));
+        if(mon.evidencias?.length)card.append(strategyElement('small','','Identificado por: '+mon.evidencias.join(' · ')));
+        grid.append(card);
+      }
+      content.append(grid);
+    }
+    const extra=strategyElement('div','hype-strategy-columns');
+    extra.append(
+      strategyTextList('Sinergias',strategy.sinergias,'Sem combinação evidente nesta leitura.'),
+      strategyTextList('Melhorias sugeridas',strategy.melhorias,'Nenhuma melhoria específica indicada.')
+    );
+    content.append(extra);
+    const plan=strategyElement('section','hype-strategy-plan');
+    plan.append(strategyElement('h3','','Como jogar com este time'));
+    const list=strategyElement('ol');
+    (strategy.plano||[]).forEach(step=>list.append(strategyElement('li','',step)));
+    plan.append(list);content.append(plan);
+    content.hidden=false;
+  }
+  function scheduleStrategyPreview(){
+    const sequence=++strategySequence;
+    clearTimeout(strategyTimer);
+    if(strategyAbort)strategyAbort.abort();
+    const occupied=slots.slice(0,teamSize()).filter(s=>s?.pokemon);
+    if(!occupied.length){
+      $('hypeStrategyStatus').textContent='Adicione um Pokémon para começar a análise automática.';
+      $('hypeStrategyContent').hidden=true;return;
+    }
+    $('hypeStrategyStatus').textContent='Analisando as habilidades, golpes, itens, EVs e sinergias...';
+    strategyTimer=setTimeout(async()=>{
+      const controller=new AbortController();strategyAbort=controller;
+      try{
+        const response=await fetch('{{url_for("competitive.previa_estrategia")}}',{
+          method:'POST',credentials:'same-origin',signal:controller.signal,
+          headers:{'Content-Type':'application/json',
+                   'X-CSRFToken':document.querySelector('#teamForm [name="csrf_token"]').value},
+          body:JSON.stringify({slots:occupied.map(cleanForStorage),
+                               formato_codigo:$('formatSelect').value})
+        });
+        if(!response.ok)throw Error('Analisador temporariamente indisponível.');
+        const data=await response.json();
+        if(sequence!==strategySequence)return;
+        if(!data.estrategia)throw Error('Resposta da análise inválida.');
+        displayStrategyPreview(data.estrategia);
+        $('hypeStrategyStatus').textContent='Diagnóstico atualizado automaticamente · '+occupied.length+' Pokémon.';
+      }catch(error){
+        if(sequence!==strategySequence||error.name==='AbortError')return;
+        $('hypeStrategyStatus').textContent='Não foi possível atualizar a estratégia. Atualize a página e tente novamente.';
+      }
+    },650);
   }
 
   $('showAllItems').addEventListener('change',event=>{

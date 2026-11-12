@@ -8,6 +8,10 @@ on:
       - 'templates/team_builder.html'
       - 'static/hype_team_builder_modern.css'
       - 'tests/test_hype_team_builder_ui.py'
+      - 'tests/test_hype_team_strategy.py'
+      - 'modules/hype_team_strategy.py'
+      - 'templates/team_analise.html'
+      - 'static/hype_team_strategy.css'
       - 'modules/hype_tournament_formats.py'
       - 'modules/arena_private_teams.py'
       - 'templates/arena_torneio_equipes.html'
@@ -35,6 +39,10 @@ on:
       - 'templates/team_builder.html'
       - 'static/hype_team_builder_modern.css'
       - 'tests/test_hype_team_builder_ui.py'
+      - 'tests/test_hype_team_strategy.py'
+      - 'modules/hype_team_strategy.py'
+      - 'templates/team_analise.html'
+      - 'static/hype_team_strategy.css'
       - 'modules/hype_tournament_formats.py'
       - 'modules/arena_private_teams.py'
       - 'templates/arena_torneio_equipes.html'
@@ -60,9 +68,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install --disable-pip-version-check jinja2
-      - run: python -m py_compile app.py modules/events_v26.py modules/hype_tournament_formats.py modules/arena_private_teams.py modules/expansion_features.py
+      - run: python -m py_compile app.py modules/events_v26.py modules/hype_tournament_formats.py modules/arena_private_teams.py modules/expansion_features.py modules/competitive_features.py modules/hype_team_strategy.py
       - run: python -m unittest discover -s tests -p 'test_hype_arena_v2.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_arena_private_teams.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_arena_admin_review.py' -v
       - run: python -m unittest discover -s tests -p 'test_hype_team_builder_ui.py' -v
+      - run: python -m unittest discover -s tests -p 'test_hype_team_strategy.py' -v
       - run: python -m unittest discover -s tests -p 'test_arena_formatos_fk.py' -v

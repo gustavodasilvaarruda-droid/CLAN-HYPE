@@ -1,8 +1,45 @@
 {% extends 'builders_base.html' %}
 {% block title %}Análise de Time - HYPE{% endblock %}
+{% block extra_head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='hype_team_strategy.css') }}?v=1">{% endblock %}
 {% block builders_content %}
 <div class="hgb-legacy-page hgb-integrated-tool">
 <section class="dash-welcome"><div><span class="breed-kicker">HYPE TEAM ANALYZER</span><h1>{{time.nome}}</h1><p>{{(analise.formato or {}).nome or time.formato or 'Formato livre'}} · {{analise.total_pokemon}} Pokémon</p></div></section>
+
+  {% set auto = analise.estrategia_inteligente %}
+  <section class="dash-card hype-strategy-panel hype-strategy-full" aria-labelledby="autoStrategyTitle">
+    <div class="hype-strategy-heading">
+      <div><span class="breed-kicker">HYPE · DIAGNÓSTICO AUTOMÁTICO</span><h2 id="autoStrategyTitle">Estratégia da equipe</h2>
+      <p>A leitura abaixo é feita automaticamente a partir das builds. Não depende do campo “Papel no time”.</p></div>
+      <span class="hype-strategy-signal">◆ ANÁLISE POR SETS</span>
+    </div>
+    <div class="hype-strategy-summary">
+      <div><small>ESTILO DO TIME</small><strong>{{ auto.estilo }}</strong></div>
+      <div><small>ESTRATÉGIA IDENTIFICADA</small><strong>{{ auto.estrategia }}</strong></div>
+    </div>
+    <p class="hype-strategy-desc">{{ auto.resumo }}</p>
+    <div class="hype-strategy-columns">
+      <section><h3>✓ Pontos fortes</h3>{% for item in auto.fortes %}<p>{{ item }}</p>{% else %}<p>Adicione mais informações para identificar vantagens.</p>{% endfor %}</section>
+      <section><h3>⚠ Riscos e vulnerabilidades</h3>{% for item in auto.riscos %}<p>{{ item }}</p>{% else %}<p>Nenhum risco específico identificado pelas regras disponíveis.</p>{% endfor %}</section>
+    </div>
+    <div class="hype-strategy-subhead"><h3>Função de cada Pokémon</h3><p>Papel deduzido por golpes, itens, habilidades, EVs e combinações — não alteramos sua build.</p></div>
+    <div class="hype-strategy-mon-grid">
+      {% for mon in auto.funcoes %}
+      <article class="hype-strategy-mon">
+        <h4>{{ mon.pokemon_exibicao or mon.pokemon }}</h4>
+        <p class="hype-strategy-meta">{{ mon.ability or 'Habilidade não informada' }} · {{ mon.item or 'Sem item' }}</p>
+        <div class="hype-strategy-tags">{% for papel in mon.funcoes %}<span>{{ papel }}</span>{% endfor %}</div>
+        <p>{{ mon.como_jogar }}</p>
+        {% if mon.evidencias %}<small>Base: {{ mon.evidencias|join(' · ') }}</small>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    <div class="hype-strategy-columns">
+      <section><h3>Sinergias detectadas</h3>{% for item in auto.sinergias %}<p>{{ item }}</p>{% else %}<p>Não foram encontradas combinações óbvias; isso não significa que o time não funcione.</p>{% endfor %}</section>
+      <section><h3>Melhorias sugeridas</h3>{% for item in auto.melhorias %}<p>{{ item }}</p>{% else %}<p>Nenhuma troca específica sugerida com os dados atuais.</p>{% endfor %}</section>
+    </div>
+    <section class="hype-strategy-plan"><h3>Plano recomendado de batalha</h3><ol>{% for etapa in auto.plano %}<li>{{ etapa }}</li>{% endfor %}</ol></section>
+    <p class="hype-strategy-disclaimer">Análise estratégica por heurísticas, não previsão de vitória nem validação oficial de legalidade. Confira as regras e o TeamValidator do Pokémon Showdown antes dos torneios.</p>
+  </section>
 
   <section class="dash-card"><h2>Composição</h2><div class="team-grid">{% for s in time.slots %}<article class="team-card detailed-set-card"><div class="set-card-top">{% if s.sprite %}<img src="{{s.sprite}}" alt="{{s.pokemon}}">{% endif %}<div><h3>{{s.pokemon}}</h3><p>{{(s.tipos or [])|join(' / ')}}</p></div></div><p><b>Item:</b> {{s.item or '-'}}</p><p><b>Ability:</b> {{s.ability or '-'}}</p><p><b>Nature:</b> {{s.nature or '-'}}</p><p><b>Papel:</b> {{s.papel or '-'}}</p><p><b>Mecânica:</b> {{s.mecanica or 'nenhuma'}}</p>{% if s.moves %}<div class="set-moves">{% for m in s.moves if m %}<span>{{m}}</span>{% endfor %}</div>{% endif %}{% if s.observacao %}<small>{{s.observacao}}</small>{% endif %}</article>{% endfor %}</div></section>
 
