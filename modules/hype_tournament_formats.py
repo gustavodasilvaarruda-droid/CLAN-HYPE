@@ -12,6 +12,23 @@ _SNAPSHOT_PATH = Path(__file__).resolve().parents[1] / 'data' / 'hype_showdown_g
 with _SNAPSHOT_PATH.open(encoding='utf-8') as handle:
     _SNAPSHOT = json.load(handle)
 
+_ITEMS_PATH = Path(__file__).resolve().parents[1] / 'data' / 'hype_showdown_items_snapshot.json'
+with _ITEMS_PATH.open(encoding='utf-8') as handle:
+    _ITEMS = json.load(handle)['items']
+
+
+def obter_item_showdown(nome):
+    """Catálogo versionado para pré-checagem; não substitui TeamValidator."""
+    import re
+    chave = re.sub(r'[^a-z0-9]', '', str(nome or '').casefold())
+    return deepcopy(_ITEMS.get(chave))
+
+
+def itens_showdown():
+    """Metadados para busca de itens no Team Builder."""
+    return deepcopy(_ITEMS)
+
+
 _FORMATS = {row['codigo']: {**row, 'validacao_completa': False} for row in _SNAPSHOT['formatos']}
 # Formatos extras confirmados pela comunidade Smogon. São identificadores
 # de catálogo, NÃO um substituto pelo TeamValidator (banlists podem mudar).

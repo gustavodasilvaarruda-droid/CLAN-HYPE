@@ -97,6 +97,148 @@ class TestArenaPrivateTeams(unittest.TestCase):
         slots[0]['tera_ativa']=False
         self.assertEqual(validar_equipe_basica(slots, 'gen9nationaldexubers'), [])
 
+    def test_monotype_team_must_share_one_type(self):
+        from modules.hype_tournament_formats import obter_especie_showdown
+        especies = ['Pelipper', 'Barraskewda', 'Basculegion',
+                    'Blastoise', 'Rotom-Wash', 'Quagsire']
+        self.assertTrue(all('Water' in obter_especie_showdown(p)['types']
+                            for p in especies))
+        team = equipe_valida()
+        for slot, p in zip(team, especies):
+            slot['pokemon'] = p
+        self.assertEqual(validar_equipe_basica(team, 'gen9monotype'), [])
+        # Reproduz a imagem do usuário: Venusaur e Charizard quebram o time Água.
+        team[0]['pokemon'] = 'Venusaur'
+        team[1]['pokemon'] = 'Charizard'
+        erros = validar_equipe_basica(team, 'gen9monotype')
+        self.assertTrue(any('Monotype' in erro and 'tipo' in erro for erro in erros), erros)
+
+    def test_monotype_different_forms_and_mega_types(self):
+        team = equipe_valida()
+        for slot, pokemon in zip(team, ('Arcanine', 'Torkoal', 'Infernape',
+                                       'Chandelure', 'Skeledirge', 'Charizard')):
+            slot['pokemon'] = pokemon
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexmonotype'), [])
+        team[-1]['item'] = 'Charizardite X'
+        team[-1]['mecanica'] = 'mega'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexmonotype'), [])
+        team[0]['pokemon'] = 'Garchomp'
+        self.assertTrue(any('Monotype' in e for e in
+                            validar_equipe_basica(team, 'gen9nationaldexmonotype')))
+
+    def test_arceus_primal_ogerpon_required_items(self):
+        team = equipe_valida()
+        team[0]['pokemon'] = 'Arceus-Bug'
+        team[0]['item'] = 'Leftovers'
+        self.assertTrue(any('item de sua forma' in e for e in
+                            validar_equipe_basica(team, 'gen9nationaldexag')))
+        team[0]['item'] = 'Insect Plate'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexag'), [])
+        team[1]['pokemon'] = 'Arceus-Fire'
+        team[1]['item'] = 'Flame Plate'
+        self.assertTrue(any('espécies repetidas' in e for e in
+                            validar_equipe_basica(team, 'gen9nationaldexag')))
+        team[1]['pokemon'] = 'Palkia'
+        team[1]['item'] = 'Leftovers'
+        # A espécie Kyogre original ocupava o slot 3; não duplicar sua forma Primal.
+        team[2]['pokemon'] = 'Reshiram'
+        team[0]['pokemon'] = 'Kyogre-Primal'
+        team[0]['item'] = 'Leftovers'
+        self.assertTrue(any('blueorb' in e for e in
+                            validar_equipe_basica(team, 'gen9nationaldexag')))
+        team[0]['item'] = 'Blue Orb'
+        self.assertEqual(validar_equipe_basica(team, 'gen9nationaldexag'), [])
+
+        team = equipe_valida()
+        team[0]['pokemon'] = 'Ogerpon-Hearthflame'
+        team[0]['item'] = 'Leftovers'
+        self.assertTrue(any('hearthflamemask' in e for e in
+                            validar_equipe_basica(team, 'gen9ubers')))
+        team[0]['item'] = 'Hearthflame Mask'
+        self.assertFalse(any('item de sua forma' in e for e in
+                             validar_equipe_basica(team, 'gen9ubers')))
+
+    def test_expanded_showdown_clause_bans(self):
+        # A lista resumida não possui Sleep Powder e Sand Veil, mas
+        # a cláusula herdada pelo formato precisa proibir ambos.
+        team = equipe_valida()
+        for slot, p in zip(team, ('Charizard','Garchomp','Venusaur','Metagross','Pelipper','Blastoise')):
+            slot['pokemon'] = p
+        team[0]['moves'][0] = 'Sleep Powder'
+        team[1]['ability'] = 'Sand Veil'
+        errors = ' '.join(validar_equipe_basica(team, 'gen9ou'))
+        self.assertIn('Sleep Powder', errors)
+        self.assertIn('Sand Veil', errors)
+        trio = equipe_valida()[:3]
+        for slot, p in zip(trio, ('Garchomp', 'Metagross', 'Venusaur')):
+            slot['pokemon'] = p
+        for move in ('Fissure', 'Flash', 'Double Team'):
+            trio[0]['moves'][0] = move
+            self.assertTrue(any(move in e for e in
+                                validar_equipe_basica(trio, 'gen9nationaldex1v1')), move)
+        slots = equipe_valida()
+        slots[0]['item'] = 'Bright Powder'
+        self.assertTrue(any('Bright Powder' in e for e in
+                            validar_equipe_basica(slots, 'gen9nationaldexubers')))
+        slots[0]['item'] = 'Leftovers'
+        slots[0]['moves'][0] = 'Acupressure'
+        self.assertTrue(any('Acupressure' in e for e in
+                            validar_equipe_basica(slots, 'gen9nationaldexubers')))
+
+    def test_lc_exact_level_and_format_mechanics(self):
+        team = equipe_valida()
+        especies = ['Bulbasaur','Charmander','Squirtle','Pikachu','Mudkip','Turtwig']
+        for slot, p in zip(team, especies):
+            slot['pokemon'] = p
+            slot['level'] = 5
+        # Alguns desta lista podem ser restringidos pela tier; o erro
+        # específico de nível não depende da permissividade da espécie.
+        team[0]['level'] = 4
+        self.assertTrue(any('Little Cup exige nível 5' in e for e in
+                            validar_equipe_basica(team, 'gen9lc')))
+        team = equipe_valida()
+        team[0]['pokemon'] = 'Charizard'
+        team[0]['item'] = 'Charizardite X'
+        self.assertTrue(any('Mega Stones' in e for e in
+                            validar_equipe_basica(team, 'gen9ubers')))
+        team[0]['item'] = 'Firium Z'
+        self.assertTrue(any('Z-Crystals' in e for e in
+                            validar_equipe_basica(team, 'gen9ubers')))
+
+    def test_showdown_item_catalog_rejects_unknown_and_past_in_gen9(self):
+        from modules.hype_tournament_formats import obter_item_showdown, itens_showdown
+        catalogo = itens_showdown()
+        self.assertGreaterEqual(len(catalogo), 550)
+        for item in ('leftovers', 'blueorb', 'insectplate',
+                     'hearthflamemask', 'wellspringmask', 'cornerstonemask'):
+            self.assertIsNotNone(obter_item_showdown(item), item)
+        team = equipe_valida()
+        team[0]['item'] = 'Fake Legendary Stone'
+        self.assertTrue(any('não existe no catálogo' in e for e in
+                            validar_equipe_basica(team, 'gen9nationaldexubers')))
+        team[0]['item'] = 'Blue Orb'
+        self.assertTrue(any('Geração 9 padrão' in e for e in
+                            validar_equipe_basica(team, 'gen9ubers')))
+        self.assertFalse(any('Geração 9 padrão' in e for e in
+                             validar_equipe_basica(team, 'gen9nationaldexubers')))
+        source = (ROOT / 'modules/expansion_features.py').read_text(encoding='utf-8')
+        template = (ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
+        self.assertIn('def team_builder_items_snapshot():', source)
+        self.assertIn('function bootItemsCatalog()', template)
+        self.assertIn('function formatBanIds(kind)', template)
+
+    def test_legacy_teams_show_errors_and_cannot_be_confirmed(self):
+        events = (ROOT / 'modules/events_v26.py').read_text(encoding='utf-8')
+        self.assertIn("equipe_enviada['regras_alertas']", events)
+        self.assertIn("validar_equipe_basica(t.get('equipe'), codigo)", events)
+        self.assertIn("' está fora das regras: '", events)
+        user_view=(ROOT / 'templates/arena_torneio_equipes.html').read_text(encoding='utf-8')
+        admin_view=(ROOT / 'templates/admin_arena_equipes.html').read_text(encoding='utf-8')
+        self.assertIn('Time fora das regras do formato', user_view)
+        self.assertIn('Corrigir regras antes do envio', user_view)
+        self.assertIn('Checagem preliminar reprovada', admin_view)
+        self.assertIn('irregularidades == 0', admin_view)
+
     def test_never_automatically_confirms_registration(self):
         app = (ROOT / 'app.py').read_text(encoding='utf-8')
         events = (ROOT / 'modules/events_v26.py').read_text(encoding='utf-8')

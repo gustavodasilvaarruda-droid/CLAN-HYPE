@@ -25,6 +25,13 @@
           <h3>{{time.nome}}</h3>
           <span class="arena-private-state">{{time.status|replace('_',' ')|capitalize}}</span>
           {% if time.motivo_revisao %}<p class="arena-private-alert">Correção solicitada: {{time.motivo_revisao}}</p>{% endif %}
+          {% if time.regras_alertas %}
+            <div class="arena-rule-issues" role="alert">
+              <strong>⚠ Time fora das regras do formato</strong>
+              <ul>{% for erro in time.regras_alertas[:5] %}<li>{{erro}}</li>{% endfor %}</ul>
+              <small>Esse time já enviado não será alterado automaticamente. Corrija no Team Builder e reenvie antes de aprovação.</small>
+            </div>
+          {% endif %}
           <div class="arena-pokemon-icons">
           {% for p in time.equipe %}
             <span title="{{p.pokemon}}" class="arena-poke-mini">
@@ -57,10 +64,10 @@
           <select name="team_id" required>
             <option value="">Selecione uma equipe...</option>
             {% for time in meus_times %}
-              <option value="{{time.id}}" {% if time.id == time_selecionado_id %}selected{% endif %}>{{time.nome}} · {{time.slots|length}}/{{tamanho_equipe}} Pokémon</option>
+              <option value="{{time.id}}" {% if time.id == time_selecionado_id %}selected{% endif %} {% if time.regras_alertas %}disabled{% endif %}>{{time.nome}} · {{time.slots|length}}/{{tamanho_equipe}} Pokémon{{' · Corrigir regras antes do envio' if time.regras_alertas else ''}}</option>
             {% endfor %}
           </select>
-          {% if not meus_times %}<small>Você ainda não tem um time privado salvo para este formato. Use o botão Abrir Team Builder acima.</small>{% endif %}
+          {% if not meus_times %}<small>Você ainda não tem um time privado salvo para este formato. Use o botão Abrir Team Builder acima.</small>{% elif meus_times|selectattr('regras_alertas')|list|length %}<small>Times com erros de regras ficam bloqueados para envio. Revise no Team Builder, salve e tente novamente.</small>{% endif %}
         </label>
         <label class="arena-rule-check"><input type="checkbox" name="aceito_regras" value="on" required> Li e aceito o regulamento e sei que este envio não confirma minha inscrição.</label>
         <button class="v26-btn gold" type="submit" {% if not meus_times %}disabled{% endif %}>Enviar para conferência</button>

@@ -360,6 +360,16 @@ def create_expansion_blueprint(supabase, login_required, safe_table, is_admin, r
         response.headers['Cache-Control'] = 'public, max-age=3600'
         return response
 
+    @bp.route('/team-builder/items-snapshot')
+    @login_required
+    def team_builder_items_snapshot():
+        """Itens versionados do Showdown para busca e pré-filtro competitivo."""
+        directory = Path(__file__).resolve().parents[1] / 'data'
+        response = send_from_directory(directory, 'hype_showdown_items_snapshot.json',
+                                       mimetype='application/json')
+        response.headers['Cache-Control'] = 'private, max-age=3600'
+        return response
+
     @bp.route('/team-builder', methods=['GET', 'POST'])
     @login_required
     def team_builder():

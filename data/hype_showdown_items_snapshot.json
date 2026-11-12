@@ -1,0 +1,3529 @@
+{
+  "source": "https://github.com/smogon/pokemon-showdown/blob/master/data/items.ts",
+  "revisado_em": "2026-11-11",
+  "nota": "Pré-filtro de itens; não certifica a legalidade total. Alguns itens deste arquivo não podem ser equipados.",
+  "items": {
+    "abilityshield": {
+      "name": "Ability Shield",
+      "gen": 9,
+      "num": 1881,
+      "nonstandard": ""
+    },
+    "abomasite": {
+      "name": "Abomasite",
+      "gen": 6,
+      "num": 674,
+      "nonstandard": "Past"
+    },
+    "absolite": {
+      "name": "Absolite",
+      "gen": 6,
+      "num": 677,
+      "nonstandard": "Past"
+    },
+    "absolitez": {
+      "name": "Absolite Z",
+      "gen": 9,
+      "num": 2638,
+      "nonstandard": "Future"
+    },
+    "absorbbulb": {
+      "name": "Absorb Bulb",
+      "gen": 5,
+      "num": 545,
+      "nonstandard": ""
+    },
+    "adamantcrystal": {
+      "name": "Adamant Crystal",
+      "gen": 8,
+      "num": 1777,
+      "nonstandard": ""
+    },
+    "adamantorb": {
+      "name": "Adamant Orb",
+      "gen": 4,
+      "num": 135,
+      "nonstandard": ""
+    },
+    "adrenalineorb": {
+      "name": "Adrenaline Orb",
+      "gen": 7,
+      "num": 846,
+      "nonstandard": ""
+    },
+    "aerodactylite": {
+      "name": "Aerodactylite",
+      "gen": 6,
+      "num": 672,
+      "nonstandard": "Past"
+    },
+    "aggronite": {
+      "name": "Aggronite",
+      "gen": 6,
+      "num": 667,
+      "nonstandard": "Past"
+    },
+    "aguavberry": {
+      "name": "Aguav Berry",
+      "gen": 3,
+      "num": 162,
+      "nonstandard": ""
+    },
+    "airballoon": {
+      "name": "Air Balloon",
+      "gen": 5,
+      "num": 541,
+      "nonstandard": ""
+    },
+    "alakazite": {
+      "name": "Alakazite",
+      "gen": 6,
+      "num": 679,
+      "nonstandard": "Past"
+    },
+    "aloraichiumz": {
+      "name": "Aloraichium Z",
+      "gen": 7,
+      "num": 803,
+      "nonstandard": "Past"
+    },
+    "altarianite": {
+      "name": "Altarianite",
+      "gen": 6,
+      "num": 755,
+      "nonstandard": "Past"
+    },
+    "ampharosite": {
+      "name": "Ampharosite",
+      "gen": 6,
+      "num": 658,
+      "nonstandard": "Past"
+    },
+    "apicotberry": {
+      "name": "Apicot Berry",
+      "gen": 3,
+      "num": 205,
+      "nonstandard": ""
+    },
+    "armorfossil": {
+      "name": "Armor Fossil",
+      "gen": 4,
+      "num": 104,
+      "nonstandard": "Past"
+    },
+    "aspearberry": {
+      "name": "Aspear Berry",
+      "gen": 3,
+      "num": 153,
+      "nonstandard": ""
+    },
+    "assaultvest": {
+      "name": "Assault Vest",
+      "gen": 6,
+      "num": 640,
+      "nonstandard": ""
+    },
+    "audinite": {
+      "name": "Audinite",
+      "gen": 6,
+      "num": 757,
+      "nonstandard": "Past"
+    },
+    "auspiciousarmor": {
+      "name": "Auspicious Armor",
+      "gen": 9,
+      "num": 2344,
+      "nonstandard": ""
+    },
+    "babiriberry": {
+      "name": "Babiri Berry",
+      "gen": 4,
+      "num": 199,
+      "nonstandard": ""
+    },
+    "banettite": {
+      "name": "Banettite",
+      "gen": 6,
+      "num": 668,
+      "nonstandard": "Past"
+    },
+    "barbaracite": {
+      "name": "Barbaracite",
+      "gen": 9,
+      "num": 2581,
+      "nonstandard": "Future"
+    },
+    "baxcalibrite": {
+      "name": "Baxcalibrite",
+      "gen": 9,
+      "num": 2648,
+      "nonstandard": "Future"
+    },
+    "beastball": {
+      "name": "Beast Ball",
+      "gen": 7,
+      "num": 851,
+      "nonstandard": ""
+    },
+    "beedrillite": {
+      "name": "Beedrillite",
+      "gen": 6,
+      "num": 770,
+      "nonstandard": "Past"
+    },
+    "belueberry": {
+      "name": "Belue Berry",
+      "gen": 3,
+      "num": 183,
+      "nonstandard": "Past"
+    },
+    "berryjuice": {
+      "name": "Berry Juice",
+      "gen": 2,
+      "num": 43,
+      "nonstandard": "Past"
+    },
+    "berrysweet": {
+      "name": "Berry Sweet",
+      "gen": 8,
+      "num": 1111,
+      "nonstandard": ""
+    },
+    "bignugget": {
+      "name": "Big Nugget",
+      "gen": 5,
+      "num": 581,
+      "nonstandard": ""
+    },
+    "bigroot": {
+      "name": "Big Root",
+      "gen": 4,
+      "num": 296,
+      "nonstandard": ""
+    },
+    "bindingband": {
+      "name": "Binding Band",
+      "gen": 5,
+      "num": 544,
+      "nonstandard": ""
+    },
+    "blackaugurite": {
+      "name": "Black Augurite",
+      "gen": 8,
+      "num": 1691,
+      "nonstandard": "Legends"
+    },
+    "blackbelt": {
+      "name": "Black Belt",
+      "gen": 2,
+      "num": 241,
+      "nonstandard": ""
+    },
+    "blackglasses": {
+      "name": "Black Glasses",
+      "gen": 2,
+      "num": 240,
+      "nonstandard": ""
+    },
+    "blacksludge": {
+      "name": "Black Sludge",
+      "gen": 4,
+      "num": 281,
+      "nonstandard": ""
+    },
+    "blankplate": {
+      "name": "Blank Plate",
+      "gen": 8,
+      "num": 1780,
+      "nonstandard": "Legends"
+    },
+    "blastoisinite": {
+      "name": "Blastoisinite",
+      "gen": 6,
+      "num": 661,
+      "nonstandard": "Past"
+    },
+    "blazikenite": {
+      "name": "Blazikenite",
+      "gen": 6,
+      "num": 664,
+      "nonstandard": "Past"
+    },
+    "blueorb": {
+      "name": "Blue Orb",
+      "gen": 6,
+      "num": 535,
+      "nonstandard": "Past"
+    },
+    "blukberry": {
+      "name": "Bluk Berry",
+      "gen": 3,
+      "num": 165,
+      "nonstandard": "Past"
+    },
+    "blunderpolicy": {
+      "name": "Blunder Policy",
+      "gen": 8,
+      "num": 1121,
+      "nonstandard": ""
+    },
+    "boosterenergy": {
+      "name": "Booster Energy",
+      "gen": 9,
+      "num": 1880,
+      "nonstandard": ""
+    },
+    "bottlecap": {
+      "name": "Bottle Cap",
+      "gen": 7,
+      "num": 795,
+      "nonstandard": ""
+    },
+    "brightpowder": {
+      "name": "Bright Powder",
+      "gen": 2,
+      "num": 213,
+      "nonstandard": ""
+    },
+    "buggem": {
+      "name": "Bug Gem",
+      "gen": 5,
+      "num": 558,
+      "nonstandard": "Past"
+    },
+    "buginiumz": {
+      "name": "Buginium Z",
+      "gen": 7,
+      "num": 787,
+      "nonstandard": "Past"
+    },
+    "bugmemory": {
+      "name": "Bug Memory",
+      "gen": 7,
+      "num": 909,
+      "nonstandard": "Past"
+    },
+    "burndrive": {
+      "name": "Burn Drive",
+      "gen": 5,
+      "num": 118,
+      "nonstandard": "Past"
+    },
+    "cameruptite": {
+      "name": "Cameruptite",
+      "gen": 6,
+      "num": 767,
+      "nonstandard": "Past"
+    },
+    "cellbattery": {
+      "name": "Cell Battery",
+      "gen": 5,
+      "num": 546,
+      "nonstandard": ""
+    },
+    "chandelurite": {
+      "name": "Chandelurite",
+      "gen": 9,
+      "num": 2574,
+      "nonstandard": "Future"
+    },
+    "charcoal": {
+      "name": "Charcoal",
+      "gen": 2,
+      "num": 249,
+      "nonstandard": ""
+    },
+    "charizarditex": {
+      "name": "Charizardite X",
+      "gen": 6,
+      "num": 660,
+      "nonstandard": "Past"
+    },
+    "charizarditey": {
+      "name": "Charizardite Y",
+      "gen": 6,
+      "num": 678,
+      "nonstandard": "Past"
+    },
+    "chartiberry": {
+      "name": "Charti Berry",
+      "gen": 4,
+      "num": 195,
+      "nonstandard": ""
+    },
+    "cheriberry": {
+      "name": "Cheri Berry",
+      "gen": 3,
+      "num": 149,
+      "nonstandard": ""
+    },
+    "cherishball": {
+      "name": "Cherish Ball",
+      "gen": 4,
+      "num": 16,
+      "nonstandard": "Unobtainable"
+    },
+    "chesnaughtite": {
+      "name": "Chesnaughtite",
+      "gen": 9,
+      "num": 2575,
+      "nonstandard": "Future"
+    },
+    "chestoberry": {
+      "name": "Chesto Berry",
+      "gen": 3,
+      "num": 150,
+      "nonstandard": ""
+    },
+    "chilanberry": {
+      "name": "Chilan Berry",
+      "gen": 4,
+      "num": 200,
+      "nonstandard": ""
+    },
+    "chilldrive": {
+      "name": "Chill Drive",
+      "gen": 5,
+      "num": 119,
+      "nonstandard": "Past"
+    },
+    "chimechite": {
+      "name": "Chimechite",
+      "gen": 9,
+      "num": 2637,
+      "nonstandard": "Future"
+    },
+    "chippedpot": {
+      "name": "Chipped Pot",
+      "gen": 8,
+      "num": 1254,
+      "nonstandard": ""
+    },
+    "choiceband": {
+      "name": "Choice Band",
+      "gen": 3,
+      "num": 220,
+      "nonstandard": ""
+    },
+    "choicescarf": {
+      "name": "Choice Scarf",
+      "gen": 4,
+      "num": 287,
+      "nonstandard": ""
+    },
+    "choicespecs": {
+      "name": "Choice Specs",
+      "gen": 4,
+      "num": 297,
+      "nonstandard": ""
+    },
+    "chopleberry": {
+      "name": "Chople Berry",
+      "gen": 4,
+      "num": 189,
+      "nonstandard": ""
+    },
+    "clawfossil": {
+      "name": "Claw Fossil",
+      "gen": 3,
+      "num": 100,
+      "nonstandard": "Past"
+    },
+    "clearamulet": {
+      "name": "Clear Amulet",
+      "gen": 9,
+      "num": 1882,
+      "nonstandard": ""
+    },
+    "clefablite": {
+      "name": "Clefablite",
+      "gen": 9,
+      "num": 2559,
+      "nonstandard": "Future"
+    },
+    "cloversweet": {
+      "name": "Clover Sweet",
+      "gen": 8,
+      "num": 1112,
+      "nonstandard": ""
+    },
+    "cobaberry": {
+      "name": "Coba Berry",
+      "gen": 4,
+      "num": 192,
+      "nonstandard": ""
+    },
+    "colburberry": {
+      "name": "Colbur Berry",
+      "gen": 4,
+      "num": 198,
+      "nonstandard": ""
+    },
+    "cornerstonemask": {
+      "name": "Cornerstone Mask",
+      "gen": 9,
+      "num": 2406,
+      "nonstandard": ""
+    },
+    "cornnberry": {
+      "name": "Cornn Berry",
+      "gen": 3,
+      "num": 175,
+      "nonstandard": "Past"
+    },
+    "coverfossil": {
+      "name": "Cover Fossil",
+      "gen": 5,
+      "num": 572,
+      "nonstandard": "Past"
+    },
+    "covertcloak": {
+      "name": "Covert Cloak",
+      "gen": 9,
+      "num": 1885,
+      "nonstandard": ""
+    },
+    "crabominite": {
+      "name": "Crabominite",
+      "gen": 9,
+      "num": 2644,
+      "nonstandard": "Future"
+    },
+    "crackedpot": {
+      "name": "Cracked Pot",
+      "gen": 8,
+      "num": 1253,
+      "nonstandard": ""
+    },
+    "custapberry": {
+      "name": "Custap Berry",
+      "gen": 4,
+      "num": 210,
+      "nonstandard": ""
+    },
+    "damprock": {
+      "name": "Damp Rock",
+      "gen": 4,
+      "num": 285,
+      "nonstandard": ""
+    },
+    "darkgem": {
+      "name": "Dark Gem",
+      "gen": 5,
+      "num": 562,
+      "nonstandard": "Past"
+    },
+    "darkiniumz": {
+      "name": "Darkinium Z",
+      "gen": 7,
+      "num": 791,
+      "nonstandard": "Past"
+    },
+    "darkmemory": {
+      "name": "Dark Memory",
+      "gen": 7,
+      "num": 919,
+      "nonstandard": "Past"
+    },
+    "darkranite": {
+      "name": "Darkranite",
+      "gen": 9,
+      "num": 2568,
+      "nonstandard": "Future"
+    },
+    "dawnstone": {
+      "name": "Dawn Stone",
+      "gen": 4,
+      "num": 109,
+      "nonstandard": ""
+    },
+    "decidiumz": {
+      "name": "Decidium Z",
+      "gen": 7,
+      "num": 798,
+      "nonstandard": "Past"
+    },
+    "deepseascale": {
+      "name": "Deep Sea Scale",
+      "gen": 3,
+      "num": 227,
+      "nonstandard": "Past"
+    },
+    "deepseatooth": {
+      "name": "Deep Sea Tooth",
+      "gen": 3,
+      "num": 226,
+      "nonstandard": "Past"
+    },
+    "delphoxite": {
+      "name": "Delphoxite",
+      "gen": 9,
+      "num": 2576,
+      "nonstandard": "Future"
+    },
+    "destinyknot": {
+      "name": "Destiny Knot",
+      "gen": 4,
+      "num": 280,
+      "nonstandard": ""
+    },
+    "diancite": {
+      "name": "Diancite",
+      "gen": 6,
+      "num": 764,
+      "nonstandard": "Past"
+    },
+    "diveball": {
+      "name": "Dive Ball",
+      "gen": 3,
+      "num": 7,
+      "nonstandard": ""
+    },
+    "domefossil": {
+      "name": "Dome Fossil",
+      "gen": 3,
+      "num": 102,
+      "nonstandard": "Past"
+    },
+    "dousedrive": {
+      "name": "Douse Drive",
+      "gen": 5,
+      "num": 116,
+      "nonstandard": "Past"
+    },
+    "dracoplate": {
+      "name": "Draco Plate",
+      "gen": 4,
+      "num": 311,
+      "nonstandard": ""
+    },
+    "dragalgite": {
+      "name": "Dragalgite",
+      "gen": 9,
+      "num": 2582,
+      "nonstandard": "Future"
+    },
+    "dragonfang": {
+      "name": "Dragon Fang",
+      "gen": 2,
+      "num": 250,
+      "nonstandard": ""
+    },
+    "dragongem": {
+      "name": "Dragon Gem",
+      "gen": 5,
+      "num": 561,
+      "nonstandard": "Past"
+    },
+    "dragoninite": {
+      "name": "Dragoninite",
+      "gen": 9,
+      "num": 2562,
+      "nonstandard": "Future"
+    },
+    "dragoniumz": {
+      "name": "Dragonium Z",
+      "gen": 7,
+      "num": 790,
+      "nonstandard": "Past"
+    },
+    "dragonmemory": {
+      "name": "Dragon Memory",
+      "gen": 7,
+      "num": 918,
+      "nonstandard": "Past"
+    },
+    "dragonscale": {
+      "name": "Dragon Scale",
+      "gen": 2,
+      "num": 235,
+      "nonstandard": ""
+    },
+    "drampanite": {
+      "name": "Drampanite",
+      "gen": 9,
+      "num": 2585,
+      "nonstandard": "Future"
+    },
+    "dreadplate": {
+      "name": "Dread Plate",
+      "gen": 4,
+      "num": 312,
+      "nonstandard": ""
+    },
+    "dreamball": {
+      "name": "Dream Ball",
+      "gen": 5,
+      "num": 576,
+      "nonstandard": ""
+    },
+    "dubiousdisc": {
+      "name": "Dubious Disc",
+      "gen": 4,
+      "num": 324,
+      "nonstandard": ""
+    },
+    "durinberry": {
+      "name": "Durin Berry",
+      "gen": 3,
+      "num": 182,
+      "nonstandard": "Past"
+    },
+    "duskball": {
+      "name": "Dusk Ball",
+      "gen": 4,
+      "num": 13,
+      "nonstandard": ""
+    },
+    "duskstone": {
+      "name": "Dusk Stone",
+      "gen": 4,
+      "num": 108,
+      "nonstandard": ""
+    },
+    "earthplate": {
+      "name": "Earth Plate",
+      "gen": 4,
+      "num": 305,
+      "nonstandard": ""
+    },
+    "eelektrossite": {
+      "name": "Eelektrossite",
+      "gen": 9,
+      "num": 2573,
+      "nonstandard": "Future"
+    },
+    "eeviumz": {
+      "name": "Eevium Z",
+      "gen": 7,
+      "num": 805,
+      "nonstandard": "Past"
+    },
+    "ejectbutton": {
+      "name": "Eject Button",
+      "gen": 5,
+      "num": 547,
+      "nonstandard": ""
+    },
+    "ejectpack": {
+      "name": "Eject Pack",
+      "gen": 8,
+      "num": 1119,
+      "nonstandard": ""
+    },
+    "electirizer": {
+      "name": "Electirizer",
+      "gen": 4,
+      "num": 322,
+      "nonstandard": ""
+    },
+    "electricgem": {
+      "name": "Electric Gem",
+      "gen": 5,
+      "num": 550,
+      "nonstandard": "Past"
+    },
+    "electricmemory": {
+      "name": "Electric Memory",
+      "gen": 7,
+      "num": 915,
+      "nonstandard": "Past"
+    },
+    "electricseed": {
+      "name": "Electric Seed",
+      "gen": 7,
+      "num": 881,
+      "nonstandard": ""
+    },
+    "electriumz": {
+      "name": "Electrium Z",
+      "gen": 7,
+      "num": 779,
+      "nonstandard": "Past"
+    },
+    "emboarite": {
+      "name": "Emboarite",
+      "gen": 9,
+      "num": 2569,
+      "nonstandard": "Future"
+    },
+    "enigmaberry": {
+      "name": "Enigma Berry",
+      "gen": 3,
+      "num": 208,
+      "nonstandard": ""
+    },
+    "eviolite": {
+      "name": "Eviolite",
+      "gen": 5,
+      "num": 538,
+      "nonstandard": ""
+    },
+    "excadrite": {
+      "name": "Excadrite",
+      "gen": 9,
+      "num": 2570,
+      "nonstandard": "Future"
+    },
+    "expertbelt": {
+      "name": "Expert Belt",
+      "gen": 4,
+      "num": 268,
+      "nonstandard": ""
+    },
+    "fairiumz": {
+      "name": "Fairium Z",
+      "gen": 7,
+      "num": 793,
+      "nonstandard": "Past"
+    },
+    "fairyfeather": {
+      "name": "Fairy Feather",
+      "gen": 9,
+      "num": 2401,
+      "nonstandard": ""
+    },
+    "fairygem": {
+      "name": "Fairy Gem",
+      "gen": 6,
+      "num": 715,
+      "nonstandard": "Past"
+    },
+    "fairymemory": {
+      "name": "Fairy Memory",
+      "gen": 7,
+      "num": 920,
+      "nonstandard": "Past"
+    },
+    "falinksite": {
+      "name": "Falinksite",
+      "gen": 9,
+      "num": 2587,
+      "nonstandard": "Future"
+    },
+    "fastball": {
+      "name": "Fast Ball",
+      "gen": 2,
+      "num": 492,
+      "nonstandard": ""
+    },
+    "feraligite": {
+      "name": "Feraligite",
+      "gen": 9,
+      "num": 2564,
+      "nonstandard": "Future"
+    },
+    "fightinggem": {
+      "name": "Fighting Gem",
+      "gen": 5,
+      "num": 553,
+      "nonstandard": "Past"
+    },
+    "fightingmemory": {
+      "name": "Fighting Memory",
+      "gen": 7,
+      "num": 904,
+      "nonstandard": "Past"
+    },
+    "fightiniumz": {
+      "name": "Fightinium Z",
+      "gen": 7,
+      "num": 782,
+      "nonstandard": "Past"
+    },
+    "figyberry": {
+      "name": "Figy Berry",
+      "gen": 3,
+      "num": 159,
+      "nonstandard": ""
+    },
+    "firegem": {
+      "name": "Fire Gem",
+      "gen": 5,
+      "num": 548,
+      "nonstandard": "Past"
+    },
+    "firememory": {
+      "name": "Fire Memory",
+      "gen": 7,
+      "num": 912,
+      "nonstandard": "Past"
+    },
+    "firestone": {
+      "name": "Fire Stone",
+      "gen": 1,
+      "num": 82,
+      "nonstandard": ""
+    },
+    "firiumz": {
+      "name": "Firium Z",
+      "gen": 7,
+      "num": 777,
+      "nonstandard": "Past"
+    },
+    "fistplate": {
+      "name": "Fist Plate",
+      "gen": 4,
+      "num": 303,
+      "nonstandard": ""
+    },
+    "flameorb": {
+      "name": "Flame Orb",
+      "gen": 4,
+      "num": 273,
+      "nonstandard": ""
+    },
+    "flameplate": {
+      "name": "Flame Plate",
+      "gen": 4,
+      "num": 298,
+      "nonstandard": ""
+    },
+    "floatstone": {
+      "name": "Float Stone",
+      "gen": 5,
+      "num": 539,
+      "nonstandard": ""
+    },
+    "floettite": {
+      "name": "Floettite",
+      "gen": 9,
+      "num": 2579,
+      "nonstandard": "Future"
+    },
+    "flowersweet": {
+      "name": "Flower Sweet",
+      "gen": 8,
+      "num": 1113,
+      "nonstandard": ""
+    },
+    "flyinggem": {
+      "name": "Flying Gem",
+      "gen": 5,
+      "num": 556,
+      "nonstandard": "Past"
+    },
+    "flyingmemory": {
+      "name": "Flying Memory",
+      "gen": 7,
+      "num": 905,
+      "nonstandard": "Past"
+    },
+    "flyiniumz": {
+      "name": "Flyinium Z",
+      "gen": 7,
+      "num": 785,
+      "nonstandard": "Past"
+    },
+    "focusband": {
+      "name": "Focus Band",
+      "gen": 2,
+      "num": 230,
+      "nonstandard": ""
+    },
+    "focussash": {
+      "name": "Focus Sash",
+      "gen": 4,
+      "num": 275,
+      "nonstandard": ""
+    },
+    "fossilizedbird": {
+      "name": "Fossilized Bird",
+      "gen": 8,
+      "num": 1105,
+      "nonstandard": "Past"
+    },
+    "fossilizeddino": {
+      "name": "Fossilized Dino",
+      "gen": 8,
+      "num": 1108,
+      "nonstandard": "Past"
+    },
+    "fossilizeddrake": {
+      "name": "Fossilized Drake",
+      "gen": 8,
+      "num": 1107,
+      "nonstandard": "Past"
+    },
+    "fossilizedfish": {
+      "name": "Fossilized Fish",
+      "gen": 8,
+      "num": 1106,
+      "nonstandard": "Past"
+    },
+    "friendball": {
+      "name": "Friend Ball",
+      "gen": 2,
+      "num": 497,
+      "nonstandard": ""
+    },
+    "froslassite": {
+      "name": "Froslassite",
+      "gen": 9,
+      "num": 2566,
+      "nonstandard": "Future"
+    },
+    "fullincense": {
+      "name": "Full Incense",
+      "gen": 4,
+      "num": 316,
+      "nonstandard": "Past"
+    },
+    "galaricacuff": {
+      "name": "Galarica Cuff",
+      "gen": 8,
+      "num": 1582,
+      "nonstandard": ""
+    },
+    "galaricawreath": {
+      "name": "Galarica Wreath",
+      "gen": 8,
+      "num": 1592,
+      "nonstandard": ""
+    },
+    "galladite": {
+      "name": "Galladite",
+      "gen": 6,
+      "num": 756,
+      "nonstandard": "Past"
+    },
+    "ganlonberry": {
+      "name": "Ganlon Berry",
+      "gen": 3,
+      "num": 202,
+      "nonstandard": ""
+    },
+    "garchompite": {
+      "name": "Garchompite",
+      "gen": 6,
+      "num": 683,
+      "nonstandard": "Past"
+    },
+    "garchompitez": {
+      "name": "Garchompite Z",
+      "gen": 9,
+      "num": 2640,
+      "nonstandard": "Future"
+    },
+    "gardevoirite": {
+      "name": "Gardevoirite",
+      "gen": 6,
+      "num": 657,
+      "nonstandard": "Past"
+    },
+    "gengarite": {
+      "name": "Gengarite",
+      "gen": 6,
+      "num": 656,
+      "nonstandard": "Past"
+    },
+    "ghostgem": {
+      "name": "Ghost Gem",
+      "gen": 5,
+      "num": 560,
+      "nonstandard": "Past"
+    },
+    "ghostiumz": {
+      "name": "Ghostium Z",
+      "gen": 7,
+      "num": 789,
+      "nonstandard": "Past"
+    },
+    "ghostmemory": {
+      "name": "Ghost Memory",
+      "gen": 7,
+      "num": 910,
+      "nonstandard": "Past"
+    },
+    "glalitite": {
+      "name": "Glalitite",
+      "gen": 6,
+      "num": 763,
+      "nonstandard": "Past"
+    },
+    "glimmoranite": {
+      "name": "Glimmoranite",
+      "gen": 9,
+      "num": 2650,
+      "nonstandard": "Future"
+    },
+    "goldbottlecap": {
+      "name": "Gold Bottle Cap",
+      "gen": 7,
+      "num": 796,
+      "nonstandard": ""
+    },
+    "golisopite": {
+      "name": "Golisopite",
+      "gen": 9,
+      "num": 2645,
+      "nonstandard": "Future"
+    },
+    "golurkite": {
+      "name": "Golurkite",
+      "gen": 9,
+      "num": 2642,
+      "nonstandard": "Future"
+    },
+    "grassgem": {
+      "name": "Grass Gem",
+      "gen": 5,
+      "num": 551,
+      "nonstandard": "Past"
+    },
+    "grassiumz": {
+      "name": "Grassium Z",
+      "gen": 7,
+      "num": 780,
+      "nonstandard": "Past"
+    },
+    "grassmemory": {
+      "name": "Grass Memory",
+      "gen": 7,
+      "num": 914,
+      "nonstandard": "Past"
+    },
+    "grassyseed": {
+      "name": "Grassy Seed",
+      "gen": 7,
+      "num": 884,
+      "nonstandard": ""
+    },
+    "greatball": {
+      "name": "Great Ball",
+      "gen": 1,
+      "num": 3,
+      "nonstandard": ""
+    },
+    "greninjite": {
+      "name": "Greninjite",
+      "gen": 9,
+      "num": 2577,
+      "nonstandard": "Future"
+    },
+    "grepaberry": {
+      "name": "Grepa Berry",
+      "gen": 3,
+      "num": 173,
+      "nonstandard": ""
+    },
+    "gripclaw": {
+      "name": "Grip Claw",
+      "gen": 4,
+      "num": 286,
+      "nonstandard": ""
+    },
+    "griseouscore": {
+      "name": "Griseous Core",
+      "gen": 8,
+      "num": 1779,
+      "nonstandard": ""
+    },
+    "griseousorb": {
+      "name": "Griseous Orb",
+      "gen": 4,
+      "num": 112,
+      "nonstandard": ""
+    },
+    "groundgem": {
+      "name": "Ground Gem",
+      "gen": 5,
+      "num": 555,
+      "nonstandard": "Past"
+    },
+    "groundiumz": {
+      "name": "Groundium Z",
+      "gen": 7,
+      "num": 784,
+      "nonstandard": "Past"
+    },
+    "groundmemory": {
+      "name": "Ground Memory",
+      "gen": 7,
+      "num": 907,
+      "nonstandard": "Past"
+    },
+    "gyaradosite": {
+      "name": "Gyaradosite",
+      "gen": 6,
+      "num": 676,
+      "nonstandard": "Past"
+    },
+    "habanberry": {
+      "name": "Haban Berry",
+      "gen": 4,
+      "num": 197,
+      "nonstandard": ""
+    },
+    "hardstone": {
+      "name": "Hard Stone",
+      "gen": 2,
+      "num": 238,
+      "nonstandard": ""
+    },
+    "hawluchanite": {
+      "name": "Hawluchanite",
+      "gen": 9,
+      "num": 2583,
+      "nonstandard": "Future"
+    },
+    "healball": {
+      "name": "Heal Ball",
+      "gen": 4,
+      "num": 14,
+      "nonstandard": ""
+    },
+    "hearthflamemask": {
+      "name": "Hearthflame Mask",
+      "gen": 9,
+      "num": 2408,
+      "nonstandard": ""
+    },
+    "heatranite": {
+      "name": "Heatranite",
+      "gen": 9,
+      "num": 2567,
+      "nonstandard": "Future"
+    },
+    "heatrock": {
+      "name": "Heat Rock",
+      "gen": 4,
+      "num": 284,
+      "nonstandard": ""
+    },
+    "heavyball": {
+      "name": "Heavy Ball",
+      "gen": 2,
+      "num": 495,
+      "nonstandard": ""
+    },
+    "heavydutyboots": {
+      "name": "Heavy-Duty Boots",
+      "gen": 8,
+      "num": 1120,
+      "nonstandard": ""
+    },
+    "helixfossil": {
+      "name": "Helix Fossil",
+      "gen": 3,
+      "num": 101,
+      "nonstandard": "Past"
+    },
+    "heracronite": {
+      "name": "Heracronite",
+      "gen": 6,
+      "num": 680,
+      "nonstandard": "Past"
+    },
+    "hondewberry": {
+      "name": "Hondew Berry",
+      "gen": 3,
+      "num": 172,
+      "nonstandard": ""
+    },
+    "houndoominite": {
+      "name": "Houndoominite",
+      "gen": 6,
+      "num": 666,
+      "nonstandard": "Past"
+    },
+    "iapapaberry": {
+      "name": "Iapapa Berry",
+      "gen": 3,
+      "num": 163,
+      "nonstandard": ""
+    },
+    "icegem": {
+      "name": "Ice Gem",
+      "gen": 5,
+      "num": 552,
+      "nonstandard": "Past"
+    },
+    "icememory": {
+      "name": "Ice Memory",
+      "gen": 7,
+      "num": 917,
+      "nonstandard": "Past"
+    },
+    "icestone": {
+      "name": "Ice Stone",
+      "gen": 7,
+      "num": 849,
+      "nonstandard": ""
+    },
+    "icicleplate": {
+      "name": "Icicle Plate",
+      "gen": 4,
+      "num": 302,
+      "nonstandard": ""
+    },
+    "iciumz": {
+      "name": "Icium Z",
+      "gen": 7,
+      "num": 781,
+      "nonstandard": "Past"
+    },
+    "icyrock": {
+      "name": "Icy Rock",
+      "gen": 4,
+      "num": 282,
+      "nonstandard": ""
+    },
+    "inciniumz": {
+      "name": "Incinium Z",
+      "gen": 7,
+      "num": 799,
+      "nonstandard": "Past"
+    },
+    "insectplate": {
+      "name": "Insect Plate",
+      "gen": 4,
+      "num": 308,
+      "nonstandard": ""
+    },
+    "ironball": {
+      "name": "Iron Ball",
+      "gen": 4,
+      "num": 278,
+      "nonstandard": ""
+    },
+    "ironplate": {
+      "name": "Iron Plate",
+      "gen": 4,
+      "num": 313,
+      "nonstandard": ""
+    },
+    "jabocaberry": {
+      "name": "Jaboca Berry",
+      "gen": 4,
+      "num": 211,
+      "nonstandard": ""
+    },
+    "jawfossil": {
+      "name": "Jaw Fossil",
+      "gen": 6,
+      "num": 710,
+      "nonstandard": "Past"
+    },
+    "kangaskhanite": {
+      "name": "Kangaskhanite",
+      "gen": 6,
+      "num": 675,
+      "nonstandard": "Past"
+    },
+    "kasibberry": {
+      "name": "Kasib Berry",
+      "gen": 4,
+      "num": 196,
+      "nonstandard": ""
+    },
+    "kebiaberry": {
+      "name": "Kebia Berry",
+      "gen": 4,
+      "num": 190,
+      "nonstandard": ""
+    },
+    "keeberry": {
+      "name": "Kee Berry",
+      "gen": 6,
+      "num": 687,
+      "nonstandard": ""
+    },
+    "kelpsyberry": {
+      "name": "Kelpsy Berry",
+      "gen": 3,
+      "num": 170,
+      "nonstandard": ""
+    },
+    "kingsrock": {
+      "name": "King",
+      "gen": 2,
+      "num": 221,
+      "nonstandard": ""
+    },
+    "kommoniumz": {
+      "name": "Kommonium Z",
+      "gen": 7,
+      "num": 926,
+      "nonstandard": "Past"
+    },
+    "laggingtail": {
+      "name": "Lagging Tail",
+      "gen": 4,
+      "num": 279,
+      "nonstandard": ""
+    },
+    "lansatberry": {
+      "name": "Lansat Berry",
+      "gen": 3,
+      "num": 206,
+      "nonstandard": ""
+    },
+    "latiasite": {
+      "name": "Latiasite",
+      "gen": 6,
+      "num": 684,
+      "nonstandard": "Past"
+    },
+    "latiosite": {
+      "name": "Latiosite",
+      "gen": 6,
+      "num": 685,
+      "nonstandard": "Past"
+    },
+    "laxincense": {
+      "name": "Lax Incense",
+      "gen": 3,
+      "num": 255,
+      "nonstandard": "Past"
+    },
+    "leafstone": {
+      "name": "Leaf Stone",
+      "gen": 1,
+      "num": 85,
+      "nonstandard": ""
+    },
+    "leek": {
+      "name": "Leek",
+      "gen": 8,
+      "num": 259,
+      "nonstandard": "Past"
+    },
+    "leftovers": {
+      "name": "Leftovers",
+      "gen": 2,
+      "num": 234,
+      "nonstandard": ""
+    },
+    "legendplate": {
+      "name": "Legend Plate",
+      "gen": 8,
+      "num": 1828,
+      "nonstandard": "Legends"
+    },
+    "leppaberry": {
+      "name": "Leppa Berry",
+      "gen": 3,
+      "num": 154,
+      "nonstandard": ""
+    },
+    "levelball": {
+      "name": "Level Ball",
+      "gen": 2,
+      "num": 493,
+      "nonstandard": ""
+    },
+    "liechiberry": {
+      "name": "Liechi Berry",
+      "gen": 3,
+      "num": 201,
+      "nonstandard": ""
+    },
+    "lifeorb": {
+      "name": "Life Orb",
+      "gen": 4,
+      "num": 270,
+      "nonstandard": ""
+    },
+    "lightball": {
+      "name": "Light Ball",
+      "gen": 2,
+      "num": 236,
+      "nonstandard": ""
+    },
+    "lightclay": {
+      "name": "Light Clay",
+      "gen": 4,
+      "num": 269,
+      "nonstandard": ""
+    },
+    "loadeddice": {
+      "name": "Loaded Dice",
+      "gen": 9,
+      "num": 1886,
+      "nonstandard": ""
+    },
+    "lopunnite": {
+      "name": "Lopunnite",
+      "gen": 6,
+      "num": 768,
+      "nonstandard": "Past"
+    },
+    "loveball": {
+      "name": "Love Ball",
+      "gen": 2,
+      "num": 496,
+      "nonstandard": ""
+    },
+    "lovesweet": {
+      "name": "Love Sweet",
+      "gen": 8,
+      "num": 1110,
+      "nonstandard": ""
+    },
+    "lucarionite": {
+      "name": "Lucarionite",
+      "gen": 6,
+      "num": 673,
+      "nonstandard": "Past"
+    },
+    "lucarionitez": {
+      "name": "Lucarionite Z",
+      "gen": 9,
+      "num": 2641,
+      "nonstandard": "Future"
+    },
+    "luckypunch": {
+      "name": "Lucky Punch",
+      "gen": 2,
+      "num": 256,
+      "nonstandard": "Past"
+    },
+    "lumberry": {
+      "name": "Lum Berry",
+      "gen": 3,
+      "num": 157,
+      "nonstandard": ""
+    },
+    "luminousmoss": {
+      "name": "Luminous Moss",
+      "gen": 6,
+      "num": 648,
+      "nonstandard": ""
+    },
+    "lunaliumz": {
+      "name": "Lunalium Z",
+      "gen": 7,
+      "num": 922,
+      "nonstandard": "Past"
+    },
+    "lureball": {
+      "name": "Lure Ball",
+      "gen": 2,
+      "num": 494,
+      "nonstandard": ""
+    },
+    "lustrousglobe": {
+      "name": "Lustrous Globe",
+      "gen": 8,
+      "num": 1778,
+      "nonstandard": ""
+    },
+    "lustrousorb": {
+      "name": "Lustrous Orb",
+      "gen": 4,
+      "num": 136,
+      "nonstandard": ""
+    },
+    "luxuryball": {
+      "name": "Luxury Ball",
+      "gen": 3,
+      "num": 11,
+      "nonstandard": ""
+    },
+    "lycaniumz": {
+      "name": "Lycanium Z",
+      "gen": 7,
+      "num": 925,
+      "nonstandard": "Past"
+    },
+    "machobrace": {
+      "name": "Macho Brace",
+      "gen": 3,
+      "num": 215,
+      "nonstandard": "Past"
+    },
+    "magearnite": {
+      "name": "Magearnite",
+      "gen": 9,
+      "num": 2646,
+      "nonstandard": "Future"
+    },
+    "magmarizer": {
+      "name": "Magmarizer",
+      "gen": 4,
+      "num": 323,
+      "nonstandard": ""
+    },
+    "magnet": {
+      "name": "Magnet",
+      "gen": 2,
+      "num": 242,
+      "nonstandard": ""
+    },
+    "magoberry": {
+      "name": "Mago Berry",
+      "gen": 3,
+      "num": 161,
+      "nonstandard": ""
+    },
+    "magostberry": {
+      "name": "Magost Berry",
+      "gen": 3,
+      "num": 176,
+      "nonstandard": "Past"
+    },
+    "mail": {
+      "name": "Mail",
+      "gen": 2,
+      "num": 137,
+      "nonstandard": "Past"
+    },
+    "malamarite": {
+      "name": "Malamarite",
+      "gen": 9,
+      "num": 2580,
+      "nonstandard": "Future"
+    },
+    "maliciousarmor": {
+      "name": "Malicious Armor",
+      "gen": 9,
+      "num": 1861,
+      "nonstandard": ""
+    },
+    "manectite": {
+      "name": "Manectite",
+      "gen": 6,
+      "num": 682,
+      "nonstandard": "Past"
+    },
+    "marangaberry": {
+      "name": "Maranga Berry",
+      "gen": 6,
+      "num": 688,
+      "nonstandard": ""
+    },
+    "marshadiumz": {
+      "name": "Marshadium Z",
+      "gen": 7,
+      "num": 802,
+      "nonstandard": "Past"
+    },
+    "masterball": {
+      "name": "Master Ball",
+      "gen": 1,
+      "num": 1,
+      "nonstandard": ""
+    },
+    "masterpieceteacup": {
+      "name": "Masterpiece Teacup",
+      "gen": 9,
+      "num": 2404,
+      "nonstandard": ""
+    },
+    "mawilite": {
+      "name": "Mawilite",
+      "gen": 6,
+      "num": 681,
+      "nonstandard": "Past"
+    },
+    "meadowplate": {
+      "name": "Meadow Plate",
+      "gen": 4,
+      "num": 301,
+      "nonstandard": ""
+    },
+    "medichamite": {
+      "name": "Medichamite",
+      "gen": 6,
+      "num": 665,
+      "nonstandard": "Past"
+    },
+    "meganiumite": {
+      "name": "Meganiumite",
+      "gen": 9,
+      "num": 2563,
+      "nonstandard": "Future"
+    },
+    "mentalherb": {
+      "name": "Mental Herb",
+      "gen": 3,
+      "num": 219,
+      "nonstandard": ""
+    },
+    "meowsticite": {
+      "name": "Meowsticite",
+      "gen": 9,
+      "num": 2643,
+      "nonstandard": "Future"
+    },
+    "metagrossite": {
+      "name": "Metagrossite",
+      "gen": 6,
+      "num": 758,
+      "nonstandard": "Past"
+    },
+    "metalalloy": {
+      "name": "Metal Alloy",
+      "gen": 9,
+      "num": 2482,
+      "nonstandard": ""
+    },
+    "metalcoat": {
+      "name": "Metal Coat",
+      "gen": 2,
+      "num": 233,
+      "nonstandard": ""
+    },
+    "metalpowder": {
+      "name": "Metal Powder",
+      "gen": 2,
+      "num": 257,
+      "nonstandard": "Past"
+    },
+    "metronome": {
+      "name": "Metronome",
+      "gen": 4,
+      "num": 277,
+      "nonstandard": ""
+    },
+    "mewniumz": {
+      "name": "Mewnium Z",
+      "gen": 7,
+      "num": 806,
+      "nonstandard": "Past"
+    },
+    "mewtwonitex": {
+      "name": "Mewtwonite X",
+      "gen": 6,
+      "num": 662,
+      "nonstandard": "Past"
+    },
+    "mewtwonitey": {
+      "name": "Mewtwonite Y",
+      "gen": 6,
+      "num": 663,
+      "nonstandard": "Past"
+    },
+    "micleberry": {
+      "name": "Micle Berry",
+      "gen": 4,
+      "num": 209,
+      "nonstandard": ""
+    },
+    "mimikiumz": {
+      "name": "Mimikium Z",
+      "gen": 7,
+      "num": 924,
+      "nonstandard": "Past"
+    },
+    "mindplate": {
+      "name": "Mind Plate",
+      "gen": 4,
+      "num": 307,
+      "nonstandard": ""
+    },
+    "miracleseed": {
+      "name": "Miracle Seed",
+      "gen": 2,
+      "num": 239,
+      "nonstandard": ""
+    },
+    "mirrorherb": {
+      "name": "Mirror Herb",
+      "gen": 9,
+      "num": 1883,
+      "nonstandard": ""
+    },
+    "mistyseed": {
+      "name": "Misty Seed",
+      "gen": 7,
+      "num": 883,
+      "nonstandard": ""
+    },
+    "moonball": {
+      "name": "Moon Ball",
+      "gen": 2,
+      "num": 498,
+      "nonstandard": ""
+    },
+    "moonstone": {
+      "name": "Moon Stone",
+      "gen": 1,
+      "num": 81,
+      "nonstandard": ""
+    },
+    "muscleband": {
+      "name": "Muscle Band",
+      "gen": 4,
+      "num": 266,
+      "nonstandard": ""
+    },
+    "mysticwater": {
+      "name": "Mystic Water",
+      "gen": 2,
+      "num": 243,
+      "nonstandard": ""
+    },
+    "nanabberry": {
+      "name": "Nanab Berry",
+      "gen": 3,
+      "num": 166,
+      "nonstandard": "Past"
+    },
+    "nestball": {
+      "name": "Nest Ball",
+      "gen": 3,
+      "num": 8,
+      "nonstandard": ""
+    },
+    "netball": {
+      "name": "Net Ball",
+      "gen": 3,
+      "num": 6,
+      "nonstandard": ""
+    },
+    "nevermeltice": {
+      "name": "Never-Melt Ice",
+      "gen": 2,
+      "num": 246,
+      "nonstandard": ""
+    },
+    "nomelberry": {
+      "name": "Nomel Berry",
+      "gen": 3,
+      "num": 178,
+      "nonstandard": "Past"
+    },
+    "normalgem": {
+      "name": "Normal Gem",
+      "gen": 5,
+      "num": 564,
+      "nonstandard": ""
+    },
+    "normaliumz": {
+      "name": "Normalium Z",
+      "gen": 7,
+      "num": 776,
+      "nonstandard": "Past"
+    },
+    "occaberry": {
+      "name": "Occa Berry",
+      "gen": 4,
+      "num": 184,
+      "nonstandard": ""
+    },
+    "oddincense": {
+      "name": "Odd Incense",
+      "gen": 4,
+      "num": 314,
+      "nonstandard": "Past"
+    },
+    "oldamber": {
+      "name": "Old Amber",
+      "gen": 3,
+      "num": 103,
+      "nonstandard": "Past"
+    },
+    "oranberry": {
+      "name": "Oran Berry",
+      "gen": 3,
+      "num": 155,
+      "nonstandard": ""
+    },
+    "ovalstone": {
+      "name": "Oval Stone",
+      "gen": 4,
+      "num": 110,
+      "nonstandard": ""
+    },
+    "pamtreberry": {
+      "name": "Pamtre Berry",
+      "gen": 3,
+      "num": 180,
+      "nonstandard": "Past"
+    },
+    "parkball": {
+      "name": "Park Ball",
+      "gen": 4,
+      "num": 500,
+      "nonstandard": "Unobtainable"
+    },
+    "passhoberry": {
+      "name": "Passho Berry",
+      "gen": 4,
+      "num": 185,
+      "nonstandard": ""
+    },
+    "payapaberry": {
+      "name": "Payapa Berry",
+      "gen": 4,
+      "num": 193,
+      "nonstandard": ""
+    },
+    "peatblock": {
+      "name": "Peat Block",
+      "gen": 8,
+      "num": 1692,
+      "nonstandard": "Legends"
+    },
+    "pechaberry": {
+      "name": "Pecha Berry",
+      "gen": 3,
+      "num": 151,
+      "nonstandard": ""
+    },
+    "persimberry": {
+      "name": "Persim Berry",
+      "gen": 3,
+      "num": 156,
+      "nonstandard": ""
+    },
+    "petayaberry": {
+      "name": "Petaya Berry",
+      "gen": 3,
+      "num": 204,
+      "nonstandard": ""
+    },
+    "pidgeotite": {
+      "name": "Pidgeotite",
+      "gen": 6,
+      "num": 762,
+      "nonstandard": "Past"
+    },
+    "pikaniumz": {
+      "name": "Pikanium Z",
+      "gen": 7,
+      "num": 794,
+      "nonstandard": "Past"
+    },
+    "pikashuniumz": {
+      "name": "Pikashunium Z",
+      "gen": 7,
+      "num": 836,
+      "nonstandard": "Past"
+    },
+    "pinapberry": {
+      "name": "Pinap Berry",
+      "gen": 3,
+      "num": 168,
+      "nonstandard": "Past"
+    },
+    "pinsirite": {
+      "name": "Pinsirite",
+      "gen": 6,
+      "num": 671,
+      "nonstandard": "Past"
+    },
+    "pixieplate": {
+      "name": "Pixie Plate",
+      "gen": 6,
+      "num": 644,
+      "nonstandard": ""
+    },
+    "plumefossil": {
+      "name": "Plume Fossil",
+      "gen": 5,
+      "num": 573,
+      "nonstandard": "Past"
+    },
+    "poisonbarb": {
+      "name": "Poison Barb",
+      "gen": 2,
+      "num": 245,
+      "nonstandard": ""
+    },
+    "poisongem": {
+      "name": "Poison Gem",
+      "gen": 5,
+      "num": 554,
+      "nonstandard": "Past"
+    },
+    "poisoniumz": {
+      "name": "Poisonium Z",
+      "gen": 7,
+      "num": 783,
+      "nonstandard": "Past"
+    },
+    "poisonmemory": {
+      "name": "Poison Memory",
+      "gen": 7,
+      "num": 906,
+      "nonstandard": "Past"
+    },
+    "pokeball": {
+      "name": "Poke Ball",
+      "gen": 1,
+      "num": 4,
+      "nonstandard": ""
+    },
+    "pomegberry": {
+      "name": "Pomeg Berry",
+      "gen": 3,
+      "num": 169,
+      "nonstandard": ""
+    },
+    "poweranklet": {
+      "name": "Power Anklet",
+      "gen": 4,
+      "num": 293,
+      "nonstandard": ""
+    },
+    "powerband": {
+      "name": "Power Band",
+      "gen": 4,
+      "num": 292,
+      "nonstandard": ""
+    },
+    "powerbelt": {
+      "name": "Power Belt",
+      "gen": 4,
+      "num": 290,
+      "nonstandard": ""
+    },
+    "powerbracer": {
+      "name": "Power Bracer",
+      "gen": 4,
+      "num": 289,
+      "nonstandard": ""
+    },
+    "powerherb": {
+      "name": "Power Herb",
+      "gen": 4,
+      "num": 271,
+      "nonstandard": ""
+    },
+    "powerlens": {
+      "name": "Power Lens",
+      "gen": 4,
+      "num": 291,
+      "nonstandard": ""
+    },
+    "powerweight": {
+      "name": "Power Weight",
+      "gen": 4,
+      "num": 294,
+      "nonstandard": ""
+    },
+    "premierball": {
+      "name": "Premier Ball",
+      "gen": 3,
+      "num": 12,
+      "nonstandard": ""
+    },
+    "prettyfeather": {
+      "name": "Pretty Feather",
+      "gen": 5,
+      "num": 571,
+      "nonstandard": ""
+    },
+    "primariumz": {
+      "name": "Primarium Z",
+      "gen": 7,
+      "num": 800,
+      "nonstandard": "Past"
+    },
+    "prismscale": {
+      "name": "Prism Scale",
+      "gen": 5,
+      "num": 537,
+      "nonstandard": ""
+    },
+    "protectivepads": {
+      "name": "Protective Pads",
+      "gen": 7,
+      "num": 880,
+      "nonstandard": ""
+    },
+    "protector": {
+      "name": "Protector",
+      "gen": 4,
+      "num": 321,
+      "nonstandard": ""
+    },
+    "psychicgem": {
+      "name": "Psychic Gem",
+      "gen": 5,
+      "num": 557,
+      "nonstandard": "Past"
+    },
+    "psychicmemory": {
+      "name": "Psychic Memory",
+      "gen": 7,
+      "num": 916,
+      "nonstandard": "Past"
+    },
+    "psychicseed": {
+      "name": "Psychic Seed",
+      "gen": 7,
+      "num": 882,
+      "nonstandard": ""
+    },
+    "psychiumz": {
+      "name": "Psychium Z",
+      "gen": 7,
+      "num": 786,
+      "nonstandard": "Past"
+    },
+    "punchingglove": {
+      "name": "Punching Glove",
+      "gen": 9,
+      "num": 1884,
+      "nonstandard": ""
+    },
+    "pyroarite": {
+      "name": "Pyroarite",
+      "gen": 9,
+      "num": 2578,
+      "nonstandard": "Future"
+    },
+    "qualotberry": {
+      "name": "Qualot Berry",
+      "gen": 3,
+      "num": 171,
+      "nonstandard": ""
+    },
+    "quickball": {
+      "name": "Quick Ball",
+      "gen": 4,
+      "num": 15,
+      "nonstandard": ""
+    },
+    "quickclaw": {
+      "name": "Quick Claw",
+      "gen": 2,
+      "num": 217,
+      "nonstandard": ""
+    },
+    "quickpowder": {
+      "name": "Quick Powder",
+      "gen": 4,
+      "num": 274,
+      "nonstandard": "Past"
+    },
+    "rabutaberry": {
+      "name": "Rabuta Berry",
+      "gen": 3,
+      "num": 177,
+      "nonstandard": "Past"
+    },
+    "raichunitex": {
+      "name": "Raichunite X",
+      "gen": 9,
+      "num": 2635,
+      "nonstandard": "Future"
+    },
+    "raichunitey": {
+      "name": "Raichunite Y",
+      "gen": 9,
+      "num": 2636,
+      "nonstandard": "Future"
+    },
+    "rarebone": {
+      "name": "Rare Bone",
+      "gen": 4,
+      "num": 106,
+      "nonstandard": ""
+    },
+    "rawstberry": {
+      "name": "Rawst Berry",
+      "gen": 3,
+      "num": 152,
+      "nonstandard": ""
+    },
+    "razorclaw": {
+      "name": "Razor Claw",
+      "gen": 4,
+      "num": 326,
+      "nonstandard": ""
+    },
+    "razorfang": {
+      "name": "Razor Fang",
+      "gen": 4,
+      "num": 327,
+      "nonstandard": ""
+    },
+    "razzberry": {
+      "name": "Razz Berry",
+      "gen": 3,
+      "num": 164,
+      "nonstandard": "Past"
+    },
+    "reapercloth": {
+      "name": "Reaper Cloth",
+      "gen": 4,
+      "num": 325,
+      "nonstandard": ""
+    },
+    "redcard": {
+      "name": "Red Card",
+      "gen": 5,
+      "num": 542,
+      "nonstandard": ""
+    },
+    "redorb": {
+      "name": "Red Orb",
+      "gen": 6,
+      "num": 534,
+      "nonstandard": "Past"
+    },
+    "repeatball": {
+      "name": "Repeat Ball",
+      "gen": 3,
+      "num": 9,
+      "nonstandard": ""
+    },
+    "ribbonsweet": {
+      "name": "Ribbon Sweet",
+      "gen": 8,
+      "num": 1115,
+      "nonstandard": ""
+    },
+    "rindoberry": {
+      "name": "Rindo Berry",
+      "gen": 4,
+      "num": 187,
+      "nonstandard": ""
+    },
+    "ringtarget": {
+      "name": "Ring Target",
+      "gen": 5,
+      "num": 543,
+      "nonstandard": ""
+    },
+    "rockgem": {
+      "name": "Rock Gem",
+      "gen": 5,
+      "num": 559,
+      "nonstandard": "Past"
+    },
+    "rockincense": {
+      "name": "Rock Incense",
+      "gen": 4,
+      "num": 315,
+      "nonstandard": "Past"
+    },
+    "rockiumz": {
+      "name": "Rockium Z",
+      "gen": 7,
+      "num": 788,
+      "nonstandard": "Past"
+    },
+    "rockmemory": {
+      "name": "Rock Memory",
+      "gen": 7,
+      "num": 908,
+      "nonstandard": "Past"
+    },
+    "rockyhelmet": {
+      "name": "Rocky Helmet",
+      "gen": 5,
+      "num": 540,
+      "nonstandard": ""
+    },
+    "roomservice": {
+      "name": "Room Service",
+      "gen": 8,
+      "num": 1122,
+      "nonstandard": ""
+    },
+    "rootfossil": {
+      "name": "Root Fossil",
+      "gen": 3,
+      "num": 99,
+      "nonstandard": "Past"
+    },
+    "roseincense": {
+      "name": "Rose Incense",
+      "gen": 4,
+      "num": 318,
+      "nonstandard": "Past"
+    },
+    "roseliberry": {
+      "name": "Roseli Berry",
+      "gen": 6,
+      "num": 686,
+      "nonstandard": ""
+    },
+    "rowapberry": {
+      "name": "Rowap Berry",
+      "gen": 4,
+      "num": 212,
+      "nonstandard": ""
+    },
+    "rustedshield": {
+      "name": "Rusted Shield",
+      "gen": 8,
+      "num": 1104,
+      "nonstandard": ""
+    },
+    "rustedsword": {
+      "name": "Rusted Sword",
+      "gen": 8,
+      "num": 1103,
+      "nonstandard": ""
+    },
+    "sablenite": {
+      "name": "Sablenite",
+      "gen": 6,
+      "num": 754,
+      "nonstandard": "Past"
+    },
+    "sachet": {
+      "name": "Sachet",
+      "gen": 6,
+      "num": 647,
+      "nonstandard": "Past"
+    },
+    "safariball": {
+      "name": "Safari Ball",
+      "gen": 1,
+      "num": 5,
+      "nonstandard": ""
+    },
+    "safetygoggles": {
+      "name": "Safety Goggles",
+      "gen": 6,
+      "num": 650,
+      "nonstandard": ""
+    },
+    "sailfossil": {
+      "name": "Sail Fossil",
+      "gen": 6,
+      "num": 711,
+      "nonstandard": "Past"
+    },
+    "salacberry": {
+      "name": "Salac Berry",
+      "gen": 3,
+      "num": 203,
+      "nonstandard": ""
+    },
+    "salamencite": {
+      "name": "Salamencite",
+      "gen": 6,
+      "num": 769,
+      "nonstandard": "Past"
+    },
+    "sceptilite": {
+      "name": "Sceptilite",
+      "gen": 6,
+      "num": 753,
+      "nonstandard": "Past"
+    },
+    "scizorite": {
+      "name": "Scizorite",
+      "gen": 6,
+      "num": 670,
+      "nonstandard": "Past"
+    },
+    "scolipite": {
+      "name": "Scolipite",
+      "gen": 9,
+      "num": 2571,
+      "nonstandard": "Future"
+    },
+    "scopelens": {
+      "name": "Scope Lens",
+      "gen": 2,
+      "num": 232,
+      "nonstandard": ""
+    },
+    "scovillainite": {
+      "name": "Scovillainite",
+      "gen": 9,
+      "num": 2647,
+      "nonstandard": "Future"
+    },
+    "scraftinite": {
+      "name": "Scraftinite",
+      "gen": 9,
+      "num": 2572,
+      "nonstandard": "Future"
+    },
+    "seaincense": {
+      "name": "Sea Incense",
+      "gen": 3,
+      "num": 254,
+      "nonstandard": "Past"
+    },
+    "sharpbeak": {
+      "name": "Sharp Beak",
+      "gen": 2,
+      "num": 244,
+      "nonstandard": ""
+    },
+    "sharpedonite": {
+      "name": "Sharpedonite",
+      "gen": 6,
+      "num": 759,
+      "nonstandard": "Past"
+    },
+    "shedshell": {
+      "name": "Shed Shell",
+      "gen": 4,
+      "num": 295,
+      "nonstandard": ""
+    },
+    "shellbell": {
+      "name": "Shell Bell",
+      "gen": 3,
+      "num": 253,
+      "nonstandard": ""
+    },
+    "shinystone": {
+      "name": "Shiny Stone",
+      "gen": 4,
+      "num": 107,
+      "nonstandard": ""
+    },
+    "shockdrive": {
+      "name": "Shock Drive",
+      "gen": 5,
+      "num": 117,
+      "nonstandard": "Past"
+    },
+    "shucaberry": {
+      "name": "Shuca Berry",
+      "gen": 4,
+      "num": 191,
+      "nonstandard": ""
+    },
+    "silkscarf": {
+      "name": "Silk Scarf",
+      "gen": 3,
+      "num": 251,
+      "nonstandard": ""
+    },
+    "silverpowder": {
+      "name": "Silver Powder",
+      "gen": 2,
+      "num": 222,
+      "nonstandard": ""
+    },
+    "sitrusberry": {
+      "name": "Sitrus Berry",
+      "gen": 3,
+      "num": 158,
+      "nonstandard": ""
+    },
+    "skarmorite": {
+      "name": "Skarmorite",
+      "gen": 9,
+      "num": 2565,
+      "nonstandard": "Future"
+    },
+    "skullfossil": {
+      "name": "Skull Fossil",
+      "gen": 4,
+      "num": 105,
+      "nonstandard": "Past"
+    },
+    "skyplate": {
+      "name": "Sky Plate",
+      "gen": 4,
+      "num": 306,
+      "nonstandard": ""
+    },
+    "slowbronite": {
+      "name": "Slowbronite",
+      "gen": 6,
+      "num": 760,
+      "nonstandard": "Past"
+    },
+    "smoothrock": {
+      "name": "Smooth Rock",
+      "gen": 4,
+      "num": 283,
+      "nonstandard": ""
+    },
+    "snorliumz": {
+      "name": "Snorlium Z",
+      "gen": 7,
+      "num": 804,
+      "nonstandard": "Past"
+    },
+    "snowball": {
+      "name": "Snowball",
+      "gen": 6,
+      "num": 649,
+      "nonstandard": ""
+    },
+    "softsand": {
+      "name": "Soft Sand",
+      "gen": 2,
+      "num": 237,
+      "nonstandard": ""
+    },
+    "solganiumz": {
+      "name": "Solganium Z",
+      "gen": 7,
+      "num": 921,
+      "nonstandard": "Past"
+    },
+    "souldew": {
+      "name": "Soul Dew",
+      "gen": 3,
+      "num": 225,
+      "nonstandard": ""
+    },
+    "spelltag": {
+      "name": "Spell Tag",
+      "gen": 2,
+      "num": 247,
+      "nonstandard": ""
+    },
+    "spelonberry": {
+      "name": "Spelon Berry",
+      "gen": 3,
+      "num": 179,
+      "nonstandard": "Past"
+    },
+    "splashplate": {
+      "name": "Splash Plate",
+      "gen": 4,
+      "num": 299,
+      "nonstandard": ""
+    },
+    "spookyplate": {
+      "name": "Spooky Plate",
+      "gen": 4,
+      "num": 310,
+      "nonstandard": ""
+    },
+    "sportball": {
+      "name": "Sport Ball",
+      "gen": 2,
+      "num": 499,
+      "nonstandard": ""
+    },
+    "staraptite": {
+      "name": "Staraptite",
+      "gen": 9,
+      "num": 2639,
+      "nonstandard": "Future"
+    },
+    "starfberry": {
+      "name": "Starf Berry",
+      "gen": 3,
+      "num": 207,
+      "nonstandard": ""
+    },
+    "starminite": {
+      "name": "Starminite",
+      "gen": 9,
+      "num": 2561,
+      "nonstandard": "Future"
+    },
+    "starsweet": {
+      "name": "Star Sweet",
+      "gen": 8,
+      "num": 1114,
+      "nonstandard": ""
+    },
+    "steelgem": {
+      "name": "Steel Gem",
+      "gen": 5,
+      "num": 563,
+      "nonstandard": "Past"
+    },
+    "steeliumz": {
+      "name": "Steelium Z",
+      "gen": 7,
+      "num": 792,
+      "nonstandard": "Past"
+    },
+    "steelixite": {
+      "name": "Steelixite",
+      "gen": 6,
+      "num": 761,
+      "nonstandard": "Past"
+    },
+    "steelmemory": {
+      "name": "Steel Memory",
+      "gen": 7,
+      "num": 911,
+      "nonstandard": "Past"
+    },
+    "stick": {
+      "name": "Stick",
+      "gen": 2,
+      "num": 259,
+      "nonstandard": "Past"
+    },
+    "stickybarb": {
+      "name": "Sticky Barb",
+      "gen": 4,
+      "num": 288,
+      "nonstandard": ""
+    },
+    "stoneplate": {
+      "name": "Stone Plate",
+      "gen": 4,
+      "num": 309,
+      "nonstandard": ""
+    },
+    "strangeball": {
+      "name": "Strange Ball",
+      "gen": 8,
+      "num": 1785,
+      "nonstandard": "Unobtainable"
+    },
+    "strawberrysweet": {
+      "name": "Strawberry Sweet",
+      "gen": 8,
+      "num": 1109,
+      "nonstandard": ""
+    },
+    "sunstone": {
+      "name": "Sun Stone",
+      "gen": 2,
+      "num": 80,
+      "nonstandard": ""
+    },
+    "swampertite": {
+      "name": "Swampertite",
+      "gen": 6,
+      "num": 752,
+      "nonstandard": "Past"
+    },
+    "sweetapple": {
+      "name": "Sweet Apple",
+      "gen": 8,
+      "num": 1116,
+      "nonstandard": ""
+    },
+    "syrupyapple": {
+      "name": "Syrupy Apple",
+      "gen": 9,
+      "num": 2402,
+      "nonstandard": ""
+    },
+    "tamatoberry": {
+      "name": "Tamato Berry",
+      "gen": 3,
+      "num": 174,
+      "nonstandard": ""
+    },
+    "tangaberry": {
+      "name": "Tanga Berry",
+      "gen": 4,
+      "num": 194,
+      "nonstandard": ""
+    },
+    "tapuniumz": {
+      "name": "Tapunium Z",
+      "gen": 7,
+      "num": 801,
+      "nonstandard": "Past"
+    },
+    "tartapple": {
+      "name": "Tart Apple",
+      "gen": 8,
+      "num": 1117,
+      "nonstandard": ""
+    },
+    "tatsugirinite": {
+      "name": "Tatsugirinite",
+      "gen": 9,
+      "num": 2649,
+      "nonstandard": "Future"
+    },
+    "terrainextender": {
+      "name": "Terrain Extender",
+      "gen": 7,
+      "num": 879,
+      "nonstandard": ""
+    },
+    "thickclub": {
+      "name": "Thick Club",
+      "gen": 2,
+      "num": 258,
+      "nonstandard": "Past"
+    },
+    "throatspray": {
+      "name": "Throat Spray",
+      "gen": 8,
+      "num": 1118,
+      "nonstandard": ""
+    },
+    "thunderstone": {
+      "name": "Thunder Stone",
+      "gen": 1,
+      "num": 83,
+      "nonstandard": ""
+    },
+    "timerball": {
+      "name": "Timer Ball",
+      "gen": 3,
+      "num": 10,
+      "nonstandard": ""
+    },
+    "toxicorb": {
+      "name": "Toxic Orb",
+      "gen": 4,
+      "num": 272,
+      "nonstandard": ""
+    },
+    "toxicplate": {
+      "name": "Toxic Plate",
+      "gen": 4,
+      "num": 304,
+      "nonstandard": ""
+    },
+    "tr00": {
+      "name": "TR00",
+      "gen": 8,
+      "num": 1130,
+      "nonstandard": "Past"
+    },
+    "tr01": {
+      "name": "TR01",
+      "gen": 8,
+      "num": 1131,
+      "nonstandard": "Past"
+    },
+    "tr02": {
+      "name": "TR02",
+      "gen": 8,
+      "num": 1132,
+      "nonstandard": "Past"
+    },
+    "tr03": {
+      "name": "TR03",
+      "gen": 8,
+      "num": 1133,
+      "nonstandard": "Past"
+    },
+    "tr04": {
+      "name": "TR04",
+      "gen": 8,
+      "num": 1134,
+      "nonstandard": "Past"
+    },
+    "tr05": {
+      "name": "TR05",
+      "gen": 8,
+      "num": 1135,
+      "nonstandard": "Past"
+    },
+    "tr06": {
+      "name": "TR06",
+      "gen": 8,
+      "num": 1136,
+      "nonstandard": "Past"
+    },
+    "tr07": {
+      "name": "TR07",
+      "gen": 8,
+      "num": 1137,
+      "nonstandard": "Past"
+    },
+    "tr08": {
+      "name": "TR08",
+      "gen": 8,
+      "num": 1138,
+      "nonstandard": "Past"
+    },
+    "tr09": {
+      "name": "TR09",
+      "gen": 8,
+      "num": 1139,
+      "nonstandard": "Past"
+    },
+    "tr10": {
+      "name": "TR10",
+      "gen": 8,
+      "num": 1140,
+      "nonstandard": "Past"
+    },
+    "tr11": {
+      "name": "TR11",
+      "gen": 8,
+      "num": 1141,
+      "nonstandard": "Past"
+    },
+    "tr12": {
+      "name": "TR12",
+      "gen": 8,
+      "num": 1142,
+      "nonstandard": "Past"
+    },
+    "tr13": {
+      "name": "TR13",
+      "gen": 8,
+      "num": 1143,
+      "nonstandard": "Past"
+    },
+    "tr14": {
+      "name": "TR14",
+      "gen": 8,
+      "num": 1144,
+      "nonstandard": "Past"
+    },
+    "tr15": {
+      "name": "TR15",
+      "gen": 8,
+      "num": 1145,
+      "nonstandard": "Past"
+    },
+    "tr16": {
+      "name": "TR16",
+      "gen": 8,
+      "num": 1146,
+      "nonstandard": "Past"
+    },
+    "tr17": {
+      "name": "TR17",
+      "gen": 8,
+      "num": 1147,
+      "nonstandard": "Past"
+    },
+    "tr18": {
+      "name": "TR18",
+      "gen": 8,
+      "num": 1148,
+      "nonstandard": "Past"
+    },
+    "tr19": {
+      "name": "TR19",
+      "gen": 8,
+      "num": 1149,
+      "nonstandard": "Past"
+    },
+    "tr20": {
+      "name": "TR20",
+      "gen": 8,
+      "num": 1150,
+      "nonstandard": "Past"
+    },
+    "tr21": {
+      "name": "TR21",
+      "gen": 8,
+      "num": 1151,
+      "nonstandard": "Past"
+    },
+    "tr22": {
+      "name": "TR22",
+      "gen": 8,
+      "num": 1152,
+      "nonstandard": "Past"
+    },
+    "tr23": {
+      "name": "TR23",
+      "gen": 8,
+      "num": 1153,
+      "nonstandard": "Past"
+    },
+    "tr24": {
+      "name": "TR24",
+      "gen": 8,
+      "num": 1154,
+      "nonstandard": "Past"
+    },
+    "tr25": {
+      "name": "TR25",
+      "gen": 8,
+      "num": 1155,
+      "nonstandard": "Past"
+    },
+    "tr26": {
+      "name": "TR26",
+      "gen": 8,
+      "num": 1156,
+      "nonstandard": "Past"
+    },
+    "tr27": {
+      "name": "TR27",
+      "gen": 8,
+      "num": 1157,
+      "nonstandard": "Past"
+    },
+    "tr28": {
+      "name": "TR28",
+      "gen": 8,
+      "num": 1158,
+      "nonstandard": "Past"
+    },
+    "tr29": {
+      "name": "TR29",
+      "gen": 8,
+      "num": 1159,
+      "nonstandard": "Past"
+    },
+    "tr30": {
+      "name": "TR30",
+      "gen": 8,
+      "num": 1160,
+      "nonstandard": "Past"
+    },
+    "tr31": {
+      "name": "TR31",
+      "gen": 8,
+      "num": 1161,
+      "nonstandard": "Past"
+    },
+    "tr32": {
+      "name": "TR32",
+      "gen": 8,
+      "num": 1162,
+      "nonstandard": "Past"
+    },
+    "tr33": {
+      "name": "TR33",
+      "gen": 8,
+      "num": 1163,
+      "nonstandard": "Past"
+    },
+    "tr34": {
+      "name": "TR34",
+      "gen": 8,
+      "num": 1164,
+      "nonstandard": "Past"
+    },
+    "tr35": {
+      "name": "TR35",
+      "gen": 8,
+      "num": 1165,
+      "nonstandard": "Past"
+    },
+    "tr36": {
+      "name": "TR36",
+      "gen": 8,
+      "num": 1166,
+      "nonstandard": "Past"
+    },
+    "tr37": {
+      "name": "TR37",
+      "gen": 8,
+      "num": 1167,
+      "nonstandard": "Past"
+    },
+    "tr38": {
+      "name": "TR38",
+      "gen": 8,
+      "num": 1168,
+      "nonstandard": "Past"
+    },
+    "tr39": {
+      "name": "TR39",
+      "gen": 8,
+      "num": 1169,
+      "nonstandard": "Past"
+    },
+    "tr40": {
+      "name": "TR40",
+      "gen": 8,
+      "num": 1170,
+      "nonstandard": "Past"
+    },
+    "tr41": {
+      "name": "TR41",
+      "gen": 8,
+      "num": 1171,
+      "nonstandard": "Past"
+    },
+    "tr42": {
+      "name": "TR42",
+      "gen": 8,
+      "num": 1172,
+      "nonstandard": "Past"
+    },
+    "tr43": {
+      "name": "TR43",
+      "gen": 8,
+      "num": 1173,
+      "nonstandard": "Past"
+    },
+    "tr44": {
+      "name": "TR44",
+      "gen": 8,
+      "num": 1174,
+      "nonstandard": "Past"
+    },
+    "tr45": {
+      "name": "TR45",
+      "gen": 8,
+      "num": 1175,
+      "nonstandard": "Past"
+    },
+    "tr46": {
+      "name": "TR46",
+      "gen": 8,
+      "num": 1176,
+      "nonstandard": "Past"
+    },
+    "tr47": {
+      "name": "TR47",
+      "gen": 8,
+      "num": 1177,
+      "nonstandard": "Past"
+    },
+    "tr48": {
+      "name": "TR48",
+      "gen": 8,
+      "num": 1178,
+      "nonstandard": "Past"
+    },
+    "tr49": {
+      "name": "TR49",
+      "gen": 8,
+      "num": 1179,
+      "nonstandard": "Past"
+    },
+    "tr50": {
+      "name": "TR50",
+      "gen": 8,
+      "num": 1180,
+      "nonstandard": "Past"
+    },
+    "tr51": {
+      "name": "TR51",
+      "gen": 8,
+      "num": 1181,
+      "nonstandard": "Past"
+    },
+    "tr52": {
+      "name": "TR52",
+      "gen": 8,
+      "num": 1182,
+      "nonstandard": "Past"
+    },
+    "tr53": {
+      "name": "TR53",
+      "gen": 8,
+      "num": 1183,
+      "nonstandard": "Past"
+    },
+    "tr54": {
+      "name": "TR54",
+      "gen": 8,
+      "num": 1184,
+      "nonstandard": "Past"
+    },
+    "tr55": {
+      "name": "TR55",
+      "gen": 8,
+      "num": 1185,
+      "nonstandard": "Past"
+    },
+    "tr56": {
+      "name": "TR56",
+      "gen": 8,
+      "num": 1186,
+      "nonstandard": "Past"
+    },
+    "tr57": {
+      "name": "TR57",
+      "gen": 8,
+      "num": 1187,
+      "nonstandard": "Past"
+    },
+    "tr58": {
+      "name": "TR58",
+      "gen": 8,
+      "num": 1188,
+      "nonstandard": "Past"
+    },
+    "tr59": {
+      "name": "TR59",
+      "gen": 8,
+      "num": 1189,
+      "nonstandard": "Past"
+    },
+    "tr60": {
+      "name": "TR60",
+      "gen": 8,
+      "num": 1190,
+      "nonstandard": "Past"
+    },
+    "tr61": {
+      "name": "TR61",
+      "gen": 8,
+      "num": 1191,
+      "nonstandard": "Past"
+    },
+    "tr62": {
+      "name": "TR62",
+      "gen": 8,
+      "num": 1192,
+      "nonstandard": "Past"
+    },
+    "tr63": {
+      "name": "TR63",
+      "gen": 8,
+      "num": 1193,
+      "nonstandard": "Past"
+    },
+    "tr64": {
+      "name": "TR64",
+      "gen": 8,
+      "num": 1194,
+      "nonstandard": "Past"
+    },
+    "tr65": {
+      "name": "TR65",
+      "gen": 8,
+      "num": 1195,
+      "nonstandard": "Past"
+    },
+    "tr66": {
+      "name": "TR66",
+      "gen": 8,
+      "num": 1196,
+      "nonstandard": "Past"
+    },
+    "tr67": {
+      "name": "TR67",
+      "gen": 8,
+      "num": 1197,
+      "nonstandard": "Past"
+    },
+    "tr68": {
+      "name": "TR68",
+      "gen": 8,
+      "num": 1198,
+      "nonstandard": "Past"
+    },
+    "tr69": {
+      "name": "TR69",
+      "gen": 8,
+      "num": 1199,
+      "nonstandard": "Past"
+    },
+    "tr70": {
+      "name": "TR70",
+      "gen": 8,
+      "num": 1200,
+      "nonstandard": "Past"
+    },
+    "tr71": {
+      "name": "TR71",
+      "gen": 8,
+      "num": 1201,
+      "nonstandard": "Past"
+    },
+    "tr72": {
+      "name": "TR72",
+      "gen": 8,
+      "num": 1202,
+      "nonstandard": "Past"
+    },
+    "tr73": {
+      "name": "TR73",
+      "gen": 8,
+      "num": 1203,
+      "nonstandard": "Past"
+    },
+    "tr74": {
+      "name": "TR74",
+      "gen": 8,
+      "num": 1204,
+      "nonstandard": "Past"
+    },
+    "tr75": {
+      "name": "TR75",
+      "gen": 8,
+      "num": 1205,
+      "nonstandard": "Past"
+    },
+    "tr76": {
+      "name": "TR76",
+      "gen": 8,
+      "num": 1206,
+      "nonstandard": "Past"
+    },
+    "tr77": {
+      "name": "TR77",
+      "gen": 8,
+      "num": 1207,
+      "nonstandard": "Past"
+    },
+    "tr78": {
+      "name": "TR78",
+      "gen": 8,
+      "num": 1208,
+      "nonstandard": "Past"
+    },
+    "tr79": {
+      "name": "TR79",
+      "gen": 8,
+      "num": 1209,
+      "nonstandard": "Past"
+    },
+    "tr80": {
+      "name": "TR80",
+      "gen": 8,
+      "num": 1210,
+      "nonstandard": "Past"
+    },
+    "tr81": {
+      "name": "TR81",
+      "gen": 8,
+      "num": 1211,
+      "nonstandard": "Past"
+    },
+    "tr82": {
+      "name": "TR82",
+      "gen": 8,
+      "num": 1212,
+      "nonstandard": "Past"
+    },
+    "tr83": {
+      "name": "TR83",
+      "gen": 8,
+      "num": 1213,
+      "nonstandard": "Past"
+    },
+    "tr84": {
+      "name": "TR84",
+      "gen": 8,
+      "num": 1214,
+      "nonstandard": "Past"
+    },
+    "tr85": {
+      "name": "TR85",
+      "gen": 8,
+      "num": 1215,
+      "nonstandard": "Past"
+    },
+    "tr86": {
+      "name": "TR86",
+      "gen": 8,
+      "num": 1216,
+      "nonstandard": "Past"
+    },
+    "tr87": {
+      "name": "TR87",
+      "gen": 8,
+      "num": 1217,
+      "nonstandard": "Past"
+    },
+    "tr88": {
+      "name": "TR88",
+      "gen": 8,
+      "num": 1218,
+      "nonstandard": "Past"
+    },
+    "tr89": {
+      "name": "TR89",
+      "gen": 8,
+      "num": 1219,
+      "nonstandard": "Past"
+    },
+    "tr90": {
+      "name": "TR90",
+      "gen": 8,
+      "num": 1220,
+      "nonstandard": "Past"
+    },
+    "tr91": {
+      "name": "TR91",
+      "gen": 8,
+      "num": 1221,
+      "nonstandard": "Past"
+    },
+    "tr92": {
+      "name": "TR92",
+      "gen": 8,
+      "num": 1222,
+      "nonstandard": "Past"
+    },
+    "tr93": {
+      "name": "TR93",
+      "gen": 8,
+      "num": 1223,
+      "nonstandard": "Past"
+    },
+    "tr94": {
+      "name": "TR94",
+      "gen": 8,
+      "num": 1224,
+      "nonstandard": "Past"
+    },
+    "tr95": {
+      "name": "TR95",
+      "gen": 8,
+      "num": 1225,
+      "nonstandard": "Past"
+    },
+    "tr96": {
+      "name": "TR96",
+      "gen": 8,
+      "num": 1226,
+      "nonstandard": "Past"
+    },
+    "tr97": {
+      "name": "TR97",
+      "gen": 8,
+      "num": 1227,
+      "nonstandard": "Past"
+    },
+    "tr98": {
+      "name": "TR98",
+      "gen": 8,
+      "num": 1228,
+      "nonstandard": "Past"
+    },
+    "tr99": {
+      "name": "TR99",
+      "gen": 8,
+      "num": 1229,
+      "nonstandard": "Past"
+    },
+    "twistedspoon": {
+      "name": "Twisted Spoon",
+      "gen": 2,
+      "num": 248,
+      "nonstandard": ""
+    },
+    "tyranitarite": {
+      "name": "Tyranitarite",
+      "gen": 6,
+      "num": 669,
+      "nonstandard": "Past"
+    },
+    "ultraball": {
+      "name": "Ultra Ball",
+      "gen": 1,
+      "num": 2,
+      "nonstandard": ""
+    },
+    "ultranecroziumz": {
+      "name": "Ultranecrozium Z",
+      "gen": 7,
+      "num": 923,
+      "nonstandard": "Past"
+    },
+    "unremarkableteacup": {
+      "name": "Unremarkable Teacup",
+      "gen": 9,
+      "num": 2403,
+      "nonstandard": ""
+    },
+    "upgrade": {
+      "name": "Up-Grade",
+      "gen": 2,
+      "num": 252,
+      "nonstandard": ""
+    },
+    "utilityumbrella": {
+      "name": "Utility Umbrella",
+      "gen": 8,
+      "num": 1123,
+      "nonstandard": ""
+    },
+    "venusaurite": {
+      "name": "Venusaurite",
+      "gen": 6,
+      "num": 659,
+      "nonstandard": "Past"
+    },
+    "victreebelite": {
+      "name": "Victreebelite",
+      "gen": 9,
+      "num": 2560,
+      "nonstandard": "Future"
+    },
+    "wacanberry": {
+      "name": "Wacan Berry",
+      "gen": 4,
+      "num": 186,
+      "nonstandard": ""
+    },
+    "watergem": {
+      "name": "Water Gem",
+      "gen": 5,
+      "num": 549,
+      "nonstandard": "Past"
+    },
+    "wateriumz": {
+      "name": "Waterium Z",
+      "gen": 7,
+      "num": 778,
+      "nonstandard": "Past"
+    },
+    "watermemory": {
+      "name": "Water Memory",
+      "gen": 7,
+      "num": 913,
+      "nonstandard": "Past"
+    },
+    "waterstone": {
+      "name": "Water Stone",
+      "gen": 1,
+      "num": 84,
+      "nonstandard": ""
+    },
+    "watmelberry": {
+      "name": "Watmel Berry",
+      "gen": 3,
+      "num": 181,
+      "nonstandard": "Past"
+    },
+    "waveincense": {
+      "name": "Wave Incense",
+      "gen": 4,
+      "num": 317,
+      "nonstandard": "Past"
+    },
+    "weaknesspolicy": {
+      "name": "Weakness Policy",
+      "gen": 6,
+      "num": 639,
+      "nonstandard": ""
+    },
+    "wellspringmask": {
+      "name": "Wellspring Mask",
+      "gen": 9,
+      "num": 2407,
+      "nonstandard": ""
+    },
+    "wepearberry": {
+      "name": "Wepear Berry",
+      "gen": 3,
+      "num": 167,
+      "nonstandard": "Past"
+    },
+    "whippeddream": {
+      "name": "Whipped Dream",
+      "gen": 6,
+      "num": 646,
+      "nonstandard": "Past"
+    },
+    "whiteherb": {
+      "name": "White Herb",
+      "gen": 3,
+      "num": 214,
+      "nonstandard": ""
+    },
+    "widelens": {
+      "name": "Wide Lens",
+      "gen": 4,
+      "num": 265,
+      "nonstandard": ""
+    },
+    "wikiberry": {
+      "name": "Wiki Berry",
+      "gen": 3,
+      "num": 160,
+      "nonstandard": ""
+    },
+    "wiseglasses": {
+      "name": "Wise Glasses",
+      "gen": 4,
+      "num": 267,
+      "nonstandard": ""
+    },
+    "yacheberry": {
+      "name": "Yache Berry",
+      "gen": 4,
+      "num": 188,
+      "nonstandard": ""
+    },
+    "zapplate": {
+      "name": "Zap Plate",
+      "gen": 4,
+      "num": 300,
+      "nonstandard": ""
+    },
+    "zeraorite": {
+      "name": "Zeraorite",
+      "gen": 9,
+      "num": 2586,
+      "nonstandard": "Future"
+    },
+    "zoomlens": {
+      "name": "Zoom Lens",
+      "gen": 4,
+      "num": 276,
+      "nonstandard": ""
+    },
+    "zygardite": {
+      "name": "Zygardite",
+      "gen": 9,
+      "num": 2584,
+      "nonstandard": "Future"
+    },
+    "berry": {
+      "name": "Berry",
+      "gen": 2,
+      "num": 155,
+      "nonstandard": "Past"
+    },
+    "berserkgene": {
+      "name": "Berserk Gene",
+      "gen": 2,
+      "num": 0,
+      "nonstandard": "Past"
+    },
+    "bitterberry": {
+      "name": "Bitter Berry",
+      "gen": 2,
+      "num": 156,
+      "nonstandard": "Past"
+    },
+    "burntberry": {
+      "name": "Burnt Berry",
+      "gen": 2,
+      "num": 153,
+      "nonstandard": "Past"
+    },
+    "goldberry": {
+      "name": "Gold Berry",
+      "gen": 2,
+      "num": 158,
+      "nonstandard": "Past"
+    },
+    "iceberry": {
+      "name": "Ice Berry",
+      "gen": 2,
+      "num": 152,
+      "nonstandard": "Past"
+    },
+    "mintberry": {
+      "name": "Mint Berry",
+      "gen": 2,
+      "num": 150,
+      "nonstandard": "Past"
+    },
+    "miracleberry": {
+      "name": "Miracle Berry",
+      "gen": 2,
+      "num": 157,
+      "nonstandard": "Past"
+    },
+    "mysteryberry": {
+      "name": "Mystery Berry",
+      "gen": 2,
+      "num": 154,
+      "nonstandard": "Past"
+    },
+    "pinkbow": {
+      "name": "Pink Bow",
+      "gen": 2,
+      "num": 251,
+      "nonstandard": "Past"
+    },
+    "polkadotbow": {
+      "name": "Polkadot Bow",
+      "gen": 2,
+      "num": 251,
+      "nonstandard": "Past"
+    },
+    "przcureberry": {
+      "name": "PRZ Cure Berry",
+      "gen": 2,
+      "num": 149,
+      "nonstandard": "Past"
+    },
+    "psncureberry": {
+      "name": "PSN Cure Berry",
+      "gen": 2,
+      "num": 151,
+      "nonstandard": "Past"
+    },
+    "crucibellite": {
+      "name": "Crucibellite",
+      "gen": 6,
+      "num": -1,
+      "nonstandard": "CAP"
+    },
+    "vilevial": {
+      "name": "Vile Vial",
+      "gen": 8,
+      "num": -2,
+      "nonstandard": "CAP"
+    }
+  }
+}

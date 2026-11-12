@@ -55,3 +55,11 @@
  .arena-private-grid{grid-template-columns:minmax(0,1fr)}
  .arena-pokemon-icons{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+/* Checagem das regras do formato: feedback claro e acessível nos slots. */
+.arena-rule-issues{margin:13px 0;padding:12px 14px;border:1px solid #c05e50;border-left:4px solid #f07561;border-radius:10px;background:#351e24;color:#ffddd6;line-height:1.5}
+.arena-rule-issues strong{color:#ffd2bb}
+.arena-rule-issues ul{margin:8px 0;padding-left:20px}
+.arena-rule-issues li{margin:4px 0}
+.arena-rule-issues small{display:block;color:#eecfc7}
+.arena-review-actions button:disabled{opacity:.5;cursor:not-allowed}
