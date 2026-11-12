@@ -107,7 +107,7 @@ class TestHypeTeamBuilderUX(unittest.TestCase):
         self.assertIn('Buginium Z', obter_regras_especie_showdown('Arceus-Bug')['requiredItems'])
         template=(ROOT / 'templates/team_builder.html').read_text(encoding='utf-8')
         routes=(ROOT / 'modules/expansion_features.py').read_text(encoding='utf-8')
-        for marker in ('function bootSpeciesRules()', 'function allowedSpeciesAbilities(pokemon)',
+        for marker in ('function bootSpeciesRules()', "function allowedSpeciesAbilities(pokemon,item='',mechanic='')",
                        'function requiredFormHeldItems(pokemon)',
                        'Habilidades que não pertencem ao Pokémon:',
                        'requiredFormHeldItems(s.pokemon)',
@@ -143,11 +143,33 @@ const emptySlot=()=>({level:100,pokemon:'',pokemon_id:null,tipos:[],sprite:'',
 item:'',ability:'',nature:'',papel:'',mecanica:'nenhuma',tera_ativa:false,tera_type:'',
 moves:['','','',''],evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},
 ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31}});
-const speciesMeta=name=>({n:name,num:6,types:['Fire','Flying']});
+const speciesMeta=name=>{
+  const key=String(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const data={
+    charizard:{n:'Charizard',num:6,types:['Fire','Flying']},
+    charizardmegax:{n:'Charizard-Mega-X',base:'charizard',num:6,types:['Fire','Dragon']},
+    charizardmegay:{n:'Charizard-Mega-Y',base:'charizard',num:6,types:['Fire','Flying']},
+    mewtwo:{n:'Mewtwo',num:150,types:['Psychic']},
+    mewtwomegay:{n:'Mewtwo-Mega-Y',base:'mewtwo',num:150,types:['Psychic']},
+    pidgeot:{n:'Pidgeot',num:18,types:['Normal','Flying']},
+    pidgeotmega:{n:'Pidgeot-Mega',base:'pidgeot',num:18,types:['Normal','Flying']},
+    rayquaza:{n:'Rayquaza',num:384,types:['Dragon','Flying']},
+    rayquazamega:{n:'Rayquaza-Mega',base:'rayquaza',num:384,types:['Dragon','Flying']}
+  };
+  return data[key]||null;
+};
 const slug=v=>String(v||'').toLowerCase().trim().replaceAll(' ','-').replace(/[^a-z0-9-]/g,'');
-const megaStoneOwner={'charizardite-x':'charizard','charizardite-y':'charizard'};
+const megaStoneOwner={'charizardite-x':'charizard','charizardite-y':'charizard',
+  'mewtwonite-y':'mewtwo','pidgeotite':'pidgeot'};
 const selectedFormat=()=>({permite_mega:true,little_cup:false});
 const showdownReady=true;
+const speciesKey=value=>String(value||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function megaVariantForSet(pokemon,item,mechanic='') {
+  const base=speciesKey(speciesMeta(pokemon)?.base||pokemon),stone=slug(item);
+  if(megaStoneOwner[stone]===base)
+    return base+'-Mega'+(stone.endsWith('-x')?'-X':stone.endsWith('-y')?'-Y':'');
+  return base==='rayquaza'&&mechanic==='mega'?'Rayquaza-Mega':'';
+}
 """
         checks = r"""
 const source=[
@@ -180,6 +202,29 @@ if(result.parsed[1].ivs.atk!==0||result.parsed[1].nature!=='Timid')throw Error('
 if(result.parsed[1].moves[3]!=='Roost')throw Error('Quarto golpe perdido.');
 if(parseShowdownTeam(source.replace('252 SpA','300 SpA')).errors.length===0)throw Error('EV inválido não foi rejeitado.');
 if(parseShowdownTeam('Charizard @ <img src=x>').errors.length===0)throw Error('Item inseguro não foi rejeitado.');
+const megaY=source.split('Charizard @ Charizardite Y')[1];
+const exact='Charizard-Mega-Y @ Charizardite Y'+megaY.replace('- Focus Blast','- Scorching Sands');
+const alias=parseShowdownTeam(exact);
+if(alias.errors.length||alias.parsed.length!==1)throw Error('Forma Mega-Y recusada: '+JSON.stringify(alias.errors));
+const resultY=alias.parsed[0];
+if(resultY.pokemon!=='Charizard'||resultY.item!=='Charizardite Y'||resultY.mecanica!=='mega')throw Error('Forma Mega-Y não normalizada.');
+if(resultY.moves[2]!=='Scorching Sands'||resultY.ability!=='Blaze'||resultY.ivs.atk!==0||resultY.evs.spa!==252)
+  throw Error('O importador apagou dados da forma Mega.');
+const variant=exact.replace('Ability: Blaze','Ability: Drought');
+if(parseShowdownTeam(variant).parsed[0].ability!=='Drought')throw Error('Habilidade Mega perdida.');
+if(!parseShowdownTeam(variant.replace('Charizardite Y','Charizardite X')).errors.some(e=>e.includes('não corresponde')))
+  throw Error('Mega Stone X não foi rejeitada na forma Y.');
+if(!parseShowdownTeam(variant.replace('Charizardite Y','Leftovers')).errors.length)
+  throw Error('Mega sem pedra não foi rejeitada.');
+for(const text of ['Mewtwo-Mega-Y @ Mewtwonite Y','Pidgeot-Mega @ Pidgeotite']){
+  const set=parseShowdownTeam(text+'\nAbility: Insomnia\nTimid Nature\n- Protect');
+  if(set.errors.length||set.parsed[0].mecanica!=='mega')throw Error('Forma Mega adicional: '+text+': '+JSON.stringify(set.errors));
+}
+const dragon='Rayquaza-Mega @ Life Orb\nAbility: Delta Stream\nJolly Nature\n- Dragon Ascent';
+if(parseShowdownTeam(dragon).errors.length||parseShowdownTeam(dragon).parsed[0].mecanica!=='mega')
+  throw Error('Mega Rayquaza sem stone não reconhecido.');
+if(!parseShowdownTeam(dragon.replace('Dragon Ascent','Protect')).errors.length)
+  throw Error('Mega Rayquaza sem Dragon Ascent foi aceito.');
 """
         result = subprocess.run(['node', '-'], input=harness+parser+checks, text=True,
                                 capture_output=True, timeout=12)
@@ -212,6 +257,32 @@ if(parseShowdownTeam('Charizard @ <img src=x>').errors.length===0)throw Error('I
         self.assertTrue(any('Ultra Ball' in e for e in validar_equipe_basica(data, 'gen9nationaldexubers')))
         data[0]['item'] = 'Light Ball'
         self.assertEqual(validar_equipe_basica(data, 'gen9nationaldexubers'), [])
+
+
+    def test_post_mega_abilities_are_validated_for_the_matching_stone(self):
+        slots = []
+        for name, item, ability, mechanic in (
+            ('Charizard', 'Charizardite Y', 'Drought', 'mega'),
+            ('Mewtwo', 'Mewtwonite Y', 'Insomnia', 'mega'),
+            ('Pidgeot', 'Pidgeotite', 'No Guard', 'mega'),
+            ('Dialga', 'Leftovers', 'Pressure', 'nenhuma'),
+            ('Palkia', 'Leftovers', 'Pressure', 'nenhuma'),
+            ('Lugia', 'Leftovers', 'Pressure', 'nenhuma'),
+        ):
+            slots.append({
+                'pokemon': name, 'item': item, 'ability': ability,
+                'mecanica': mechanic, 'nature': 'Timid',
+                'moves': ['Protect', 'Rest', 'Sleep Talk', 'Recover'],
+                'evs': {k: 0 for k in ('hp', 'atk', 'def', 'spa', 'spd', 'spe')},
+                'ivs': {k: 31 for k in ('hp', 'atk', 'def', 'spa', 'spd', 'spe')},
+            })
+        errors = validar_equipe_basica(slots, 'gen9nationaldexubers')
+        self.assertEqual(errors, [], errors)
+        slots[0]['ability'] = 'Wonder Guard'
+        self.assertTrue(any('não pertence' in e for e in validar_equipe_basica(slots, 'gen9nationaldexubers')))
+        slots[0]['ability'] = 'Drought'
+        slots[0]['item'] = 'Charizardite X'
+        self.assertTrue(any('não pertence' in e for e in validar_equipe_basica(slots, 'gen9nationaldexubers')))
 
 
 

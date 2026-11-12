@@ -305,6 +305,7 @@
     'ampharosite':'ampharos','audinite':'audino','banettite':'banette',
     'beedrillite':'beedrill','blastoisinite':'blastoise','blazikenite':'blaziken',
     'cameruptite':'camerupt','charizardite-x':'charizard','charizardite-y':'charizard',
+    'mewtwonite-x':'mewtwo','mewtwonite-y':'mewtwo','pidgeotite':'pidgeot',
     'diancite':'diancie','galladite':'gallade','garchompite':'garchomp',
     'gardevoirite':'gardevoir','gengarite':'gengar','glalitite':'glalie',
     'gyaradosite':'gyarados','heracronite':'heracross','houndoominite':'houndoom',
@@ -348,10 +349,22 @@
     const fallback=requiredFormHeldItem(pokemon);
     return fallback?[fallback]:[];
   }
-  function allowedSpeciesAbilities(pokemon){
+  function megaVariantForSet(pokemon, item, mechanic='') {
+    const base=speciesKey(speciesMeta(pokemon)?.base||pokemon);
+    const stone=slug(item);
+    if (megaStoneOwner[stone]===base) {
+      const suffix=stone.endsWith('-x')?'-X':stone.endsWith('-y')?'-Y':'';
+      return base+'-Mega'+suffix;
+    }
+    if (base==='rayquaza' && mechanic==='mega') return 'Rayquaza-Mega';
+    return '';
+  }
+  function allowedSpeciesAbilities(pokemon,item='',mechanic='') {
     const base=speciesMeta(pokemon)?.base;
-    return speciesRuleDex?.[speciesKey(pokemon)]?.abilities||
+    const primary=speciesRuleDex?.[speciesKey(pokemon)]?.abilities||
       speciesRuleDex?.[speciesKey(base)]?.abilities||[];
+    const mega=speciesRuleDex?.[speciesKey(megaVariantForSet(pokemon,item,mechanic))]?.abilities||[];
+    return [...new Set([...primary,...mega])];
   }
   async function bootSpeciesRules(){
     try{
@@ -632,7 +645,8 @@
     pokemonInput.value=s.pokemon||''; itemInput.value=s.item||''; natureSelect.value=s.nature||''; roleSelect.value=s.papel||''; mechanicSelect.value=s.mecanica==='tera'?'nenhuma':s.mecanica||'nenhuma'; teraSelect.value=s.tera_type||''; teraEnabled.checked=!!s.tera_ativa||s.mecanica==='tera'; notesInput.value=s.observacao||'';
     const portrait=$('pokemonPortrait'); portrait.innerHTML=s.sprite?`<img src="${s.sprite}" alt="${s.pokemon}">`:'<span>?</span>';
     $('typeBadges').innerHTML=(s.tipos||[]).map(t=>`<span class="type-chip type-${t}">${pretty(t)}</span>`).join('');
-    abilitySelect.innerHTML = s.abilities?.length ? '<option value="">Selecione...</option>'+s.abilities.map(a=>`<option value="${a}" ${a===s.ability?'selected':''}>${pretty(a)}</option>`).join('') : `<option value="${s.ability||''}">${s.ability?pretty(s.ability):'Escolha o Pokémon primeiro'}</option>`;
+    const abilityOptions=[...new Set([...(s.abilities||[]),...allowedSpeciesAbilities(s.pokemon,s.item,s.mecanica),...(s.ability?[s.ability]:[])])];
+    abilitySelect.innerHTML = abilityOptions.length ? '<option value="">Selecione...</option>'+abilityOptions.map(a=>`<option value="${a}" ${speciesKey(a)===speciesKey(s.ability)?'selected':''}>${pretty(a)}</option>`).join('') : '<option value="">Escolha o Pokémon primeiro</option>';
     document.querySelectorAll('.moveInput').forEach((el,i)=>el.value=(s.moves||[])[i]||'');
     document.querySelectorAll('.evInput').forEach(el=>el.value=(s.evs||{})[el.dataset.stat] ?? 0);
     document.querySelectorAll('.ivInput').forEach(el=>el.value=(s.ivs||{})[el.dataset.stat] ?? 31);
@@ -666,11 +680,12 @@
        else if(speciesKey(previousPokemon)!==speciesKey(slot.pokemon))slot.item='';
       slot.tipos=p.types.map(x=>x.type.name);
       slot.sprite=p.sprites?.other?.['official-artwork']?.front_default||p.sprites?.front_default||'';
-      slot.abilities=p.abilities.map(x=>x.ability.name);
+      slot.abilities=[...new Set([...p.abilities.map(x=>x.ability.name),...allowedSpeciesAbilities(slot.pokemon,slot.item,slot.mecanica)])];
       slot.moves_available=p.moves.map(x=>x.move.name).sort();
       slot.base_stats={};const statMap={'hp':'hp','attack':'atk','defense':'def','special-attack':'spa','special-defense':'spd','speed':'spe'};
       (p.stats||[]).forEach(x=>{const stat=statMap[x.stat?.name];if(stat)slot.base_stats[stat]=x.base_stat;});
-      if(!slot.abilities.includes(slot.ability))slot.ability=slot.abilities[0]||'';
+      if(slot.ability && !slot.abilities.some(a=>speciesKey(a)===speciesKey(slot.ability)) && slot.mecanica==='mega' && !speciesRuleDex)slot.abilities.push(slot.ability);
+      if(!slot.abilities.some(a=>speciesKey(a)===speciesKey(slot.ability)))slot.ability=slot.abilities[0]||'';
       pokemonInput.value=slot.pokemon;renderEditor();assignMegaStone();saveEditor();renderTabs();
       loadShowdownMovesForSlot(slot);
     }catch(e){
@@ -1038,7 +1053,7 @@
     if(invalidAbilities.length)messages.push({ok:false,text:'Habilidades proibidas: '+invalidAbilities.map(s=>pretty(s.pokemon)).join(', ')});
     if(speciesRuleDex){
       const invalidSpeciesAbilities=filled.filter(s=>{
-        const permitted=allowedSpeciesAbilities(s.pokemon);
+        const permitted=allowedSpeciesAbilities(s.pokemon,s.item,s.mecanica);
         return s.ability&&permitted.length&&!permitted.some(x=>speciesKey(x)===speciesKey(s.ability));
       });
       if(invalidSpeciesAbilities.length)messages.push({ok:false,text:'Habilidades que não pertencem ao Pokémon: '+invalidSpeciesAbilities.map(s=>pretty(s.pokemon)).join(', ')});
@@ -1196,18 +1211,31 @@
       if (item && !allowedText.test(item)) { errors.push(prefix+'item inválido.'); continue; }
       const s = emptySlot();
       const meta = speciesMeta(name);
-      s.pokemon = meta?.n || name;
-      s.pokemon_id = Number.isInteger(meta?.num) ? meta.num : null;
-      s.tipos = Array.isArray(meta?.types) ? meta.types.map(t=>String(t).toLowerCase()) : [];
+      // Smogon pode copiar "Charizard-Mega-Y"; o editor armazena a espécie-base
+      // com sua pedra e mecânica, sem apagar a forma indicada no texto.
+      const formName = meta?.n || name;
+      const explicitMega = /-Mega(?:-[XYZ])?$/i.test(formName);
+      const baseName = explicitMega ? (meta?.base || formName.replace(/-Mega(?:-[XYZ])?$/i,'')) : formName;
+      const baseMeta = explicitMega ? speciesMeta(baseName) : meta;
+      s.pokemon = baseMeta?.n || baseName;
+      s.pokemon_id = Number.isInteger(baseMeta?.num) ? baseMeta.num : null;
+      s.tipos = Array.isArray(baseMeta?.types) ? baseMeta.types.map(t=>String(t).toLowerCase()) : [];
       if (s.pokemon_id > 0) s.sprite = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + s.pokemon_id + '.png';
       s.item = item;
-      const stone = slug(item);
-      s.mecanica = megaStoneOwner[stone] && megaStoneOwner[stone] === slug(s.pokemon) ? 'mega' : 'nenhuma';
-      if (megaStoneOwner[stone] && s.mecanica !== 'mega') errors.push(prefix+'Mega Stone não pertence a '+s.pokemon+'.');
+      const stone = slug(item), baseId=speciesKey(s.pokemon);
+      const expectedMega=megaVariantForSet(s.pokemon,item,'mega');
+      const megaWithStone=!!megaStoneOwner[stone] && megaStoneOwner[stone]===baseId;
+      const megaRayquaza=explicitMega && baseId==='rayquaza';
+      s.mecanica = megaWithStone || megaRayquaza ? 'mega' : 'nenhuma';
+      if (megaStoneOwner[stone] && !megaWithStone) errors.push(prefix+'Mega Stone não pertence a '+s.pokemon+'.');
+      if (explicitMega && !megaWithStone && !megaRayquaza && !megaStoneOwner[stone])
+        errors.push(prefix+formName+' exige a Mega Stone correspondente.');
+      if (explicitMega && megaWithStone && speciesKey(expectedMega)!==speciesKey(formName))
+        errors.push(prefix+item+' não corresponde à forma '+formName+'.');
       if (s.mecanica === 'mega' && selectedFormat() && !selectedFormat().permite_mega) {
         errors.push(prefix+'Mega Evolution não é permitida neste formato. Escolha um formato compatível.');
       }
-      if (showdownReady && !meta) warnings.push(prefix+s.pokemon+' não foi encontrado no catálogo da Arena.');
+      if (showdownReady && !meta) warnings.push(prefix+formName+' não foi encontrado no catálogo da Arena.');
       let moveCount = 0;
 
       function readStats(value, destination, maximum) {
@@ -1251,6 +1279,8 @@
           // Shiny, gênero e metadados extras não fazem parte do editor atual.
         }
       }
+      if (megaRayquaza && !s.moves.some(m=>speciesKey(m)==='dragonascent'))
+        errors.push(prefix+'Rayquaza-Mega exige Dragon Ascent.');
       if (Object.values(s.evs).reduce((total,v)=>total+v,0) > 510) errors.push(prefix+'EVs acima de 510.');
       if (selectedFormat()?.little_cup && s.level !== 5) errors.push(prefix+'Little Cup exige level 5.');
       parsed.push(s);

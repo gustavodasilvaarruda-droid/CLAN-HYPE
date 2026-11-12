@@ -29,6 +29,7 @@ MEGA_STONE_OWNERS = {
     'ampharosite': 'ampharos', 'audinite': 'audino', 'banettite': 'banette',
     'beedrillite': 'beedrill', 'blastoisinite': 'blastoise', 'blazikenite': 'blaziken',
     'cameruptite': 'camerupt', 'charizarditex': 'charizard', 'charizarditey': 'charizard',
+    'mewtwonitex': 'mewtwo', 'mewtwonitey': 'mewtwo', 'pidgeotite': 'pidgeot',
     'diancite': 'diancie', 'galladite': 'gallade', 'garchompite': 'garchomp',
     'gardevoirite': 'gardevoir', 'gengarite': 'gengar', 'glalitite': 'glalie',
     'gyaradosite': 'gyarados', 'heracronite': 'heracross', 'houndoominite': 'houndoom',
@@ -179,6 +180,15 @@ def _itens_permitidos_forma(especie, formato):
     return requeridos
 
 
+def _forma_mega_da_pedra(base, item_id):
+    """ID de forma Mega previsto no snapshot, incluindo pedras X/Y."""
+    if MEGA_STONE_OWNERS.get(item_id) != base:
+        return ''
+    sufixo = item_id[-1] if item_id in ('charizarditex', 'charizarditey',
+                                       'mewtwonitex', 'mewtwonitey') else ''
+    return base + 'mega' + sufixo
+
+
 def _habilidades_permitidas_especie(especie):
     """Lista oficial exata da forma; usa a base quando a forma herda abilities."""
     ficha = obter_regras_especie_showdown(especie) or {}
@@ -188,6 +198,22 @@ def _habilidades_permitidas_especie(especie):
         ficha = obter_regras_especie_showdown(meta.get('base')) or {}
         nomes = ficha.get('abilities') or []
     return nomes
+
+
+def _habilidades_permitidas_slot(slot):
+    """Uma forma Mega pode ter habilidade própria após Mega Evolution."""
+    especie = slot.get('pokemon')
+    habilidades = list(_habilidades_permitidas_especie(especie))
+    meta = obter_especie_showdown(especie) or {}
+    base = _chave(meta.get('base') or especie)
+    mecanica = _chave(slot.get('mecanica') or 'nenhuma')
+    if mecanica == 'mega':
+        pedra = _chave(slot.get('item'))
+        forma = (_forma_mega_da_pedra(base, pedra) or
+                 ('rayquazamega' if base == 'rayquaza' else ''))
+        if forma:
+            habilidades.extend(_habilidades_permitidas_especie(forma))
+    return list(dict.fromkeys(habilidades))
 
 
 def _especie_base_clause(especie):
@@ -206,7 +232,7 @@ def _tipos_monotype(slot):
     especie_id = _chave(slot.get('pokemon'))
     base_id = _chave(meta.get('base') or meta.get('n') or slot.get('pokemon'))
     if MEGA_STONE_OWNERS.get(item_id) == base_id:
-        forma = base_id + 'mega' + (item_id[-1] if item_id in ('charizarditex', 'charizarditey') else '')
+        forma = _forma_mega_da_pedra(base_id, item_id)
         mega = obter_especie_showdown(forma)
         if mega and mega.get('types'):
             tipos.intersection_update(_chave(t) for t in mega['types'])
@@ -325,14 +351,14 @@ def validar_equipe_basica(slots, codigo_formato):
             erros.append(f'Slot {indice}: mecânica desconhecida.')
         elif mecanica in flags and not formato.get(flags[mecanica], False):
             erros.append(f'Slot {indice}: a mecânica {mecanica} não é permitida neste formato.')
-        if mecanica == 'mega' and (item_id not in MEGA_STONE_OWNERS or
-                                   MEGA_STONE_OWNERS.get(item_id) != base):
+        rayquaza_mega = mecanica == 'mega' and base == 'rayquaza'
+        if mecanica == 'mega' and not rayquaza_mega and not _forma_mega_da_pedra(base, item_id):
             erros.append(f'Slot {indice}: Mega Evolução exige a Mega Stone correta.')
+        if rayquaza_mega and 'dragonascent' not in {_chave(m) for m in (slot.get('moves') or [])}:
+            erros.append(f'Slot {indice}: Rayquaza-Mega exige Dragon Ascent.')
         if mecanica == 'mega':
-            forma = base + 'mega'
-            if item_id in ('charizarditex', 'charizarditey'):
-                forma += item_id[-1]
-            if (restricao := _disponibilidade(forma, formato)):
+            forma = 'rayquazamega' if rayquaza_mega else _forma_mega_da_pedra(base, item_id)
+            if forma and (restricao := _disponibilidade(forma, formato)):
                 erros.append(f'Slot {indice}: a Mega Evolução de {especie} {restricao}.')
         tera = str(slot.get('tera_type') or '').strip()
         if tera and not formato.get('permite_tera', False):
@@ -340,7 +366,7 @@ def validar_equipe_basica(slots, codigo_formato):
         if _chave(slot.get('ability')) in habilidades_banidas:
             erros.append(f"Slot {indice}: habilidade {slot.get('ability')} proibida no formato.")
         habilidade = str(slot.get('ability') or '').strip()
-        habilidades_oficiais = _habilidades_permitidas_especie(especie)
+        habilidades_oficiais = _habilidades_permitidas_slot(slot)
         if habilidade and habilidades_oficiais and _chave(habilidade) not in {
                 _chave(valor) for valor in habilidades_oficiais}:
             erros.append(
