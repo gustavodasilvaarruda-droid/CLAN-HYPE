@@ -50,6 +50,48 @@
           <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ (item.meta or {}).get('compatibility', {}).get('minecraft') or 'Não declarado' }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
         {% else %}<tr><td colspan="6">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
       </table></div>
+      <h2>2. Revisar e testar antes de liberar</h2>
+      <p>Marque como em teste, confira o JAR protegido dentro do Minecraft e só então confirme a aprovação. O envio sozinho não libera uma atualização.</p>
+      {% for item in drafts %}
+        {% if item.status in ('aguardando_protecao', 'em_teste', 'pronto_para_aprovacao') %}
+        <form method="post" action="{{ url_for('hype_mod_admin.mod_release_review') }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="draft_id" value="{{ item.id }}">
+          <span><strong>{{ item.module_id }} — {{ item.version }}</strong> ({{ item.status|replace('_', ' ') }})</span>
+          <select name="status" aria-label="Próximo estado de revisão">
+            {% if item.status == 'aguardando_protecao' %}
+              <option value="em_teste">Mover para testes</option>
+            {% else %}
+              <option value="em_teste">Voltar para testes</option>
+              <option value="pronto_para_aprovacao">Aprovar após testar</option>
+            {% endif %}
+            <option value="rejeitado">Rejeitar versão</option>
+          </select>
+          <label><input name="tested" value="yes" type="checkbox"> Testado no jogo (obrigatório para aprovar)</label>
+          <button type="submit" class="hype-v6-btn">Salvar revisão</button>
+        </form>
+        {% endif %}
+      {% endfor %}
+      {% if publish_enabled %}
+        <hr>
+        <h2>3. Publicar atualização assinada</h2>
+        <p>A publicação só aceita o <strong>HYPE Client</strong> aprovado, acompanhado de manifesto Ed25519 assinado com a chave correspondente à versão instalada nos jogadores. O site valida a assinatura, versão, endereço, tamanho e SHA-256 antes de registrar.</p>
+        <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish') }}" enctype="multipart/form-data" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label for="draft_publish">Versão aprovada</label>
+          <select name="draft_id" id="draft_publish" required>
+            <option value="">Selecione...</option>
+            {% for item in drafts if item.status == 'pronto_para_aprovacao' and item.module_id == 'hypeclient' %}
+              <option value="{{ item.id }}">{{ item.version }} — {{ item.sha256[:12] }}</option>
+            {% endfor %}
+          </select>
+          <label for="manifest_publish">Manifesto assinado</label>
+          <input id="manifest_publish" name="manifest" type="file" accept=".properties" required>
+          <button type="submit" class="hype-v6-btn gold">Publicar versão assinada</button>
+        </form>
+      {% else %}
+        <p><small>Publicação desativada. O modo de aprovação e entrega automática precisa de homologação e ativação separada no servidor.</small></p>
+      {% endif %}
     {% else %}
       <p><small>O envio privado de arquivos está desativado no servidor. A análise local de um JAR continua disponível; nenhuma atualização será enviada aos jogadores.</small></p>
     {% endif %}
