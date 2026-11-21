@@ -1,12 +1,13 @@
 {% extends 'hype_app_base.html' %}
-{% block title %}HYPE | Análise de JARs{% endblock %}
+{% block title %}HYPE | Atualizações do Cliente{% endblock %}
 {% block content %}
 <section class="hype-v6-page" style="max-width:1080px;margin:25px auto;padding:20px;">
   <div class="hype-v6-panel" style="padding:26px;">
     <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Gerenciador de Módulos</a></p>
-    <span class="hype-v6-kicker">HYPE ADMIN • INSPEÇÃO SEGURA</span>
+    <span class="hype-v6-kicker">HYPE ADMIN • ATUALIZAÇÕES DO CLIENTE</span>
     <h1>Central de Publicação HYPE</h1>
-    <p>Analise os metadados de um mod Fabric antes de publicar. <strong>Neste teste, nenhum JAR é guardado, ofuscado ou enviado aos jogadores.</strong></p>
+    <p>Central para conferir versões do Cliente HYPE e outros mods Fabric antes de distribuí-las. O envio privado de arquivos não instala nem libera automaticamente uma atualização.</p>
+    <p><strong>Fluxo seguro:</strong> analisar JAR → guardar original em privado → proteger e testar o build → assinar a versão → publicar para o atualizador do Minecraft. Apenas as duas primeiras etapas estão disponíveis nesta tela.</p>
     <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label for="jar_inspect">Arquivo Fabric (.jar, máximo de 10 MiB)</label>
@@ -23,6 +24,10 @@
         <tr><th>ID Fabric</th><td><code>{{ report.module_id }}</code></td></tr>
         <tr><th>Versão</th><td>{{ report.version }}</td></tr>
         <tr><th>SHA-256</th><td style="overflow-wrap:anywhere;"><code>{{ report.sha256 }}</code></td></tr>
+        <tr><th>Minecraft</th><td>{{ report.compatibility.minecraft or 'Não declarado' }}</td></tr>
+        <tr><th>Fabric Loader</th><td>{{ report.compatibility.fabricloader or 'Não declarado' }}</td></tr>
+        <tr><th>Cobblemon</th><td>{{ report.compatibility.cobblemon or 'Não declarado' }}</td></tr>
+        <tr><th>Java</th><td>{{ report.compatibility.java or 'Não declarado' }}</td></tr>
         <tr><th>Tamanho</th><td>{{ report.size_bytes }} bytes</td></tr>
         <tr><th>Depende do HYPE Client</th><td>{{ 'Sim' if report.requires_client else 'Não' }}</td></tr>
         <tr><th>Declara Mixins</th><td>{{ 'Sim' if report.has_mixins else 'Não' }}</td></tr>
@@ -31,8 +36,8 @@
     {% endif %}
     {% if staging_enabled %}
       <hr>
-      <h2>Armazenamento privado de originais (staging)</h2>
-      <p>Somente para homologação com banco e bucket privados configurados. Armazenar um original não publica o mod.</p>
+      <h2>1. Enviar JAR para armazenamento privado</h2>
+      <p>O upload registra o ID Fabric, versão, tamanho, SHA-256 e requisitos declarados no arquivo. Somente administradores podem enviar. Esta etapa <strong>não</strong> publica o JAR, nem prova que ele foi ofuscado, assinado ou testado no jogo.</p>
       <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="jar_upload">Arquivo original (.jar)</label>
@@ -40,13 +45,13 @@
         <button type="submit" class="hype-v6-btn gold">Guardar original em privado</button>
       </form>
       <div class="hype-v6-table-wrap"><table class="hype-v6-table">
-        <thead><tr><th>Módulo</th><th>Versão</th><th>Status</th><th>Recebido</th><th>SHA-256</th></tr></thead>
+        <thead><tr><th>Módulo</th><th>Versão</th><th>Minecraft</th><th>Status</th><th>Recebido</th><th>SHA-256</th></tr></thead>
         <tbody>{% for item in drafts %}
-          <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
-        {% else %}<tr><td colspan="5">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
+          <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ (item.meta or {}).get('compatibility', {}).get('minecraft') or 'Não declarado' }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
+        {% else %}<tr><td colspan="6">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
       </table></div>
     {% else %}
-      <p><small>Armazenamento permanente e distribuição de mods desativados por segurança nesta fase.</small></p>
+      <p><small>O envio privado de arquivos está desativado no servidor. A análise local de um JAR continua disponível; nenhuma atualização será enviada aos jogadores.</small></p>
     {% endif %}
   </div>
 </section>
