@@ -1,29 +1,42 @@
-# Central de Publicação HYPE — primeira integração
+# HYPE Client — publicação e atualização segura pelo site
 
-Implementação opt-in, desativada por padrão, integrada ao painel já existente em `/admin/modulos`. Não altera APIs do HYPE Client, Breed ou distribuição de updates já existente.
+Esta implementação é opt-in e desligada por padrão. O administrador faz upload privado, revisa e testa o JAR, depois publica somente com manifesto Ed25519 assinado. O upload por si só não atualiza jogadores.
 
-## Controles atuais
-- `HYPE_MOD_STAGING_ENABLED` vazio/0: **rotas novas inexistentes**.
-- Quando habilitada, somente sessão administrativa aprovada por `_is_admin`.
-- POST exige CSRF global do `app.py` e tamanho do arquivo <= 10 MiB.
-- Valida ZIP/Fabric/ID da primeira lista oficial (Client, Pokédex, Breed Calculator, Campo de Batalha e Battle AI). Auto Ovo preview não entra.
-- Verifica que o Supabase Storage bucket é privado ANTES de enviar o JAR.
-- Metadados, hash SHA-256, compatibilidade Fabric declarada no JAR (Minecraft, loader, Cobblemon, Java) e histórico na tabela `hype_mod_release_drafts`, com RLS.
-- Sem endpoint de download público, sem ofuscação/assinatura/publicação nesta fase.
+## Atualizador existente no HYPE Client
+A versão R7.19 Alpha 7 Preview 10.0.42 fornecida em novembro de 2026 consulta:
+- https://clan-hype.onrender.com/hype-updates/manifest.properties
+- https://clan-hype.onrender.com/hype-updates/releases/hypeclient-rN.jar
 
-## Homologação antes de ativar em produção
-1. Implantar esta branch num ambiente de teste separado.
-2. Executar `sql/20261110_hype_mod_release_staging.sql` **somente no banco de teste**.
-3. Confirmar bucket `hype-mod-originals` privado e RLS ativo.
-4. Configurar `HYPE_RELEASE_SUPABASE_SERVICE_ROLE_KEY` **somente no ambiente do backend**, nunca no repositório ou Java Client.
-5. Definir `HYPE_MOD_STAGING_ENABLED=1` no ambiente de teste. Acessar `/admin/modulos/releases`.
-6. Testar 403 sem login/não admin, falha no CSRF, arquivo inválido, tamanhos, bucket acidentalmente público, armazenamento, rollback e logs. Testes locais não substituem estes testes.
-7. Fazer revisão de segurança antes de decidir ativar na produção.
+O cliente exige HTTPS no domínio oficial, mod_id=hypeclient, minecraft=1.21.1, channel=stable, número de release crescente, tamanho, SHA-256 e assinatura Ed25519. **A chave pública já é fixa dentro do JAR**. A chave privada correspondente precisa existir fora do repositório e do servidor web. Sem ela, nenhum manifesto gerado para este cliente será aceito. Uma chave privada nova não funciona com as instalações atuais: seria preciso uma primeira instalação manual de um cliente contendo a nova chave pública.
 
-## Interface de administração
-A opção **Atualizações do Cliente** aparece no Gerenciador de Módulos. A rota `/admin/modulos/releases` pode analisar um JAR mesmo com o staging desligado; o upload privado depende de `HYPE_MOD_STAGING_ENABLED=1` e da configuração correta do backend.
+## Configuração no servidor
+- HYPE_MOD_STAGING_ENABLED=1: análise e upload para bucket privado pelo Painel Admin.
+- HYPE_MOD_PUBLISH_ENABLED=1: habilita a importação administrativa de um manifesto válido para JAR previamente aprovado. Requer STAGING.
+- HYPE_MOD_DISTRIBUTION_ENABLED=1: o manifesto e os JARs vêm do catálogo Supabase privado. Se não houver versão assinada publicada, os endpoints retornam 404.
+- Sem DISTRIBUTION, a distribuição estática anterior continua inalterada.
 
-Esta área **não publica** o mod para os jogadores; ela apenas inicia a preparação da versão e registra o JAR em privado. O relatório lê somente os requisitos declarados no `fabric.mod.json`, sem garantir compatibilidade real no jogo.
+O backend usa SUPABASE_URL e SUPABASE_KEY, inicializados no app.py. Essas chaves devem permanecer secretas no Render, jamais no site público, repositório ou mod Java. O bucket hype-mod-originals deve permanecer privado e sem políticas SELECT para usuários anônimos.
 
-## Próximas etapas necessárias para atualizar pelo site
-Pipeline isolado de ofuscação, regras de preservação Fabric/Mixin/Cobblemon, testes em jogo, assinatura Ed25519 com chave privada fora do servidor web, aprovação manual, catálogo assinado e instalador/Client que instala com Minecraft fechado e oferece rollback. Sem isso, upload é só rascunho privado.
+Em homologação, aplicar sql/20261110_hype_mod_release_staging.sql e sql/20261121_hype_mod_published_releases.sql, confirmar RLS e acesso do backend. **Não executar migrações de produção sem revisão e backup.**
+
+## Uso da tela
+1. Admin → Gerenciador de Módulos → Atualizações do Cliente.
+2. Enviar o JAR. O site verifica ZIP, ID Fabric, integridade, versão, dependências declaradas e SHA-256, e salva como rascunho privado.
+3. Testar o build final protegido dentro do Minecraft. Usar a revisão para marcar em teste e depois pronto para aprovação. Aprovação manual não substitui testes em jogo.
+4. Criar um manifesto properties usando as linhas release, version, url, sha256, size, minecraft, mod_id e channel, nesta ordem, e assiná-las offline com a chave Ed25519 privada original. A assinatura Base64 é acrescentada como signature.
+5. Importar o manifesto assinado no painel, selecionar a versão aprovada e publicar. O backend verifica assinatura, hash do arquivo recuperado, tamanho, versão, URL oficial e número de release crescente.
+6. Habilitar DISTRIBUTION inicialmente só em homologação; verificar o endpoint de saúde, o manifesto, o download, o fechamento e reinício do Minecraft, e a recuperação de falhas. Depois aprovar deploy em produção.
+
+## Contrato do manifesto
+- release: inteiro positivo de 1 a 999999999, sempre maior que releases anteriores.
+- version: versão exata do fabric.mod.json, inclusive letras e símbolos.
+- url: https://clan-hype.onrender.com/hype-updates/releases/hypeclient-rN.jar, onde N é release.
+- sha256: hash hexadecimal minúsculo do JAR (64 caracteres).
+- size: tamanho exato do arquivo em bytes (entre 1000 e 67108864 aceitos pelo cliente; o bucket aceita até 10485760).
+- minecraft: 1.21.1; mod_id: hypeclient; channel: stable.
+- signature: Base64 da assinatura Ed25519 do texto canônico UTF-8 com as oito primeiras linhas, cada uma no formato chave=valor seguida de uma quebra de linha LF, inclusive a última. A linha signature não é assinada.
+
+## Segurança e limitações
+O servidor nunca assina atualizações, nem aceita manifesto sem assinatura válida para a chave pública fixa no cliente. A URL retorna o JAR diretamente a partir de Storage privado, pelo domínio oficial, com conferência de tamanho e hash. Uma vez instalado no PC do jogador, o JAR não pode ser protegido 100% contra cópia: manter segredos e decisões de permissão no servidor. A entrega automática só deve ser ativada após homologação do instalador e do rollback.
+
+**Estado:** branch de desenvolvimento pronta para revisão. Nenhum arquivo foi publicado automaticamente para os jogadores com estas mudanças.
