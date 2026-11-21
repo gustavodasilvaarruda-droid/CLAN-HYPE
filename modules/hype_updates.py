@@ -41,7 +41,7 @@ def _managed_latest():
 
 
 def _managed_jar(filename):
-    number = int(_RELEASE_NAME.fullmatch(filename).group(1))
+    number = int(filename[len('hypeclient-r'):-len('.jar')])
     try:
         db = _release_db()
         releases = (db.table('hype_mod_published_releases')
