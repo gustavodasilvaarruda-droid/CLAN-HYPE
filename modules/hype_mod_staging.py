@@ -94,7 +94,7 @@ def assert_private_bucket(storage):
         raise RuntimeError("Bucket de originais não é comprovadamente privado.")
 
 
-def register_mod_release_routes(bp, is_admin, registrar_log, db):
+def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     # Reuse the site's existing server-side Supabase connection. Staging
