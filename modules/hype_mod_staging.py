@@ -106,7 +106,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     # Reuse the site's existing server-side Supabase connection. Staging
     # stays disabled unless explicitly enabled in the Render environment.
-    # No database credentials are exposed to templates or JAR files.
+    # Never expose a service_key or database credentials to templates or JAR files.
     if not staging_enabled:
         db = None
 
