@@ -9,6 +9,7 @@ on:
       - "templates/admin_hype_modulos.html"
       - "tests/test_hype_mod_inspection_route.py"
       - "tests/test_hype_mod_release_validator.py"
+      - "tests/test_hype_mod_staging_upload.py"
       - "modules/hype_mod_access.py"
       - "tests/test_hype_mod_admin.py"
       - "tests/test_hype_mod_access.py"
