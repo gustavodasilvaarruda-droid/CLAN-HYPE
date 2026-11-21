@@ -14,9 +14,11 @@ from uuid import uuid4
 from zipfile import ZipFile, BadZipFile
 
 from flask import abort, flash, redirect, render_template, request, session, url_for
+from modules.hype_signed_release import InvalidRelease, verify_signed_manifest, validate_binary
 
 BUCKET = "hype-mod-originals"
 TABLE = "hype_mod_release_drafts"
+PUBLISHED = "hype_mod_published_releases"
 MAX_UPLOAD = 10 * 1024 * 1024
 MAX_ENTRIES = 8000
 MAX_UNCOMPRESSED = 300 * 1024 * 1024
@@ -68,6 +70,12 @@ def inspect_original(raw):
             depends = metadata.get("depends") or {}
             if not isinstance(depends, dict):
                 raise InvalidJar("Dependências Fabric inválidas.")
+            compatibility = {
+                "minecraft": depends.get("minecraft") if isinstance(depends.get("minecraft"), str) else None,
+                "fabricloader": depends.get("fabricloader") if isinstance(depends.get("fabricloader"), str) else None,
+                "cobblemon": depends.get("cobblemon") if isinstance(depends.get("cobblemon"), str) else None,
+                "java": depends.get("java") if isinstance(depends.get("java"), str) else None,
+            }
             for entry in entries:
                 if not entry.is_dir():
                     with archive.open(entry) as stream:
@@ -79,6 +87,7 @@ def inspect_original(raw):
                 "version": version,
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "size_bytes": len(raw),
+                "compatibility": compatibility,
                 "has_mixins": bool(metadata.get("mixins")),
                 "requires_client": module_id == "hypeclient" or "hypeclient" in depends,
             }
@@ -94,12 +103,13 @@ def assert_private_bucket(storage):
         raise RuntimeError("Bucket de originais não é comprovadamente privado.")
 
 
-def register_mod_release_routes(bp, is_admin, registrar_log, db):
+def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
+    publish_enabled = staging_enabled and os.getenv("HYPE_MOD_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     # Reuse the site's existing server-side Supabase connection. Staging
     # stays disabled unless explicitly enabled in the Render environment.
-    # No database credentials are exposed to templates or JAR files.
+    # Never expose a service_key or database credentials to templates or JAR files.
     if not staging_enabled:
         db = None
 
@@ -114,13 +124,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db):
         if db is not None:
             try:
                 drafts = (db.table(TABLE).select(
-                    "id,module_id,version,status,created_at,sha256"
+                    "id,module_id,version,status,created_at,sha256,meta,size_bytes"
                 ).order("created_at", desc=True).limit(100).execute().data or [])
             except Exception:
                 flash("Erro ao consultar rascunhos no banco.", "erro")
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
-            staging_enabled=staging_enabled, report=None, error=None,
+            staging_enabled=staging_enabled, publish_enabled=publish_enabled,
+            report=None, error=None,
         )
 
     @bp.post("/admin/modulos/releases/analisar")
@@ -138,7 +149,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db):
                 error = str(exc)
         return render_template(
             "admin_hype_mod_releases.html", drafts=[],
-            staging_enabled=staging_enabled, report=report, error=error,
+            staging_enabled=staging_enabled, publish_enabled=publish_enabled,
+            report=report, error=error,
         )
 
     @bp.post("/admin/modulos/releases/upload")
@@ -170,7 +182,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db):
                 "sha256": report["sha256"], "size_bytes": report["size_bytes"],
                 "original_filename": (file.filename or "")[:200], "storage_path": path,
                 "uploaded_by": session["usuario_email"], "status": "aguardando_protecao",
-                "meta": {"has_mixins": report["has_mixins"], "requires_client": report["requires_client"]},
+                "meta": {"has_mixins": report["has_mixins"], "requires_client": report["requires_client"],
+                         "compatibility": report["compatibility"]},
             }).execute()
             if registrar_log:
                 registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
@@ -184,4 +197,107 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db):
                 except Exception:
                     pass
             flash("Falha no armazenamento privado. Verifique tabela, bucket e permissões.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+
+    @bp.post("/admin/modulos/releases/revisar")
+    def mod_release_review():
+        """Explicit manual review step; this does not publish the original file."""
+        admin_only()
+        if not staging_enabled or db is None:
+            abort(404)
+        try:
+            draft_id = int(request.form.get("draft_id") or "0")
+            target = request.form.get("status") or ""
+            if target not in {"em_teste", "pronto_para_aprovacao", "rejeitado"} or draft_id < 1:
+                raise ValueError()
+            items = (db.table(TABLE).select("id,status,module_id")
+                     .eq("id", draft_id).limit(1).execute().data or [])
+            if not items:
+                abort(404)
+            old = items[0]["status"]
+            permitted = {
+                "aguardando_protecao": {"em_teste", "rejeitado"},
+                "em_teste": {"pronto_para_aprovacao", "rejeitado"},
+                "pronto_para_aprovacao": {"em_teste", "rejeitado"},
+            }
+            if target not in permitted.get(old, set()):
+                raise ValueError()
+            if target == "pronto_para_aprovacao" and request.form.get("tested") != "yes":
+                raise ValueError()
+            db.table(TABLE).update({"status": target}).eq("id", draft_id).eq("status", old).execute()
+            if registrar_log:
+                registrar_log("revisar_release_jar", "hype_mods", TABLE, draft_id,
+                              {"antes": old, "depois": target})
+            flash("Estado da revisão salvo. O mod ainda não foi publicado.", "sucesso")
+        except ValueError:
+            flash("Revisão inválida; confirme os testes antes da aprovação.", "erro")
+        except Exception:
+            flash("Não foi possível atualizar a revisão.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+    @bp.post("/admin/modulos/releases/publicar")
+    def mod_release_publish():
+        """Publish only a JAR with an independently signed, matching manifest.
+
+        No private signing key is stored on the web server. A human must review
+        the protected build, game-test it, and supply the Ed25519-signed manifest.
+        """
+        admin_only()
+        if not publish_enabled or db is None:
+            abort(404)
+        try:
+            draft_id = int(request.form.get("draft_id") or "0")
+            if draft_id < 1:
+                raise InvalidRelease("Selecione uma versão válida.")
+            signed_file = request.files.get("manifest")
+            if not signed_file or not (signed_file.filename or "").endswith(".properties"):
+                raise InvalidRelease("Envie o manifesto assinado .properties.")
+            signed_bytes = signed_file.stream.read(16385)
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,size_bytes,storage_path"
+            ).eq("id", draft_id).limit(1).execute().data or [])
+            if not rows:
+                raise InvalidRelease("Versão não encontrada.")
+            draft = rows[0]
+            if draft["module_id"] != "hypeclient" or draft["status"] != "pronto_para_aprovacao":
+                raise InvalidRelease("Somente o Client aprovado e testado pode ser publicado.")
+            storage_path = draft["storage_path"]
+            if not (storage_path.startswith("hypeclient/") and
+                    storage_path.endswith("/" + draft["sha256"] + ".jar")):
+                raise InvalidRelease("Caminho privado não confere com o arquivo.")
+            assert_private_bucket(db.storage)
+            raw = db.storage.from_(BUCKET).download(storage_path)
+            validate_binary(raw, expected_sha=draft["sha256"])
+            report = inspect_original(raw)
+            if (report["module_id"] != draft["module_id"] or
+                    report["version"] != draft["version"] or
+                    report["size_bytes"] != draft["size_bytes"]):
+                raise InvalidRelease("Metadados do JAR não conferem com a versão aprovada.")
+            # Reject a release that cannot check for subsequent updates.
+            with ZipFile(io.BytesIO(raw)) as archive:
+                if "br/clanhype/client/update/HypeAutoUpdateClient.class" not in archive.namelist():
+                    raise InvalidRelease("O HYPE Client enviado não possui o atualizador.")
+            signed = verify_signed_manifest(
+                signed_bytes, version=draft["version"], sha256=draft["sha256"],
+                size_bytes=draft["size_bytes"])
+            prior = (db.table(PUBLISHED).select("release")
+                     .order("release", desc=True).limit(1).execute().data or [])
+            if prior and signed["release"] <= int(prior[0]["release"]):
+                raise InvalidRelease("A nova release precisa ter número maior que as anteriores.")
+            db.table(PUBLISHED).insert({
+                "release": signed["release"], "draft_id": draft_id,
+                "module_id": "hypeclient", "version": signed["version"],
+                "sha256": signed["sha256"], "size_bytes": signed["size_bytes"],
+                "storage_path": storage_path, "manifest": signed["content"],
+                "status": "published", "published_by": session["usuario_email"],
+            }).execute()
+            if registrar_log:
+                registrar_log("publicar_release_hypeclient", "hype_mods", PUBLISHED,
+                              signed["release"], {"sha256": signed["sha256"], "draft_id": draft_id})
+            flash("Versão assinada registrada. A entrega exige HYPE_MOD_DISTRIBUTION_ENABLED=1.", "sucesso")
+        except (InvalidRelease, InvalidJar, ValueError) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Falha na publicação; confira o catálogo, o bucket e a configuração.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))

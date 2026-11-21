@@ -5,13 +5,73 @@ must be signed OFFLINE and explicitly staged before a manifest is published.
 """
 import os
 import re
+import io
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, send_file
+from modules.hype_signed_release import InvalidRelease, validate_binary
 
 hype_updates_bp = Blueprint('hype_updates', __name__)
 _RELEASE_NAME = re.compile(r'hypeclient-r[1-9][0-9]{0,8}\.jar\Z', re.ASCII)
+
+
+def _managed_enabled():
+    return os.getenv('HYPE_MOD_DISTRIBUTION_ENABLED', '').lower() in ('1', 'true', 'yes')
+
+
+def _release_db():
+    db = current_app.extensions.get('hype_release_db')
+    if db is None:
+        abort(503)
+    return db
+
+
+def _managed_latest():
+    try:
+        data = (_release_db().table('hype_mod_published_releases')
+                .select('release,manifest').eq('status', 'published')
+                .order('release', desc=True).limit(1).execute().data or [])
+    except Exception:
+        current_app.logger.exception('Failed to load HYPE signed manifest')
+        abort(503)
+    if not data:
+        abort(404)
+    return data[0]
+
+
+def _managed_jar(filename):
+    number = int(filename[len('hypeclient-r'):-len('.jar')])
+    try:
+        db = _release_db()
+        releases = (db.table('hype_mod_published_releases')
+                    .select('release,size_bytes,sha256,storage_path,status')
+                    .eq('release', number).eq('status', 'published').limit(1)
+                    .execute().data or [])
+        if not releases:
+            abort(404)
+        item = releases[0]
+        path = item['storage_path']
+        sha = item['sha256']
+        if not (path.startswith('hypeclient/') and path.endswith('/' + sha + '.jar')):
+            abort(503)
+        # The published JAR remains in private Storage. Never redirect clients
+        # to a third-party URL or leak a storage service-role key.
+        raw = db.storage.from_('hype-mod-originals').download(path)
+        if len(raw) != int(item['size_bytes']):
+            abort(503)
+        validate_binary(raw, expected_sha=sha)
+    except InvalidRelease:
+        current_app.logger.error('HYPE release checksum mismatch: %s', filename)
+        abort(503)
+    except Exception as exc:
+        from werkzeug.exceptions import HTTPException
+        if isinstance(exc, HTTPException):
+            raise
+        current_app.logger.exception('Failed to serve HYPE release: %s', filename)
+        abort(503)
+    return _deliver(io.BytesIO(raw), 'application/java-archive',
+                    'public, max-age=31536000, immutable')
 
 
 def _root():
@@ -38,6 +98,13 @@ def _deliver(path, mimetype, cache):
 @hype_updates_bp.get('/hype-updates/manifest.properties')
 def updates_manifest():
     """Clients verify the detached Ed25519 signature before trusting metadata."""
+    if _managed_enabled():
+        release = _managed_latest()
+        response = make_response(release['manifest'], 200)
+        response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, max-age=0'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
     path = _safe_regular_file(_root(), 'manifest.properties')
     return _deliver(path, 'text/plain; charset=utf-8', 'no-store, max-age=0')
 
@@ -67,6 +134,8 @@ def _external_release_url(filename, variable='HYPE_UPDATES_RELEASE_BASE_URL'):
 def updates_release(filename):
     if not _RELEASE_NAME.fullmatch(filename):
         abort(404)
+    if _managed_enabled():
+        return _managed_jar(filename)
 
     # Prefer a local release for compatibility with existing deployments.
     directory = (_root() / 'releases').resolve()
@@ -86,6 +155,16 @@ def updates_release(filename):
 
 @hype_updates_bp.get('/hype-updates/health')
 def updates_health():
+    if _managed_enabled():
+        try:
+            _managed_latest()
+            published = True
+        except Exception:
+            published = False
+        response = jsonify(service='hype-updates', manifest_present=published,
+                           managed_distribution=True)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
     root = _root()
     manifest = root / 'manifest.properties'
     # This endpoint is deliberately not a signature/integrity attestation.

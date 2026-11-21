@@ -63,6 +63,8 @@ class TestReleaseValidation(unittest.TestCase):
         self.assertEqual(info["version"], "2.0")
         self.assertEqual(info["sha256"], hashlib.sha256(data).hexdigest())
         self.assertFalse(info["requires_client"])
+        self.assertEqual(info["compatibility"]["minecraft"], "1.21.1")
+        self.assertIsNone(info["compatibility"]["fabricloader"])
 
     def test_declared_hypeclient_dependency(self):
         info = inspect_original(make_jar(depends={"hypeclient": "*"}))

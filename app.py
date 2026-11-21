@@ -7767,8 +7767,10 @@ app.register_blueprint(create_hype_wallet_blueprint(
     login_required, membro_hype_ativo, _is_admin
 ))
 
-# HYPE Auto Update - somente distribuicao de versoes assinadas, sem banco de dados.
+# HYPE Auto Update: distribui versões assinadas via banco PRIVADO apenas
+# quando HYPE_MOD_DISTRIBUTION_ENABLED=1. O modo antigo permanece intacto.
 from modules.hype_updates import hype_updates_bp
+app.extensions["hype_release_db"] = supabase
 app.register_blueprint(hype_updates_bp)
 
 # ============================================================================
