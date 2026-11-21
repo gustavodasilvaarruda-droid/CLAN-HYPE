@@ -51,6 +51,7 @@ class TestDistributionSecurity(unittest.TestCase):
             good.storage = Storage(payload)
             response = fetch_verified_jar(good, release)
             self.assertEqual(response.status_code, 200)
+            response.direct_passthrough = False
             self.assertEqual(response.get_data(), payload)
 
             bad = Mock()
