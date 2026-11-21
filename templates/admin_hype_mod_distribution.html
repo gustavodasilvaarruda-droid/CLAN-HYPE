@@ -1,0 +1,55 @@
+{% extends "hype_app_base.html" %}
+{% block title %}Distribuição de Mods | HYPE Admin{% endblock %}
+{% block content %}
+<section style="max-width:1080px;margin:25px auto;padding:22px">
+  <p><a href="{{ url_for('hype_mod_admin.mod_releases') }}">← Voltar à análise de JARs</a></p>
+  <p style="letter-spacing:.1em;color:#c9a258">HYPE ADMIN • DISTRIBUIÇÃO</p>
+  <h1>Publicar mods no site</h1>
+  <p>Envie somente o JAR final de distribuição, nunca um original que deseje manter reservado. O bucket de distribuição é privado; o site libera downloads somente após publicação e autenticação.</p>
+  <p><strong>Atenção:</strong> publicação nesta tela habilita download MANUAL. Não assina o JAR, não oferece ofuscação e NÃO habilita atualizações automáticas do Minecraft.</p>
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% if not distribution_enabled %}
+    <p><strong>Publicação desativada:</strong> execute a migração SQL, configure o bucket privado e habilite HYPE_MOD_DISTRIBUTION_ENABLED=1 no Render somente após validar o ambiente.</p>
+  {% else %}
+    <form action="{{ url_for('hype_mod_admin.upload') }}" method="post" enctype="multipart/form-data" style="padding:20px;border:1px solid #554523;border-radius:14px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="mod_file">JAR final pronto para distribuição (máximo 10 MiB)</label>
+      <input id="mod_file" type="file" name="jar" accept=".jar" required style="display:block;margin:15px 0">
+      <button class="hype-v6-btn gold" type="submit">Enviar como rascunho privado</button>
+    </form>
+  {% endif %}
+  <div style="overflow-x:auto;margin-top:25px">
+  <table class="hype-v6-table" style="width:100%">
+    <thead><tr><th>Mod</th><th>Versão</th><th>Estado</th><th>SHA-256</th><th>Ações</th></tr></thead>
+    <tbody>
+    {% for item in items %}
+      <tr>
+        <td>{{ module_names.get(item.module_id,item.module_id) }}</td>
+        <td>{{ item.version }}</td>
+        <td>{{ item.status }}</td>
+        <td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td>
+        <td>
+          {% if distribution_enabled and item.status != 'publicado' %}
+            <form method="post" action="{{ url_for('hype_mod_admin.change_status',release_id=item.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="estado" value="publicado">
+              <button type="submit">Publicar download</button>
+            </form>
+          {% elif distribution_enabled %}
+            <form method="post" action="{{ url_for('hype_mod_admin.change_status',release_id=item.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="estado" value="suspenso">
+              <button type="submit">Suspender download</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">Ainda não há publicações.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p style="margin-top:25px"><a href="{{ url_for('hype_mod_admin.downloads') }}">Ver página de downloads</a></p>
+</section>
+{% endblock %}
