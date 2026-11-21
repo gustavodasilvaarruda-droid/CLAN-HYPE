@@ -6,6 +6,7 @@
     <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Gerenciador de Módulos</a></p>
     <span class="hype-v6-kicker">HYPE ADMIN • INSPEÇÃO SEGURA</span>
     <h1>Central de Publicação HYPE</h1>
+    <p><a class="hype-v6-btn gold" href="{{ url_for('hype_mod_admin.publications') }}">Abrir distribuição de mods e downloads</a></p>
     <p>Analise os metadados de um mod Fabric antes de publicar. <strong>Neste teste, nenhum JAR é guardado, ofuscado ou enviado aos jogadores.</strong></p>
     <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
