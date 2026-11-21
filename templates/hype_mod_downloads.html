@@ -1,0 +1,33 @@
+{% extends "hype_app_base.html" %}
+{% block title %}Downloads HYPE | Mods Minecraft{% endblock %}
+{% block content %}
+<section style="max-width:1080px;margin:24px auto;padding:22px">
+  <p style="letter-spacing:.1em;color:#c9a258">HYPE • MINECRAFT • FABRIC 1.21.1</p>
+  <h1>Central de Mods HYPE</h1>
+  <p>Baixe as versões oficiais publicadas pela equipe. Para receber atualizações automáticas no futuro, será necessário usar uma versão do HYPE Client compatível com o atualizador.</p>
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% if not distribution_enabled %}
+    <p><strong>A central de downloads está em preparação.</strong> Nenhum arquivo foi publicado por esta página.</p>
+  {% endif %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin-top:24px">
+  {% for module_id, name in module_names.items() %}
+    {% set release = releases.get(module_id) %}
+    <article style="background:#151515;border:1px solid #564626;border-radius:14px;padding:20px">
+      <h2 style="margin-top:0">{{ name }}</h2>
+      {% if release %}
+        <p>Versão: <strong>{{ release.version }}</strong></p>
+        <p>Arquivo verificado por SHA-256 na entrega.</p>
+        {% if module_id in allowed %}
+          <a class="hype-v6-btn gold" href="{{ url_for('hype_mod_admin.download', module_id=module_id) }}" style="display:inline-block;padding:10px 15px">Baixar .jar</a>
+        {% else %}
+          <p>Download indisponível para sua conta. Consulte o administrador do clã.</p>
+        {% endif %}
+      {% else %}
+        <p style="color:#b6ad9c">Sem versão publicada</p>
+      {% endif %}
+    </article>
+  {% endfor %}
+  </div>
+  <p style="margin-top:20px;font-size:.95em">Instalação manual: com o Minecraft fechado, mova o .jar para a pasta mods, sem manter duas versões do mesmo mod. Faça backup antes de substituir arquivos.</p>
+</section>
+{% endblock %}
