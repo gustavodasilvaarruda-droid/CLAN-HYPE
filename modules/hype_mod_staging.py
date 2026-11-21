@@ -68,6 +68,12 @@ def inspect_original(raw):
             depends = metadata.get("depends") or {}
             if not isinstance(depends, dict):
                 raise InvalidJar("Dependências Fabric inválidas.")
+            compatibility = {
+                "minecraft": depends.get("minecraft") if isinstance(depends.get("minecraft"), str) else None,
+                "fabricloader": depends.get("fabricloader") if isinstance(depends.get("fabricloader"), str) else None,
+                "cobblemon": depends.get("cobblemon") if isinstance(depends.get("cobblemon"), str) else None,
+                "java": depends.get("java") if isinstance(depends.get("java"), str) else None,
+            }
             for entry in entries:
                 if not entry.is_dir():
                     with archive.open(entry) as stream:
@@ -79,6 +85,7 @@ def inspect_original(raw):
                 "version": version,
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "size_bytes": len(raw),
+                "compatibility": compatibility,
                 "has_mixins": bool(metadata.get("mixins")),
                 "requires_client": module_id == "hypeclient" or "hypeclient" in depends,
             }
@@ -94,7 +101,7 @@ def assert_private_bucket(storage):
         raise RuntimeError("Bucket de originais não é comprovadamente privado.")
 
 
-def register_mod_release_routes(bp, is_admin, registrar_log, db):
+def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     # Reuse the site's existing server-side Supabase connection. Staging
@@ -114,7 +121,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db):
         if db is not None:
             try:
                 drafts = (db.table(TABLE).select(
-                    "id,module_id,version,status,created_at,sha256"
+                    "id,module_id,version,status,created_at,sha256,meta,size_bytes"
                 ).order("created_at", desc=True).limit(100).execute().data or [])
             except Exception:
                 flash("Erro ao consultar rascunhos no banco.", "erro")
@@ -170,7 +177,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db):
                 "sha256": report["sha256"], "size_bytes": report["size_bytes"],
                 "original_filename": (file.filename or "")[:200], "storage_path": path,
                 "uploaded_by": session["usuario_email"], "status": "aguardando_protecao",
-                "meta": {"has_mixins": report["has_mixins"], "requires_client": report["requires_client"]},
+                "meta": {"has_mixins": report["has_mixins"], "requires_client": report["requires_client"],
+                         "compatibility": report["compatibility"]},
             }).execute()
             if registrar_log:
                 registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
