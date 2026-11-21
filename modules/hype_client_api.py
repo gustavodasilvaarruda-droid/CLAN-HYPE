@@ -337,4 +337,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         (order_services or {}).get('breeder_handlers') or {},
     )
 
+    from modules.hype_mod_distribution import register_client_distribution_api
+    register_client_distribution_api(api, secure, db, is_member)
+
     return api

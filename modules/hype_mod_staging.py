@@ -94,12 +94,13 @@ def assert_private_bucket(storage):
         raise RuntimeError("Bucket de originais não é comprovadamente privado.")
 
 
-def register_mod_release_routes(bp, is_admin, registrar_log, db):
+def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     # Reuse the site's existing server-side Supabase connection. Staging
     # stays disabled unless explicitly enabled in the Render environment.
     # No database credentials are exposed to templates or JAR files.
+    distribution_db = db
     if not staging_enabled:
         db = None
 
@@ -185,3 +186,17 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db):
                     pass
             flash("Falha no armazenamento privado. Verifique tabela, bucket e permissões.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
+
+    # Distribuição independente do staging de ORIGINAIS. Continua inativa
+    # até HYPE_MOD_DISTRIBUTION_ENABLED=1 e migração SQL aplicada.
+    from modules.hype_mod_distribution import register_distribution_routes
+
+    def is_member_hype(email):
+        try:
+            rows = (distribution_db.table("membros_hype").select("ativo")
+                    .eq("usuario_email", email).limit(1).execute().data or [])
+            return bool(rows and rows[0].get("ativo"))
+        except Exception:
+            return False
+
+    register_distribution_routes(bp, distribution_db, is_admin, registrar_log, is_member_hype)

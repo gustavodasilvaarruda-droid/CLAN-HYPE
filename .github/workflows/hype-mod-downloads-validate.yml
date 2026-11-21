@@ -1,0 +1,31 @@
+name: HYPE Mod Downloads - syntax
+on:
+  pull_request:
+    paths:
+      - 'modules/hype_mod_distribution.py'
+      - 'modules/hype_mod_staging.py'
+      - 'modules/hype_client_api.py'
+      - 'templates/hype_mod_downloads.html'
+      - 'templates/admin_hype_mod_distribution.html'
+      - 'sql/hype_mod_distribuicao.sql'
+      - '.github/workflows/hype-mod-downloads-validate.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check Python syntax
+        run: python -m py_compile modules/hype_mod_distribution.py modules/hype_mod_staging.py modules/hype_client_api.py modules/hype_mod_access.py
+      - name: Check Jinja templates syntax
+        run: |
+          python -m pip install "Jinja2>=3.1,<4"
+          python - <<'PY'
+          from jinja2 import Environment
+          for path in ("templates/hype_mod_downloads.html", "templates/admin_hype_mod_distribution.html"):
+              with open(path, encoding="utf-8") as f:
+                  Environment().parse(f.read())
+              print("OK", path)
+          PY
