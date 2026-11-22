@@ -1,6 +1,7 @@
 """Verification contract for the HYPE Client auto-updater (R7.19).
 
-Only the *public* Ed25519 key is in this module. Never place a signing
+The Ed25519 public key below matches the manually installed HYPE Client key.
+Only the *public* key is in this module. Never place a signing
 private key in the repository, browser, or a Minecraft mod.
 """
 import base64
@@ -9,7 +10,7 @@ import re
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-PUBLIC_KEY_DER_B64 = "MCowBQYDK2VwAyEARuMdCP0sz0PgfWc8aUMTHmElRH1jpCmE84gZojUY34k="
+PUBLIC_KEY_DER_B64 = "MCowBQYDK2VwAyEAdCDp8AwxCIKTm4OIJKhO/37OGa/hWus1S7WLOdWgzMY="
 FIELDS = ("release", "version", "url", "sha256", "size", "minecraft", "mod_id", "channel")
 ROOT_URL = "https://clan-hype.onrender.com/hype-updates/releases/"
 RELEASE_FILE = re.compile(r"hypeclient-r([1-9][0-9]{0,8})\.jar\Z", re.ASCII)
