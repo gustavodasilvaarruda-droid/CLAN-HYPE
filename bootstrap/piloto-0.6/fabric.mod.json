@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "hypebootstrap",
+  "version": "0.6.0-stage-preview",
+  "name": "HYPE Bootstrap 0.6 - Private Staging Pilot",
+  "description": "Teste de preparacao autenticada; sem downloads no startup e sem instalar mods.",
+  "authors": ["CLAN HYPE"],
+  "environment": "client",
+  "entrypoints": {"client": ["br.clanhype.bootstrap.HypeBootstrap"]},
+  "depends": {
+    "fabricloader": ">=0.17.2",
+    "minecraft": "1.21.1",
+    "java": ">=21"
+  }
+}
