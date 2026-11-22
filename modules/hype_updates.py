@@ -10,8 +10,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, send_file
-from modules.hype_signed_release import InvalidRelease, validate_binary
-from modules.hype_mod_catalog import InvalidCatalogue, verify_signed_catalogue
+from modules.hype_signed_release import InvalidRelease, validate_binary, SHA
+from modules.hype_mod_catalog import (InvalidCatalogue, verify_signed_catalogue,
+                                     MODULE_IDS, CATALOGUE_BASE_URL)
 
 hype_updates_bp = Blueprint('hype_updates', __name__)
 _RELEASE_NAME = re.compile(r'hypeclient-r[1-9][0-9]{0,8}\.jar\Z', re.ASCII)
@@ -200,6 +201,51 @@ def multi_mod_signed_catalogue():
     response.headers['Cache-Control'] = 'no-store, max-age=0'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
+
+
+
+@hype_updates_bp.get('/hype-updates/mods/<mod_id>/<sha256>.jar')
+def multi_mod_signed_binary(mod_id, sha256):
+    """Pilot binary delivery: OFF unless both independent switches are enabled.
+
+    Only serve an immutable hash-named JAR that is named in the currently signed
+    and verified catalogue. No original uploads or candidate staging paths are
+    readable through this route. Never enable for restricted modules until the
+    authorization/entitlements policy is implemented.
+    """
+    if (os.getenv('HYPE_MULTI_MOD_CATALOG_ENABLED', '').lower() not in ('1', 'true', 'yes')
+            or os.getenv('HYPE_MULTI_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')):
+        abort(404)
+    if mod_id not in MODULE_IDS or not SHA.fullmatch(sha256):
+        abort(404)
+    try:
+        catalogue = verify_signed_catalogue(
+            _safe_regular_file(_root() / 'mods', 'catalog.json').read_bytes()
+        )
+    except (InvalidCatalogue, OSError):
+        current_app.logger.exception('Invalid catalogue for HYPE pilot download')
+        abort(503)
+    expected = next((item for item in catalogue['mods']
+                     if item['id'] == mod_id and item['sha256'] == sha256), None)
+    if (expected is None or
+            expected['url'] != f'{CATALOGUE_BASE_URL}{mod_id}/{sha256}.jar'):
+        abort(404)
+    path = _safe_regular_file(_root() / 'mods' / mod_id, f'{sha256}.jar')
+    try:
+        if path.stat().st_size != expected['size']:
+            abort(503)
+        raw = path.read_bytes()
+        if len(raw) != expected['size']:
+            abort(503)
+        validate_binary(raw, expected_sha=sha256)
+    except InvalidRelease:
+        current_app.logger.error('Failed integrity check for %s/%s', mod_id, sha256)
+        abort(503)
+    except OSError:
+        current_app.logger.exception('Unable to read HYPE pilot binary')
+        abort(503)
+    return _deliver(io.BytesIO(raw), 'application/java-archive',
+                    'public, max-age=31536000, immutable')
 
 
 # Separate opt-in distribution channel for MoreCobblemonTweaks HYPE (Auto Ovo).
