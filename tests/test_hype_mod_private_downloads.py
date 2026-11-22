@@ -102,6 +102,8 @@ class PrivateModDownloadTests(unittest.TestCase):
         flags = patch.dict(os.environ, {
             "HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1",
             "HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED": "1",
+            "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "clan",
+            "HYPE_PRIVATE_MOD_CLAN_RELEASE_CONFIRMED": "yes",
         })
         flags.start()
         self.addCleanup(flags.stop)
