@@ -77,8 +77,15 @@ class DraftUuidReviewTests(unittest.TestCase):
 
     def review(self, status, tested=None, draft_id=None):
         data = {"draft_id": draft_id or self.draft_id, "status": status}
-        if tested is not None:
-            data["tested"] = tested
+        if tested == "yes":
+            data.update({
+                "test_game_launch": "yes",
+                "test_menus": "yes",
+                "test_server_connection": "yes",
+                "test_no_crashes": "yes",
+            })
+        if (self.db.draft.get("meta") or {}).get("protected"):
+            data["candidate_sha256"] = self.db.draft["meta"]["protected"]["sha256"]
         return self.client.post("/admin/modulos/releases/revisar", data=data)
 
     def test_move_to_testing_does_not_require_checkbox(self):
@@ -88,16 +95,57 @@ class DraftUuidReviewTests(unittest.TestCase):
 
     def test_approval_requires_game_test_confirmation(self):
         self.db.draft["status"] = "em_teste"
-        self.db.draft["meta"] = {"protected": {"sha256": "a" * 64}}
+        self.db.draft["meta"] = {
+            "protected": {"sha256": "a" * 64},
+            "automatic_review": {"status": "passed", "candidate_sha256": "a" * 64},
+        }
         self.review("pronto_para_aprovacao")
         self.assertEqual(self.db.draft["status"], "em_teste")
         self.review("pronto_para_aprovacao", tested="yes")
         self.assertEqual(self.db.draft["status"], "pronto_para_aprovacao")
+        review = self.db.draft["meta"]["manual_review"]
+        self.assertEqual(review["candidate_sha256"], "a" * 64)
+        self.assertEqual(review["tested_by"], "admin@example.com")
+        self.assertEqual(len(review["checks"]), 4)
 
     def test_approval_requires_protected_candidate(self):
         self.db.draft["status"] = "em_teste"
         self.review("pronto_para_aprovacao", tested="yes")
         self.assertEqual(self.db.draft["status"], "em_teste")
+
+    def test_stale_or_failed_static_audit_blocks_approval(self):
+        self.db.draft["status"] = "em_teste"
+        self.db.draft["meta"] = {
+            "protected": {"sha256": "a" * 64},
+            "automatic_review": {"status": "passed", "candidate_sha256": "b" * 64},
+        }
+        self.review("pronto_para_aprovacao", tested="yes")
+        self.assertEqual(self.db.draft["status"], "em_teste")
+        self.db.draft["meta"]["automatic_review"] = {
+            "status": "failed", "candidate_sha256": "a" * 64
+        }
+        self.review("pronto_para_aprovacao", tested="yes")
+        self.assertEqual(self.db.draft["status"], "em_teste")
+
+    def test_partial_manual_test_is_not_approval(self):
+        self.db.draft["status"] = "em_teste"
+        self.db.draft["meta"] = {
+            "protected": {"sha256": "a" * 64},
+            "automatic_review": {"status": "passed", "candidate_sha256": "a" * 64},
+        }
+        self.client.post("/admin/modulos/releases/revisar", data={
+            "draft_id": self.draft_id, "status": "pronto_para_aprovacao",
+            "candidate_sha256": "a" * 64, "test_game_launch": "yes",
+            "test_menus": "yes", "test_server_connection": "yes",
+        })
+        self.assertEqual(self.db.draft["status"], "em_teste")
+
+    def test_return_to_testing_invalidates_manual_approval(self):
+        self.db.draft["status"] = "pronto_para_aprovacao"
+        self.db.draft["meta"] = {"manual_review": {"candidate_sha256": "a" * 64}}
+        self.review("em_teste")
+        self.assertEqual(self.db.draft["status"], "em_teste")
+        self.assertNotIn("manual_review", self.db.draft["meta"])
 
     def test_invalid_uuid_never_changes_status(self):
         response = self.review("em_teste", draft_id="not-a-valid-id")
