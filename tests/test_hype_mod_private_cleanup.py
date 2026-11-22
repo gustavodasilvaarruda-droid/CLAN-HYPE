@@ -1,5 +1,6 @@
 """Admin-only cleanup of unused private Fabric JAR drafts."""
 import os
+from pathlib import Path
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -178,6 +179,16 @@ class PrivateCleanupTests(unittest.TestCase):
         self.assertEqual(fmt("2026-11-22T10:45:00Z"), "22/11/2026 às 07:45")
         self.assertEqual(fmt(None), "Data não disponível")
         self.assertEqual(fmt("inválido"), "Data não disponível")
+
+    def test_release_catalog_uses_uuid_fk_for_private_drafts(self):
+        # Production draft IDs are UUID; mismatched bigint migration prevented
+        # creation of this catalog and blocked all otherwise safe deletions.
+        schema = (Path(__file__).resolve().parents[1] / "sql" /
+                  "20261121_hype_mod_published_releases.sql").read_text(encoding="utf-8")
+        self.assertIn("draft_id uuid not null unique references public.hype_mod_release_drafts(id)", schema)
+        self.assertIn("on delete restrict", schema)
+        self.assertIn("enable row level security", schema)
+        self.assertIn("revoke all on public.hype_mod_published_releases from anon, authenticated", schema)
 
     def test_requires_explicit_confirmation_and_valid_id(self):
         self.login()
