@@ -81,7 +81,7 @@ def _approved_candidate(db, row):
         raise InvalidPrivateRelease("Rascunho invalido") from exc
     mod_id, sha = row["module_id"], row["sha256"]
     path = row.get("storage_path")
-    path_re = rf"{re.escape(mod_id)}/{re.escape(draft_id)}/protected/[a-f0-9]{{32}}/{sha}\\.jar"
+    path_re = rf"{re.escape(mod_id)}/{re.escape(draft_id)}/protected/[a-f0-9]{{32}}/{sha}\.jar"
     if not isinstance(path, str) or not re.fullmatch(path_re, path):
         raise InvalidPrivateRelease("Caminho nao aponta para o candidato protegido")
     drafts = (db.table(DRAFTS)
