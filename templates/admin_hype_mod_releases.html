@@ -78,46 +78,109 @@
         <p><small>Original enviado em: {{ item.created_at|hype_br_datetime }} (horário de Brasília)</small></p>
         {% set protected = (item.meta or {}).get('protected') %}
         {% if protected %}
-          <p>Build candidato guardado em privado, SHA-256 <code>{{ protected.sha256[:12] }}…</code>. Falta validar a proteção e testar no jogo.</p>
+          <p>Build candidato registrado em {{ protected.get('received_at')|hype_br_datetime }} (Brasília). SHA-256: <code title="{{ protected.sha256 }}">{{ protected.sha256[:12] }}…</code>. O site verifica a estrutura, mas não comprova a ofuscação nem o funcionamento no jogo.</p>
         {% else %}
           <p>Build candidato protegido ainda não registrado.</p>
         {% endif %}
-        {% if protected_upload_enabled %}
+        {% if protected_upload_enabled and not protected %}
         <form method="post" action="{{ url_for('hype_mod_admin.mod_release_protected_upload') }}" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="draft_id" value="{{ item.id }}">
           <label>Enviar build (.jar) <input type="file" name="jar" accept=".jar" required></label>
           <button type="submit" class="hype-v6-btn">Verificar e guardar build</button>
         </form>
+        {% elif protected %}
+          <p><small>Este candidato está vinculado ao registro. Para testar um JAR diferente, crie um novo rascunho; o histórico anterior não será sobrescrito.</small></p>
         {% else %}
           <p><small>O envio de builds protegidos ainda precisa de ativação separada no Render. Nenhuma proteção é feita automaticamente pelo site.</small></p>
         {% endif %}
       </div>
       {% endfor %}
+      <hr>
       <h2>3. Revisar e testar antes de liberar</h2>
-      <p>Confirme os testes somente com o build candidato preparado e registrado. Sem ele, a aprovação fica bloqueada. Nenhuma revisão libera atualização automaticamente.</p>
+      <p>Escolha um cliente em teste, confira o SHA-256, execute as verificações automáticas e teste <strong>esse mesmo JAR candidato</strong> no Minecraft. O site não inicia o jogo e nenhuma revisão publica a atualização.</p>
       {% for item in drafts %}
         {% if item.status in ('aguardando_protecao', 'em_teste', 'pronto_para_aprovacao') %}
-        <form method="post" action="{{ url_for('hype_mod_admin.mod_release_review') }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0;">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="draft_id" value="{{ item.id }}">
-          <span><strong>{{ item.module_id }} — {{ item.version }}</strong> ({{ item.status|replace('_', ' ') }})</span>
-          <span><small>Recebido em {{ item.created_at|hype_br_datetime }} (horário de Brasília)</small></span>
-          <select name="status" aria-label="Próximo estado de revisão">
-            {% if item.status == 'aguardando_protecao' %}
-              <option value="em_teste">Mover para testes</option>
-            {% else %}
-              <option value="em_teste">Voltar para testes</option>
-              {% if (item.meta or {}).get('protected') %}
-              <option value="pronto_para_aprovacao">Aprovar após testar o build candidato</option>
+        {% set metadata = item.meta or {} %}
+        {% set candidate = metadata.get('protected') or {} %}
+        {% set auto = metadata.get('automatic_review') or {} %}
+        {% set manual = metadata.get('manual_review') or {} %}
+        <article style="border:1px solid rgba(195,151,31,.38);background:linear-gradient(135deg,rgba(195,151,31,.08),transparent 65%);border-radius:14px;padding:18px;margin:16px 0;overflow-wrap:anywhere;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h3 style="margin:0 0 7px;">{{ item.module_id }} · {{ item.version }}</h3>
+              <p style="margin:0;"><strong>Situação:</strong> {% if item.status == 'em_teste' %}EM TESTE — NÃO LIBERADO{% elif item.status == 'pronto_para_aprovacao' %}Aprovado para publicação — NÃO LIBERADO{% else %}Aguardando proteção — NÃO LIBERADO{% endif %}</p>
+            </div>
+            <small><strong>Recebido:</strong> <time datetime="{{ item.created_at or '' }}">{{ item.created_at|hype_br_datetime }}</time> (Brasília)</small>
+          </div>
+          <p style="margin:12px 0 7px;"><strong>Arquivo original:</strong> {{ item.original_filename or 'Nome não registrado' }} · SHA-256 <code title="{{ item.sha256 }}">{{ item.sha256[:16] }}…</code></p>
+          {% if candidate %}
+            <p><strong>Candidato em teste:</strong> SHA-256 <code title="{{ candidate.sha256 }}">{{ candidate.sha256 }}</code><br>
+            <small>Enviado em {{ candidate.get('received_at')|hype_br_datetime }} (Brasília). O hash identifica qual arquivo deve ser instalado no seu Minecraft.</small></p>
+            <div style="padding:12px;border:1px solid rgba(195,151,31,.25);border-radius:10px;margin:12px 0;">
+              <strong>Verificações automáticas (sem executar o mod)</strong>
+              {% if auto.get('status') == 'passed' and auto.get('candidate_sha256') == candidate.get('sha256') %}
+                <p style="margin:6px 0;">Aprovadas em {{ auto.get('checked_at')|hype_br_datetime }}: integridade SHA-256, metadados Fabric, classes de inicialização{% if item.module_id == 'hypeclient' %} e presença do atualizador HYPE{% endif %}.</p>
+                <small>Classes de inicialização verificadas: {{ auto.get('entrypoints_checked', 0) }}. Isso não garante compatibilidade em execução ou proteção do código.</small>
+              {% elif auto.get('status') == 'failed' %}
+                <p role="alert">Verificação falhou: {{ auto.get('reason') or 'consulte o registro de testes' }}. Não aprove este arquivo.</p>
+              {% else %}
+                <p>Não há verificação aprovada para este SHA-256. A aprovação está bloqueada.</p>
               {% endif %}
+              {% if item.status == 'em_teste' and protected_upload_enabled %}
+                <form method="post" action="{{ url_for('hype_mod_admin.mod_release_verify') }}" style="margin-top:10px;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="draft_id" value="{{ item.id }}">
+                  <button type="submit" class="hype-v6-btn">Executar verificações automáticas novamente</button>
+                </form>
+              {% endif %}
+            </div>
+          {% else %}
+            <p><strong>Candidato:</strong> ainda não registrado. Mova o original para testes e use a etapa 2 para enviar o JAR preparado.</p>
+          {% endif %}
+          {% if manual.get('candidate_sha256') and manual.get('candidate_sha256') == candidate.get('sha256') %}
+            <p><strong>Teste no Minecraft registrado:</strong> {{ manual.get('tested_at')|hype_br_datetime }} por {{ manual.get('tested_by') or 'administrador' }}.
+            {% if manual.get('notes') %}<small>Observações: {{ manual.get('notes') }}</small>{% endif %}</p>
+          {% endif %}
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_review') }}" style="margin-top:14px;display:grid;gap:12px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="draft_id" value="{{ item.id }}">
+            {% if candidate %}<input type="hidden" name="candidate_sha256" value="{{ candidate.sha256 }}">{% endif %}
+            {% if item.status == 'em_teste' and candidate %}
+              <fieldset style="border:1px solid rgba(195,151,31,.3);border-radius:10px;padding:12px;">
+                <legend><strong>Confirmação manual — Minecraft</strong></legend>
+                <p><small>Instale exatamente o candidato com SHA-256 acima e marque somente os testes que você realizou com sucesso. Todos os quatro são obrigatórios para aprovar.</small></p>
+                <div style="display:grid;gap:9px;">
+                  <label><input type="checkbox" name="test_game_launch" value="yes"> Minecraft inicia com este JAR sem erro</label>
+                  <label><input type="checkbox" name="test_menus" value="yes"> Menus e recursos principais do HYPE Client funcionam</label>
+                  <label><input type="checkbox" name="test_server_connection" value="yes"> Conexão com o servidor e login funcionam</label>
+                  <label><input type="checkbox" name="test_no_crashes" value="yes"> Sem crashes ou erros críticos durante o teste</label>
+                </div>
+                <label style="display:block;margin-top:10px;">Observações do teste (opcional)
+                  <textarea name="test_notes" maxlength="1000" rows="2" style="display:block;width:100%;box-sizing:border-box;" placeholder="Minecraft, versão do Fabric, Cobblemon, erros encontrados..."></textarea>
+                </label>
+              </fieldset>
             {% endif %}
-            <option value="rejeitado">Rejeitar versão</option>
-          </select>
-          <label><input name="tested" value="yes" type="checkbox"> Testado no jogo (obrigatório para aprovar)</label>
-          <button type="submit" class="hype-v6-btn">Salvar revisão</button>
-        </form>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <label for="review-{{ item.id }}">Decisão</label>
+              <select id="review-{{ item.id }}" name="status" aria-label="Decisão para {{ item.module_id }} {{ item.version }}">
+                {% if item.status == 'aguardando_protecao' %}
+                  <option value="em_teste">Mover para testes</option>
+                {% else %}
+                  <option value="em_teste">Voltar para testes</option>
+                  {% if item.status == 'em_teste' and candidate %}
+                    <option value="pronto_para_aprovacao">Aprovar após testes (não publica)</option>
+                  {% endif %}
+                {% endif %}
+                <option value="rejeitado">Rejeitar versão</option>
+              </select>
+              <button type="submit" class="hype-v6-btn">Salvar decisão</button>
+            </div>
+          </form>
+        </article>
         {% endif %}
+      {% else %}
+        <p>Nenhum cliente aguardando revisão.</p>
       {% endfor %}
       {% if publish_enabled %}
         <hr>
