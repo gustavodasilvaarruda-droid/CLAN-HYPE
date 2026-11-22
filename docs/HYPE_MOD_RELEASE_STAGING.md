@@ -30,6 +30,19 @@ Em homologação, aplicar sql/20261110_hype_mod_release_staging.sql e sql/202611
 7. Importar o manifesto assinado no painel, selecionar a versão aprovada e publicar. O backend verifica assinatura, hash do arquivo recuperado, tamanho, versão, URL oficial e número de release crescente.
 8. Habilitar DISTRIBUTION inicialmente só em homologação; verificar o endpoint de saúde, o manifesto, o download, o fechamento e reinício do Minecraft, e a recuperação de falhas. Depois aprovar deploy em produção.
 
+## Assinatura offline assistida (sem enviar a chave ao site)
+O repositório inclui `python -m modules.hype_manifest_signer` para gerar e verificar o manifesto **num computador confiável**. É necessária a **chave privada Ed25519 original** que corresponde à chave pública presente no cliente instalado; o script recusa qualquer outra chave. Não envie a chave privada pelo chat, site, GitHub, Supabase ou Render. Não coloque a chave em variáveis de ambiente do servidor.
+
+Depois de registrar o **candidato protegido**, validar seu hash e testar o **mesmo JAR** no Minecraft, executar localmente (exemplo ilustrativo; escolher um número de release ainda não utilizado):
+
+```sh
+python -m modules.hype_manifest_signer --jar "HYPE-CLIENT-PROTEGIDO.jar" --private-key "hype-private-key.pem" --release 43 --output "manifest.properties"
+```
+
+A ferramenta lê a versão diretamente de `fabric.mod.json`, calcula SHA-256 e tamanho do arquivo protegido, monta as oito linhas canônicas e adiciona a assinatura Ed25519. O verificador do site ainda confere todos os dados antes da publicação. O manifesto `.properties` pode ser enviado pelo Painel Admin **somente após** a aprovação dos testes. O arquivo PEM jamais deve ser enviado.
+
+Se a chave original não existir, **não gere outra esperando atualizar o cliente já instalado**: será necessário planejar uma atualização inicial manual que instale um cliente com a nova chave pública incorporada. Esse procedimento deve ser testado separadamente.
+
 ## Contrato do manifesto
 - release: inteiro positivo de 1 a 999999999, sempre maior que releases anteriores.
 - version: versão exata do fabric.mod.json, inclusive letras e símbolos.
