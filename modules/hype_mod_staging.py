@@ -15,6 +15,7 @@ from zipfile import ZipFile, BadZipFile
 
 from flask import abort, flash, redirect, render_template, request, session, url_for
 from modules.hype_signed_release import InvalidRelease, verify_signed_manifest, validate_binary
+from modules.hype_mod_build_checks import check_fabric_classes, check_candidate_compatibility, UnsafeBuild
 
 BUCKET = "hype-mod-originals"
 TABLE = "hype_mod_release_drafts"
@@ -120,6 +121,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     publish_enabled = staging_enabled and os.getenv("HYPE_MOD_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
+    protected_upload_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTED_UPLOAD_ENABLED", "").lower() in ("1", "true", "yes")
     # Reuse the site's existing server-side Supabase connection. Staging
     # stays disabled unless explicitly enabled in the Render environment.
     # Never expose a service_key or database credentials to templates or JAR files.
@@ -144,6 +146,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
+            protected_upload_enabled=protected_upload_enabled,
             report=None, error=None,
         )
 
@@ -163,6 +166,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         return render_template(
             "admin_hype_mod_releases.html", drafts=[],
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
+            protected_upload_enabled=protected_upload_enabled,
             report=report, error=error,
         )
 
@@ -178,7 +182,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         raw = file.stream.read(MAX_UPLOAD + 1)
         try:
             report = inspect_original(raw)
-        except InvalidJar as exc:
+            check_fabric_classes(raw)
+        except (InvalidJar, UnsafeBuild) as exc:
             flash(str(exc), "erro")
             return redirect(url_for("hype_mod_admin.mod_releases"))
         path = f'{report["module_id"]}/{uuid4().hex}/{report["sha256"]}.jar'
@@ -190,13 +195,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 file_options={"content-type": "application/java-archive", "upsert": "false"},
             )
             uploaded = True
+            static_audit = check_fabric_classes(raw)
             saved = db.table(TABLE).insert({
                 "module_id": report["module_id"], "version": report["version"],
                 "sha256": report["sha256"], "size_bytes": report["size_bytes"],
                 "original_filename": (file.filename or "")[:200], "storage_path": path,
                 "uploaded_by": session["usuario_email"], "status": "aguardando_protecao",
                 "meta": {"has_mixins": report["has_mixins"], "requires_client": report["requires_client"],
-                         "compatibility": report["compatibility"]},
+                         "compatibility": report["compatibility"], "static_audit": static_audit},
             }).execute()
             if registrar_log:
                 registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
