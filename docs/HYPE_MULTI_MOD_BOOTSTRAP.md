@@ -65,7 +65,21 @@ nunca deve entrar no site, no repositório ou em um JAR.
 Formato obrigatório das URLs:
 https://clan-hype.onrender.com/hype-updates/mods/{id}/{sha256}.jar
 
-ATENÇÃO: esses endpoints de download dos mods ainda NÃO existem.
+Etapa 2A (piloto): o endpoint de download individual agora existe no código,
+mas está **desativado por padrão** e separado da publicação/atualizador legado.
+Requer simultaneamente `HYPE_MULTI_MOD_CATALOG_ENABLED=1` e
+`HYPE_MULTI_MOD_DOWNLOADS_ENABLED=1`. Busca JARs somente em
+`HYPE_UPDATES_DIR/mods/{id}/{sha256}.jar`, quando presentes no catálogo
+assinado e com tamanho e SHA-256 exatos. Não permite upload nem acesso aos
+originais/candidatos privados. O diretório do piloto é manual e a persistência
+em Render/Supabase ainda precisa ser implementada. Nenhum JAR é disponibilizado
+sem as duas flags e o catálogo assinado válido.
+
+ATENÇÃO: o piloto NÃO implementa o cadastro de releases por mod, controle
+de acesso individual, permissões do painel, download de dependências externas,
+ofuscação ou instalação automática; **não habilitar em produção** até essas
+etapas estarem validadas. URLs do catálogo são públicas por design: mods
+restritos por permissão exigirão autorização antes da publicação.
 O validador está limitado aos cinco IDs já presentes no staging:
 hypeclient, hype_pokedex, hype_breed_calculator, hype_battlefield,
 hype_battle_ai. Outros IDs devem ser cadastrados e testados.

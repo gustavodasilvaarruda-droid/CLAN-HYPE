@@ -125,5 +125,59 @@ class SignedCatalogueTests(unittest.TestCase):
             self.assertEqual(client.get("/hype-updates/mods/catalog.json").status_code, 503)
 
 
+    def test_binary_download_is_opt_in_and_requires_signed_listing_and_hash(self):
+        import io
+        from zipfile import ZipFile
+
+        with tempfile.TemporaryDirectory() as home:
+            mods = Path(home) / "mods"
+            mods.mkdir()
+            payload = io.BytesIO()
+            with ZipFile(payload, "w") as zf:
+                zf.writestr("fabric.mod.json", '{"schemaVersion":1,"id":"hype_pokedex"}')
+                zf.writestr("test.bin", b"x" * 3000)
+            jar = payload.getvalue()
+            sha = hashlib.sha256(jar).hexdigest()
+            entry = mod("hype_pokedex", depends_on=("hypeclient",))
+            entry.update({
+                "sha256": sha, "size": len(jar),
+                "url": f"https://clan-hype.onrender.com/hype-updates/mods/hype_pokedex/{sha}.jar"
+            })
+            unsigned = dict(self.unsigned, mods=[mod("hypeclient"), entry])
+            (mods / "catalog.json").write_bytes(self.signed_document(unsigned))
+            target = mods / "hype_pokedex"
+            target.mkdir()
+            (target / f"{sha}.jar").write_bytes(jar)
+            app = Flask(__name__)
+            app.config["TESTING"] = True
+            app.register_blueprint(hype_updates_bp)
+            client = app.test_client()
+            endpoint = f"/hype-updates/mods/hype_pokedex/{sha}.jar"
+
+            with patch.dict(os.environ, {
+                "HYPE_UPDATES_DIR": home,
+                "HYPE_MULTI_MOD_CATALOG_ENABLED": "1",
+                "HYPE_MULTI_MOD_DOWNLOADS_ENABLED": ""
+            }):
+                self.assertEqual(client.get(endpoint).status_code, 404)
+            with patch.dict(os.environ, {
+                "HYPE_UPDATES_DIR": home,
+                "HYPE_MULTI_MOD_CATALOG_ENABLED": "1",
+                "HYPE_MULTI_MOD_DOWNLOADS_ENABLED": "1"
+            }):
+                res = client.get(endpoint)
+                self.assertEqual(res.status_code, 200)
+                self.assertEqual(res.data, jar)
+                self.assertIn("immutable", res.headers["Cache-Control"])
+                self.assertEqual(client.get(
+                    f"/hype-updates/mods/hype_pokedex/{'0' * 64}.jar"
+                ).status_code, 404)
+                (target / f"{sha}.jar").write_bytes(b"corrupt")
+                self.assertEqual(client.get(endpoint).status_code, 503)
+                (target / f"{sha}.jar").write_bytes(jar)
+                (mods / "catalog.json").write_bytes(b"not signed")
+                self.assertEqual(client.get(endpoint).status_code, 503)
+
+
 if __name__ == "__main__":
     unittest.main()
