@@ -84,7 +84,7 @@ public final class PrivateInstallPlanner {
                         "Existing exact SHA-256 matches approved release", staged);
     }
 
-    private static String readFabricModId(Path file) throws Exception {
+    static String readFabricModId(Path file) throws Exception {
         if (Files.size(file) > 100L * 1024 * 1024)
             throw new SecurityException("Oversized installed JAR");
         try (ZipFile zip = new ZipFile(file.toFile())) {
