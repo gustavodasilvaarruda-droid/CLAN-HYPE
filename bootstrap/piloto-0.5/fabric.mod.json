@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "hypebootstrap",
+  "version": "0.5.0-preview",
+  "name": "HYPE Bootstrap 0.5 - Configurable Signed Updates Pilot",
+  "description": "Piloto com modos off/stage/after_exit. Desativado por padrao.",
+  "authors": ["CLAN HYPE"],
+  "environment": "client",
+  "entrypoints": {"client": ["br.clanhype.bootstrap.HypeBootstrap"]},
+  "depends": {
+    "fabricloader": ">=0.17.2",
+    "minecraft": "1.21.1",
+    "java": ">=21"
+  }
+}
