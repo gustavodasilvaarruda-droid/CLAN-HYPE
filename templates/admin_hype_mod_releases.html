@@ -70,32 +70,66 @@
           </tr>
         {% else %}<tr><td colspan="7">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
       </table></div>
-      <h2>2. Registrar build candidato protegido</h2>
-      <p>Esta etapa <strong>não seleciona o JAR original</strong>: ela recebe outro arquivo .jar, compilado/preparado fora do site, vinculado à versão que está em teste. A versão preparada passa por uma segunda verificação de integridade, classes de inicialização, dependências e atualizador. <strong>O site não faz proteção nem ofuscação sozinho.</strong> Não reenvie o original como se fosse um build protegido.</p>
-      {% for item in drafts if item.status == 'em_teste' %}
-      <div style="border:1px solid rgba(195,151,31,.32);border-radius:10px;padding:14px;margin:10px 0;">
-        <strong>{{ item.module_id }} — {{ item.version }}</strong>
-        <p><small>Original enviado em: {{ item.created_at|hype_br_datetime }} (horário de Brasília)</small></p>
-        {% set protected = (item.meta or {}).get('protected') %}
-        {% if protected %}
-          <p>Build candidato registrado em {{ protected.get('received_at')|hype_br_datetime }} (Brasília). SHA-256: <code title="{{ protected.sha256 }}">{{ protected.sha256[:12] }}…</code>. O site verifica a estrutura, mas não comprova a ofuscação nem o funcionamento no jogo.</p>
-        {% else %}
-          <p>Build candidato protegido ainda não registrado.</p>
+      <h2>2. Selecionar original e registrar build candidato protegido</h2>
+      <p>Escolha <strong>um JAR original que já está no armazenamento privado</strong> e mova-o para testes. Em seguida, selecione a mesma versão e envie <strong>outro JAR, já preparado fora do site</strong>. O site verifica a compatibilidade, mas <strong>não protege nem ofusca automaticamente</strong> o arquivo original. Não reenvie o original como candidato.</p>
+      {% set awaiting = drafts|selectattr('status', 'equalto', 'aguardando_protecao')|list %}
+      {% set testing = drafts|selectattr('status', 'equalto', 'em_teste')|list %}
+      {% set upload = namespace(available=false) %}
+      {% for item in testing %}
+        {% if not (item.meta or {}).get('protected') %}
+          {% set upload.available = true %}
         {% endif %}
-        {% if protected_upload_enabled and not protected %}
-        <form method="post" action="{{ url_for('hype_mod_admin.mod_release_protected_upload') }}" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="draft_id" value="{{ item.id }}">
-          <label>Enviar build (.jar) <input type="file" name="jar" accept=".jar" required></label>
-          <button type="submit" class="hype-v6-btn">Verificar e guardar build</button>
-        </form>
-        {% elif protected %}
-          <p><small>Este candidato está vinculado ao registro. Para testar um JAR diferente, crie um novo rascunho; o histórico anterior não será sobrescrito.</small></p>
+      {% endfor %}
+      <div style="border:1px solid rgba(195,151,31,.32);border-radius:12px;padding:16px;margin:12px 0;overflow-wrap:anywhere;">
+        <h3 style="margin-top:0;">2A. Escolher um original já enviado</h3>
+        {% if awaiting %}
+          <p><small>Seu arquivo está aguardando proteção? Selecione-o aqui. Mover para testes <strong>não publica nem altera o JAR</strong>; apenas habilita o registro do candidato na próxima parte.</small></p>
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_review') }}" style="display:grid;gap:12px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="status" value="em_teste">
+            <label for="original_to_test"><strong>Selecionar arquivo original</strong></label>
+            <select id="original_to_test" name="draft_id" required style="width:100%;max-width:100%;min-width:0;padding:12px;border-radius:8px;background:#101319;color:#fff;border:1px solid rgba(195,151,31,.5);">
+              <option value="" selected disabled>Selecione a versão original...</option>
+              {% for item in awaiting %}
+                <option value="{{ item.id }}">{{ item.module_id }} · {{ item.version }} · {{ item.original_filename or 'JAR original' }} · {{ item.created_at|hype_br_datetime }} · SHA {{ item.sha256[:12] }}…</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="hype-v6-btn" style="justify-self:start;">Mover versão selecionada para testes</button>
+          </form>
         {% else %}
-          <p><small>O envio de builds protegidos ainda precisa de ativação separada no Render. Nenhuma proteção é feita automaticamente pelo site.</small></p>
+          <p><small>Nenhum JAR aguardando proteção. Envie um original na etapa 1, ou use uma versão já em teste na etapa 2B.</small></p>
         {% endif %}
       </div>
-      {% endfor %}
+      <div style="border:1px solid rgba(195,151,31,.32);border-radius:12px;padding:16px;margin:12px 0;overflow-wrap:anywhere;">
+        <h3 style="margin-top:0;">2B. Vincular o JAR candidato à versão em teste</h3>
+        {% if upload.available and protected_upload_enabled %}
+          <p><small>Escolha <strong>a versão correta</strong> e envie o JAR protegido correspondente. A verificação compara ID, versão, dependências e estrutura com o original armazenado. Um registro só aceita um candidato.</small></p>
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_protected_upload') }}" enctype="multipart/form-data" style="display:grid;gap:12px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="protected_target"><strong>Versão original que receberá o candidato</strong></label>
+            <select id="protected_target" name="draft_id" required style="width:100%;max-width:100%;min-width:0;padding:12px;border-radius:8px;background:#101319;color:#fff;border:1px solid rgba(195,151,31,.5);">
+              <option value="" selected disabled>Selecione uma versão em teste...</option>
+              {% for item in testing if not (item.meta or {}).get('protected') %}
+                <option value="{{ item.id }}">{{ item.module_id }} · {{ item.version }} · {{ item.original_filename or 'JAR original' }} · {{ item.created_at|hype_br_datetime }} · SHA {{ item.sha256[:12] }}…</option>
+              {% endfor %}
+            </select>
+            <label for="protected_jar"><strong>Arquivo candidato protegido (.jar)</strong></label>
+            <input id="protected_jar" name="jar" type="file" accept=".jar" required>
+            <button type="submit" class="hype-v6-btn gold" style="justify-self:start;">Verificar e guardar build candidato</button>
+          </form>
+        {% elif upload.available %}
+          <p><small>Há uma versão em teste, mas o recebimento de candidatos está desativado no Render. É preciso habilitar o upload protegido separadamente; o site não faz ofuscação por conta própria.</small></p>
+        {% else %}
+          <p><small>Nenhuma versão em teste está esperando um JAR candidato. Selecione um original na etapa 2A ou, se já existe um candidato registrado abaixo, continue na etapa 3.</small></p>
+        {% endif %}
+        {% for item in testing if (item.meta or {}).get('protected') %}
+          {% set protected = (item.meta or {}).get('protected') %}
+          <p style="padding:10px;border:1px solid rgba(195,151,31,.2);border-radius:8px;">
+            <strong>Candidato já registrado:</strong> {{ item.module_id }} · {{ item.version }}<br>
+            <small>Original: {{ item.original_filename or 'JAR original' }}. Candidato recebido em {{ protected.get('received_at')|hype_br_datetime }} (Brasília). SHA-256 do candidato: <code title="{{ protected.sha256 }}">{{ protected.sha256[:16] }}…</code>. Continue os testes na etapa 3.</small>
+          </p>
+        {% endfor %}
+      </div>
       <hr>
       <h2>3. Revisar e testar antes de liberar</h2>
       <p>Escolha um cliente em teste, confira o SHA-256, execute as verificações automáticas e teste <strong>esse mesmo JAR candidato</strong> no Minecraft. O site não inicia o jogo e nenhuma revisão publica a atualização.</p>

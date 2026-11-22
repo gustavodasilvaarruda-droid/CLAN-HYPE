@@ -70,10 +70,16 @@ etapa pode deixar um objeto privado órfão: nesse caso, o painel alerta para
 conferência administrativa, sem publicar ou afetar uma release ativa. **Nada é
 apagado automaticamente.**
 
-A etapa **Registrar build candidato protegido** não seleciona nem reprotege o
-arquivo original já arquivado. Ela exige um segundo JAR gerado fora do site,
-com mesmo ID/versão/dependências, verificações estruturais e bytes diferentes
-do original. Reenviar o arquivo original não é o procedimento correto.
+Na etapa **2A — Escolher um original já enviado**, o administrador seleciona
+um JAR do armazenamento privado que esteja **aguardando proteção** e o move
+para **em teste**, sem alterar seus bytes nem publicar a versão. A seleção mostra
+ID Fabric, versão, nome do arquivo, data de envio e parte do SHA-256.
+Na etapa **2B — Vincular o JAR candidato**, o administrador seleciona explicitamente
+a versão **em teste** que ainda não tem candidato, e envia um **segundo JAR**
+gerado/protegido fora do site. O backend compara ID, versão, dependências,
+estrutura e hashes; a tela indica quais candidatos já foram registrados.
+O site não reprotege o original nem comprova a ofuscação. Reenviar o original
+como candidato não é o procedimento correto.
 
 ## Segurança e limitações
 O servidor nunca assina atualizações, nem aceita manifesto sem assinatura válida para a chave pública fixa no cliente. A publicação assinada precisa apontar para o **build candidato protegido**, armazenado separadamente no mesmo bucket privado; o original não pode ser distribuído por engano. A URL retorna o JAR diretamente a partir de Storage privado, pelo domínio oficial, com conferência de tamanho e hash. Uma vez instalado no PC do jogador, o JAR não pode ser protegido 100% contra cópia: manter segredos e decisões de permissão no servidor. A entrega automática só deve ser ativada após homologação do instalador e do rollback.
