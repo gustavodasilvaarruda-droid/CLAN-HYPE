@@ -10,7 +10,7 @@ import json
 import os
 import re
 import stat
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zipfile import ZipFile, BadZipFile
 
 from flask import abort, flash, redirect, render_template, request, session, url_for
@@ -32,6 +32,19 @@ IDS = {
 
 class InvalidJar(ValueError):
     pass
+
+
+def parse_draft_id(raw):
+    """Accept live UUID draft IDs and older bigint IDs, rejecting malformed values."""
+    value = (raw or "").strip()
+    if value.isdecimal():
+        numeric_id = int(value)
+        if numeric_id > 0:
+            return numeric_id
+    try:
+        return str(UUID(value))
+    except (ValueError, AttributeError, TypeError):
+        raise ValueError("Identificador da versão inválido.") from None
 
 
 def inspect_original(raw):
@@ -207,10 +220,10 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         if not staging_enabled or db is None:
             abort(404)
         try:
-            draft_id = int(request.form.get("draft_id") or "0")
+            draft_id = parse_draft_id(request.form.get("draft_id"))
             target = request.form.get("status") or ""
-            if target not in {"em_teste", "pronto_para_aprovacao", "rejeitado"} or draft_id < 1:
-                raise ValueError()
+            if target not in {"em_teste", "pronto_para_aprovacao", "rejeitado"}:
+                raise ValueError("Etapa de revisão inválida.")
             items = (db.table(TABLE).select("id,status,module_id")
                      .eq("id", draft_id).limit(1).execute().data or [])
             if not items:
@@ -222,16 +235,16 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 "pronto_para_aprovacao": {"em_teste", "rejeitado"},
             }
             if target not in permitted.get(old, set()):
-                raise ValueError()
+                raise ValueError("Transição de revisão inválida. Atualize a página e tente novamente.")
             if target == "pronto_para_aprovacao" and request.form.get("tested") != "yes":
-                raise ValueError()
+                raise ValueError("Confirme os testes no jogo antes da aprovação.")
             db.table(TABLE).update({"status": target}).eq("id", draft_id).eq("status", old).execute()
             if registrar_log:
                 registrar_log("revisar_release_jar", "hype_mods", TABLE, draft_id,
                               {"antes": old, "depois": target})
             flash("Estado da revisão salvo. O mod ainda não foi publicado.", "sucesso")
-        except ValueError:
-            flash("Revisão inválida; confirme os testes antes da aprovação.", "erro")
+        except ValueError as exc:
+            flash(str(exc) or "Revisão inválida.", "erro")
         except Exception:
             flash("Não foi possível atualizar a revisão.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
@@ -247,9 +260,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         if not publish_enabled or db is None:
             abort(404)
         try:
-            draft_id = int(request.form.get("draft_id") or "0")
-            if draft_id < 1:
-                raise InvalidRelease("Selecione uma versão válida.")
+            draft_id = parse_draft_id(request.form.get("draft_id"))
             signed_file = request.files.get("manifest")
             if not signed_file or not (signed_file.filename or "").endswith(".properties"):
                 raise InvalidRelease("Envie o manifesto assinado .properties.")
