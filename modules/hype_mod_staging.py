@@ -158,6 +158,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     publish_enabled = staging_enabled and os.getenv("HYPE_MOD_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     protected_upload_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTED_UPLOAD_ENABLED", "").lower() in ("1", "true", "yes")
+    # Explicit independent gate; must never be enabled by ordinary staging.
+    private_publish_enabled = publish_enabled and os.getenv("HYPE_MOD_PRIVATE_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     @bp.app_template_filter("hype_br_datetime")
     def hype_br_datetime(value):
         """Show upload timestamps in Brazil time, never fabricate missing dates."""
@@ -202,6 +204,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             "admin_hype_mod_releases.html", drafts=drafts,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
+            private_publish_enabled=private_publish_enabled,
             report=None, error=None,
         )
 
@@ -653,6 +656,40 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash(str(exc) or "Revisão inválida.", "erro")
         except Exception:
             flash("Não foi possível atualizar a revisão.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+    @bp.post("/admin/modulos/releases/publicar-privado")
+    def mod_release_publish_private():
+        """Publish one admin-approved private JAR; no automatic signing/upload."""
+        admin_only()
+        if not private_publish_enabled or db is None:
+            abort(404)
+        from modules.hype_mod_private_publication import (
+            publish_first_private_release,
+        )
+        from modules.hype_mod_private_releases import InvalidPrivateRelease
+        try:
+            if request.form.get("confirm_release") != "yes":
+                raise InvalidPrivateRelease("Confirme explicitamente a publicacao deste JAR.")
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            manifest_file = request.files.get("manifest")
+            if not manifest_file or not (manifest_file.filename or "").endswith(".properties"):
+                raise InvalidPrivateRelease("Envie o manifesto assinado .properties.")
+            manifest = manifest_file.stream.read(16385)
+            record = publish_first_private_release(
+                db, draft_id=draft_id, manifest_bytes=manifest,
+                published_by=session["usuario_email"])
+            if registrar_log:
+                registrar_log(
+                    "publicar_release_mod_privado", "hype_mods",
+                    "hype_mod_restricted_releases", record["release"],
+                    {"modulo": record["module_id"], "draft_id": draft_id,
+                     "sha256": record["sha256"]})
+            flash("Release privada registrada. Downloads continuam protegidos pelas flags e permissoes.", "sucesso")
+        except (InvalidPrivateRelease, ValueError) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Nao foi possivel publicar a release privada; nada foi liberado automaticamente.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/publicar")
