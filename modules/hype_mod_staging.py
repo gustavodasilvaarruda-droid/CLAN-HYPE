@@ -10,6 +10,8 @@ import json
 import os
 import re
 import stat
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from uuid import UUID, uuid4
 from zipfile import ZipFile, BadZipFile
 
@@ -122,6 +124,19 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     publish_enabled = staging_enabled and os.getenv("HYPE_MOD_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     protected_upload_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTED_UPLOAD_ENABLED", "").lower() in ("1", "true", "yes")
+    @bp.app_template_filter("hype_br_datetime")
+    def hype_br_datetime(value):
+        """Show upload timestamps in Brazil time, never fabricate missing dates."""
+        if not value:
+            return "Data não disponível"
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y às %H:%M")
+        except (TypeError, ValueError, OverflowError):
+            return "Data não disponível"
+
     # Reuse the site's existing server-side Supabase connection. Staging
     # stays disabled unless explicitly enabled in the Render environment.
     # Never expose a service_key or database credentials to templates or JAR files.
@@ -139,7 +154,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         if db is not None:
             try:
                 drafts = (db.table(TABLE).select(
-                    "id,module_id,version,status,created_at,sha256,meta,size_bytes"
+                    "id,module_id,version,status,created_at,sha256,meta,size_bytes,original_filename"
                 ).order("created_at", desc=True).limit(100).execute().data or [])
             except Exception:
                 flash("Erro ao consultar rascunhos no banco.", "erro")
@@ -281,6 +296,102 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash(str(exc), "erro")
         except Exception:
             flash("Falha no armazenamento do build candidato. Confira o bucket e as permissões.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+
+    @bp.post("/admin/modulos/releases/excluir")
+    def mod_release_delete():
+        """Delete an unused private draft and its stored JARs, never a live release."""
+        admin_only()
+        if not staging_enabled or db is None:
+            abort(404)
+        if request.form.get("confirm_delete") != "yes":
+            flash("Confirme a exclusão do JAR antes de continuar.", "erro")
+            return redirect(url_for("hype_mod_admin.mod_releases"))
+        try:
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,storage_path,meta"
+            ).eq("id", draft_id).limit(1).execute().data or [])
+            if not rows:
+                raise ValueError("Arquivo não encontrado. Atualize a página.")
+            draft = rows[0]
+            state = draft.get("status")
+            if state not in {"aguardando_protecao", "rejeitado"}:
+                raise ValueError("Apenas arquivos pendentes ou rejeitados podem ser apagados. "
+                                 "Versões em teste, aprovadas ou publicadas estão protegidas.")
+
+            # Storage paths always come from trusted DB records, never a browser field.
+            module_id = draft.get("module_id")
+            sha = draft.get("sha256")
+            original_path = draft.get("storage_path")
+            if (module_id not in IDS or not isinstance(sha, str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", sha)
+                    or not isinstance(original_path, str)
+                    or not re.fullmatch(
+                        rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\.jar",
+                        original_path,
+                    )):
+                raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
+            paths = [original_path]
+            protected = (draft.get("meta") or {}).get("protected") or {}
+            if protected:
+                protected_sha = protected.get("sha256")
+                protected_path = protected.get("storage_path")
+                if (not isinstance(protected_sha, str)
+                        or not re.fullmatch(r"[0-9a-f]{64}", protected_sha)
+                        or not isinstance(protected_path, str)
+                        or not re.fullmatch(
+                            rf"{re.escape(module_id)}/{re.escape(str(draft_id))}/protected/"
+                            rf"[0-9a-f]{{32}}/{protected_sha}\.jar",
+                            protected_path,
+                        )):
+                    raise ValueError("Caminho do build protegido inválido; exclusão bloqueada.")
+                paths.append(protected_path)
+
+            # Never delete a release referenced in the catalog, including disabled
+            # releases retained for rollback and old versions still in use.
+            if (db.table(PUBLISHED).select("release").eq("draft_id", draft_id)
+                    .limit(1).execute().data or []):
+                raise ValueError("Esta versão está vinculada a uma publicação e não pode ser apagada.")
+            for path in paths:
+                if (db.table(PUBLISHED).select("release").eq("storage_path", path)
+                        .limit(1).execute().data or []):
+                    raise ValueError("Este arquivo faz parte de uma publicação e não pode ser apagado.")
+
+            assert_private_bucket(db.storage)
+            # Delete the database record first. A published release's FK protects
+            # it even if another admin starts publication between the two checks.
+            # Then remove ONLY the paths belonging to this now-deleted draft.
+            removed = (db.table(TABLE).delete().eq("id", draft_id)
+                       .eq("status", state).execute().data or [])
+            if not removed:
+                raise ValueError("O arquivo mudou de estado. Atualize a página.")
+            try:
+                db.storage.from_(BUCKET).remove(paths)
+            except Exception:
+                # Orphaned files are private; no active release is ever broken.
+                if registrar_log:
+                    try:
+                        registrar_log("limpeza_jar_pendente", "hype_mods", TABLE, draft_id,
+                                      {"storage_paths": paths, "motivo": "falha_no_storage"})
+                    except Exception:
+                        pass
+                flash("Registro removido, mas a limpeza do armazenamento falhou. "
+                      "É necessária conferência administrativa.", "erro")
+                return redirect(url_for("hype_mod_admin.mod_releases"))
+            if registrar_log:
+                try:
+                    registrar_log("excluir_jar_privado", "hype_mods", TABLE, draft_id,
+                                  {"modulo": module_id, "status": state,
+                                   "sha256": sha, "arquivos": len(paths)})
+                except Exception:
+                    pass
+            flash("JAR privado antigo excluído com segurança.", "sucesso")
+        except ValueError as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Não foi possível excluir o JAR. Nenhuma versão publicada foi liberada.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
 
