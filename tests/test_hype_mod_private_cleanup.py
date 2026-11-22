@@ -172,6 +172,13 @@ class PrivateCleanupTests(unittest.TestCase):
         self.assertEqual(len(self.db.drafts), 1)
         self.assertEqual(self.db.storage.removed, [])
 
+    def test_upload_timestamp_shown_in_brasilia_time(self):
+        fmt = self.app.jinja_env.filters["hype_br_datetime"]
+        self.assertEqual(fmt("2026-11-22T10:45:00+00:00"), "22/11/2026 às 07:45")
+        self.assertEqual(fmt("2026-11-22T10:45:00Z"), "22/11/2026 às 07:45")
+        self.assertEqual(fmt(None), "Data não disponível")
+        self.assertEqual(fmt("inválido"), "Data não disponível")
+
     def test_requires_explicit_confirmation_and_valid_id(self):
         self.login()
         self.delete(confirmed=False)
