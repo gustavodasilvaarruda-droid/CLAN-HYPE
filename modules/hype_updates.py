@@ -192,10 +192,14 @@ def multi_mod_signed_catalogue():
     path = _safe_regular_file(_root() / 'mods', 'catalog.json')
     try:
         raw = path.read_bytes()
-        verify_signed_catalogue(raw)
+        catalogue = verify_signed_catalogue(raw)
     except (InvalidCatalogue, OSError):
         current_app.logger.exception('Invalid HYPE multi-mod signed catalogue')
         abort(503)
+    # The pilot catalogue is public. Never disclose restricted releases on it.
+    # A per-user signed/authorized catalogue is still required for multi-mod.
+    if any(item['id'] != 'hypeclient' for item in catalogue['mods']):
+        abort(403)
     response = make_response(raw, 200)
     response.headers['Content-Type'] = 'application/json; charset=utf-8'
     response.headers['Cache-Control'] = 'no-store, max-age=0'
@@ -218,6 +222,10 @@ def multi_mod_signed_binary(mod_id, sha256):
         abort(404)
     if mod_id not in MODULE_IDS or not SHA.fullmatch(sha256):
         abort(404)
+    # Signed does not mean authorized. This legacy pilot URL has NO login;
+    # private mods must be served only by the future per-user download API.
+    if mod_id != 'hypeclient':
+        abort(403)
     try:
         catalogue = verify_signed_catalogue(
             _safe_regular_file(_root() / 'mods', 'catalog.json').read_bytes()
