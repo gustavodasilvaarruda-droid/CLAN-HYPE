@@ -24,7 +24,10 @@ public final class HypePrivateSessionBridge {
             Class<?> loader = Class.forName("net.fabricmc.loader.api.FabricLoader");
             Object fabric = loader.getMethod("getInstance").invoke(null);
             gameDir = (Path) loader.getMethod("getGameDir").invoke(fabric);
-            if (UpdateConfiguration.load(gameDir) == UpdateMode.OFF) return;
+            if (UpdateConfiguration.load(gameDir) == UpdateMode.OFF) {
+                System.out.println("[HYPE 0.6] Login bridge OK; private updates OFF (no downloads).");
+                return;
+            }
         } catch (Exception | LinkageError failure) {
             System.err.println("[HYPE 0.6] Private staging unavailable: " +
                     failure.getClass().getSimpleName());
@@ -65,5 +68,6 @@ public final class HypePrivateSessionBridge {
             if (worker != null) worker.interrupt();
             worker = null;
         }
+        System.out.println("[HYPE 0.6] Logout bridge OK; staging cancelled.");
     }
 }
