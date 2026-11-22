@@ -31,3 +31,20 @@ java -cp hype-bootstrap-0.4.jar:classes br.clanhype.bootstrap.PrivateModUpdaterT
 5. Testar no Windows / Fabric 1.21.1 / Java 21 com instância separada e confirmar logs e ausência de crash. Depois, revisão manual antes de liberar a distribuição.
 
 Dependências: PR #76 (Bootstrap 0.5) e PR #77 (API de releases privadas), ambas em revisão. Não ativar `HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED` ou `HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED` no ambiente de produção.
+
+### JAR piloto construído localmente
+
+O piloto Fabric `0.6.0-stage-preview` foi montado localmente sobre o JAR
+0.5 fornecido pelo proprietário. Foram preservadas todas as classes do 0.5,
+adicionadas cinco classes `PrivateModUpdater*` e substituídas apenas
+`HypeBootstrap`, `UpdateConfiguration`, `UpdateMode` e `fabric.mod.json`.
+O entrypoint Fabric 0.6 permanece **inerte no startup** para impedir que
+`update_mode=after_exit` da versão anterior dispare instalações antes
+da integração de login e nova homologação.
+
+**Testes locais:** `javac --release 21` OK; 20 asserções de preparação
+isolada executadas contra o JAR final com `java -Xverify:all` OK;
+`jar --validate` OK; ZIP íntegro sem entradas duplicadas. Não foi
+executado no Minecraft real, no Windows do jogador ou com login real.
+A presença do método `stageAfterLogin` **não faz** a integração ocorrer
+automaticamente. Não colocar o JAR 0.6 no clã.
