@@ -46,14 +46,14 @@
       </form>
       <p><small><strong>Limpeza segura:</strong> use Apagar somente em arquivos pendentes ou rejeitados. Builds em teste e versões aprovadas/publicadas ficam bloqueados. Para descartar um build em teste, marque-o como Rejeitado na etapa 3 primeiro. O sistema não apaga arquivos automaticamente.</small></p>
       <div class="hype-v6-table-wrap"><table class="hype-v6-table">
-        <thead><tr><th>Módulo</th><th>Versão</th><th>Minecraft</th><th>Status</th><th>Recebido</th><th>SHA-256</th><th>Ações</th></tr></thead>
+        <thead><tr><th>Módulo</th><th>Versão</th><th>Minecraft</th><th>Status</th><th>Recebido (horário de Brasília)</th><th>SHA-256</th><th>Ações</th></tr></thead>
         <tbody>{% for item in drafts %}
           <tr>
             <td title="{{ item.original_filename or '' }}">{{ item.module_id }}</td>
             <td>{{ item.version }}</td>
             <td>{{ (item.meta or {}).get('compatibility', {}).get('minecraft') or 'Não declarado' }}</td>
             <td>{{ item.status|replace('_',' ') }}</td>
-            <td>{{ item.created_at }}</td>
+            <td><time datetime="{{ item.created_at or '' }}">{{ item.created_at|hype_br_datetime }}</time></td>
             <td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td>
             <td>
               {% if item.status in ('aguardando_protecao', 'rejeitado') %}
@@ -75,6 +75,7 @@
       {% for item in drafts if item.status == 'em_teste' %}
       <div style="border:1px solid rgba(195,151,31,.32);border-radius:10px;padding:14px;margin:10px 0;">
         <strong>{{ item.module_id }} — {{ item.version }}</strong>
+        <p><small>Original enviado em: {{ item.created_at|hype_br_datetime }} (horário de Brasília)</small></p>
         {% set protected = (item.meta or {}).get('protected') %}
         {% if protected %}
           <p>Build candidato guardado em privado, SHA-256 <code>{{ protected.sha256[:12] }}…</code>. Falta validar a proteção e testar no jogo.</p>
@@ -101,6 +102,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="draft_id" value="{{ item.id }}">
           <span><strong>{{ item.module_id }} — {{ item.version }}</strong> ({{ item.status|replace('_', ' ') }})</span>
+          <span><small>Recebido em {{ item.created_at|hype_br_datetime }} (horário de Brasília)</small></span>
           <select name="status" aria-label="Próximo estado de revisão">
             {% if item.status == 'aguardando_protecao' %}
               <option value="em_teste">Mover para testes</option>
