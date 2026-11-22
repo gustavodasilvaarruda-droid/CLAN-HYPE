@@ -119,6 +119,40 @@ def assert_private_bucket(storage):
         raise RuntimeError("Bucket de originais não é comprovadamente privado.")
 
 
+def audit_candidate_pair(original, candidate, draft):
+    """Read-only, static checks of the exact archived binaries; never execute JAR code."""
+    meta = draft.get("meta") or {}
+    protected = meta.get("protected") or {}
+    expected = protected.get("sha256")
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise InvalidJar("Build candidato não registrado ou hash inválido.")
+    validate_binary(original, expected_sha=draft["sha256"])
+    validate_binary(candidate, expected_sha=expected)
+    first = inspect_original(original)
+    second = inspect_original(candidate)
+    if (first["module_id"], first["version"]) != (draft["module_id"], draft["version"]):
+        raise InvalidJar("Metadados do original divergentes do registro.")
+    if (second["module_id"], second["version"]) != (draft["module_id"], draft["version"]):
+        raise InvalidJar("Metadados do candidato divergentes do registro.")
+    if protected.get("size_bytes") != len(candidate):
+        raise InvalidJar("Tamanho do candidato não confere.")
+    class_audit = check_candidate_compatibility(original, candidate)
+    if draft["module_id"] == "hypeclient" and not class_audit.get("updater_present"):
+        raise InvalidJar("Atualizador HYPE Client ausente.")
+    return {
+        "status": "passed",
+        "candidate_sha256": expected,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checks": {
+            "integrity": "passed",
+            "fabric_metadata": "passed",
+            "classes": "passed",
+            "updater": "passed" if draft["module_id"] == "hypeclient" else "not_applicable",
+        },
+        "entrypoints_checked": class_audit["entrypoints_checked"],
+    }
+
+
 def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
@@ -258,6 +292,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             draft = rows[0]
             if draft["status"] != "em_teste":
                 raise InvalidJar("Coloque a versão em teste antes de registrar o build protegido.")
+            if (draft.get("meta") or {}).get("protected"):
+                raise InvalidJar("Já existe um candidato neste registro. Crie um novo rascunho para outro JAR, preservando o histórico.")
             assert_private_bucket(db.storage)
             original = db.storage.from_(BUCKET).download(draft["storage_path"])
             validate_binary(original, expected_sha=draft["sha256"])
@@ -277,7 +313,12 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     "storage_path": path, "sha256": report["sha256"],
                     "size_bytes": report["size_bytes"], "static_audit": "passed",
                     "obfuscation_verified": False,
+                    "received_at": datetime.now(timezone.utc).isoformat(),
                 }
+                meta["automatic_review"] = audit_candidate_pair(
+                    original, raw, {**draft, "meta": meta}
+                )
+                meta.pop("manual_review", None)
                 saved = (db.table(TABLE).update({"meta": meta})
                          .eq("id", draft_id).eq("status", "em_teste").execute())
                 if not saved.data:
@@ -298,6 +339,60 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash("Falha no armazenamento do build candidato. Confira o bucket e as permissões.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
+
+    @bp.post("/admin/modulos/releases/verificar")
+    def mod_release_verify():
+        """Re-run static checks against private stored bytes; no Minecraft runtime execution."""
+        admin_only()
+        if not protected_upload_enabled or db is None:
+            abort(404)
+        try:
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,storage_path,meta"
+            ).eq("id", draft_id).limit(1).execute().data or [])
+            if not rows:
+                raise ValueError("Rascunho não encontrado.")
+            draft = rows[0]
+            if draft["status"] != "em_teste":
+                raise ValueError("Somente versões em teste podem ser verificadas novamente.")
+            meta = dict(draft.get("meta") or {})
+            protected = meta.get("protected") or {}
+            if not protected.get("storage_path"):
+                raise ValueError("Registre o JAR candidato antes da verificação.")
+            assert_private_bucket(db.storage)
+            original = db.storage.from_(BUCKET).download(draft["storage_path"])
+            candidate = db.storage.from_(BUCKET).download(protected["storage_path"])
+            report = audit_candidate_pair(original, candidate, draft)
+            meta["automatic_review"] = report
+            meta.pop("manual_review", None)
+            saved = (db.table(TABLE).update({"meta": meta})
+                     .eq("id", draft_id).eq("status", "em_teste").execute())
+            if not saved.data:
+                raise ValueError("A versão mudou durante a verificação. Atualize a página.")
+            if registrar_log:
+                registrar_log("verificar_jar_candidato", "hype_mods", TABLE, draft_id,
+                              {"sha256": report["candidate_sha256"], "resultado": "passed"})
+            flash("Verificações estáticas passaram. Falta confirmar os testes dentro do Minecraft.", "sucesso")
+        except (InvalidJar, UnsafeBuild, InvalidRelease, ValueError, RuntimeError) as exc:
+            # A failed recheck must never leave an older passing report trusted.
+            if "draft" in locals() and draft.get("status") == "em_teste":
+                try:
+                    meta = dict(draft.get("meta") or {})
+                    meta["automatic_review"] = {
+                        "status": "failed",
+                        "candidate_sha256": (meta.get("protected") or {}).get("sha256"),
+                        "checked_at": datetime.now(timezone.utc).isoformat(),
+                        "reason": str(exc)[:300],
+                    }
+                    meta.pop("manual_review", None)
+                    db.table(TABLE).update({"meta": meta}).eq("id", draft_id).eq("status", "em_teste").execute()
+                except Exception:
+                    pass
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Não foi possível verificar os arquivos privados. Não aprove até corrigir.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/excluir")
     def mod_release_delete():
@@ -397,7 +492,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
 
     @bp.post("/admin/modulos/releases/revisar")
     def mod_release_review():
-        """Explicit manual review step; this does not publish the original file."""
+        """Keep manual evidence bound to the same candidate SHA-256 as the static report."""
         admin_only()
         if not staging_enabled or db is None:
             abort(404)
@@ -418,15 +513,39 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             }
             if target not in permitted.get(old, set()):
                 raise ValueError("Transição de revisão inválida. Atualize a página e tente novamente.")
-            if target == "pronto_para_aprovacao" and not (items[0].get("meta") or {}).get("protected"):
-                raise ValueError("Registre um build candidato verificado antes de aprovar.")
-            if target == "pronto_para_aprovacao" and request.form.get("tested") != "yes":
-                raise ValueError("Confirme os testes no jogo antes da aprovação.")
-            db.table(TABLE).update({"status": target}).eq("id", draft_id).eq("status", old).execute()
+            meta = dict(items[0].get("meta") or {})
+            if target == "pronto_para_aprovacao":
+                protected = meta.get("protected") or {}
+                sha = protected.get("sha256")
+                if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha):
+                    raise ValueError("Registre um build candidato verificado antes de aprovar.")
+                auto = meta.get("automatic_review") or {}
+                if auto.get("status") != "passed" or auto.get("candidate_sha256") != sha:
+                    raise ValueError("Execute as verificações automáticas deste candidato antes de aprovar.")
+                if request.form.get("candidate_sha256") != sha:
+                    raise ValueError("O candidato mudou. Atualize a página e confira o SHA-256.")
+                required = ("game_launch", "menus", "server_connection", "no_crashes")
+                if any(request.form.get("test_" + key) != "yes" for key in required):
+                    raise ValueError("Confirme os quatro testes no Minecraft antes da aprovação.")
+                meta["manual_review"] = {
+                    "candidate_sha256": sha,
+                    "checks": {key: True for key in required},
+                    "tested_by": session["usuario_email"],
+                    "tested_at": datetime.now(timezone.utc).isoformat(),
+                    "notes": (request.form.get("test_notes") or "").strip()[:1000],
+                }
+            else:
+                # A returning/rejected build cannot keep a stale approval receipt.
+                meta.pop("manual_review", None)
+            updated = (db.table(TABLE).update({"status": target, "meta": meta})
+                       .eq("id", draft_id).eq("status", old).execute())
+            if not updated.data:
+                raise ValueError("A versão mudou. Atualize a página e tente novamente.")
             if registrar_log:
                 registrar_log("revisar_release_jar", "hype_mods", TABLE, draft_id,
-                              {"antes": old, "depois": target})
-            flash("Estado da revisão salvo. O mod ainda não foi publicado.", "sucesso")
+                              {"antes": old, "depois": target,
+                               "candidate_sha256": (meta.get("protected") or {}).get("sha256")})
+            flash("Revisão registrada. O mod não foi publicado.", "sucesso")
         except ValueError as exc:
             flash(str(exc) or "Revisão inválida.", "erro")
         except Exception:
@@ -457,8 +576,17 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             draft = rows[0]
             if draft["module_id"] != "hypeclient" or draft["status"] != "pronto_para_aprovacao":
                 raise InvalidRelease("Somente o Client aprovado e testado pode ser publicado.")
-            protected = (draft.get("meta") or {}).get("protected") or {}
+            draft_meta = draft.get("meta") or {}
+            protected = draft_meta.get("protected") or {}
             sha = protected.get("sha256")
+            automatic = draft_meta.get("automatic_review") or {}
+            manual = draft_meta.get("manual_review") or {}
+            if (automatic.get("status") != "passed"
+                    or automatic.get("candidate_sha256") != sha
+                    or manual.get("candidate_sha256") != sha
+                    or not all(manual.get("checks", {}).get(key) is True for key in
+                               ("game_launch", "menus", "server_connection", "no_crashes"))):
+                raise InvalidRelease("Revisão automática e teste manual deste JAR não estão completos.")
             size = protected.get("size_bytes")
             storage_path = protected.get("storage_path") or ""
             if not (isinstance(sha, str) and re.fullmatch("[0-9a-f]{64}", sha)
