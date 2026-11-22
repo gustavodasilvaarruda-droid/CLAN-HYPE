@@ -117,6 +117,11 @@ class SignedCatalogueTests(unittest.TestCase):
         }):
             self.assertEqual(client.get("/hype-updates/mods/catalog.json").status_code, 404)
             (folder / "catalog.json").write_bytes(self.signed_document())
+            # Never reveal a mixed/restricted catalogue through the public pilot.
+            response = client.get("/hype-updates/mods/catalog.json")
+            self.assertEqual(response.status_code, 403)
+            only_client = dict(self.unsigned, mods=[mod("hypeclient")])
+            (folder / "catalog.json").write_bytes(self.signed_document(only_client))
             response = client.get("/hype-updates/mods/catalog.json")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json["mods"][0]["id"], "hypeclient")
@@ -125,7 +130,7 @@ class SignedCatalogueTests(unittest.TestCase):
             self.assertEqual(client.get("/hype-updates/mods/catalog.json").status_code, 503)
 
 
-    def test_binary_download_is_opt_in_and_requires_signed_listing_and_hash(self):
+    def test_binary_download_is_opt_in_and_never_serves_private_mods(self):
         import io
         from zipfile import ZipFile
 
@@ -134,25 +139,27 @@ class SignedCatalogueTests(unittest.TestCase):
             mods.mkdir()
             payload = io.BytesIO()
             with ZipFile(payload, "w") as zf:
-                zf.writestr("fabric.mod.json", '{"schemaVersion":1,"id":"hype_pokedex"}')
+                zf.writestr("fabric.mod.json", '{"schemaVersion":1,"id":"hypeclient"}')
                 zf.writestr("test.bin", b"x" * 3000)
             jar = payload.getvalue()
             sha = hashlib.sha256(jar).hexdigest()
-            entry = mod("hype_pokedex", depends_on=("hypeclient",))
+            entry = mod("hypeclient")
             entry.update({
                 "sha256": sha, "size": len(jar),
-                "url": f"https://clan-hype.onrender.com/hype-updates/mods/hype_pokedex/{sha}.jar"
+                "url": f"https://clan-hype.onrender.com/hype-updates/mods/hypeclient/{sha}.jar"
             })
-            unsigned = dict(self.unsigned, mods=[mod("hypeclient"), entry])
+            unsigned = dict(self.unsigned, mods=[
+                entry, mod("hype_pokedex", depends_on=("hypeclient",))
+            ])
             (mods / "catalog.json").write_bytes(self.signed_document(unsigned))
-            target = mods / "hype_pokedex"
+            target = mods / "hypeclient"
             target.mkdir()
             (target / f"{sha}.jar").write_bytes(jar)
             app = Flask(__name__)
             app.config["TESTING"] = True
             app.register_blueprint(hype_updates_bp)
             client = app.test_client()
-            endpoint = f"/hype-updates/mods/hype_pokedex/{sha}.jar"
+            endpoint = f"/hype-updates/mods/hypeclient/{sha}.jar"
 
             with patch.dict(os.environ, {
                 "HYPE_UPDATES_DIR": home,
@@ -165,12 +172,15 @@ class SignedCatalogueTests(unittest.TestCase):
                 "HYPE_MULTI_MOD_CATALOG_ENABLED": "1",
                 "HYPE_MULTI_MOD_DOWNLOADS_ENABLED": "1"
             }):
+                # A public SHA/URL is not a player's permission.
+                restricted = "/hype-updates/mods/hype_pokedex/" + "0" * 64 + ".jar"
+                self.assertEqual(client.get(restricted).status_code, 403)
                 res = client.get(endpoint)
                 self.assertEqual(res.status_code, 200)
                 self.assertEqual(res.data, jar)
                 self.assertIn("immutable", res.headers["Cache-Control"])
                 self.assertEqual(client.get(
-                    f"/hype-updates/mods/hype_pokedex/{'0' * 64}.jar"
+                    f"/hype-updates/mods/hypeclient/{'0' * 64}.jar"
                 ).status_code, 404)
                 (target / f"{sha}.jar").write_bytes(b"corrupt")
                 self.assertEqual(client.get(endpoint).status_code, 503)
