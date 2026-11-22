@@ -43,6 +43,11 @@ public final class PrivateManagedUpgrade {
         requireDir(managed);
         Path state = managed.resolve(release.id() + ".state");
         Owned owned = readOwned(state, release.id());
+        // Interrupted transactions must be recovered by the external launcher
+        // BEFORE we consider an otherwise matching installed SHA as current.
+        Path pending = managed.resolve(release.id() + ".pending");
+        if (Files.exists(pending, NOFOLLOW))
+            throw new SecurityException("Interrupted prior update needs recovery");
         Path oldJar = mods.resolve(owned.name());
         requireFile(oldJar);
         if (!hashMatches(oldJar, owned.hash()) ||
@@ -69,9 +74,6 @@ public final class PrivateManagedUpgrade {
         requireOrCreateDir(backups);
         Path newJar = mods.resolve(filename(release.id(), release.sha256()));
         if (Files.exists(newJar, NOFOLLOW)) throw new SecurityException("Target JAR already exists");
-        Path pending = managed.resolve(release.id() + ".pending");
-        if (Files.exists(pending, NOFOLLOW))
-            throw new SecurityException("Interrupted prior update needs manual recovery");
         Path lockFile = managed.resolve(".updater-lock");
         if (Files.isSymbolicLink(lockFile)) throw new SecurityException("Unsafe lock");
         try (FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE,
