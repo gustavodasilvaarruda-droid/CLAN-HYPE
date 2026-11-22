@@ -181,15 +181,21 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         if not session.get("usuario_email") or not is_admin():
             abort(403)
 
+    def load_drafts():
+        """Load real stored files both on the dashboard and after inspection."""
+        if db is None:
+            return []
+        return (db.table(TABLE).select(
+            "id,module_id,version,status,created_at,sha256,meta,size_bytes,original_filename"
+        ).order("created_at", desc=True).limit(100).execute().data or [])
+
     @bp.get("/admin/modulos/releases")
     def mod_releases():
         admin_only()
         drafts = []
         if db is not None:
             try:
-                drafts = (db.table(TABLE).select(
-                    "id,module_id,version,status,created_at,sha256,meta,size_bytes,original_filename"
-                ).order("created_at", desc=True).limit(100).execute().data or [])
+                drafts = load_drafts()
             except Exception:
                 flash("Erro ao consultar rascunhos no banco.", "erro")
         return render_template(
@@ -212,8 +218,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 report = inspect_original(file.stream.read(MAX_UPLOAD + 1))
             except InvalidJar as exc:
                 error = str(exc)
+        # Inspection must never make the stored versions disappear from the UI.
+        try:
+            drafts = load_drafts()
+        except Exception:
+            drafts = []
+            flash("Nao foi possivel carregar a lista de JARs armazenados.", "erro")
         return render_template(
-            "admin_hype_mod_releases.html", drafts=[],
+            "admin_hype_mod_releases.html", drafts=drafts,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
             report=report, error=error,
@@ -339,6 +351,97 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash("Falha no armazenamento do build candidato. Confira o bucket e as permissões.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
+
+
+    @bp.post("/admin/modulos/releases/vincular-existente")
+    def mod_release_link_existing():
+        """Reuse an already archived candidate, copying it to a private protected path.
+
+        This is a safe *linking* operation, NOT an obfuscator. Both input records
+        stay immutable, and a candidate can never be published without Minecraft
+        review plus a valid Ed25519-signed manifest.
+        """
+        admin_only()
+        if not protected_upload_enabled or db is None:
+            abort(404)
+        path = None
+        try:
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            source_id = parse_draft_id(request.form.get("source_id"))
+            if draft_id == source_id:
+                raise InvalidJar("O candidato e o original devem ser arquivos diferentes.")
+            target_rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,storage_path,meta"
+            ).eq("id", draft_id).limit(1).execute().data or [])
+            source_rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,storage_path,meta"
+            ).eq("id", source_id).limit(1).execute().data or [])
+            if not target_rows or not source_rows:
+                raise InvalidJar("Original ou candidato armazenado nao encontrado.")
+            draft, source = target_rows[0], source_rows[0]
+            if draft["status"] != "em_teste":
+                raise InvalidJar("Escolha um original que esteja em teste.")
+            if (draft.get("meta") or {}).get("protected"):
+                raise InvalidJar("Esse original ja tem um candidato. Crie outro rascunho.")
+            if source["status"] not in ("aguardando_protecao", "em_teste"):
+                raise InvalidJar("O arquivo candidato selecionado nao esta disponivel.")
+            if (source.get("meta") or {}).get("protected"):
+                raise InvalidJar("Escolha um arquivo simples, sem candidato vinculado.")
+            if (source["module_id"], source["version"]) != (draft["module_id"], draft["version"]):
+                raise InvalidJar("O candidato deve ter o mesmo modulo e versao do original.")
+            if source["sha256"] == draft["sha256"]:
+                raise InvalidJar("O candidato e identico ao original. Nenhuma protecao detectavel.")
+
+            assert_private_bucket(db.storage)
+            original = db.storage.from_(BUCKET).download(draft["storage_path"])
+            candidate = db.storage.from_(BUCKET).download(source["storage_path"])
+            validate_binary(original, expected_sha=draft["sha256"])
+            validate_binary(candidate, expected_sha=source["sha256"])
+            report = inspect_original(candidate)
+            if (report["module_id"], report["version"]) != (draft["module_id"], draft["version"]):
+                raise InvalidJar("Metadados Fabric do candidato divergentes.")
+            check_candidate_compatibility(original, candidate)
+            path = (f'{report["module_id"]}/{draft_id}/protected/'
+                    f'{uuid4().hex}/{report["sha256"]}.jar')
+            db.storage.from_(BUCKET).upload(
+                path=path, file=candidate,
+                file_options={"content-type": "application/java-archive", "upsert": "false"},
+            )
+            try:
+                meta = dict(draft.get("meta") or {})
+                meta["protected"] = {
+                    "storage_path": path,
+                    "sha256": report["sha256"],
+                    "size_bytes": report["size_bytes"],
+                    "static_audit": "passed",
+                    "obfuscation_verified": False,
+                    "received_at": datetime.now(timezone.utc).isoformat(),
+                    "source_draft_id": str(source_id),
+                }
+                meta["automatic_review"] = audit_candidate_pair(
+                    original, candidate, {**draft, "meta": meta}
+                )
+                meta.pop("manual_review", None)
+                saved = (db.table(TABLE).update({"meta": meta})
+                         .eq("id", draft_id).eq("status", "em_teste").execute())
+                if not saved.data:
+                    raise RuntimeError("A versao mudou. Atualize a pagina.")
+            except Exception:
+                db.storage.from_(BUCKET).remove([path])
+                raise
+            if registrar_log:
+                try:
+                    registrar_log("vincular_jar_protegido_armazenado", "hype_mods", TABLE, draft_id,
+                                  {"candidate_sha256": report["sha256"],
+                                   "source_draft_id": str(source_id)})
+                except Exception:
+                    pass
+            flash("Candidato armazenado vinculado e verificado. Ainda falta testar no Minecraft e aprovar.", "sucesso")
+        except (InvalidJar, InvalidRelease, UnsafeBuild, ValueError) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Falha ao vincular o arquivo. Nada foi publicado.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/verificar")
     def mod_release_verify():
