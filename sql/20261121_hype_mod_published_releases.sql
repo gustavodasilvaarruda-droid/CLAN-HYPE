@@ -1,8 +1,10 @@
--- HYPE Client release catalog; run in a staging project before production.
+-- HYPE Client release catalog. Apply in staging first, then production.
+-- The live hype_mod_release_drafts.id is UUID (not bigint).
+-- This private catalog is also required for safe deletion checks in the admin panel.
 -- Private objects are served only by the Flask application after approval.
 create table if not exists public.hype_mod_published_releases (
   release bigint primary key check (release between 1 and 999999999),
-  draft_id bigint not null unique references public.hype_mod_release_drafts(id) on delete restrict,
+  draft_id uuid not null unique references public.hype_mod_release_drafts(id) on delete restrict,
   module_id text not null default 'hypeclient' check (module_id = 'hypeclient'),
   version text not null,
   sha256 text not null check (sha256 ~ '^[a-f0-9]{64}$'),
