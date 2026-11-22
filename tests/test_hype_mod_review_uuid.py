@@ -43,7 +43,7 @@ class FakeDatabase:
     def __init__(self, draft_id):
         self.draft = {
             "id": draft_id, "module_id": "hypeclient",
-            "status": "aguardando_protecao",
+            "status": "aguardando_protecao", "meta": {},
         }
 
     def table(self, table_name):
@@ -88,10 +88,16 @@ class DraftUuidReviewTests(unittest.TestCase):
 
     def test_approval_requires_game_test_confirmation(self):
         self.db.draft["status"] = "em_teste"
+        self.db.draft["meta"] = {"protected": {"sha256": "a" * 64}}
         self.review("pronto_para_aprovacao")
         self.assertEqual(self.db.draft["status"], "em_teste")
         self.review("pronto_para_aprovacao", tested="yes")
         self.assertEqual(self.db.draft["status"], "pronto_para_aprovacao")
+
+    def test_approval_requires_protected_candidate(self):
+        self.db.draft["status"] = "em_teste"
+        self.review("pronto_para_aprovacao", tested="yes")
+        self.assertEqual(self.db.draft["status"], "em_teste")
 
     def test_invalid_uuid_never_changes_status(self):
         response = self.review("em_teste", draft_id="not-a-valid-id")

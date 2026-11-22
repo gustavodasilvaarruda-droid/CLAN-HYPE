@@ -11,6 +11,7 @@ O cliente exige HTTPS no domínio oficial, mod_id=hypeclient, minecraft=1.21.1, 
 
 ## Configuração no servidor
 - HYPE_MOD_STAGING_ENABLED=1: análise e upload para bucket privado pelo Painel Admin.
+- HYPE_MOD_PROTECTED_UPLOAD_ENABLED=1: aceita build protegido candidato (verificado e separado do original) para uma versão em teste; não executa ofuscação e não publica. Requer STAGING. Por segurança, vem desativado.
 - HYPE_MOD_PUBLISH_ENABLED=1: habilita a importação administrativa de um manifesto válido para JAR previamente aprovado. Requer STAGING.
 - HYPE_MOD_DISTRIBUTION_ENABLED=1: o manifesto e os JARs vêm do catálogo Supabase privado. Se não houver versão assinada publicada, os endpoints retornam 404.
 - Sem DISTRIBUTION, a distribuição estática anterior continua inalterada.
@@ -22,10 +23,25 @@ Em homologação, aplicar sql/20261110_hype_mod_release_staging.sql e sql/202611
 ## Uso da tela
 1. Admin → Gerenciador de Módulos → Atualizações do Cliente.
 2. Enviar o JAR. O site verifica ZIP, ID Fabric, integridade, versão, dependências declaradas e SHA-256, e salva como rascunho privado.
-3. Testar o build final protegido dentro do Minecraft. Usar a revisão para marcar em teste e depois pronto para aprovação. Aprovação manual não substitui testes em jogo.
-4. Criar um manifesto properties usando as linhas release, version, url, sha256, size, minecraft, mod_id e channel, nesta ordem, e assiná-las offline com a chave Ed25519 privada original. A assinatura Base64 é acrescentada como signature.
-5. Importar o manifesto assinado no painel, selecionar a versão aprovada e publicar. O backend verifica assinatura, hash do arquivo recuperado, tamanho, versão, URL oficial e número de release crescente.
-6. Habilitar DISTRIBUTION inicialmente só em homologação; verificar o endpoint de saúde, o manifesto, o download, o fechamento e reinício do Minecraft, e a recuperação de falhas. Depois aprovar deploy em produção.
+3. Preparar o build protegido em um projeto-fonte Fabric/Gradle, respeitando entrypoints, Mixins, reflexão e classes usadas pelo atualizador. O site **não** faz ofuscação automática no upload, pois processar um JAR arbitrário sem mapeamentos pode quebrar o mod.
+4. Habilitar o upload privado de candidato quando houver uma compilação preparada. A tela compara com o original e rejeita ID, versão, dependências, entrypoints e Mixins diferentes. Uma diferença de bytes e a análise estrutural **não provam** a ofuscação.
+5. Testar **o build candidato** dentro do Minecraft, marcar 'Testado no jogo' e aprovar somente se o cadastro tiver esse build. Sem ele, aprovação é bloqueada.
+6. Criar um manifesto properties usando as linhas release, version, url, sha256, size, minecraft, mod_id e channel, nesta ordem, e assiná-las offline com a chave Ed25519 privada original. A assinatura Base64 é acrescentada como signature.
+7. Importar o manifesto assinado no painel, selecionar a versão aprovada e publicar. O backend verifica assinatura, hash do arquivo recuperado, tamanho, versão, URL oficial e número de release crescente.
+8. Habilitar DISTRIBUTION inicialmente só em homologação; verificar o endpoint de saúde, o manifesto, o download, o fechamento e reinício do Minecraft, e a recuperação de falhas. Depois aprovar deploy em produção.
+
+## Assinatura offline assistida (sem enviar a chave ao site)
+O repositório inclui `python -m modules.hype_manifest_signer` para gerar e verificar o manifesto **num computador confiável**. É necessária a **chave privada Ed25519 original** que corresponde à chave pública presente no cliente instalado; o script recusa qualquer outra chave. Não envie a chave privada pelo chat, site, GitHub, Supabase ou Render. Não coloque a chave em variáveis de ambiente do servidor.
+
+Depois de registrar o **candidato protegido**, validar seu hash e testar o **mesmo JAR** no Minecraft, executar localmente (exemplo ilustrativo; escolher um número de release ainda não utilizado):
+
+```sh
+python -m modules.hype_manifest_signer --jar "HYPE-CLIENT-PROTEGIDO.jar" --private-key "hype-private-key.pem" --release 43 --output "manifest.properties"
+```
+
+A ferramenta lê a versão diretamente de `fabric.mod.json`, calcula SHA-256 e tamanho do arquivo protegido, monta as oito linhas canônicas e adiciona a assinatura Ed25519. O verificador do site ainda confere todos os dados antes da publicação. O manifesto `.properties` pode ser enviado pelo Painel Admin **somente após** a aprovação dos testes. O arquivo PEM jamais deve ser enviado.
+
+Se a chave original não existir, **não gere outra esperando atualizar o cliente já instalado**: será necessário planejar uma atualização inicial manual que instale um cliente com a nova chave pública incorporada. Esse procedimento deve ser testado separadamente.
 
 ## Contrato do manifesto
 - release: inteiro positivo de 1 a 999999999, sempre maior que releases anteriores.
@@ -37,6 +53,38 @@ Em homologação, aplicar sql/20261110_hype_mod_release_staging.sql e sql/202611
 - signature: Base64 da assinatura Ed25519 do texto canônico UTF-8 com as oito primeiras linhas, cada uma no formato chave=valor seguida de uma quebra de linha LF, inclusive a última. A linha signature não é assinada.
 
 ## Segurança e limitações
-O servidor nunca assina atualizações, nem aceita manifesto sem assinatura válida para a chave pública fixa no cliente. A URL retorna o JAR diretamente a partir de Storage privado, pelo domínio oficial, com conferência de tamanho e hash. Uma vez instalado no PC do jogador, o JAR não pode ser protegido 100% contra cópia: manter segredos e decisões de permissão no servidor. A entrega automática só deve ser ativada após homologação do instalador e do rollback.
+O servidor nunca assina atualizações, nem aceita manifesto sem assinatura válida para a chave pública fixa no cliente. A publicação assinada precisa apontar para o **build candidato protegido**, armazenado separadamente no mesmo bucket privado; o original não pode ser distribuído por engano. A URL retorna o JAR diretamente a partir de Storage privado, pelo domínio oficial, com conferência de tamanho e hash. Uma vez instalado no PC do jogador, o JAR não pode ser protegido 100% contra cópia: manter segredos e decisões de permissão no servidor. A entrega automática só deve ser ativada após homologação do instalador e do rollback.
 
 **Estado:** branch de desenvolvimento pronta para revisão. Nenhum arquivo foi publicado automaticamente para os jogadores com estas mudanças.
+
+## Estado e pendências em 22/11/2026
+- Implementado: verificação estrutural automática de arquivos Fabric; recebimento privado de candidatos protegidos com SHA-256 próprio; proibição de aprovar sem candidato e teste manual; assinatura digital vinculada ao candidato, nunca ao JAR original.
+- Necessário para ofuscação **automática**: o **código-fonte** do HYPE Client (projeto Gradle/Fabric, regras de remapeamento, Mixins, dependências), um builder isolado, regras de keep validadas, validações em Minecraft e credenciais de um assinador fora do servidor web. Isso **não está implementado**.
+- Não habilitar HYPE_MOD_PUBLISH_ENABLED nem HYPE_MOD_DISTRIBUTION_ENABLED até confirmar chave original Ed25519, teste do instalador e rollback. A proteção total contra engenharia reversa não é possível.
+
+
+## Migração para a nova chave pública (instalação manual inicial)
+
+A nova chave pública Ed25519 enviada pelo administrador foi verificada contra a
+classe `br/clanhype/client/update/HypeAutoUpdate.class` do JAR experimental
+`HYPE-CLIENT-CHAVE-PUBLICA-NOVA-TESTE-MANUAL.jar`. Seu SHA-256 da chave **pública
+em DER** é:
+`0eef3a6a125a8efe03b93949e98a8028c3f589317c3c9ec8fe4509b2d31f0cd4`.
+
+O verificador de manifesto no servidor foi atualizado para fixar essa chave
+pública na branch de revisão. A chave **privada correspondente permanece apenas
+no computador do administrador** e jamais deve ser transferida ao site ou ao GitHub.
+
+**Pré-condições para produção:**
+1. Fazer backup do mod instalado e instalar manualmente o JAR com a nova chave
+   pública nos PCs de teste; verificar Minecraft, login e funções principais.
+2. Integrar a PR e implantar o servidor **sem ativar publicação/distribuição**.
+   Configurar o armazenamento privado e fazer testes de integração em homologação.
+3. Validar a assinatura de um manifesto de teste **offline** com a chave privada
+   correspondente e testar a atualização automática fim a fim, inclusive rollback.
+4. Só então distribuir a versão-base nova manualmente aos outros jogadores e
+   considerar ativar o canal de distribuição com aprovação explícita do administrador.
+
+**Aviso de compatibilidade:** as instalações que ainda contêm a chave pública
+antiga não aceitarão as atualizações assinadas pela nova chave. A nova assinatura
+não é uma atualização automática da chave antiga.
