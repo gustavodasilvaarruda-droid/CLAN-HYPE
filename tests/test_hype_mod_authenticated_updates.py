@@ -85,14 +85,18 @@ class AuthenticatedUpdateTests(unittest.TestCase):
     def test_default_off_and_login_required(self):
         with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": ""}):
             self.assertEqual(self.client.get(self.path, headers=self.auth).status_code, 404)
-        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1"}):
+        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1",
+                                    "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
+                                    "HYPE_PRIVATE_MOD_TESTER_EMAIL": "trainer@example.com"}):
             self.assertEqual(self.client.get(self.path).status_code, 401)
             self.assertEqual(self.client.get(self.path, headers={
                 "Authorization": "Bearer forged"
             }).status_code, 401)
 
     def test_four_allowed_ids_without_file_urls_or_private_user_data(self):
-        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1"}):
+        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1",
+                                    "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
+                                    "HYPE_PRIVATE_MOD_TESTER_EMAIL": "trainer@example.com"}):
             response = self.client.get(self.path, headers=self.auth)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(set(response.json["mods"]), {
@@ -110,7 +114,9 @@ class AuthenticatedUpdateTests(unittest.TestCase):
             "decisao": "permitir", "inicio_em": "2020-01-01T00:00:00Z",
             "fim_em": None
         })
-        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1"}):
+        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1",
+                                    "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
+                                    "HYPE_PRIVATE_MOD_TESTER_EMAIL": "trainer@example.com"}):
             response = self.client.get(self.path, headers=self.auth)
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("hype_pokedex", response.json["mods"])
@@ -121,7 +127,9 @@ class AuthenticatedUpdateTests(unittest.TestCase):
             "decisao": "bloquear", "inicio_em": "2020-01-01T00:00:00Z",
             "fim_em": None
         })
-        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1"}):
+        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1",
+                                    "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
+                                    "HYPE_PRIVATE_MOD_TESTER_EMAIL": "trainer@example.com"}):
             response = self.client.get(self.path, headers=self.auth)
             self.assertNotIn("hype_pokedex", response.json["mods"])
             self.member = False
@@ -146,7 +154,9 @@ class AuthenticatedUpdateTests(unittest.TestCase):
             may_account_receive_update(
                 self.db, "hype_pokedex", "trainer@example.com", "breeder", True
             )
-        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1"}):
+        with patch.dict(os.environ, {"HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED": "1",
+                                    "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
+                                    "HYPE_PRIVATE_MOD_TESTER_EMAIL": "trainer@example.com"}):
             response = self.client.get(self.path, headers=self.auth)
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("mods", response.json)
