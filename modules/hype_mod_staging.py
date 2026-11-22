@@ -291,7 +291,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             target = request.form.get("status") or ""
             if target not in {"em_teste", "pronto_para_aprovacao", "rejeitado"}:
                 raise ValueError("Etapa de revisão inválida.")
-            items = (db.table(TABLE).select("id,status,module_id")
+            items = (db.table(TABLE).select("id,status,module_id,meta")
                      .eq("id", draft_id).limit(1).execute().data or [])
             if not items:
                 abort(404)
@@ -303,6 +303,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             }
             if target not in permitted.get(old, set()):
                 raise ValueError("Transição de revisão inválida. Atualize a página e tente novamente.")
+            if target == "pronto_para_aprovacao" and not (items[0].get("meta") or {}).get("protected"):
+                raise ValueError("Registre um build candidato verificado antes de aprovar.")
             if target == "pronto_para_aprovacao" and request.form.get("tested") != "yes":
                 raise ValueError("Confirme os testes no jogo antes da aprovação.")
             db.table(TABLE).update({"status": target}).eq("id", draft_id).eq("status", old).execute()
@@ -333,32 +335,40 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 raise InvalidRelease("Envie o manifesto assinado .properties.")
             signed_bytes = signed_file.stream.read(16385)
             rows = (db.table(TABLE).select(
-                "id,module_id,version,status,sha256,size_bytes,storage_path"
+                "id,module_id,version,status,sha256,size_bytes,storage_path,meta"
             ).eq("id", draft_id).limit(1).execute().data or [])
             if not rows:
                 raise InvalidRelease("Versão não encontrada.")
             draft = rows[0]
             if draft["module_id"] != "hypeclient" or draft["status"] != "pronto_para_aprovacao":
                 raise InvalidRelease("Somente o Client aprovado e testado pode ser publicado.")
-            storage_path = draft["storage_path"]
-            if not (storage_path.startswith("hypeclient/") and
-                    storage_path.endswith("/" + draft["sha256"] + ".jar")):
-                raise InvalidRelease("Caminho privado não confere com o arquivo.")
+            protected = (draft.get("meta") or {}).get("protected") or {}
+            sha = protected.get("sha256")
+            size = protected.get("size_bytes")
+            storage_path = protected.get("storage_path") or ""
+            if not (isinstance(sha, str) and re.fullmatch("[0-9a-f]{64}", sha)
+                    and isinstance(size, int) and 1000 <= size <= MAX_UPLOAD
+                    and storage_path.startswith(f'hypeclient/{draft_id}/protected/')
+                    and storage_path.endswith("/" + sha + ".jar")):
+                raise InvalidRelease("Falta o build candidato protegido verificado.")
             assert_private_bucket(db.storage)
+            original = db.storage.from_(BUCKET).download(draft["storage_path"])
             raw = db.storage.from_(BUCKET).download(storage_path)
-            validate_binary(raw, expected_sha=draft["sha256"])
+            validate_binary(original, expected_sha=draft["sha256"])
+            validate_binary(raw, expected_sha=sha)
+            check_candidate_compatibility(original, raw)
             report = inspect_original(raw)
             if (report["module_id"] != draft["module_id"] or
                     report["version"] != draft["version"] or
-                    report["size_bytes"] != draft["size_bytes"]):
+                    report["size_bytes"] != size):
                 raise InvalidRelease("Metadados do JAR não conferem com a versão aprovada.")
             # Reject a release that cannot check for subsequent updates.
             with ZipFile(io.BytesIO(raw)) as archive:
                 if "br/clanhype/client/update/HypeAutoUpdateClient.class" not in archive.namelist():
                     raise InvalidRelease("O HYPE Client enviado não possui o atualizador.")
             signed = verify_signed_manifest(
-                signed_bytes, version=draft["version"], sha256=draft["sha256"],
-                size_bytes=draft["size_bytes"])
+                signed_bytes, version=draft["version"], sha256=sha,
+                size_bytes=size)
             prior = (db.table(PUBLISHED).select("release")
                      .order("release", desc=True).limit(1).execute().data or [])
             if prior and signed["release"] <= int(prior[0]["release"]):
@@ -374,7 +384,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 registrar_log("publicar_release_hypeclient", "hype_mods", PUBLISHED,
                               signed["release"], {"sha256": signed["sha256"], "draft_id": draft_id})
             flash("Versão assinada registrada. A entrega exige HYPE_MOD_DISTRIBUTION_ENABLED=1.", "sucesso")
-        except (InvalidRelease, InvalidJar, ValueError) as exc:
+        except (InvalidRelease, InvalidJar, UnsafeBuild, ValueError) as exc:
             flash(str(exc), "erro")
         except Exception:
             flash("Falha na publicação; confira o catálogo, o bucket e a configuração.", "erro")
