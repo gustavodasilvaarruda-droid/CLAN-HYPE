@@ -7,7 +7,7 @@
     <span class="hype-v6-kicker">HYPE ADMIN • ATUALIZAÇÕES DO CLIENTE</span>
     <h1>Central de Publicação HYPE</h1>
     <p>Central para conferir versões do Cliente HYPE e outros mods Fabric antes de distribuí-las. O envio privado de arquivos não instala nem libera automaticamente uma atualização.</p>
-    <p><strong>Fluxo seguro:</strong> analisar JAR → guardar original em privado → proteger e testar o build → assinar a versão → publicar para o atualizador do Minecraft. Ofuscação automática ainda exige configurar o projeto Java/Fabric e um executor isolado; o upload sozinho não protege o código.</p>
+    <p><strong>Fluxo seguro:</strong> analisar JAR → guardar original em privado → proteger e testar o build → assinar a versão → publicar para o atualizador do Minecraft. A ofuscação automática ainda precisa de um executor isolado; por enquanto, envie um candidato protegido ou reutilize um que já esteja armazenado. Nada é publicado ao enviar.</p>
     <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label for="jar_inspect">Arquivo Fabric (.jar, máximo de 10 MiB)</label>
@@ -37,7 +37,7 @@
     {% if staging_enabled %}
       <hr>
       <h2>1. Enviar JAR para armazenamento privado</h2>
-      <p>O upload registra o ID Fabric, versão, tamanho, SHA-256 e requisitos declarados no arquivo. Somente administradores podem enviar. Esta etapa <strong>não</strong> publica o JAR, nem prova que ele foi ofuscado, assinado ou testado no jogo.</p>
+      <p>Envie o <strong>JAR original de desenvolvimento, ainda sem proteção</strong>. Caso tenha guardado um JAR protegido aqui por engano, não reenvie: depois de guardar o original correto, use a opção 2B-A para reutilizá-lo. Nenhum upload publica o arquivo.</p>
       <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="jar_upload">Arquivo original (.jar)</label>
@@ -64,7 +64,13 @@
                 <button type="submit" class="hype-v6-btn" style="border:1px solid #bb7373;color:#ffb8b8;background:transparent;white-space:nowrap;" aria-label="Apagar arquivo privado da versão {{ item.version }}">Apagar</button>
               </form>
               {% else %}
-              <small title="Versão em teste, aprovada ou vinculada a publicação">Protegido</small>
+              {% if (item.meta or {}).get('protected') %}
+                <small title="Candidato registrado, ainda não publicado">Candidato vinculado</small>
+              {% elif item.status == 'em_teste' %}
+                <small title="Original em teste, sem candidato vinculado">Aguardando candidato</small>
+              {% else %}
+                <small title="Revisado, aguardando assinatura e publicação">Aprovado, não publicado</small>
+              {% endif %}
               {% endif %}
             </td>
           </tr>
@@ -103,7 +109,60 @@
       <div style="border:1px solid rgba(195,151,31,.32);border-radius:12px;padding:16px;margin:12px 0;overflow-wrap:anywhere;">
         <h3 style="margin-top:0;">2B. Vincular o JAR candidato à versão em teste</h3>
         {% if upload.available and protected_upload_enabled %}
-          <p><small>Escolha <strong>a versão correta</strong> e envie o JAR protegido correspondente. A verificação compara ID, versão, dependências e estrutura com o original armazenado. Um registro só aceita um candidato.</small></p>
+          <p>Escolha o <strong>original correto</strong> e vincule a ele o JAR protegido correspondente. Você pode reaproveitar um arquivo já salvo (opção A) ou enviar um novo (opção B). As verificações comparam ID, versão, dependências e SHA-256. Vincular não publica nem protege automaticamente.</p>
+          <div style="border:1px solid rgba(195,151,31,.25);border-radius:10px;padding:14px;margin:12px 0;">
+            <h4 style="margin:0 0 10px;">A. Vincular JAR já armazenado no site</h4>
+            <p><small>Se o protegido foi enviado na etapa 1 por engano, aproveite-o aqui. Uma cópia privada será vinculada ao original correto; o arquivo já salvo não será apagado.</small></p>
+            <form method="post" action="{{ url_for('hype_mod_admin.mod_release_link_existing') }}" style="display:grid;gap:11px;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label for="existing_original"><strong>Original em teste</strong></label>
+              <select id="existing_original" name="draft_id" required style="width:100%;padding:12px;border-radius:8px;background:#101319;color:#fff;border:1px solid rgba(195,151,31,.5);">
+                <option value="" selected disabled>Escolha o JAR original...</option>
+                {% for item in testing if not (item.meta or {}).get('protected') %}
+                  <option value="{{ item.id }}" data-mod="{{ item.module_id }}" data-version="{{ item.version }}" data-sha="{{ item.sha256 }}">{{ item.original_filename or 'JAR original' }} · {{ item.created_at|hype_br_datetime }} · SHA {{ item.sha256[:12] }}…</option>
+                {% endfor %}
+              </select>
+              <label for="existing_candidate"><strong>JAR protegido já guardado</strong></label>
+              <select id="existing_candidate" name="source_id" required style="width:100%;padding:12px;border-radius:8px;background:#101319;color:#fff;border:1px solid rgba(195,151,31,.5);">
+                <option value="" selected disabled>Escolha o candidato...</option>
+                {% for item in drafts if item.status in ('aguardando_protecao','em_teste') and not (item.meta or {}).get('protected') %}
+                  <option value="{{ item.id }}" data-mod="{{ item.module_id }}" data-version="{{ item.version }}" data-sha="{{ item.sha256 }}">{{ item.original_filename or 'JAR' }} · {{ item.created_at|hype_br_datetime }} · SHA {{ item.sha256[:12] }}…</option>
+                {% endfor %}
+              </select>
+              <small id="existing_match_hint" aria-live="polite">Escolha primeiro um original para filtrar os candidatos compatíveis.</small>
+              <button type="submit" class="hype-v6-btn gold" style="justify-self:start;">Verificar e vincular JAR salvo</button>
+            </form>
+          </div>
+          <script>
+            (() => {
+              const original = document.getElementById('existing_original');
+              const candidate = document.getElementById('existing_candidate');
+              const hint = document.getElementById('existing_match_hint');
+              if (!original || !candidate) return;
+              function sync() {
+                const src = original.selectedOptions[0];
+                let count = 0;
+                for (const opt of candidate.options) {
+                  if (!opt.value) continue;
+                  const valid = Boolean(src && src.value)
+                    && opt.value !== src.value
+                    && opt.dataset.mod === src.dataset.mod
+                    && opt.dataset.version === src.dataset.version
+                    && opt.dataset.sha !== src.dataset.sha;
+                  opt.hidden = !valid;
+                  opt.disabled = !valid;
+                  if (valid) count++;
+                }
+                if (candidate.selectedOptions[0] && candidate.selectedOptions[0].disabled) candidate.value = '';
+                hint.textContent = !src || !src.value ? 'Escolha o original primeiro.'
+                  : count ? count + ' candidato(s) compatível(is) armazenado(s).'
+                  : 'Nenhum candidato compatível salvo. Use a opção B abaixo.';
+              }
+              original.addEventListener('change',sync);
+              sync();
+            })();
+          </script>
+          <h4 style="margin:14px 0 8px;">B. Enviar novo JAR protegido do computador</h4>
           <form method="post" action="{{ url_for('hype_mod_admin.mod_release_protected_upload') }}" enctype="multipart/form-data" style="display:grid;gap:12px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label for="protected_target"><strong>Versão original que receberá o candidato</strong></label>
@@ -147,7 +206,10 @@
             </div>
             <small><strong>Recebido:</strong> <time datetime="{{ item.created_at or '' }}">{{ item.created_at|hype_br_datetime }}</time> (Brasília)</small>
           </div>
-          <p style="margin:12px 0 7px;"><strong>Arquivo original:</strong> {{ item.original_filename or 'Nome não registrado' }} · SHA-256 <code title="{{ item.sha256 }}">{{ item.sha256[:16] }}…</code></p>
+          <p style="margin:12px 0 7px;"><strong>Arquivo cadastrado como original:</strong> {{ item.original_filename or 'Nome não registrado' }} · SHA-256 <code title="{{ item.sha256 }}">{{ item.sha256[:16] }}…</code></p>
+          {% if 'protegido' in (item.original_filename or '')|lower and not candidate %}
+            <p style="color:#f5ce76;"><strong>Atenção:</strong> o nome sugere que este JAR já é protegido, mas foi cadastrado como original na etapa 1. Envie o verdadeiro original e vincule este JAR pela opção 2B-A; não aprove este registro como original.</p>
+          {% endif %}
           {% if candidate %}
             <p><strong>Candidato em teste:</strong> SHA-256 <code title="{{ candidate.sha256 }}">{{ candidate.sha256 }}</code><br>
             <small>Enviado em {{ candidate.get('received_at')|hype_br_datetime }} (Brasília). O hash identifica qual arquivo deve ser instalado no seu Minecraft.</small></p>
@@ -170,7 +232,7 @@
               {% endif %}
             </div>
           {% else %}
-            <p><strong>Candidato:</strong> ainda não registrado. Mova o original para testes e use a etapa 2 para enviar o JAR preparado.</p>
+            <p><strong>Candidato:</strong> ainda não registrado. Escolha o JAR protegido na etapa 2B. <strong>Este arquivo não pode ser aprovado ou publicado sem candidato e testes.</strong></p>
           {% endif %}
           {% if manual.get('candidate_sha256') and manual.get('candidate_sha256') == candidate.get('sha256') %}
             <p><strong>Teste no Minecraft registrado:</strong> {{ manual.get('tested_at')|hype_br_datetime }} por {{ manual.get('tested_by') or 'administrador' }}.
@@ -197,14 +259,14 @@
             {% endif %}
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
               <label for="review-{{ item.id }}">Decisão</label>
-              <select id="review-{{ item.id }}" name="status" aria-label="Decisão para {{ item.module_id }} {{ item.version }}">
+              <select id="review-{{ item.id }}" name="status" required aria-label="Decisão para {{ item.module_id }} {{ item.version }}">
+                <option value="" selected disabled>Selecione uma decisão...</option>
                 {% if item.status == 'aguardando_protecao' %}
-                  <option value="em_teste">Mover para testes</option>
-                {% else %}
-                  <option value="em_teste">Voltar para testes</option>
-                  {% if item.status == 'em_teste' and candidate %}
-                    <option value="pronto_para_aprovacao">Aprovar após testes (não publica)</option>
-                  {% endif %}
+                  <option value="em_teste">Mover para testes (não publica)</option>
+                {% elif item.status == 'pronto_para_aprovacao' %}
+                  <option value="em_teste">Voltar para testes (invalida aprovação)</option>
+                {% elif item.status == 'em_teste' and candidate %}
+                  <option value="pronto_para_aprovacao">Aprovar após testes (não publica)</option>
                 {% endif %}
                 <option value="rejeitado">Rejeitar versão</option>
               </select>

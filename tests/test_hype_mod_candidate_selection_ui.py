@@ -29,6 +29,20 @@ class CandidateSelectionTemplateTests(unittest.TestCase):
         self.assertIn("if not (item.meta or {}).get('protected')", self.source)
         self.assertIn("url_for('hype_mod_admin.mod_release_protected_upload')", self.source)
 
+
+    def test_stored_candidate_can_be_reused_safely(self):
+        self.assertIn('id="existing_original"', self.source)
+        self.assertIn('id="existing_candidate"', self.source)
+        self.assertIn('name="source_id" required', self.source)
+        self.assertIn("url_for('hype_mod_admin.mod_release_link_existing')", self.source)
+        self.assertIn('opt.dataset.sha !== src.dataset.sha', self.source)
+
+    def test_review_never_defaults_to_invalid_or_approval_action(self):
+        self.assertIn('value="" selected disabled>Selecione uma decisão', self.source)
+        self.assertIn("elif item.status == 'pronto_para_aprovacao'", self.source)
+        self.assertIn("elif item.status == 'em_teste' and candidate", self.source)
+        self.assertIn('Aguardando candidato', self.source)
+
     def test_publish_remains_separate_action(self):
         self.assertIn('id="draft_publish"', self.source)
         self.assertIn("url_for('hype_mod_admin.mod_release_publish')", self.source)
