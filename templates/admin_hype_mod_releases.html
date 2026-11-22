@@ -6,6 +6,35 @@
     <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Gerenciador de Módulos</a></p>
     <span class="hype-v6-kicker">HYPE ADMIN • ATUALIZAÇÕES DO CLIENTE</span>
     <h1>Central de Publicação HYPE</h1>
+    <section style="margin:16px 0;padding:18px;border:1px solid rgba(195,151,31,.4);border-radius:12px;">
+      <h2 style="margin:0 0 8px;">Distribuição privada dos mods</h2>
+      <p><strong>Escopo atual:</strong>
+        {% if private_rollout_status == 'single_ready' %}
+          Teste de uma única conta autorizado (login obrigatório e permissão por módulo)
+        {% elif private_rollout_status == 'single_missing_tester' %}
+          BLOQUEADO — o modo de conta única está sem e-mail de teste válido no servidor
+        {% elif private_rollout_status == 'clan_ready' %}
+          Escopo de clã habilitado administrativamente (permissões por módulo continuam obrigatórias)
+        {% elif private_rollout_status == 'clan_unconfirmed' %}
+          BLOQUEADO — confirmação extra de liberação para o clã ausente
+        {% else %}
+          BLOQUEADO — distribuição privada desativada por padrão
+        {% endif %}
+      </p>
+      <p><small>O HYPE Client usa seu próprio canal assinado. Os outros quatro mods usam catálogo autenticado com assinatura Ed25519. Nenhum arquivo é distribuído só por ser enviado ao site: é preciso original, build protegido diferente, revisão automática, teste em jogo do build exato, manifesto offline assinado e publicação administrativa.</small></p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% for module_id, module_name in [
+          ('hypeclient','HYPE Client'),
+          ('hype_pokedex','HYPE Pokédex'),
+          ('hype_breed_calculator','Breed Calculator'),
+          ('hype_battlefield','Campo de Batalha'),
+          ('hype_battle_ai','Battle AI')
+        ] %}
+          <span style="border:1px solid rgba(195,151,31,.25);padding:6px 10px;border-radius:9px;font-size:.9em;">{{ module_name }}</span>
+        {% endfor %}
+      </div>
+      <p><small><strong>Importante:</strong> o modo de teste não instala nada no Minecraft por conta própria. O instalador pós-fechamento ainda exige homologação. Nunca salve a chave de assinatura privada no Render.</small></p>
+    </section>
     <p>Central para conferir versões do Cliente HYPE e outros mods Fabric antes de distribuí-las. O envio privado de arquivos não instala nem libera automaticamente uma atualização.</p>
     <p><strong>Fluxo seguro:</strong> analisar JAR → guardar original em privado → proteger e testar o build → assinar a versão → publicar para o atualizador do Minecraft. A ofuscação automática ainda precisa de um executor isolado; por enquanto, envie um candidato protegido ou reutilize um que já esteja armazenado. Nada é publicado ao enviar.</p>
     <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
@@ -297,6 +326,33 @@
         </form>
       {% else %}
         <p><small>Publicação desativada. O modo de aprovação e entrega automática precisa de homologação e ativação separada no servidor.</small></p>
+      {% endif %}
+      {% if private_publish_enabled %}
+        <section style="margin:22px 0;padding:16px;border:1px solid rgba(195,151,31,.4);border-radius:12px;">
+          <h2>4B. Publicar primeiro mod privado protegido</h2>
+          <p>Exclusivo para a primeira release de cada módulo restrito.
+          O arquivo candidato deve ter passado nas verificações automáticas
+          e nos quatro testes manuais, e o manifesto Ed25519 precisa estar
+          assinado com a chave OFFLINE autorizada. Não há troca automática de versões
+          já publicadas. O site não assina nem ofusca arquivos.</p>
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_private') }}"
+                enctype="multipart/form-data" style="display:grid;gap:12px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="private_draft">Mod privado aprovado</label>
+            <select id="private_draft" name="draft_id" required>
+              <option value="">Selecione a release aprovada...</option>
+              {% for item in drafts if item.status == 'pronto_para_aprovacao' and item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') %}
+                <option value="{{ item.id }}">{{ item.module_id }} · {{ item.version }} · {{ ((item.meta or {}).get('protected') or {}).get('sha256','')[:16] }}...</option>
+              {% endfor %}
+            </select>
+            <label for="private_manifest">Manifesto assinado offline (.properties)</label>
+            <input id="private_manifest" name="manifest" type="file" accept=".properties" required>
+            <label><input type="checkbox" name="confirm_release" value="yes" required>
+              Confirmo o SHA-256 do candidato, os testes no Minecraft e a publicação privada desta release.
+            </label>
+            <button type="submit" class="hype-v6-btn gold">Publicar primeira release privada aprovada</button>
+          </form>
+        </section>
       {% endif %}
     {% else %}
       <p><small>O envio privado de arquivos está desativado no servidor. A análise local de um JAR continua disponível; nenhuma atualização será enviada aos jogadores.</small></p>
