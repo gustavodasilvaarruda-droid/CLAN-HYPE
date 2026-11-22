@@ -10,6 +10,8 @@ import json
 import os
 import re
 import stat
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from uuid import UUID, uuid4
 from zipfile import ZipFile, BadZipFile
 
@@ -122,6 +124,19 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     publish_enabled = staging_enabled and os.getenv("HYPE_MOD_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     protected_upload_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTED_UPLOAD_ENABLED", "").lower() in ("1", "true", "yes")
+    @bp.app_template_filter("hype_br_datetime")
+    def hype_br_datetime(value):
+        """Show upload timestamps in Brazil time, never fabricate missing dates."""
+        if not value:
+            return "Data não disponível"
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y às %H:%M")
+        except (TypeError, ValueError, OverflowError):
+            return "Data não disponível"
+
     # Reuse the site's existing server-side Supabase connection. Staging
     # stays disabled unless explicitly enabled in the Render environment.
     # Never expose a service_key or database credentials to templates or JAR files.
