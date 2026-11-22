@@ -61,3 +61,30 @@ O servidor nunca assina atualizações, nem aceita manifesto sem assinatura vál
 - Implementado: verificação estrutural automática de arquivos Fabric; recebimento privado de candidatos protegidos com SHA-256 próprio; proibição de aprovar sem candidato e teste manual; assinatura digital vinculada ao candidato, nunca ao JAR original.
 - Necessário para ofuscação **automática**: o **código-fonte** do HYPE Client (projeto Gradle/Fabric, regras de remapeamento, Mixins, dependências), um builder isolado, regras de keep validadas, validações em Minecraft e credenciais de um assinador fora do servidor web. Isso **não está implementado**.
 - Não habilitar HYPE_MOD_PUBLISH_ENABLED nem HYPE_MOD_DISTRIBUTION_ENABLED até confirmar chave original Ed25519, teste do instalador e rollback. A proteção total contra engenharia reversa não é possível.
+
+
+## Migração para a nova chave pública (instalação manual inicial)
+
+A nova chave pública Ed25519 enviada pelo administrador foi verificada contra a
+classe `br/clanhype/client/update/HypeAutoUpdate.class` do JAR experimental
+`HYPE-CLIENT-CHAVE-PUBLICA-NOVA-TESTE-MANUAL.jar`. Seu SHA-256 da chave **pública
+em DER** é:
+`0eef3a6a125a8efe03b93949e98a8028c3f589317c3c9ec8fe4509b2d31f0cd4`.
+
+O verificador de manifesto no servidor foi atualizado para fixar essa chave
+pública na branch de revisão. A chave **privada correspondente permanece apenas
+no computador do administrador** e jamais deve ser transferida ao site ou ao GitHub.
+
+**Pré-condições para produção:**
+1. Fazer backup do mod instalado e instalar manualmente o JAR com a nova chave
+   pública nos PCs de teste; verificar Minecraft, login e funções principais.
+2. Integrar a PR e implantar o servidor **sem ativar publicação/distribuição**.
+   Configurar o armazenamento privado e fazer testes de integração em homologação.
+3. Validar a assinatura de um manifesto de teste **offline** com a chave privada
+   correspondente e testar a atualização automática fim a fim, inclusive rollback.
+4. Só então distribuir a versão-base nova manualmente aos outros jogadores e
+   considerar ativar o canal de distribuição com aprovação explícita do administrador.
+
+**Aviso de compatibilidade:** as instalações que ainda contêm a chave pública
+antiga não aceitarão as atualizações assinadas pela nova chave. A nova assinatura
+não é uma atualização automática da chave antiga.
