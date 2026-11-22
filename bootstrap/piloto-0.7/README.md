@@ -47,3 +47,34 @@ Validação local em 22/11/2026:
 
 Dependências: PR #78 (Bootstrap 0.6 e login) e PRs #77/#79 (API e publicação).
 Todos continuam em revisão. Flags OFF por padrão; não ligar nada na produção.
+
+### Primeira instalação com desfazimento automático (prova isolada)
+
+Adicionado `PrivateFirstInstallTransaction.java` — **não vinculado ao jogo
+nem à inicialização automática**. Exige `after_exit` como opt-in local,
+uma prova externa de jogo encerrado e uma verificação de autorização
+fornecida pelo chamador. **A prova e a autorização ainda NÃO são implementadas
+por um processo real**, e os testes usam callbacks simulados: não ativar
+em produção.
+
+- Revalida a assinatura Ed25519 e o SHA-256 do JAR privado preparado.
+- Impede sobrescrever mods manuais; instala apenas quando não existe
+  nenhum JAR com aquele ID Fabric. O JAR protegido é criado por link exclusivo
+  dentro de `mods/` (falha fechado em filesystem sem hardlinks).
+- Cria um marcador local sem tokens em `.hype-private-managed/`.
+- Se surgir erro de escrita, falha provocada ou revogação antes de concluir,
+  remove somente o novo arquivo criado pela própria transação.
+- Não adota automaticamente JAR preexistente nem substitui versões já
+  gerenciadas. **Recuperação de queda abrupta de energia ainda não garantida.**
+- Não oferece instalador pós-fechamento real, prova de encerramento do processo,
+  revalidação da autorização no servidor, reentrada do jogador nem integração
+  com o atualizador HYPE Client.
+
+**Testes locais (Java 21, 22/11/2026): 19 verificações aprovadas** com o
+JAR real protegido da Pokédex Beta 8 e assinatura Ed25519 descartável.
+O teste `PrivateFirstInstallTransactionTest.java` só lê esse JAR do caminho
+local informado, nunca publica o binário e não acessa Render/Supabase.
+
+**Próximos passos:** implementar autenticação segura do instalador pós-saída
+sem guardar Bearer; transação de upgrade de versões previamente gerenciadas
+com backup e rollback; recuperação de queda, locks e teste real no Windows.
