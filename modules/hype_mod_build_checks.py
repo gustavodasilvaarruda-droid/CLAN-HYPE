@@ -32,7 +32,7 @@ def check_fabric_classes(raw):
                 path = cls.replace(".", "/") + ".class"
                 if path not in paths:
                     raise UnsafeBuild("Classe de inicialização Fabric ausente: " + cls)
-                if archive.read(path)[:4] != b"\\xca\\xfe\\xba\\xbe":
+                if archive.read(path)[:4] != bytes.fromhex("CAFEBABE"):
                     raise UnsafeBuild("Classe de inicialização Java corrompida.")
                 checked += 1
         if metadata.get("id") == "hypeclient" and (
