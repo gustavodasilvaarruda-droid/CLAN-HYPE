@@ -25,9 +25,9 @@ def fake_jar(body: bytes, version="R7.19-TEST"):
     buff = io.BytesIO()
     with ZipFile(buff, "w", ZIP_DEFLATED) as jar:
         jar.writestr("fabric.mod.json", json.dumps(meta))
-        jar.writestr("br/clanhype/client/HypeClient.class", b"\\xca\\xfe\\xba\\xbe")
+        jar.writestr("br/clanhype/client/HypeClient.class", bytes.fromhex("cafebabe"))
         jar.writestr("br/clanhype/client/update/HypeAutoUpdateClient.class",
-                     b"\\xca\\xfe\\xba\\xbe")
+                     bytes.fromhex("cafebabe"))
         jar.writestr("asset.txt", body)
     return buff.getvalue()
 
