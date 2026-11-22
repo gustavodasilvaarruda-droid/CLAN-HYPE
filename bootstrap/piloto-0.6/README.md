@@ -85,3 +85,31 @@ de teste; nada foi publicado no site.
 
 Não incorporar as PRs #76, #77 ou #78, não ativar flags no Render,
 não fazer deploy ou distribuir JARs aos jogadores sem homologação.
+
+### Aceitação offline com o JAR protegido real (22/11/2026)
+
+Novo teste reexecutável: `test/br/clanhype/bootstrap/RealPokedexOfflineTest.java`.
+Recebe o **caminho local** do JAR protegido (jamais adicionar este arquivo no Git).
+Verifica o SHA exato `176819c73facf52da2826ba3ac1d179926670d64f10c6e92923ccefa65f5ca18`
+e a versão Fabric `2.0.0-beta.8-defesas-multiplas-colecao-compacta-20261109`.
+
+Teste de aceitação separado, executado localmente no Java 21 com o código
+compilado do Bootstrap 0.6 e o JAR real, passou em **20 verificações**:
+assinatura com chave descartável, catálogo permitido, staging, cache,
+assinatura inválida, JAR adulterado, autorização vazia, logout durante
+download e pasta mods/ preservada.
+
+Reproduzir do GitHub, com o JAR privado localmente:
+
+```sh
+javac --release 21 -cp HYPE-BOOTSTRAP-0.6-BRIDGE-LOGIN-PILOTO-NAO-DISTRIBUIR.jar -d tests-classes bootstrap/piloto-0.6/test/br/clanhype/bootstrap/RealPokedexOfflineTest.java
+java -Xverify:all -cp HYPE-BOOTSTRAP-0.6-BRIDGE-LOGIN-PILOTO-NAO-DISTRIBUIR.jar:tests-classes br.clanhype.bootstrap.RealPokedexOfflineTest /CAMINHO/LOCAL/HYPE-POKEDEX-2.0-BETA8-PROTEGIDO-PILOTO-NAO-PUBLICAR.jar
+```
+
+No Windows, trocar ':' por ';' no classpath e colocar o caminho local
+do JAR protegido entre aspas. A chave Ed25519 de teste é gerada e
+descartada na execução; não assina uma release válida de produção.
+
+**Não comprova download real do Render, permissões no Supabase nem
+instalação automática.** Permanecem bloqueados até homologação
+da API e publicação administrativa offline do hash aprovado.
