@@ -195,7 +195,12 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 file_options={"content-type": "application/java-archive", "upsert": "false"},
             )
             uploaded = True
-            static_audit = check_fabric_classes(raw)
+            try:
+                static_audit = check_fabric_classes(raw)
+            except UnsafeBuild as exc:
+                # Originals may be archived for analysis even before the
+                # updater/entrypoints are fixed; candidates remain strict.
+                static_audit = {"status": "needs_review", "reason": str(exc)}
             saved = db.table(TABLE).insert({
                 "module_id": report["module_id"], "version": report["version"],
                 "sha256": report["sha256"], "size_bytes": report["size_bytes"],
