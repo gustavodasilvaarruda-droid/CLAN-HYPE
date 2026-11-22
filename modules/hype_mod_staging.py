@@ -219,6 +219,67 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
 
+    @bp.post("/admin/modulos/releases/protegido")
+    def mod_release_protected_upload():
+        """Stage a separately built candidate, never an automatically published JAR."""
+        admin_only()
+        if not protected_upload_enabled or db is None:
+            abort(404)
+        path = None
+        try:
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            file = request.files.get("jar")
+            if not file or not (file.filename or "").lower().endswith(".jar"):
+                raise InvalidJar("Escolha um build protegido .jar.")
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,storage_path,meta"
+            ).eq("id", draft_id).limit(1).execute().data or [])
+            if not rows:
+                abort(404)
+            draft = rows[0]
+            if draft["status"] != "em_teste":
+                raise InvalidJar("Coloque a versão em teste antes de registrar o build protegido.")
+            assert_private_bucket(db.storage)
+            original = db.storage.from_(BUCKET).download(draft["storage_path"])
+            validate_binary(original, expected_sha=draft["sha256"])
+            raw = file.stream.read(MAX_UPLOAD + 1)
+            report = inspect_original(raw)
+            check_candidate_compatibility(original, raw)
+            if (report["module_id"], report["version"]) != (draft["module_id"], draft["version"]):
+                raise InvalidJar("O build deve ter o mesmo módulo e versão do original.")
+            path = f'{report["module_id"]}/{draft_id}/protected/{uuid4().hex}/{report["sha256"]}.jar'
+            db.storage.from_(BUCKET).upload(
+                path=path, file=raw,
+                file_options={"content-type": "application/java-archive", "upsert": "false"},
+            )
+            try:
+                meta = dict(draft.get("meta") or {})
+                meta["protected"] = {
+                    "storage_path": path, "sha256": report["sha256"],
+                    "size_bytes": report["size_bytes"], "static_audit": "passed",
+                    "obfuscation_verified": False,
+                }
+                saved = (db.table(TABLE).update({"meta": meta})
+                         .eq("id", draft_id).eq("status", "em_teste").execute())
+                if not saved.data:
+                    raise RuntimeError("Registro alterado durante o envio.")
+            except Exception:
+                db.storage.from_(BUCKET).remove([path])
+                raise
+            if registrar_log:
+                try:
+                    registrar_log("upload_jar_protected_candidate", "hype_mods", TABLE, draft_id,
+                                  {"sha256": report["sha256"]})
+                except Exception:
+                    pass
+            flash("Build candidato guardado e verificado. A ofuscação e o teste em jogo ainda precisam ser validados.", "sucesso")
+        except (InvalidJar, UnsafeBuild, InvalidRelease, ValueError) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Falha no armazenamento do build candidato. Confira o bucket e as permissões.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+
     @bp.post("/admin/modulos/releases/revisar")
     def mod_release_review():
         """Explicit manual review step; this does not publish the original file."""
