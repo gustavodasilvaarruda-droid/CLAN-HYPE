@@ -182,8 +182,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         raw = file.stream.read(MAX_UPLOAD + 1)
         try:
             report = inspect_original(raw)
-            check_fabric_classes(raw)
-        except (InvalidJar, UnsafeBuild) as exc:
+        except InvalidJar as exc:
             flash(str(exc), "erro")
             return redirect(url_for("hype_mod_admin.mod_releases"))
         path = f'{report["module_id"]}/{uuid4().hex}/{report["sha256"]}.jar'
