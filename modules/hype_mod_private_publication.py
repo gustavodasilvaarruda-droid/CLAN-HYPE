@@ -69,7 +69,10 @@ def validate_private_publication(db, *, draft_id, manifest_bytes, published_by):
                           sha256=sha, size_bytes=size)
 
     # Verify both archived artifacts and private bucket AGAIN at publish time.
-    assert_private_bucket(db.storage)
+    try:
+        assert_private_bucket(db.storage)
+    except RuntimeError as exc:
+        raise InvalidPrivateRelease("Bucket privado nao verificado") from exc
     original = db.storage.from_(BUCKET).download(draft["storage_path"])
     binary = db.storage.from_(BUCKET).download(path)
     validate_binary(original, expected_sha=draft["sha256"])
@@ -82,12 +85,14 @@ def validate_private_publication(db, *, draft_id, manifest_bytes, published_by):
             or meta["size_bytes"] != size):
         raise InvalidPrivateRelease("Metadados Fabric divergentes")
 
+    active = (db.table(TABLE).select("release")
+              .eq("module_id", module_id).eq("status", "published")
+              .limit(1).execute().data or [])
     previous = (db.table(TABLE).select("release,status")
                 .eq("module_id", module_id)
                 .order("release", desc=True).limit(1).execute().data or [])
-    if previous and (previous[0]["status"] == "published"
-                     or release <= int(previous[0]["release"])):
-        # Protect from nontransactional swap/overwriting an active release.
+    if active or (previous and release <= int(previous[0]["release"])):
+        # No unsafe nontransactional swap; database unique index is a final guard.
         raise InvalidPrivateRelease("Ja existe versao ativa ou release nao crescente. Troca atomica pendente.")
     return {
         "module_id": module_id,
