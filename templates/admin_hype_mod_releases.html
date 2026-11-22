@@ -44,14 +44,34 @@
         <input id="jar_upload" name="jar" type="file" accept=".jar" required>
         <button type="submit" class="hype-v6-btn gold">Guardar original em privado</button>
       </form>
+      <p><small><strong>Limpeza segura:</strong> use Apagar somente em arquivos pendentes ou rejeitados. Builds em teste e versões aprovadas/publicadas ficam bloqueados. Para descartar um build em teste, marque-o como Rejeitado na etapa 3 primeiro. O sistema não apaga arquivos automaticamente.</small></p>
       <div class="hype-v6-table-wrap"><table class="hype-v6-table">
-        <thead><tr><th>Módulo</th><th>Versão</th><th>Minecraft</th><th>Status</th><th>Recebido</th><th>SHA-256</th></tr></thead>
+        <thead><tr><th>Módulo</th><th>Versão</th><th>Minecraft</th><th>Status</th><th>Recebido</th><th>SHA-256</th><th>Ações</th></tr></thead>
         <tbody>{% for item in drafts %}
-          <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ (item.meta or {}).get('compatibility', {}).get('minecraft') or 'Não declarado' }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
-        {% else %}<tr><td colspan="6">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
+          <tr>
+            <td title="{{ item.original_filename or '' }}">{{ item.module_id }}</td>
+            <td>{{ item.version }}</td>
+            <td>{{ (item.meta or {}).get('compatibility', {}).get('minecraft') or 'Não declarado' }}</td>
+            <td>{{ item.status|replace('_',' ') }}</td>
+            <td>{{ item.created_at }}</td>
+            <td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td>
+            <td>
+              {% if item.status in ('aguardando_protecao', 'rejeitado') %}
+              <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}" onsubmit="return confirm('Apagar definitivamente este JAR privado e seu eventual build candidato? Esta ação não pode ser desfeita.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="draft_id" value="{{ item.id }}">
+                <input type="hidden" name="confirm_delete" value="yes">
+                <button type="submit" class="hype-v6-btn" style="border:1px solid #bb7373;color:#ffb8b8;background:transparent;white-space:nowrap;" aria-label="Apagar arquivo privado da versão {{ item.version }}">Apagar</button>
+              </form>
+              {% else %}
+              <small title="Versão em teste, aprovada ou vinculada a publicação">Protegido</small>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}<tr><td colspan="7">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
       </table></div>
       <h2>2. Registrar build candidato protegido</h2>
-      <p>O JAR original fica guardado em privado. A versão preparada fora do site passa por uma segunda verificação de integridade, classes de inicialização, dependências e atualizador. Essa conferência <strong>não prova que o código foi ofuscado</strong>.</p>
+      <p>Esta etapa <strong>não seleciona o JAR original</strong>: ela recebe outro arquivo .jar, compilado/preparado fora do site, vinculado à versão que está em teste. A versão preparada passa por uma segunda verificação de integridade, classes de inicialização, dependências e atualizador. <strong>O site não faz proteção nem ofuscação sozinho.</strong> Não reenvie o original como se fosse um build protegido.</p>
       {% for item in drafts if item.status == 'em_teste' %}
       <div style="border:1px solid rgba(195,151,31,.32);border-radius:10px;padding:14px;margin:10px 0;">
         <strong>{{ item.module_id }} — {{ item.version }}</strong>
