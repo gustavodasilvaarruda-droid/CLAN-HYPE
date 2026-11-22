@@ -20,6 +20,9 @@ create table if not exists public.hype_mod_restricted_releases (
     unique (module_id, release),
     unique (module_id, sha256)
 );
+-- Uma unica release ativa por mod; todas as anteriores ficam disabled para rollback auditavel.
+create unique index if not exists hype_mod_restricted_one_live_per_mod_idx
+    on public.hype_mod_restricted_releases(module_id) where status = 'published';
 create index if not exists hype_mod_restricted_latest_idx
     on public.hype_mod_restricted_releases(module_id, status, release desc);
 alter table public.hype_mod_restricted_releases enable row level security;
