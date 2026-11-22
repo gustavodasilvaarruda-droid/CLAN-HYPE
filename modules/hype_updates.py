@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, send_file
 from modules.hype_signed_release import InvalidRelease, validate_binary
+from modules.hype_mod_catalog import InvalidCatalogue, verify_signed_catalogue
 
 hype_updates_bp = Blueprint('hype_updates', __name__)
 _RELEASE_NAME = re.compile(r'hypeclient-r[1-9][0-9]{0,8}\.jar\Z', re.ASCII)
@@ -174,6 +175,30 @@ def updates_health():
         published = False
     response = jsonify(service='hype-updates', manifest_present=published)
     response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@hype_updates_bp.get('/hype-updates/mods/catalog.json')
+def multi_mod_signed_catalogue():
+    """Preview-only signed catalogue for a future HYPE bootstrap (OFF by default).
+
+    This is NOT consumed by the current HYPE Client, and this route does not
+    expose or publish any mod JARs. Keep disabled until the matching signed
+    binary endpoints and new Java bootstrap have passed end-to-end testing.
+    """
+    if os.getenv('HYPE_MULTI_MOD_CATALOG_ENABLED', '').lower() not in ('1', 'true', 'yes'):
+        abort(404)
+    path = _safe_regular_file(_root() / 'mods', 'catalog.json')
+    try:
+        raw = path.read_bytes()
+        verify_signed_catalogue(raw)
+    except (InvalidCatalogue, OSError):
+        current_app.logger.exception('Invalid HYPE multi-mod signed catalogue')
+        abort(503)
+    response = make_response(raw, 200)
+    response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    response.headers['Cache-Control'] = 'no-store, max-age=0'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
 
 
