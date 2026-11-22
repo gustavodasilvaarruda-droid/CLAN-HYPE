@@ -318,6 +318,25 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         except Exception:
             return fail('Nao foi possivel validar o acesso aos modulos.', 503)
 
+    @api.get('/updates/authorized-mods')
+    @secure
+    def authorized_update_mods():
+        """Only current authenticated entitlements; no public JAR or catalogue."""
+        import os
+        from modules.hype_mod_authenticated_updates import (
+            ModEntitlementUnavailable, authorized_mod_ids,
+        )
+        if os.getenv('HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED', '').lower() not in ('1', 'true', 'yes'):
+            return fail('Recurso indisponivel.', 404)
+        try:
+            email = g.hype_user['email']
+            allowed = authorized_mod_ids(
+                db, email, g.hype_user.get('cargo'), bool(is_member(email))
+            )
+        except (ModEntitlementUnavailable, Exception):
+            return fail('Nao foi possivel validar os modulos.', 503)
+        return jsonify({'ok': True, 'mods': allowed})
+
     if breed_services is not None:
         from modules.hype_client_breed_submit import install_breed_submit
         install_breed_submit(api, db, secure, get_permissions, breed_services)
