@@ -7,7 +7,7 @@
     <span class="hype-v6-kicker">HYPE ADMIN • ATUALIZAÇÕES DO CLIENTE</span>
     <h1>Central de Publicação HYPE</h1>
     <p>Central para conferir versões do Cliente HYPE e outros mods Fabric antes de distribuí-las. O envio privado de arquivos não instala nem libera automaticamente uma atualização.</p>
-    <p><strong>Fluxo seguro:</strong> analisar JAR → guardar original em privado → proteger e testar o build → assinar a versão → publicar para o atualizador do Minecraft. Apenas as duas primeiras etapas estão disponíveis nesta tela.</p>
+    <p><strong>Fluxo seguro:</strong> analisar JAR → guardar original em privado → proteger e testar o build → assinar a versão → publicar para o atualizador do Minecraft. Ofuscação automática ainda exige configurar o projeto Java/Fabric e um executor isolado; o upload sozinho não protege o código.</p>
     <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label for="jar_inspect">Arquivo Fabric (.jar, máximo de 10 MiB)</label>
@@ -50,8 +50,31 @@
           <tr><td>{{ item.module_id }}</td><td>{{ item.version }}</td><td>{{ (item.meta or {}).get('compatibility', {}).get('minecraft') or 'Não declarado' }}</td><td>{{ item.status|replace('_',' ') }}</td><td>{{ item.created_at }}</td><td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td></tr>
         {% else %}<tr><td colspan="6">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
       </table></div>
-      <h2>2. Revisar e testar antes de liberar</h2>
-      <p>Marque como em teste, confira o JAR protegido dentro do Minecraft e só então confirme a aprovação. O envio sozinho não libera uma atualização.</p>
+      <h2>2. Registrar build candidato protegido</h2>
+      <p>O JAR original fica guardado em privado. A versão preparada fora do site passa por uma segunda verificação de integridade, classes de inicialização, dependências e atualizador. Essa conferência <strong>não prova que o código foi ofuscado</strong>.</p>
+      {% for item in drafts if item.status == 'em_teste' %}
+      <div style="border:1px solid rgba(195,151,31,.32);border-radius:10px;padding:14px;margin:10px 0;">
+        <strong>{{ item.module_id }} — {{ item.version }}</strong>
+        {% set protected = (item.meta or {}).get('protected') %}
+        {% if protected %}
+          <p>Build candidato guardado em privado, SHA-256 <code>{{ protected.sha256[:12] }}…</code>. Falta validar a proteção e testar no jogo.</p>
+        {% else %}
+          <p>Build candidato protegido ainda não registrado.</p>
+        {% endif %}
+        {% if protected_upload_enabled %}
+        <form method="post" action="{{ url_for('hype_mod_admin.mod_release_protected_upload') }}" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="draft_id" value="{{ item.id }}">
+          <label>Enviar build (.jar) <input type="file" name="jar" accept=".jar" required></label>
+          <button type="submit" class="hype-v6-btn">Verificar e guardar build</button>
+        </form>
+        {% else %}
+          <p><small>O envio de builds protegidos ainda precisa de ativação separada no Render. Nenhuma proteção é feita automaticamente pelo site.</small></p>
+        {% endif %}
+      </div>
+      {% endfor %}
+      <h2>3. Revisar e testar antes de liberar</h2>
+      <p>Confirme os testes somente com o build candidato preparado e registrado. Sem ele, a aprovação fica bloqueada. Nenhuma revisão libera atualização automaticamente.</p>
       {% for item in drafts %}
         {% if item.status in ('aguardando_protecao', 'em_teste', 'pronto_para_aprovacao') %}
         <form method="post" action="{{ url_for('hype_mod_admin.mod_release_review') }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0;">
@@ -63,7 +86,9 @@
               <option value="em_teste">Mover para testes</option>
             {% else %}
               <option value="em_teste">Voltar para testes</option>
-              <option value="pronto_para_aprovacao">Aprovar após testar</option>
+              {% if (item.meta or {}).get('protected') %}
+              <option value="pronto_para_aprovacao">Aprovar após testar o build candidato</option>
+              {% endif %}
             {% endif %}
             <option value="rejeitado">Rejeitar versão</option>
           </select>
@@ -74,8 +99,8 @@
       {% endfor %}
       {% if publish_enabled %}
         <hr>
-        <h2>3. Publicar atualização assinada</h2>
-        <p>A publicação só aceita o <strong>HYPE Client</strong> aprovado, acompanhado de manifesto Ed25519 assinado com a chave correspondente à versão instalada nos jogadores. O site valida a assinatura, versão, endereço, tamanho e SHA-256 antes de registrar.</p>
+        <h2>4. Publicar atualização assinada</h2>
+        <p>A publicação só aceita o <strong>HYPE Client</strong> aprovado, acompanhado de manifesto Ed25519 assinado com a chave correspondente à versão instalada nos jogadores. O site valida a assinatura, versão, endereço, tamanho e SHA-256 do <strong>build candidato</strong> antes de registrar. O arquivo original nunca é publicado por engano.</p>
         <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish') }}" enctype="multipart/form-data" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <label for="draft_publish">Versão aprovada</label>
