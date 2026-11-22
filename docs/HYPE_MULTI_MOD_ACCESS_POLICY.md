@@ -55,10 +55,37 @@ módulo restrito.
 - Cada consulta busca novamente o cargo, a filiação ativa, os estados dos
   módulos, os grupos e os bloqueios individuais. Falha no banco resulta em
   erro de serviço, nunca em liberação parcial.
-- **Ainda falta** implementar catálogo assinado por conta, downloads
-  autenticados, armazenamento permanente dos cinco builds protegidos,
-  integração Bearer no Bootstrap, aplicação em jogo e testes ponta a ponta.
-  As flags de distribuição e downloads devem continuar desligadas.
+- A migration sql/20261122_hype_mod_restricted_releases.sql prepara uma tabela
+  SEPARADA e privada para os quatro mods restritos (sem executar o SQL).
+- O verificador modules/hype_mod_private_releases.py valida assinatura Ed25519,
+  hash e a aprovação estática/manual vinculada ao candidato protegido exato.
+- GET /api/hype/v1/updates/releases lista releases autorizadas e assinadas.
+- GET /api/hype/v1/updates/mods/{id}/{sha256}.jar entrega bytes do Storage
+  privado apenas após autenticação e autorização, sem cache público ou redirect.
+  Cargo e filiação são revalidados antes de responder, mesmo após ler o JAR.
+- Ambas as rotas são OFF por padrão: exigem simultaneamente as flags
+  HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED e HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED.
+  Nenhum JAR foi cadastrado ou publicado por estas rotas, e nenhuma flag foi
+  ativada. A migração SQL também não foi executada no Supabase.
+- AINDA FALTA: publicação administrativa com assinatura offline, upload
+  de originais/candidatos privados, validar a migração em homologação,
+  conectar o token Bearer no Bootstrap, verificar o manifesto no lado Java,
+  instalar após sair do Minecraft, rollback e testes completos de segurança.
+
+## Piloto da Pokédex Beta 8
+
+O proprietário informou em 22/11/2026 que a Pokédex Beta 8 protegida
+funcionou no Minecraft. Trata-se de teste manual informado pelo proprietário,
+não de homologação integral e nem de autorização para publicar.
+
+- Fabric mod ID: hype_pokedex
+- Versão: 2.0.0-beta.8-defesas-multiplas-colecao-compacta-20261109
+- SHA-256 protegido: 176819c73facf52da2826ba3ac1d179926670d64f10c6e92923ccefa65f5ca18
+- Originais e builds protegidos permanecem privados; nunca colocar JAR
+  original no repositório ou em URL pública.
+- Para publicar: upload no Storage privado, revisão automática e manual
+  para esse SHA, aprovação humana, assinatura offline, teste de download
+  autenticado em homologação e só então autorização final do administrador.
 
 ## Testes obrigatórios para liberar
 
