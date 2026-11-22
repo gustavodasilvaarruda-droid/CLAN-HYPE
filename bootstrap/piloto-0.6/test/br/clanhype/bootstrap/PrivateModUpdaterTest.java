@@ -138,6 +138,22 @@ public final class PrivateModUpdaterTest {
         } catch (UnsupportedOperationException e) {
             // Symbolic links unsupported by this test platform.
         }
+        Path cancelledDir = Files.createTempDirectory("hype06-cancel-test-");
+        setMode(cancelledDir, "stage");
+        java.util.concurrent.atomic.AtomicBoolean active = new java.util.concurrent.atomic.AtomicBoolean(true);
+        PrivateModUpdater.Fetcher revocation = (requested, token, max) -> {
+            if (requested.equals(PrivateModUpdater.API + "/releases"))
+                return json.getBytes(StandardCharsets.UTF_8);
+            if (requested.equals(url)) {
+                active.set(false);  // Simulated logout while binary was in-flight.
+                return jar;
+            }
+            throw new AssertionError("Unexpected endpoint");
+        };
+        denies(() -> PrivateModUpdater.stageAfterLogin(cancelledDir, "test-bearer",
+                key.getPublic(), revocation, active::get), "logout during download");
+        check(!Files.exists(cancelledDir.resolve(".hype-private-staging/" + ID + "-" + sha + ".jar")),
+              "cancelled session must not write staged JAR");
         setMode(dir,"after_exit");
         check(PrivateModUpdater.stageAfterLogin(dir,"test-bearer",key.getPublic(),good).staged() == 0,
               "AFTER_EXIT mode remains stage-only in 0.6");
