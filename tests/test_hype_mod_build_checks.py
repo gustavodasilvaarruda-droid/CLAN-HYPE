@@ -1,12 +1,14 @@
 """Check that Fabric entrypoints and updater survive protected-build staging."""
 import io
 import json
+import hashlib
 import unittest
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from modules.hype_mod_build_checks import (
     UnsafeBuild, check_fabric_classes, check_candidate_compatibility,
 )
+from modules.hype_mod_staging import audit_candidate_pair, InvalidJar, InvalidRelease
 
 
 def fake_jar(*, version="R7.19-TEST", body=b"original", entrypoint=True, valid_magic=True):
@@ -54,6 +56,24 @@ class ProtectedBuildChecksTests(unittest.TestCase):
         other = fake_jar(body=b"candidate")
         report = check_candidate_compatibility(source, other)
         self.assertFalse(report["obfuscation_verified"])
+
+    def test_static_preflight_binds_report_to_stored_candidate(self):
+        original = fake_jar()
+        candidate = fake_jar(body=b"candidate")
+        digest = hashlib.sha256(candidate).hexdigest()
+        draft = {
+            "module_id": "hypeclient", "version": "R7.19-TEST",
+            "sha256": hashlib.sha256(original).hexdigest(),
+            "meta": {"protected": {"sha256": digest, "size_bytes": len(candidate)}},
+        }
+        report = audit_candidate_pair(original, candidate, draft)
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(report["candidate_sha256"], digest)
+        self.assertEqual(report["checks"]["updater"], "passed")
+        with self.assertRaises(InvalidRelease):
+            audit_candidate_pair(original, fake_jar(body=b"tampered"), draft)
+        with self.assertRaises(InvalidJar):
+            audit_candidate_pair(original, candidate, {**draft, "version": "wrong"})
 
     def test_changed_fabric_version_rejected(self):
         with self.assertRaises(UnsafeBuild):
