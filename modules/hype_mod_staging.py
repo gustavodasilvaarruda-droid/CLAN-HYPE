@@ -160,6 +160,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     protected_upload_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTED_UPLOAD_ENABLED", "").lower() in ("1", "true", "yes")
     # Explicit independent gate; must never be enabled by ordinary staging.
     private_publish_enabled = publish_enabled and os.getenv("HYPE_MOD_PRIVATE_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
+    from modules.hype_mod_pilot_scope import pilot_scope_status
     @bp.app_template_filter("hype_br_datetime")
     def hype_br_datetime(value):
         """Show upload timestamps in Brazil time, never fabricate missing dates."""
@@ -205,6 +206,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
             private_publish_enabled=private_publish_enabled,
+            private_rollout_status=pilot_scope_status(),
             report=None, error=None,
         )
 
@@ -231,6 +233,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             "admin_hype_mod_releases.html", drafts=drafts,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
+            private_publish_enabled=private_publish_enabled,
+            private_rollout_status=pilot_scope_status(),
             report=report, error=error,
         )
 
