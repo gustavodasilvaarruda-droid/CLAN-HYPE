@@ -191,6 +191,54 @@ class PrivateModDownloadTests(unittest.TestCase):
         self.assertNotIn(EMAIL, str(res.json))
         self.assertIn("no-store", res.headers["Cache-Control"])
 
+    def test_rollout_defaults_off_even_with_legacy_feature_flags(self):
+        with patch.dict(os.environ, {"HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": ""}):
+            self.assertEqual(self.client.get(self.catalogue, headers=self.auth).status_code, 404)
+            self.assertEqual(self.client.get(self.url, headers=self.auth).status_code, 404)
+
+    def test_single_tester_only_even_when_both_accounts_have_role(self):
+        self.db.rows["usuarios_clan"].append({
+            "email": "other@example.org", "cargo": "breeder", "nick_jogo": "Other"})
+        stranger = URLSafeTimedSerializer(
+            "private-tests-only-not-a-production-secret", salt=SALT
+        ).dumps({"email": "other@example.org"})
+        outsider_auth = {"Authorization": f"Bearer {stranger}"}
+        with patch.dict(os.environ, {
+            "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
+            "HYPE_PRIVATE_MOD_TESTER_EMAIL": EMAIL.upper(),
+        }):
+            self.assertEqual(self.client.get(self.catalogue, headers=self.auth).status_code, 200)
+            self.assertEqual(self.client.get(self.url, headers=self.auth).status_code, 200)
+            for path in (self.catalogue, self.url):
+                self.assertEqual(self.client.get(
+                    path, headers=outsider_auth).status_code, 404)
+
+    def test_single_tester_unconfigured_or_malformed_denies_everyone(self):
+        for target in ("", "not-an-email", "name@example.org\nBcc:someone@example.org"):
+            with self.subTest(target=target), patch.dict(os.environ, {
+                "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
+                "HYPE_PRIVATE_MOD_TESTER_EMAIL": target,
+            }):
+                self.assertEqual(self.client.get(self.catalogue, headers=self.auth).status_code, 404)
+
+    def test_clan_scope_requires_separate_release_confirmation(self):
+        with patch.dict(os.environ, {
+            "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "clan",
+            "HYPE_PRIVATE_MOD_CLAN_RELEASE_CONFIRMED": "",
+        }):
+            self.assertEqual(self.client.get(self.url, headers=self.auth).status_code, 404)
+
+    def test_single_tester_revoked_while_binary_is_loading(self):
+        scope = {
+            "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
+            "HYPE_PRIVATE_MOD_TESTER_EMAIL": EMAIL,
+        }
+        def revoke_during_download():
+            os.environ["HYPE_PRIVATE_MOD_TESTER_EMAIL"] = "other@example.org"
+        with patch.dict(os.environ, scope):
+            self.db.storage.on_download = revoke_during_download
+            self.assertEqual(self.client.get(self.url, headers=self.auth).status_code, 403)
+
     def test_binary_integrity_and_no_public_cache(self):
         res = self.client.get(self.url, headers=self.auth)
         self.assertEqual(res.status_code, 200)
