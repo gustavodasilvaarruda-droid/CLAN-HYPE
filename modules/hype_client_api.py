@@ -326,7 +326,9 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         from modules.hype_mod_authenticated_updates import (
             ModEntitlementUnavailable, authorized_mod_ids,
         )
-        if os.getenv('HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED', '').lower() not in ('1', 'true', 'yes'):
+        from modules.hype_mod_pilot_scope import can_account_download_private_mods
+        if (os.getenv('HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED', '').lower() not in ('1', 'true', 'yes')
+                or not can_account_download_private_mods(g.hype_user['email'])):
             return fail('Recurso indisponivel.', 404)
         try:
             email = g.hype_user['email']
@@ -345,8 +347,10 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         import os
         from modules.hype_mod_authenticated_updates import authorized_mod_ids
         from modules.hype_mod_private_releases import find_private_release
+        from modules.hype_mod_pilot_scope import can_account_download_private_mods
         if (os.getenv('HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED', '').lower() not in ('1', 'true', 'yes')
-                or os.getenv('HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')):
+                or os.getenv('HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')
+                or not can_account_download_private_mods(g.hype_user['email'])):
             return fail('Recurso indisponivel.', 404)
         try:
             email = g.hype_user['email']
@@ -370,8 +374,10 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         from modules.hype_mod_update_access import MOD_TO_SITE_MODULE
         from modules.hype_mod_authenticated_updates import may_account_receive_update
         from modules.hype_mod_private_releases import find_private_release, download_protected_jar
+        from modules.hype_mod_pilot_scope import can_account_download_private_mods
         if (os.getenv('HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED', '').lower() not in ('1', 'true', 'yes')
-                or os.getenv('HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')):
+                or os.getenv('HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')
+                or not can_account_download_private_mods(g.hype_user['email'])):
             return fail('Recurso indisponivel.', 404)
         if mod_id not in MOD_TO_SITE_MODULE or not signed.SHA.fullmatch(sha256):
             return fail('Arquivo nao encontrado.', 404)
@@ -389,7 +395,8 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             # administrator might revoke permission while Storage is loading.
             users = (db.table('usuarios_clan').select('email,cargo')
                      .eq('email', email).limit(2).execute().data or [])
-            if (len(users) != 1 or not may_account_receive_update(
+            if (len(users) != 1 or not can_account_download_private_mods(email)
+                    or not may_account_receive_update(
                     db, mod_id, email, users[0].get('cargo'), bool(is_member(email)))):
                 return fail('Permissao revogada durante o download.', 403)
             return send_file(
