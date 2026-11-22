@@ -22,6 +22,8 @@ on:
       - "modules/hype_mod_authenticated_updates.py"
       - "modules/hype_mod_private_releases.py"
       - "modules/hype_mod_private_publication.py"
+      - "modules/hype_mod_pilot_scope.py"
+      - "tests/test_hype_mod_pilot_scope.py"
       - "tests/test_hype_mod_private_publication.py"
       - "sql/20261122_hype_mod_restricted_releases.sql"
       - "tests/test_hype_mod_private_downloads.py"
