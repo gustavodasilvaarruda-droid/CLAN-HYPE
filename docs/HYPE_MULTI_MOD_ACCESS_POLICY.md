@@ -48,9 +48,17 @@ módulo restrito.
 - Os endpoints públicos experimentais de multi-mod ficam impedidos de servir
   um catálogo que anuncie mods restritos e JARs restritos, mesmo se as duas
   flags experimentais forem habilitadas por engano.
-- **Ainda falta** implementar o catálogo por conta, a rota autenticada para
-  downloads, a integração Bearer no Bootstrap, a aplicação em jogo e os testes
-  ponta a ponta. As flags de distribuição devem continuar desligadas.
+- A rota experimental `GET /api/hype/v1/updates/authorized-mods` reutiliza o
+  **Bearer já autenticado pelo HYPE Client**, lê as permissões atuais do banco
+  e retorna **somente IDs permitidos**, sem URLs, hashes ou JARs. A flag
+  `HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED` é **OFF por padrão**.
+- Cada consulta busca novamente o cargo, a filiação ativa, os estados dos
+  módulos, os grupos e os bloqueios individuais. Falha no banco resulta em
+  erro de serviço, nunca em liberação parcial.
+- **Ainda falta** implementar catálogo assinado por conta, downloads
+  autenticados, armazenamento permanente dos cinco builds protegidos,
+  integração Bearer no Bootstrap, aplicação em jogo e testes ponta a ponta.
+  As flags de distribuição e downloads devem continuar desligadas.
 
 ## Testes obrigatórios para liberar
 
