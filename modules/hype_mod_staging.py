@@ -314,7 +314,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     or not re.fullmatch(r"[0-9a-f]{64}", sha)
                     or not isinstance(original_path, str)
                     or not re.fullmatch(
-                        rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\\.jar",
+                        rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\.jar",
                         original_path,
                     )):
                 raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
@@ -328,7 +328,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         or not isinstance(protected_path, str)
                         or not re.fullmatch(
                             rf"{re.escape(module_id)}/{re.escape(str(draft_id))}/protected/"
-                            rf"[0-9a-f]{{32}}/{protected_sha}\\.jar",
+                            rf"[0-9a-f]{{32}}/{protected_sha}\.jar",
                             protected_path,
                         )):
                     raise ValueError("Caminho do build protegido inválido; exclusão bloqueada.")
