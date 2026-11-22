@@ -7,12 +7,10 @@ from modules.hype_mod_private_releases import InvalidPrivateRelease
 from modules.hype_mod_private_publication import (
     validate_private_publication, publish_first_private_release,
 )
-from test_hype_mod_private_downloads import (
-    PrivateModDownloadTests, Query, FakeDB, MOD, DRAFT_ID,
-)
+import test_hype_mod_private_downloads as fixtures
 
 
-class WritingQuery(Query):
+class WritingQuery(fixtures.Query):
     def insert(self, data):
         self.to_insert = dict(data)
         return self
@@ -26,14 +24,14 @@ class WritingQuery(Query):
         return super().execute()
 
 
-class WritingDB(FakeDB):
+class WritingDB(fixtures.FakeDB):
     def table(self, name):
         return WritingQuery(self, name)
 
 
 class PrivatePublicationTests(unittest.TestCase):
     def setUp(self):
-        fixture = PrivateModDownloadTests(
+        fixture = fixtures.PrivateModDownloadTests(
             methodName="test_flags_off_even_for_valid_token")
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
@@ -45,7 +43,7 @@ class PrivatePublicationTests(unittest.TestCase):
         self.draft = self.db.rows["hype_mod_release_drafts"][0]
         self.manifest = fixture.signed_manifest().encode("ascii")
         self.kw = dict(
-            draft_id=DRAFT_ID, manifest_bytes=self.manifest,
+            draft_id=fixtures.DRAFT_ID, manifest_bytes=self.manifest,
             published_by="admin@example.org")
         compatibility = patch(
             "modules.hype_mod_private_publication.check_candidate_compatibility",
@@ -53,7 +51,7 @@ class PrivatePublicationTests(unittest.TestCase):
         inspect = patch(
             "modules.hype_mod_private_publication.inspect_original",
             return_value={
-                "module_id": MOD, "version": "2.0.0-test",
+                "module_id": fixtures.MOD, "version": "2.0.0-test",
                 "size_bytes": len(fixture.jar)})
         compatibility.start()
         inspect.start()
@@ -68,7 +66,7 @@ class PrivatePublicationTests(unittest.TestCase):
     def test_all_four_checks_signer_and_sha_enable_first_release(self):
         prepared = validate_private_publication(self.db, **self.kw)
         self.assertEqual(prepared["sha256"], self.fixture.sha)
-        self.assertEqual(prepared["module_id"], MOD)
+        self.assertEqual(prepared["module_id"], fixtures.MOD)
         self.assertEqual(prepared["status"], "published")
         self.assertFalse(self.db.rows["hype_mod_restricted_releases"])
         saved = publish_first_private_release(self.db, **self.kw)
@@ -77,7 +75,7 @@ class PrivatePublicationTests(unittest.TestCase):
 
     def test_rejects_active_prior_version(self):
         self.db.rows["hype_mod_restricted_releases"].append(
-            {"release": 1, "status": "published", "module_id": MOD})
+            {"release": 1, "status": "published", "module_id": fixtures.MOD})
         with self.assertRaises(InvalidPrivateRelease):
             validate_private_publication(self.db, **self.kw)
 
