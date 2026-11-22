@@ -114,3 +114,26 @@ Não chamar na inicialização Fabric, não distribuir como atualizador
 completo. O callback de autorização usado nos testes NÃO substitui
 consulta real às permissões no site. A chave privada de produção
 nunca deve ir para o site ou para o JAR.
+
+### Simulação dos quatro mods HYPE (somente estrutura)
+
+O teste `PrivateMultiModUpgradeTest.java` cria builds **sintéticos**
+para os quatro módulos privados da HYPE e percorre instalação inicial,
+backup e troca de versão no mesmo diretório de Minecraft descartável.
+**25 verificações locais aprovadas** no Java 21 (sem rede).
+Isso prova a generalidade do instalador para IDs Fabric distintos, mas
+**não comprova que os JARs reais dos outros três mods funcionem**.
+A Pokédex Beta 8 protegida foi testada separadamente com o artefato real.
+
+Fluxo automático desejado, **ainda não conectado**:
+1. Bootstrap instala o HYPE Client público assinado e aguarda reinício;
+2. HYPE Client autentica o jogador; backend autoriza cada mod privado;
+3. Bootstrap prepara as versões assinadas, sem alterar JAR em uso;
+4. Agente externo mantém credenciais temporárias apenas em memória,
+   aguarda fechamento real do Minecraft, revalida a permissão no site,
+   e aplica as transações com backup/rollback;
+5. Agente pré-lançamento recupera `.pending` antes de o Fabric buscar mods;
+6. Atualização do HYPE Client e do próprio Bootstrap usam seus canais
+   públicos assinados, pois o Bootstrap não pode substituir-se em uso.
+A obfuscação automatizada exige build isolado, sem chave privada no servidor.
+Nenhuma dessas etapas deve ser habilitada em produção antes de homologação.
