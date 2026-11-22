@@ -78,3 +78,39 @@ local informado, nunca publica o binário e não acessa Render/Supabase.
 **Próximos passos:** implementar autenticação segura do instalador pós-saída
 sem guardar Bearer; transação de upgrade de versões previamente gerenciadas
 com backup e rollback; recuperação de queda, locks e teste real no Windows.
+
+### Upgrade de versão já gerenciada + recuperação (22/11/2026)
+
+Novo código: `PrivateManagedUpgrade.java`, com testes em
+`test/br/clanhype/bootstrap/PrivateManagedUpgradeTest.java`.
+
+- Troca **somente** um mod que já tenha `.hype-private-managed/{id}.state`,
+  arquivo antigo íntegro e SHA-256 exato, sem outro JAR com mesmo ID Fabric.
+- O catálogo, manifesto e JAR protegido da nova versão são validados antes
+  de qualquer alteração pela `PrivateInstallPlanner`.
+- Com `after_exit` opt-in, callbacks de jogo encerrado e autorização ativa
+  (ainda **simulados nos testes**, NÃO conectados ao servidor), a rotina
+  prepara o backup privado, cria um journal de transação e a nova versão
+  exclusivamente, atualiza o marcador e remove só o JAR antigo gerenciado.
+- Falha ou revogação durante a operação restauram o estado anterior.
+  O backup é preservado para inspeção/rollback.
+- `recoverPending` recupera uma atualização abruptamente interrompida
+  restaurando o backup anterior, desde que os arquivos passem nos hashes.
+  **Precisa ser chamado pelo launcher/agent ANTES da descoberta de mods
+  pelo Fabric; ainda não está integrado**. O Minecraft poderia falhar
+  se o usuário o abrisse durante uma recuperação pendente.
+- Um `.pending` impede outra tentativa de atualização mesmo que o novo
+  SHA já pareça instalado. O usuário não deve apagar journals manualmente.
+- Não atualiza o HYPE Client ou o próprio Bootstrap nesta etapa.
+  Eles exigem canais assinados próprios e agente externo pós-saída.
+
+**Teste local:** Java 21, arquivo protegido real da HYPE Pokédex Beta 8 e
+chaves Ed25519 temporárias: **38 verificações aprovadas**, incluindo
+troca, backup, rollback, revogação, adulteração, duplicatas e recuperação
+simulada de queda. Sem rede, sem Windows/Minecraft real, sem deploy.
+
+**ATENÇÃO:** a implementação ainda é **experimento desconectado**.
+Não chamar na inicialização Fabric, não distribuir como atualizador
+completo. O callback de autorização usado nos testes NÃO substitui
+consulta real às permissões no site. A chave privada de produção
+nunca deve ir para o site ou para o JAR.
