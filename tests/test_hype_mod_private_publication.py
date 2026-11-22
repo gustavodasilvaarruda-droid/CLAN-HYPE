@@ -41,6 +41,13 @@ class PrivatePublicationTests(unittest.TestCase):
         self.db.blobs = fixture.db.blobs
         self.db.rows["hype_mod_restricted_releases"] = []
         self.draft = self.db.rows["hype_mod_release_drafts"][0]
+        # The private-storage fixture must include the true archived original;
+        # the catalog/download tests only need the protected candidate.
+        original = b"offline-original-fixture-distinct-from-protected" * 100
+        original_path = f"{fixtures.MOD}/{fixtures.DRAFT_ID}/original-test.jar"
+        self.draft["storage_path"] = original_path
+        self.draft["sha256"] = __import__("hashlib").sha256(original).hexdigest()
+        self.db.blobs[original_path] = original
         self.manifest = fixture.signed_manifest().encode("ascii")
         self.kw = dict(
             draft_id=fixtures.DRAFT_ID, manifest_bytes=self.manifest,
@@ -81,7 +88,7 @@ class PrivatePublicationTests(unittest.TestCase):
 
     def test_rejects_nonincreasing_previous_release(self):
         self.db.rows["hype_mod_restricted_releases"].append(
-            {"release": 1, "status": "disabled", "module_id": MOD})
+            {"release": 1, "status": "disabled", "module_id": fixtures.MOD})
         with self.assertRaises(InvalidPrivateRelease):
             validate_private_publication(self.db, **self.kw)
 
