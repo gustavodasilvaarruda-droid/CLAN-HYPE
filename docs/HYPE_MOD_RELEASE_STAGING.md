@@ -52,6 +52,27 @@ Se a chave original não existir, **não gere outra esperando atualizar o client
 - minecraft: 1.21.1; mod_id: hypeclient; channel: stable.
 - signature: Base64 da assinatura Ed25519 do texto canônico UTF-8 com as oito primeiras linhas, cada uma no formato chave=valor seguida de uma quebra de linha LF, inclusive a última. A linha signature não é assinada.
 
+## Limpeza de uploads privados no Painel Admin
+
+A Central de Publicação permite ao administrador apagar um registro e os JARs
+privados associados somente se o rascunho estiver **aguardando proteção** ou
+**rejeitado**. A exclusão exige confirmação explícita, sessão administrativa,
+verificação do bucket privado e validação dos caminhos de armazenamento. Um JAR
+em teste deve ser rejeitado antes de ser descartado; builds aprovados e releases
+publicadas ou desabilitadas para rollback não podem ser excluídos.
+
+O servidor verifica ligações no catálogo de releases (por rascunho e caminho).
+A remoção ocorre primeiro no banco e depois no Storage privado, com registro da
+ação. Como banco e Storage não têm uma transação conjunta, uma falha na segunda
+etapa pode deixar um objeto privado órfão: nesse caso, o painel alerta para
+conferência administrativa, sem publicar ou afetar uma release ativa. **Nada é
+apagado automaticamente.**
+
+A etapa **Registrar build candidato protegido** não seleciona nem reprotege o
+arquivo original já arquivado. Ela exige um segundo JAR gerado fora do site,
+com mesmo ID/versão/dependências, verificações estruturais e bytes diferentes
+do original. Reenviar o arquivo original não é o procedimento correto.
+
 ## Segurança e limitações
 O servidor nunca assina atualizações, nem aceita manifesto sem assinatura válida para a chave pública fixa no cliente. A publicação assinada precisa apontar para o **build candidato protegido**, armazenado separadamente no mesmo bucket privado; o original não pode ser distribuído por engano. A URL retorna o JAR diretamente a partir de Storage privado, pelo domínio oficial, com conferência de tamanho e hash. Uma vez instalado no PC do jogador, o JAR não pode ser protegido 100% contra cópia: manter segredos e decisões de permissão no servidor. A entrega automática só deve ser ativada após homologação do instalador e do rollback.
 
