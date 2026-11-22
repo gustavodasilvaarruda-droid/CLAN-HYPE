@@ -48,3 +48,40 @@ isolada executadas contra o JAR final com `java -Xverify:all` OK;
 executado no Minecraft real, no Windows do jogador ou com login real.
 A presença do método `stageAfterLogin` **não faz** a integração ocorrer
 automaticamente. Não colocar o JAR 0.6 no clã.
+
+### Ponte com HYPE Client Preview 10.0.42 — piloto de login
+
+- O JAR HYPE Client `R7.19-ALPHA7-PREVIEW10.0.42` fornecido pelo
+  proprietário foi auditado via `javap`: a classe `HypeBreedApi` conclui
+  login em `lambda$login$1` e executa logout em `logout()`.
+- O helper opcional `integration-client/br/clanhype/client/HypeAutoStagingBridge.java`
+  encaminha o token **apenas em memória** por reflexão, depois de login
+  bem-sucedido; funciona também sem o Bootstrap instalado. Ele **não altera**
+  o mecanismo de persistência da sessão já existente no HYPE Client.
+- O patcher OFFLINE `integration-client/build/WeaveHypeClient.java` injeta
+  a chamada de login e o cancelamento de logout no bytecode da versão exata
+  10.0.42. O JAR original é preservado; o reempacotamento é só para teste.
+- `HypePrivateSessionBridge` recebe o sinal, verifica o modo local e só
+  chama `PrivateModUpdater.stageAfterLogin` se `update_mode` for
+  explicitamente `stage` ou `after_exit`. Mesmo em `after_exit`, esta
+  versão só prepara arquivos; não os instala.
+- Em `off` (padrão), há logs seguros de recebimento de login/logout para
+  homologação no Minecraft, mas **não há rede, download ou escrita em mods/**.
+- O logout interrompe a tarefa e cancela o staging antes de gravar o JAR.
+  Não grava nem imprime Bearer, senha, refresh token ou chave privada.
+- Re-login necessário para disparar a ponte neste piloto; retomada de sessão
+  previamente salva ainda exige integração complementar.
+- Testes locais Java 21: 22 asserções de staging, inclusive revogação durante
+  download; teste de ponte login/logout; teste de modo OFF; BasicVerifier de
+  38 métodos da classe HypeBreedApi; validação ZIP/JAR de ambos os arquivos.
+  **Ainda não testado dentro do Minecraft pelo proprietário.**
+
+**Atenção: duas etapas ainda pendentes para instalar APENAS Bootstrap:**
+primeiro distribuir/instalar HYPE Client assinado publicamente, reiniciar e
+efetuar login; depois baixar os quatro JARs restritos por conta e aplicar com
+agente pós-fechamento, backup, rollback e novas verificações. A ponte atual
+exige que HYPE Client e Bootstrap 0.6 estejam instalados em uma instância
+de teste; nada foi publicado no site.
+
+Não incorporar as PRs #76, #77 ou #78, não ativar flags no Render,
+não fazer deploy ou distribuir JARs aos jogadores sem homologação.
