@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -58,12 +59,23 @@ public final class PrivateModUpdater {
 
     /** Public bridge for authenticated HYPE Client. Never call from pre-login startup. */
     public static Result stageAfterLogin(Path gameDir, String token) throws Exception {
+        return stageAfterLogin(gameDir, token, () -> true);
+    }
+
+    /** No session is stored: the caller cancels staging on logout or account change. */
+    public static Result stageAfterLogin(Path gameDir, String token, BooleanSupplier sessionActive)
+            throws Exception {
         return stageAfterLogin(gameDir, token, CatalogVerifier.pinnedPublicKey(),
-                               new OfficialFetcher());
+                               new OfficialFetcher(), sessionActive);
     }
 
     static Result stageAfterLogin(Path gameDir, String token, PublicKey key, Fetcher fetcher)
             throws Exception {
+        return stageAfterLogin(gameDir, token, key, fetcher, () -> true);
+    }
+
+    static Result stageAfterLogin(Path gameDir, String token, PublicKey key, Fetcher fetcher,
+                                 BooleanSupplier sessionActive) throws Exception {
         // OFF by default. AFTER_EXIT is intentionally staging ONLY in 0.6.
         UpdateMode mode = UpdateConfiguration.load(gameDir);
         if (mode == UpdateMode.OFF) return new Result(0, 0, 0);
@@ -71,11 +83,14 @@ public final class PrivateModUpdater {
                 || token.indexOf('\r') >= 0 || token.indexOf('\n') >= 0) {
             throw new SecurityException("Authenticated HYPE Client session required");
         }
+        ensureSessionActive(sessionActive);
         Path staging = safeStaging(gameDir);
         byte[] raw = fetcher.get(API + "/releases", token, MAX_LIST);
+        ensureSessionActive(sessionActive);
         List<Release> releases = readReleases(raw, key);
         int staged = 0, present = 0;
         for (Release item : releases) {
+            ensureSessionActive(sessionActive);
             String fileName = item.id() + "-" + item.sha256() + ".jar";
             Path target = staging.resolve(fileName);
             if (Files.isSymbolicLink(target)) throw new SecurityException("Unsafe staged file");
@@ -85,16 +100,19 @@ public final class PrivateModUpdater {
                 continue;
             }
             byte[] jar = fetcher.get(item.url(), token, Math.toIntExact(item.size()));
+            ensureSessionActive(sessionActive);
             validateJar(jar, item);
             Path temp = Files.createTempFile(staging, "hype-", ".part");
             try {
                 Files.write(temp, jar);
+                ensureSessionActive(sessionActive);
                 // CREATE_NEW semantics are not available for atomic move: never replace.
                 if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
                     validateFile(target, item);
                     present++;
                     continue;
                 }
+                ensureSessionActive(sessionActive);
                 Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE);
                 staged++;
             } finally {
@@ -102,6 +120,11 @@ public final class PrivateModUpdater {
             }
         }
         return new Result(staged, present, releases.size());
+    }
+
+    private static void ensureSessionActive(BooleanSupplier active) {
+        if (active == null || !active.getAsBoolean() || Thread.currentThread().isInterrupted())
+            throw new SecurityException("Private stage cancelled or signed out");
     }
 
     static List<Release> readReleases(byte[] bytes, PublicKey key) throws Exception {
