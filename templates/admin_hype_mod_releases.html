@@ -7,10 +7,45 @@
     <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Gerenciador de Módulos</a></p>
     <span class="hype-v6-kicker">HYPE ADMIN • GERENCIAMENTO DE RELEASES</span>
     <h1>Central de Publicação HYPE</h1>
-    <p class="hpub-subtitle">Um processo organizado para conferir, armazenar, testar e publicar seus mods Fabric, sem misturar as etapas.</p>
+    <p class="hpub-subtitle">Central de lançamento normal dos mods Fabric HYPE, com catálogo de releases e entrega autenticada pelo HYPE Client e Bootstrap.</p>
+    <section class="hpub-launch-panel" aria-label="Estado da publicação normal">
+      <div class="hpub-launch-heading">
+        <div>
+          <strong>Canal estável HYPE</strong>
+          <p>Sem canal piloto separado: somente releases assinadas e publicadas entram na lista de atualizações. Enviar um JAR não publica seus arquivos.</p>
+        </div>
+        {% if staging_enabled %}
+          <button class="hype-v6-btn gold" type="button" data-hpub-goto="publicar">Abrir publicação</button>
+        {% endif %}
+      </div>
+      <div class="hpub-launch-stats">
+        <span><strong>{{ published_releases|length }}</strong> releases publicadas</span>
+        <span><strong>{{ drafts|length }}</strong> arquivos em preparação</span>
+        <span><strong>{% if private_rollout_status == 'single_ready' %}Uma conta{% elif private_rollout_status == 'clan_ready' %}Clã autorizado{% else %}Bloqueado{% endif %}</strong> alcance atual dos downloads restritos</span>
+      </div>
+      {% if private_rollout_status == 'single_ready' %}
+        <p class="hpub-launch-notice"><strong>Downloads restritos:</strong> só a conta autorizada no servidor pode consultar releases privadas dos outros mods, desde que tenha permissão individual. A posse do Bootstrap, por si só, não é uma proteção.</p>
+      {% elif private_rollout_status == 'clan_ready' %}
+        <p class="hpub-launch-notice">Os membros autenticados com permissão para cada módulo podem baixar releases privadas assinadas. Não considere os arquivos inacessíveis aos jogadores.</p>
+      {% else %}
+        <p class="hpub-launch-notice">O acesso aos downloads privados está bloqueado pelo controle de distribuição. Publicar o registro não libera o JAR enquanto a restrição estiver ativa.</p>
+      {% endif %}
+      {% if published_releases %}
+        <details class="hpub-published-list">
+          <summary>Ver versões realmente publicadas</summary>
+          <div class="hpub-publication-grid">
+            {% for release in published_releases %}
+              <div><strong>{{ release.module_id }} · {{ release.version }}</strong><small>{{ release.channel_name }} · Release {{ release.release }} · {{ release.published_at|hype_br_datetime }}</small></div>
+            {% endfor %}
+          </div>
+        </details>
+      {% else %}
+        <p class="hpub-launch-empty">Ainda não existe release assinada e publicada. O Bootstrap não tem novos JARs para baixar por esse catálogo.</p>
+      {% endif %}
+    </section>
     <div class="hpub-metrics" aria-label="Resumo dos arquivos registrados">
-      <div><strong>{{ drafts|length }}</strong><span>Arquivos originais cadastrados</span></div>
-      <div><strong>{{ drafts|selectattr('status', 'equalto', 'em_teste')|list|length }}</strong><span>Versões em teste</span></div>
+      <div><strong>{{ drafts|length }}</strong><span>Arquivos preparados</span></div>
+      <div><strong>{{ drafts|selectattr('status', 'equalto', 'em_teste')|list|length }}</strong><span>Aguardando conclusão</span></div>
       <div><strong>{{ drafts|selectattr('status', 'equalto', 'pronto_para_aprovacao')|list|length }}</strong><span>Aprovadas, não publicadas</span></div>
     </div>
     <nav class="hpub-stepper" aria-label="Etapas da publicação">
@@ -106,7 +141,7 @@
             <td title="{{ item.original_filename or '' }}">{{ item.module_id }}</td>
             <td>{{ item.version }}</td>
             <td>{{ (item.meta or {}).get('compatibility', {}).get('minecraft') or 'Não declarado' }}</td>
-            <td>{{ item.status|replace('_',' ') }}</td>
+            <td><strong>{{ item.status|replace('_',' ') }}</strong><br><small>{{ item.release_next_step }}</small></td>
             <td><time datetime="{{ item.created_at or '' }}">{{ item.created_at|hype_br_datetime }}</time></td>
             <td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td>
             <td>
