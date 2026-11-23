@@ -232,12 +232,50 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 abort(403)
 
     def load_drafts():
-        """Load real stored files both on the dashboard and after inspection."""
+        """Display the actual release blockers without changing publication rules."""
         if db is None:
             return []
-        return (db.table(TABLE).select(
+        rows = (db.table(TABLE).select(
             "id,module_id,version,status,created_at,sha256,meta,size_bytes,original_filename"
         ).order("created_at", desc=True).limit(100).execute().data or [])
+        for row in rows:
+            meta = row.get("meta") or {}
+            candidate = meta.get("protected") or {}
+            automatic = meta.get("automatic_review") or {}
+            manual = meta.get("manual_review") or {}
+            sha = candidate.get("sha256")
+            if row.get("status") == "rejeitado":
+                step = "Rejeitado — envie uma nova versão"
+            elif not sha:
+                step = "Falta um JAR candidato protegido"
+            elif automatic.get("status") != "passed" or automatic.get("candidate_sha256") != sha:
+                step = "Falta validar a integridade do candidato"
+            elif manual.get("candidate_sha256") != sha:
+                step = "Falta registrar a aprovação do mesmo candidato"
+            elif row.get("status") != "pronto_para_aprovacao":
+                step = "Falta concluir a aprovação da versão"
+            else:
+                step = "Aguardando manifesto assinado e publicação"
+            row["release_next_step"] = step
+        return rows
+
+    def load_published_releases():
+        """Read status from the immutable release catalogues, not from drafts."""
+        if db is None:
+            return []
+        result = []
+        for table_name, channel in (
+            ("hype_mod_published_releases", "HYPE Client"),
+            ("hype_mod_restricted_releases", "Mods HYPE"),
+        ):
+            rows = (db.table(table_name).select(
+                "module_id,version,release,status,published_at"
+            ).eq("status", "published").order(
+                "published_at", desc=True
+            ).limit(100).execute().data or [])
+            for row in rows:
+                result.append({**row, "channel_name": channel})
+        return result
 
     def load_protection_jobs():
         if db is None or not protection_queue_enabled:
@@ -281,8 +319,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         except Exception:
             protection_jobs = {}
             flash("Nao foi possivel consultar a fila de protecao.", "erro")
+        try:
+            published_releases = load_published_releases()
+        except Exception:
+            published_releases = []
+            flash("Nao foi possivel consultar o catalogo de publicacoes.", "erro")
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
+            published_releases=published_releases,
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
@@ -316,8 +360,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         except Exception:
             protection_jobs = {}
             flash("Nao foi possivel consultar a fila de protecao.", "erro")
+        try:
+            published_releases = load_published_releases()
+        except Exception:
+            published_releases = []
+            flash("Nao foi possivel consultar o catalogo de publicacoes.", "erro")
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
+            published_releases=published_releases,
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
