@@ -87,6 +87,9 @@
       <section class="hpub-stage" data-hpub-stage="envio" id="hpub-envio" aria-label="Etapa 2: enviar e preparar proteção">
       <div class="hpub-stage-title"><span class="hpub-stage-number">02 / 04</span><div><h2>Enviar e preparar a versão</h2><p>Guarde primeiro o original; depois escolha um original armazenado e vincule um candidato protegido da mesma versão.</p></div></div>
       <hr>
+      <h2>Dois caminhos: original para teste ou protegido para distribuição</h2>
+      <p>O original pode ser usado somente em testes administrativos; ele não entra no catálogo do Bootstrap.
+      Um JAR protegido enviado aqui fica privado até passar na verificação, nos testes e na aprovação.</p>
       <h2>Enviar o JAR original ao armazenamento privado</h2>
       <p>Envie o <strong>JAR original de desenvolvimento, ainda sem proteção</strong>. Caso tenha guardado um JAR protegido aqui por engano, não reenvie: depois de guardar o original correto, use a opção 2B-A para reutilizá-lo. Nenhum upload publica o arquivo.</p>
       <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
@@ -107,6 +110,10 @@
             <td><time datetime="{{ item.created_at or '' }}">{{ item.created_at|hype_br_datetime }}</time></td>
             <td title="{{ item.sha256 }}"><code>{{ item.sha256[:12] }}…</code></td>
             <td>
+              {% if original_test_download_enabled and item.status in ('aguardando_protecao', 'em_teste') %}
+                <a class="hype-v6-btn" href="{{ url_for('hype_mod_admin.mod_release_original_test_download', draft_id=item.id) }}"
+                   title="Somente administrador: baixar o JAR original para teste local, sem publicar">Baixar original para teste</a>
+              {% endif %}
               {% if item.status in ('aguardando_protecao', 'rejeitado') %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}" onsubmit="return confirm('Apagar definitivamente este JAR privado e seu eventual build candidato? Esta ação não pode ser desfeita.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
