@@ -220,8 +220,16 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         db = None
 
     def admin_only():
-        if not session.get("usuario_email") or not is_admin():
+        email = session.get("usuario_email")
+        if not email or not is_admin():
             abort(403)
+        # O canal individual de teste restringe TODA a Central de Releases,
+        # inclusive download do original, upload, revisao e publicacao.
+        # A identidade vem exclusivamente da sessao Flask assinada.
+        if os.getenv("HYPE_PRIVATE_MOD_ROLLOUT_SCOPE", "off").strip().lower() == "single":
+            from modules.hype_mod_pilot_scope import can_account_download_private_mods
+            if not can_account_download_private_mods(email):
+                abort(403)
 
     def load_drafts():
         """Load real stored files both on the dashboard and after inspection."""
