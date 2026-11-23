@@ -133,7 +133,7 @@
         <p>Os originais já armazenados podem entrar na fila, sem novo upload. O processamento só ocorre quando um worker isolado e um ofuscador confiável estiverem configurados; agendar não equivale a proteger ou publicar.</p>
         {% for item in drafts if item.status in ('aguardando_protecao', 'em_teste') %}
           {% set job = protection_jobs.get(item.id|string) %}
-          {% if job or item.status == 'aguardando_protecao' %}
+          {% if job or (item.status in ('aguardando_protecao', 'em_teste') and not (item.meta or {}).get('protected')) %}
           <div style="padding:12px 0;border-top:1px solid rgba(195,151,31,.18);display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between;">
             <div>
               <strong>{{ item.module_id }} · {{ item.version }}</strong>
@@ -147,7 +147,7 @@
                 {% else %}Pronto para solicitar proteção{% endif %}
               </small></div>
             </div>
-            {% if item.status == 'aguardando_protecao' and (not job or job.status == 'failed') %}
+            {% if item.status in ('aguardando_protecao', 'em_teste') and not (item.meta or {}).get('protected') and (not job or job.status == 'failed') %}
             <form method="post" action="{{ url_for('hype_mod_admin.mod_release_request_protection') }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="draft_id" value="{{ item.id }}">

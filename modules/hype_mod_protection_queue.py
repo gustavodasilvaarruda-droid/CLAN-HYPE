@@ -22,8 +22,8 @@ def queue_protection(db, draft_id, requested_by):
     if not rows:
         raise InvalidJar("Arquivo original nao encontrado.")
     draft = rows[0]
-    if draft.get("module_id") not in IDS or draft.get("status") != "aguardando_protecao":
-        raise InvalidJar("Somente um original aguardando protecao pode entrar na fila.")
+    if draft.get("module_id") not in IDS or draft.get("status") not in ("aguardando_protecao", "em_teste"):
+        raise InvalidJar("Somente originais pendentes ou em teste podem entrar na fila.")
     if (draft.get("meta") or {}).get("protected"):
         raise InvalidJar("Este arquivo ja possui um candidato protegido.")
     sha = draft.get("sha256")

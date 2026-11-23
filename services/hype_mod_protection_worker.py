@@ -87,7 +87,7 @@ def _load_draft(db, job):
     if not rows:
         raise ProtectionError("Original nao encontrado.")
     d = rows[0]
-    if (d.get("status") != "aguardando_protecao"
+    if (d.get("status") not in ("aguardando_protecao", "em_teste")
             or d.get("module_id") not in IDS
             or d.get("sha256") != job["job_sha256"]
             or (d.get("meta") or {}).get("protected")):
@@ -133,9 +133,17 @@ def process_job(db, job, command):
     storage.upload(path=path, file=candidate,
                    file_options={"content-type": "application/java-archive", "upsert": "false"})
     try:
-        updated = (db.table(TABLE).update({"status": "em_teste", "meta": meta})
-                   .eq("id", draft_id).eq("status", "aguardando_protecao").execute().data or [])
-        if not updated:
+        # Atualizacao atomica no banco: nao sobrescreve um candidato enviado
+        # manualmente nem reverte uma aprovacao em corrida com o worker.
+        committed = db.rpc("hype_finish_mod_protection_draft", {
+            "p_draft_id": str(draft_id), "p_sha256": draft["sha256"],
+            "p_job_id": job["job_id"],
+            "p_candidate": {
+                "protected": meta["protected"],
+                "automatic_review": meta["automatic_review"],
+            },
+        }).execute().data
+        if committed is not True:
             raise ProtectionError("Original mudou enquanto o candidato era armazenado.")
     except Exception:
         storage.remove([path])
