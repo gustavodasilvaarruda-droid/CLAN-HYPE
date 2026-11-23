@@ -12,7 +12,7 @@
       <div class="hpub-launch-heading">
         <div>
           <strong>Canal estável HYPE</strong>
-          <p>Sem canal piloto separado: somente releases assinadas e publicadas entram na lista de atualizações. Enviar um JAR não publica seus arquivos.</p>
+          <p>O canal estável protegido permanece separado do piloto de teste individual. Só as releases assinadas e publicadas aparecem nas atualizações; enviar um JAR não o publica.</p>
         </div>
         {% if staging_enabled %}
           <button class="hype-v6-btn gold" type="button" data-hpub-next="publicar">Abrir publicação</button>
@@ -71,7 +71,7 @@
           BLOQUEADO — distribuição privada desativada por padrão
         {% endif %}
       </p>
-      <p><small>O HYPE Client usa seu próprio canal assinado. Os outros quatro mods usam catálogo autenticado com assinatura Ed25519. Nenhum arquivo é distribuído só por ser enviado ao site: é preciso original, build protegido diferente, revisão automática, teste em jogo do build exato, manifesto offline assinado e publicação administrativa.</small></p>
+      <p><small>O HYPE Client usa seu próprio canal assinado. Os outros quatro mods usam catálogo autenticado com assinatura Ed25519. No canal estável, nenhum arquivo é distribuído só por ser enviado ao site: é preciso original, build protegido diferente, revisão automática, teste em jogo do build exato, manifesto offline assinado e publicação administrativa. O piloto individual permite exclusivamente originais assinados, separado do canal estável.</small></p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         {% for module_id, module_name in [
           ('hypeclient','HYPE Client'),
@@ -123,7 +123,7 @@
       <div class="hpub-stage-title"><span class="hpub-stage-number">02 / 04</span><div><h2>Enviar e preparar a versão</h2><p>Guarde primeiro o original; depois escolha um original armazenado e vincule um candidato protegido da mesma versão.</p></div></div>
       <hr>
       <h2>Dois caminhos: original para teste ou protegido para distribuição</h2>
-      <p>O original pode ser usado somente em testes administrativos; ele não entra no catálogo do Bootstrap.
+      <p>O original pode entrar SOMENTE no piloto assinado e restrito à conta de teste quando essa opção estiver habilitada; o catálogo protegido dos jogadores continua separado.
       Um JAR protegido enviado aqui fica privado até passar na verificação, nos testes e na aprovação.</p>
       <h2>Enviar o JAR original ao armazenamento privado</h2>
       <p>Envie o <strong>JAR original de desenvolvimento, ainda sem proteção</strong>. Caso tenha guardado um JAR protegido aqui por engano, não reenvie: depois de guardar o original correto, use a opção 2B-A para reutilizá-lo. Nenhum upload publica o arquivo.</p>
@@ -450,6 +450,35 @@
       {% else %}
         <p><small>Publicação desativada. O modo de aprovação e entrega automática precisa de homologação e ativação separada no servidor.</small></p>
       {% endif %}
+      <section class="hpub-release-picker" aria-label="Publicar original no piloto HYPE">
+        <h3>Teste do Bootstrap — JAR original, sem proteção</h3>
+        <p>Este caminho é SEPARADO do lançamento protegido. Serve somente para sua conta de teste e permite conferir se o Bootstrap detecta, baixa e instala a versão depois do fechamento do Minecraft. Não distribua o Bootstrap piloto para jogadores.</p>
+        {% if pilot_original_enabled %}
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_original_pilot') }}"
+                enctype="multipart/form-data" style="display:grid;gap:12px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="pilot_original_draft">Original já armazenado no site</label>
+            <select id="pilot_original_draft" name="draft_id" required>
+              <option value="">Escolha o mod original para testar...</option>
+              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') %}
+                <option value="{{ item.id }}"
+                  {% if item.status == 'rejeitado' or (item.meta or {}).get('pilot_original') %}disabled{% endif %}>
+                  {{ item.module_id }} · {{ item.version }} — {{ 'Já publicado no piloto' if (item.meta or {}).get('pilot_original') else 'Original sem ofuscação' }}
+                </option>
+              {% endfor %}
+            </select>
+            <label for="pilot_original_manifest">Manifesto assinado offline (.properties) para este JAR original</label>
+            <input id="pilot_original_manifest" name="manifest" type="file" accept=".properties" required>
+            <p><small>A assinatura Ed25519 continua obrigatória. Assine o JAR original com a chave oficial fora do servidor, usando o comando <code>python -m modules.hype_manifest_signer --private-mod ...</code>. Enviar um original sozinho NÃO o publica.</small></p>
+            <label><input type="checkbox" name="confirm_pilot" value="yes" required>
+              Confirmo que este JAR NÃO está protegido e só deve ser oferecido ao Bootstrap da minha conta de teste.
+            </label>
+            <button type="submit" class="hype-v6-btn gold">Publicar original no piloto</button>
+          </form>
+        {% else %}
+          <p><small>Publicação de originais desativada. Para habilitar, o administrador do Render deve configurar <code>HYPE_MOD_PILOT_ORIGINAL_ENABLED=1</code> e restringir <code>HYPE_PRIVATE_MOD_ROLLOUT_SCOPE=single</code> à conta de teste. O download autenticado e a assinatura continuam necessários.</small></p>
+        {% endif %}
+      </section>
       {% if private_publish_enabled %}
         <section style="margin:22px 0;padding:16px;border:1px solid rgba(195,151,31,.4);border-radius:12px;">
           <h2>Canal privado: Pokédex, Breed Calculator, Campo de Batalha e Battle AI</h2>

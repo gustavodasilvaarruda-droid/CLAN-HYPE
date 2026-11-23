@@ -71,9 +71,45 @@ def sign_manifest(jar: bytes, private_key: Ed25519PrivateKey, release: int) -> b
     return document
 
 
+
+def sign_private_mod_manifest(jar: bytes, private_key: Ed25519PrivateKey, release: int) -> bytes:
+    """Sign a restricted HYPE mod (protected OR original) on a trusted PC only."""
+    from modules.hype_mod_private_releases import BASE_URL, parse_signed_manifest
+    from modules.hype_mod_staging import inspect_original
+    from modules.hype_mod_update_access import MOD_TO_SITE_MODULE
+    if not isinstance(private_key, Ed25519PrivateKey):
+        raise ValueError("Chave privada Ed25519 obrigatoria")
+    if not isinstance(release, int) or not 1 <= release <= 999999999:
+        raise ValueError("Numero de release invalido")
+    public_der = private_key.public_key().public_bytes(
+        Encoding.DER, PublicFormat.SubjectPublicKeyInfo
+    )
+    if public_der != base64.b64decode(PUBLIC_KEY_DER_B64, validate=True):
+        raise ValueError("Chave privada nao corresponde ao Bootstrap 0.8")
+    report = inspect_original(jar)
+    mod_id = report["module_id"]
+    if mod_id not in MOD_TO_SITE_MODULE:
+        raise ValueError("Modulo HYPE privado desconhecido")
+    values = {
+        "release": str(release), "version": report["version"],
+        "url": f"{BASE_URL}{mod_id}/{report['sha256']}.jar",
+        "sha256": report["sha256"], "size": str(report["size_bytes"]),
+        "minecraft": "1.21.1", "mod_id": mod_id, "channel": "stable",
+    }
+    canonical = "".join(f"{field}={values[field]}\n" for field in FIELDS).encode("ascii")
+    document = canonical + f"signature={base64.b64encode(private_key.sign(canonical)).decode('ascii')}\n".encode("ascii")
+    parse_signed_manifest(
+        document.decode("ascii"), module_id=mod_id,
+        version=report["version"], release=release,
+        sha256=report["sha256"], size_bytes=report["size_bytes"],
+    )
+    return document
+
+
 def main():
     parser = argparse.ArgumentParser(description="Assinador offline HYPE Client (Ed25519).")
     parser.add_argument("--jar", required=True, type=Path, help="JAR protegido testado")
+    parser.add_argument("--private-mod", action="store_true", help="Assinar original/candidato de mod HYPE privado para piloto")
     parser.add_argument("--private-key", required=True, type=Path, help="Chave Ed25519 original PEM, local")
     parser.add_argument("--release", required=True, type=int, help="Número maior que o publicado")
     parser.add_argument("--output", required=True, type=Path, help="Novo manifesto .properties")
@@ -88,7 +124,8 @@ def main():
     except TypeError:
         password = getpass("Senha da chave privada PEM (não será exibida): ").encode()
         key = load_pem_private_key(pem, password=password)
-    document = sign_manifest(args.jar.read_bytes(), key, args.release)
+    document = (sign_private_mod_manifest(args.jar.read_bytes(), key, args.release)
+                if args.private_mod else sign_manifest(args.jar.read_bytes(), key, args.release))
     args.output.write_bytes(document)
     print(f"Manifesto assinado criado: {args.output}")
     print("Verifique a versão aprovada e o hash no Painel Admin ANTES de publicar.")
