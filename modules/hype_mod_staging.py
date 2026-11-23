@@ -158,6 +158,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     publish_enabled = staging_enabled and os.getenv("HYPE_MOD_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     protected_upload_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTED_UPLOAD_ENABLED", "").lower() in ("1", "true", "yes")
+    protection_queue_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTION_QUEUE_ENABLED", "").lower() in ("1", "true", "yes")
     # Explicit independent gate; must never be enabled by ordinary staging.
     private_publish_enabled = publish_enabled and os.getenv("HYPE_MOD_PRIVATE_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     from modules.hype_mod_pilot_scope import pilot_scope_status
@@ -192,6 +193,12 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             "id,module_id,version,status,created_at,sha256,meta,size_bytes,original_filename"
         ).order("created_at", desc=True).limit(100).execute().data or [])
 
+    def load_protection_jobs():
+        if db is None or not protection_queue_enabled:
+            return {}
+        from modules.hype_mod_protection_queue import jobs_for_drafts
+        return jobs_for_drafts(db)
+
     @bp.get("/admin/modulos/releases")
     def mod_releases():
         admin_only()
@@ -201,8 +208,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 drafts = load_drafts()
             except Exception:
                 flash("Erro ao consultar rascunhos no banco.", "erro")
+        try:
+            protection_jobs = load_protection_jobs()
+        except Exception:
+            protection_jobs = {}
+            flash("Nao foi possivel consultar a fila de protecao.", "erro")
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
+            protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
             private_publish_enabled=private_publish_enabled,
@@ -229,14 +242,39 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         except Exception:
             drafts = []
             flash("Nao foi possivel carregar a lista de JARs armazenados.", "erro")
+        try:
+            protection_jobs = load_protection_jobs()
+        except Exception:
+            protection_jobs = {}
+            flash("Nao foi possivel consultar a fila de protecao.", "erro")
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
+            protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
             private_publish_enabled=private_publish_enabled,
             private_rollout_status=pilot_scope_status(),
             report=report, error=error,
         )
+
+    @bp.post("/admin/modulos/releases/solicitar-protecao")
+    def mod_release_request_protection():
+        """Admin-only request. The web request NEVER executes the obfuscator."""
+        admin_only()
+        if not protection_queue_enabled or db is None:
+            abort(404)
+        try:
+            from modules.hype_mod_protection_queue import queue_protection
+            job_id = queue_protection(db, request.form.get("draft_id"), session["usuario_email"])
+            if registrar_log:
+                registrar_log("solicitar_protecao_jar", "hype_mods", "hype_mod_protection_jobs",
+                              str(job_id), {"status": "queued"})
+            flash("Protecao solicitada. O original continua privado e nada foi publicado.", "sucesso")
+        except (InvalidJar, ValueError) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Nao foi possivel agendar a protecao. Confira a fila e o banco de dados.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/upload")
     def mod_release_upload():
@@ -616,6 +654,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             if not items:
                 abort(404)
             old = items[0]["status"]
+            # Nao permitir que o admin mova manualmente um original enquanto
+            # um worker ja esta trabalhando na mesma versao.
+            if protection_queue_enabled and old == "aguardando_protecao" and target == "em_teste":
+                from modules.hype_mod_protection_queue import JOBS
+                jobs = (db.table(JOBS).select("status")
+                        .eq("draft_id", str(draft_id)).limit(1).execute().data or [])
+                if jobs and jobs[0].get("status") in ("queued", "running"):
+                    raise ValueError("Esta versao esta na fila de protecao. Aguarde o resultado.")
             permitted = {
                 "aguardando_protecao": {"em_teste", "rejeitado"},
                 "em_teste": {"pronto_para_aprovacao", "rejeitado"},
