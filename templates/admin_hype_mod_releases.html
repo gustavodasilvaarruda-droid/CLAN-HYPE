@@ -127,8 +127,41 @@
           </tr>
         {% else %}<tr><td colspan="7">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
       </table></div>
-      <h2>Vincular o JAR protegido à versão</h2>
-      <p>Escolha <strong>um JAR original que já está no armazenamento privado</strong> e mova-o para testes. Em seguida, selecione a mesma versão e envie <strong>outro JAR, já preparado fora do site</strong>. O site verifica a compatibilidade, mas <strong>não protege nem ofusca automaticamente</strong> o arquivo original. Não reenvie o original como candidato.</p>
+      {% if protection_queue_enabled %}
+      <div class="hpub-protection-queue" style="border:1px solid rgba(195,151,31,.45);border-radius:12px;padding:16px;margin:18px 0;overflow-wrap:anywhere;">
+        <h3 style="margin-top:0;">Proteção automática — fila piloto</h3>
+        <p>Os originais já armazenados podem entrar na fila, sem novo upload. O processamento só ocorre quando um worker isolado e um ofuscador confiável estiverem configurados; agendar não equivale a proteger ou publicar.</p>
+        {% for item in drafts if item.status in ('aguardando_protecao', 'em_teste') %}
+          {% set job = protection_jobs.get(item.id|string) %}
+          {% if job or item.status == 'aguardando_protecao' %}
+          <div style="padding:12px 0;border-top:1px solid rgba(195,151,31,.18);display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between;">
+            <div>
+              <strong>{{ item.module_id }} · {{ item.version }}</strong>
+              <div><small>
+                {% if job %}
+                  {% if job.status == 'queued' %}Na fila, aguardando worker
+                  {% elif job.status == 'running' %}Proteção em andamento
+                  {% elif job.status == 'completed' %}Candidato gerado; testes no Minecraft pendentes
+                  {% elif job.status == 'failed' %}Falha na proteção: {{ job.failure_reason or 'Consulte o administrador do worker' }}
+                  {% else %}Status da fila indisponível{% endif %}
+                {% else %}Pronto para solicitar proteção{% endif %}
+              </small></div>
+            </div>
+            {% if item.status == 'aguardando_protecao' and (not job or job.status == 'failed') %}
+            <form method="post" action="{{ url_for('hype_mod_admin.mod_release_request_protection') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="draft_id" value="{{ item.id }}">
+              <button type="submit" class="hype-v6-btn gold">{{ 'Tentar novamente' if job else 'Solicitar proteção' }}</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+        {% endfor %}
+        <p><small>Somente o candidato validado entra em teste. A aprovação, assinatura e publicação continuam sendo ações separadas e manuais. Não ative a distribuição para jogadores durante o piloto.</small></p>
+      </div>
+      {% endif %}
+      <h2>Vincular um JAR protegido manualmente</h2>
+      <p>Como alternativa à fila piloto, escolha um original armazenado, mova-o para testes e vincule um <strong>outro JAR protegido fora do site</strong>. Este formulário manual não executa o ofuscador. Nunca vincule o próprio original como candidato.</p>
       {% set awaiting = drafts|selectattr('status', 'equalto', 'aguardando_protecao')|list %}
       {% set testing = drafts|selectattr('status', 'equalto', 'em_teste')|list %}
       {% set upload = namespace(available=false) %}
