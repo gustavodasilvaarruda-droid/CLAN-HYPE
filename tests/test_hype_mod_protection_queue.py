@@ -112,8 +112,23 @@ class ProtectionQueueTests(unittest.TestCase):
         self.assertEqual(queue_protection(self.db, "21", "admin@example.com"), "job-1")
         self.assertEqual(self.db.rows[JOBS][0]["status"], "queued")
 
-    def test_rejeita_original_ja_em_teste(self):
+    def test_aceita_original_em_teste_sem_candidato(self):
         self.db.rows[TABLE][0]["status"] = "em_teste"
+        job = queue_protection(self.db, "21", "admin@example.com")
+        self.assertEqual(job, "job-1")
+        self.assertEqual(self.db.rows[TABLE][0]["status"], "em_teste")
+        self.assertEqual(_load_draft(self.db, {
+            "job_draft_id": "21", "job_sha256": SHA,
+        })["status"], "em_teste")
+
+    def test_nao_aceita_candidato_ja_registrado(self):
+        self.db.rows[TABLE][0]["status"] = "em_teste"
+        self.db.rows[TABLE][0]["meta"] = {"protected": {"sha256": "b" * 64}}
+        with self.assertRaises(InvalidJar):
+            queue_protection(self.db, "21", "admin@example.com")
+
+    def test_nao_aceita_versao_aprovada(self):
+        self.db.rows[TABLE][0]["status"] = "pronto_para_aprovacao"
         with self.assertRaises(InvalidJar):
             queue_protection(self.db, "21", "admin@example.com")
 
@@ -175,6 +190,10 @@ class ReleaseSafetySourceTests(unittest.TestCase):
         self.assertIn('HYPE_MOD_PRIVATE_PUBLISH_ENABLED', staging)
         self.assertIn('security invoker', sql.lower())
         self.assertIn('revoke all', sql.lower())
+        self.assertIn('hype_finish_mod_protection_draft', sql)
+        self.assertIn("and d.status in ('aguardando_protecao', 'em_teste')", sql)
+        self.assertIn("not (coalesce(d.meta, '{}'::jsonb) ? 'protected')", sql)
+        self.assertIn("db.rpc(\"hype_finish_mod_protection_draft\"", worker)
 
 
 if __name__ == "__main__":
