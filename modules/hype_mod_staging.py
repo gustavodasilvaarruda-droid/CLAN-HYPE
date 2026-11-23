@@ -318,7 +318,38 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
                               (saved.data or [{}])[0].get("id"),
                               {"modulo": report["module_id"], "sha256": report["sha256"]})
-            flash("Original armazenado em privado. Ainda NÃO foi protegido ou publicado.", "sucesso")
+            if protection_queue_enabled:
+                # Enfileira automaticamente apenas depois do upload privado e
+                # do registro do draft. Falha na fila nao apaga o original.
+                try:
+                    from modules.hype_mod_protection_queue import queue_after_upload
+                    job_id = queue_after_upload(
+                        db, (saved.data or [None])[0],
+                        session["usuario_email"], enabled=True,
+                    )
+                except Exception:
+                    flash(
+                        "Original guardado em privado, mas a fila de proteção falhou. "
+                        "Use 'Solicitar proteção' para tentar novamente.",
+                        "erro",
+                    )
+                else:
+                    if registrar_log:
+                        try:
+                            registrar_log(
+                                "solicitar_protecao_jar_automatica", "hype_mods",
+                                "hype_mod_protection_jobs", str(job_id),
+                                {"status": "queued", "module_id": report["module_id"]},
+                            )
+                        except Exception:
+                            pass  # Falha de log nao reverte o upload nem a fila.
+                    flash(
+                        "Original guardado em privado e enviado automaticamente "
+                        "para a fila. Ainda NÃO foi ofuscado ou publicado.",
+                        "sucesso",
+                    )
+            else:
+                flash("Original armazenado em privado. Ainda NÃO foi protegido ou publicado.", "sucesso")
         except Exception:
             if uploaded:
                 try:
