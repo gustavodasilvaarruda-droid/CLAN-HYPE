@@ -26,6 +26,9 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertEqual(stages, ["arquivo", "envio", "teste", "publicar"])
         self.assertEqual(self.html.count('data-hpub-goto='), 4)
         self.assertIn("hype_publish_center.js", self.html)
+        self.assertIn("mod_release_original_test_download", self.html)
+        self.assertIn("{% if original_test_download_enabled and item.status in ('aguardando_protecao', 'em_teste') %}", self.html)
+        self.assertIn("ele não entra no catálogo do Bootstrap", self.html)
         self.assertIn("hype_publish_center.css", self.html)
 
     def test_existing_privileged_endpoints_are_preserved(self):

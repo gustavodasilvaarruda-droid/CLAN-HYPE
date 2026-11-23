@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from uuid import UUID, uuid4
 from zipfile import ZipFile, BadZipFile
 
-from flask import abort, flash, redirect, render_template, request, session, url_for
+from flask import abort, flash, redirect, render_template, request, session, send_file, url_for
 from modules.hype_signed_release import InvalidRelease, verify_signed_manifest, validate_binary
 from modules.hype_mod_build_checks import check_fabric_classes, check_candidate_compatibility, UnsafeBuild
 
@@ -153,12 +153,50 @@ def audit_candidate_pair(original, candidate, draft):
     }
 
 
+def read_original_for_admin_test(db, draft_id):
+    """Admin-gated caller only: read an archived original without publication.
+
+    Never returns a public Storage URL, changes draft status, or puts the
+    unprotected bytes into the player-facing update catalog.
+    """
+    parsed = parse_draft_id(str(draft_id))
+    rows = (db.table(TABLE)
+            .select("id,module_id,version,status,sha256,storage_path")
+            .eq("id", parsed).limit(2).execute().data or [])
+    if len(rows) != 1:
+        raise InvalidJar("Original de teste nao encontrado.")
+    draft = rows[0]
+    module_id = draft.get("module_id")
+    sha = draft.get("sha256")
+    path = draft.get("storage_path")
+    if (module_id not in IDS
+            or draft.get("status") not in ("aguardando_protecao", "em_teste")
+            or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
+            or not isinstance(path, str)
+            or not re.fullmatch(rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\.jar", path)):
+        raise InvalidJar("Original indisponivel para teste privado.")
+    assert_private_bucket(db.storage)
+    raw = db.storage.from_(BUCKET).download(path)
+    if not isinstance(raw, bytes):
+        raise InvalidJar("Leitura do JAR privado invalida.")
+    validate_binary(raw, expected_sha=sha)
+    report = inspect_original(raw)
+    if (report["module_id"] != module_id
+            or report["version"] != draft.get("version")
+            or report["sha256"] != sha):
+        raise InvalidJar("Arquivo privado nao corresponde a versao registrada.")
+    return raw, report
+
+
 def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
     publish_enabled = staging_enabled and os.getenv("HYPE_MOD_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     protected_upload_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTED_UPLOAD_ENABLED", "").lower() in ("1", "true", "yes")
     protection_queue_enabled = staging_enabled and os.getenv("HYPE_MOD_PROTECTION_QUEUE_ENABLED", "").lower() in ("1", "true", "yes")
+    original_test_download_enabled = staging_enabled and os.getenv(
+        "HYPE_MOD_ORIGINAL_TEST_DOWNLOAD_ENABLED", ""
+    ).lower() in ("1", "true", "yes")
     # Explicit independent gate; must never be enabled by ordinary staging.
     private_publish_enabled = publish_enabled and os.getenv("HYPE_MOD_PRIVATE_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     from modules.hype_mod_pilot_scope import pilot_scope_status
@@ -199,6 +237,28 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         from modules.hype_mod_protection_queue import jobs_for_drafts
         return jobs_for_drafts(db)
 
+    @bp.get("/admin/modulos/releases/original-teste/<draft_id>")
+    def mod_release_original_test_download(draft_id):
+        """Admin-only download for local testing. NEVER a Bootstrap release."""
+        admin_only()
+        if not original_test_download_enabled or db is None:
+            abort(404)
+        try:
+            raw, report = read_original_for_admin_test(db, draft_id)
+        except (InvalidJar, InvalidRelease, ValueError):
+            abort(404)
+        except Exception:
+            abort(503)
+        filename = f'{report["module_id"]}-original-teste-{report["sha256"][:12]}.jar'
+        response = send_file(
+            io.BytesIO(raw), mimetype="application/java-archive",
+            as_attachment=True, download_name=filename, max_age=0,
+        )
+        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
     @bp.get("/admin/modulos/releases")
     def mod_releases():
         admin_only()
@@ -218,6 +278,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
+            original_test_download_enabled=original_test_download_enabled,
             private_publish_enabled=private_publish_enabled,
             private_rollout_status=pilot_scope_status(),
             report=None, error=None,
@@ -252,6 +313,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
+            original_test_download_enabled=original_test_download_enabled,
             private_publish_enabled=private_publish_enabled,
             private_rollout_status=pilot_scope_status(),
             report=report, error=error,
