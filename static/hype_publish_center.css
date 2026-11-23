@@ -85,3 +85,10 @@
 .hpub-publication-grid strong{color:#eadeb9}
 .hpub-publication-grid small{color:#bcb8ae}
 @media(max-width:680px){.hpub-launch-stats{grid-template-columns:1fr}.hpub-publication-grid{grid-template-columns:1fr}.hpub-launch-heading>.hype-v6-btn{width:100%}}
+
+.hpub-release-picker{display:grid;gap:12px;padding:18px;margin:20px 0;border:1px solid rgba(213,174,91,.36);border-radius:14px;background:rgba(15,18,25,.6)}
+.hpub-release-picker h3,.hpub-release-picker p{margin:0}
+.hpub-release-picker select{width:100%;max-width:100%;min-width:0;padding:12px;border-radius:9px;background:#101319;color:#fff;border:1px solid rgba(195,151,31,.5)}
+.hpub-release-picker-status{color:#efd69d;line-height:1.5}
+.hpub-release-picker .hype-v6-btn{justify-self:start}
+@media(max-width:680px){.hpub-release-picker .hype-v6-btn{justify-self:stretch}}
