@@ -1,12 +1,27 @@
 {% extends 'hype_app_base.html' %}
-{% block title %}HYPE | Atualizações do Cliente{% endblock %}
+{% block title %}HYPE | Central de Publicação de Mods{% endblock %}
 {% block content %}
-<section class="hype-v6-page" style="max-width:1080px;margin:25px auto;padding:20px;">
+<link rel="stylesheet" href="{{ url_for('static', filename='hype_publish_center.css') }}?v=1">
+<section class="hype-v6-page hpub-page" id="hpub-app" style="max-width:1160px;margin:25px auto;padding:20px;">
   <div class="hype-v6-panel" style="padding:26px;">
     <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Gerenciador de Módulos</a></p>
-    <span class="hype-v6-kicker">HYPE ADMIN • ATUALIZAÇÕES DO CLIENTE</span>
+    <span class="hype-v6-kicker">HYPE ADMIN • GERENCIAMENTO DE RELEASES</span>
     <h1>Central de Publicação HYPE</h1>
-    <section style="margin:16px 0;padding:18px;border:1px solid rgba(195,151,31,.4);border-radius:12px;">
+    <p class="hpub-subtitle">Um processo organizado para conferir, armazenar, testar e publicar seus mods Fabric, sem misturar as etapas.</p>
+    <div class="hpub-metrics" aria-label="Resumo dos arquivos registrados">
+      <div><strong>{{ drafts|length }}</strong><span>Arquivos originais cadastrados</span></div>
+      <div><strong>{{ drafts|selectattr('status', 'equalto', 'em_teste')|list|length }}</strong><span>Versões em teste</span></div>
+      <div><strong>{{ drafts|selectattr('status', 'equalto', 'pronto_para_aprovacao')|list|length }}</strong><span>Aprovadas, não publicadas</span></div>
+    </div>
+    <nav class="hpub-stepper" aria-label="Etapas da publicação">
+      <button type="button" class="hpub-step" data-hpub-goto="arquivo" aria-controls="hpub-arquivo"><span>01</span><strong>Analisar arquivo</strong><small>Confira o JAR</small></button>
+      <button type="button" class="hpub-step" data-hpub-goto="envio" aria-controls="hpub-envio" {% if not staging_enabled %}disabled title="Envio privado desativado"{% endif %}><span>02</span><strong>Enviar e proteger</strong><small>Original + candidato</small></button>
+      <button type="button" class="hpub-step" data-hpub-goto="teste" aria-controls="hpub-teste" {% if not staging_enabled %}disabled title="Teste indisponível"{% endif %}><span>03</span><strong>Testar e aprovar</strong><small>Minecraft + verificação</small></button>
+      <button type="button" class="hpub-step" data-hpub-goto="publicar" aria-controls="hpub-publicar" {% if not staging_enabled %}disabled title="Publicação indisponível"{% endif %}><span>04</span><strong>Publicar release</strong><small>Assinatura e controle</small></button>
+    </nav>
+    <details class="hpub-rollout">
+      <summary>Segurança e distribuição <span class="hpub-rollout-hint">Ver política do piloto e limitações</span></summary>
+      <div class="hpub-rollout-body">
       <h2 style="margin:0 0 8px;">Distribuição privada dos mods</h2>
       <p><strong>Escopo atual:</strong>
         {% if private_rollout_status == 'single_ready' %}
@@ -34,7 +49,10 @@
         {% endfor %}
       </div>
       <p><small><strong>Importante:</strong> o modo de teste não instala nada no Minecraft por conta própria. O instalador pós-fechamento ainda exige homologação. Nunca salve a chave de assinatura privada no Render.</small></p>
-    </section>
+      </div>
+    </details>
+    <section class="hpub-stage" data-hpub-stage="arquivo" id="hpub-arquivo" aria-label="Etapa 1: analisar arquivo">
+      <div class="hpub-stage-title"><span class="hpub-stage-number">01 / 04</span><div><h2>Analisar o arquivo JAR</h2><p>Primeiro, confira se o arquivo pertence ao mod e à versão que pretende atualizar. Esta análise é opcional e não envia o arquivo para distribuição.</p></div></div>
     <p>Central para conferir versões do Cliente HYPE e outros mods Fabric antes de distribuí-las. O envio privado de arquivos não instala nem libera automaticamente uma atualização.</p>
     <p><strong>Fluxo seguro:</strong> analisar JAR → guardar original em privado → proteger e testar o build → assinar a versão → publicar para o atualizador do Minecraft. A ofuscação automática ainda precisa de um executor isolado; por enquanto, envie um candidato protegido ou reutilize um que já esteja armazenado. Nada é publicado ao enviar.</p>
     <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
@@ -63,9 +81,13 @@
       </tbody></table></div>
       <p><small>O relatório não confirma que o mod funciona no Minecraft e não é prova de ofuscação ou assinatura.</small></p>
     {% endif %}
+      <div class="hpub-footer"><span>Não armazena nem publica o JAR.</span><button type="button" class="hype-v6-btn gold" data-hpub-next="envio" {% if not staging_enabled %}disabled{% endif %}>Próximo: enviar original →</button></div>
+    </section>
     {% if staging_enabled %}
+      <section class="hpub-stage" data-hpub-stage="envio" id="hpub-envio" aria-label="Etapa 2: enviar e preparar proteção">
+      <div class="hpub-stage-title"><span class="hpub-stage-number">02 / 04</span><div><h2>Enviar e preparar a versão</h2><p>Guarde primeiro o original; depois escolha um original armazenado e vincule um candidato protegido da mesma versão.</p></div></div>
       <hr>
-      <h2>1. Enviar JAR para armazenamento privado</h2>
+      <h2>Enviar o JAR original ao armazenamento privado</h2>
       <p>Envie o <strong>JAR original de desenvolvimento, ainda sem proteção</strong>. Caso tenha guardado um JAR protegido aqui por engano, não reenvie: depois de guardar o original correto, use a opção 2B-A para reutilizá-lo. Nenhum upload publica o arquivo.</p>
       <form method="post" action="{{ url_for('hype_mod_admin.mod_release_upload') }}" enctype="multipart/form-data" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:20px 0">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -105,7 +127,7 @@
           </tr>
         {% else %}<tr><td colspan="7">Nenhum arquivo armazenado.</td></tr>{% endfor %}</tbody>
       </table></div>
-      <h2>2. Selecionar original e registrar build candidato protegido</h2>
+      <h2>Vincular o JAR protegido à versão</h2>
       <p>Escolha <strong>um JAR original que já está no armazenamento privado</strong> e mova-o para testes. Em seguida, selecione a mesma versão e envie <strong>outro JAR, já preparado fora do site</strong>. O site verifica a compatibilidade, mas <strong>não protege nem ofusca automaticamente</strong> o arquivo original. Não reenvie o original como candidato.</p>
       {% set awaiting = drafts|selectattr('status', 'equalto', 'aguardando_protecao')|list %}
       {% set testing = drafts|selectattr('status', 'equalto', 'em_teste')|list %}
@@ -218,8 +240,12 @@
           </p>
         {% endfor %}
       </div>
+      <div class="hpub-footer"><button type="button" class="hype-v6-btn" data-hpub-prev="arquivo">← Analisar</button><button type="button" class="hype-v6-btn gold" data-hpub-next="teste">Próximo: testar versões →</button></div>
+      </section>
+      <section class="hpub-stage" data-hpub-stage="teste" id="hpub-teste" aria-label="Etapa 3: revisar e testar">
+      <div class="hpub-stage-title"><span class="hpub-stage-number">03 / 04</span><div><h2>Verificar e testar no Minecraft</h2><p>Confira cada candidato protegido e registre o teste real antes de aprovar a release. A aprovação não publica o download.</p></div></div>
       <hr>
-      <h2>3. Revisar e testar antes de liberar</h2>
+      <h2>Revisar e testar antes de liberar</h2>
       <p>Escolha um cliente em teste, confira o SHA-256, execute as verificações automáticas e teste <strong>esse mesmo JAR candidato</strong> no Minecraft. O site não inicia o jogo e nenhuma revisão publica a atualização.</p>
       {% for item in drafts %}
         {% if item.status in ('aguardando_protecao', 'em_teste', 'pronto_para_aprovacao') %}
@@ -307,9 +333,13 @@
       {% else %}
         <p>Nenhum cliente aguardando revisão.</p>
       {% endfor %}
+      <div class="hpub-footer"><button type="button" class="hype-v6-btn" data-hpub-prev="envio">← Preparar</button><button type="button" class="hype-v6-btn gold" data-hpub-next="publicar">Próximo: publicação →</button></div>
+      </section>
+      <section class="hpub-stage" data-hpub-stage="publicar" id="hpub-publicar" aria-label="Etapa 4: publicação assinada">
+      <div class="hpub-stage-title"><span class="hpub-stage-number">04 / 04</span><div><h2>Publicar atualização assinada</h2><p>Esta é a etapa final: exige candidato aprovado e manifesto assinado. Não use antes de concluir os testes da versão exata.</p></div></div>
       {% if publish_enabled %}
         <hr>
-        <h2>4. Publicar atualização assinada</h2>
+        <h2>Canal do HYPE Client</h2>
         <p>A publicação só aceita o <strong>HYPE Client</strong> aprovado, acompanhado de manifesto Ed25519 assinado com a chave correspondente à versão instalada nos jogadores. O site valida a assinatura, versão, endereço, tamanho e SHA-256 do <strong>build candidato</strong> antes de registrar. O arquivo original nunca é publicado por engano.</p>
         <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish') }}" enctype="multipart/form-data" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -329,7 +359,7 @@
       {% endif %}
       {% if private_publish_enabled %}
         <section style="margin:22px 0;padding:16px;border:1px solid rgba(195,151,31,.4);border-radius:12px;">
-          <h2>4B. Publicar primeiro mod privado protegido</h2>
+          <h2>Canal privado: Pokédex, Breed Calculator, Campo de Batalha e Battle AI</h2>
           <p>Exclusivo para a primeira release de cada módulo restrito.
           O arquivo candidato deve ter passado nas verificações automáticas
           e nos quatro testes manuais, e o manifesto Ed25519 precisa estar
@@ -354,9 +384,12 @@
           </form>
         </section>
       {% endif %}
+      <div class="hpub-footer"><button type="button" class="hype-v6-btn" data-hpub-prev="teste">← Voltar aos testes</button><span>A publicação é separada da instalação automática no Minecraft.</span></div>
+      </section>
     {% else %}
       <p><small>O envio privado de arquivos está desativado no servidor. A análise local de um JAR continua disponível; nenhuma atualização será enviada aos jogadores.</small></p>
     {% endif %}
   </div>
 </section>
-{% endblock %}
+<script src="{{ url_for('static', filename='hype_publish_center.js') }}?v=1" defer></script>
+{% endblock %>
