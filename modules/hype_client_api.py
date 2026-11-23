@@ -347,6 +347,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         import os
         from modules.hype_mod_authenticated_updates import authorized_mod_ids
         from modules.hype_mod_private_releases import find_private_release
+        from modules.hype_mod_pilot_original import pilot_original_enabled, find_pilot_original
         from modules.hype_mod_pilot_scope import can_account_download_private_mods
         if (os.getenv('HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED', '').lower() not in ('1', 'true', 'yes')
                 or os.getenv('HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')
@@ -357,7 +358,11 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             ids = authorized_mod_ids(db, email, g.hype_user.get('cargo'), bool(is_member(email)))
             releases = []
             for mod_id in ids:
-                item = find_private_release(db, mod_id)
+                # Single-account pilot is opt-in; the protected catalogue is unchanged.
+                item = (find_pilot_original(db, mod_id)
+                        if pilot_original_enabled(email) else None)
+                if item is None:
+                    item = find_private_release(db, mod_id)
                 if item is not None:
                     releases.append(item[1])
             return jsonify({'ok': True, 'releases': releases})
@@ -367,13 +372,14 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
     @api.get('/updates/mods/<mod_id>/<sha256>.jar')
     @secure
     def restricted_mod_binary(mod_id, sha256):
-        """Serve ONLY a signed, approved protected JAR after LIVE authorization."""
+        """Serve signed protected releases, or owner-only signed originals in pilot."""
         import os
         from flask import send_file
         from modules import hype_signed_release as signed
         from modules.hype_mod_update_access import MOD_TO_SITE_MODULE
         from modules.hype_mod_authenticated_updates import may_account_receive_update
         from modules.hype_mod_private_releases import find_private_release, download_protected_jar
+        from modules.hype_mod_pilot_original import (pilot_original_enabled, find_pilot_original, download_pilot_original)
         from modules.hype_mod_pilot_scope import can_account_download_private_mods
         if (os.getenv('HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED', '').lower() not in ('1', 'true', 'yes')
                 or os.getenv('HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')
@@ -386,11 +392,17 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             if not may_account_receive_update(
                     db, mod_id, email, g.hype_user.get('cargo'), bool(is_member(email))):
                 return fail('Sem permissao para este modulo.', 403)
-            found = find_private_release(db, mod_id, sha256=sha256)
-            if found is None:
-                return fail('Arquivo nao encontrado.', 404)
-            record, _metadata = found
-            binary = download_protected_jar(db, record)
+            pilot = (find_pilot_original(db, mod_id, sha256=sha256)
+                     if pilot_original_enabled(email) else None)
+            if pilot is not None:
+                draft, _metadata = pilot
+                binary = download_pilot_original(db, draft)
+            else:
+                found = find_private_release(db, mod_id, sha256=sha256)
+                if found is None:
+                    return fail('Arquivo nao encontrado.', 404)
+                record, _metadata = found
+                binary = download_protected_jar(db, record)
             # Re-read BOTH role and membership before releasing bytes, as an
             # administrator might revoke permission while Storage is loading.
             users = (db.table('usuarios_clan').select('email,cargo')
@@ -404,7 +416,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
                 download_name=f'{mod_id}-{sha256}.jar', conditional=False, max_age=0,
             )
         except Exception:
-            return fail('Nao foi possivel entregar o JAR protegido.', 503)
+            return fail('Nao foi possivel entregar o JAR autenticado.', 503)
 
     if breed_services is not None:
         from modules.hype_client_breed_submit import install_breed_submit
