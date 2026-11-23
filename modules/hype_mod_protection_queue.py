@@ -58,6 +58,19 @@ def queue_protection(db, draft_id, requested_by):
     return saved[0]["id"]
 
 
+def queue_after_upload(db, saved_record, requested_by, enabled=False):
+    """Queue a freshly saved private original only after its draft insert succeeds.
+
+    Disabled mode leaves existing manual review unchanged. Any failure must be
+    handled by the caller without deleting the successfully stored original.
+    """
+    if not enabled:
+        return None
+    if not isinstance(saved_record, dict) or not saved_record.get("id"):
+        raise RuntimeError("O original foi salvo sem identificador para a fila.")
+    return queue_protection(db, str(saved_record["id"]), requested_by)
+
+
 def jobs_for_drafts(db):
     rows = (db.table(JOBS)
             .select("draft_id,status,failure_reason,requested_at")
