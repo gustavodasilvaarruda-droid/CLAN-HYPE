@@ -11,7 +11,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -96,7 +95,7 @@ def _load_draft(db, job):
     path = d.get("storage_path")
     sha = d["sha256"]
     if not isinstance(path, str) or not re.fullmatch(
-            rf"{re.escape(d['module_id'])}/[0-9a-f]{{32}}/{sha}\\.jar", path):
+            rf"{re.escape(d['module_id'])}/[0-9a-f]{{32}}/{sha}\.jar", path):
         raise ProtectionError("Caminho do JAR original invalido.")
     return d
 
