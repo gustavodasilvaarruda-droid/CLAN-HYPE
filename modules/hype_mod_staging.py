@@ -878,6 +878,39 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash("Não foi possível atualizar a revisão.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
+    @bp.post("/admin/modulos/releases/publicar-original-piloto")
+    def mod_release_publish_original_pilot():
+        """Owner-only experiment: signed ORIGINAL; never replaces protected stable."""
+        admin_only()
+        if db is None or not pilot_original_enabled(session.get("usuario_email")):
+            abort(404)
+        from modules.hype_mod_pilot_original import publish_pilot_original
+        from modules.hype_mod_private_releases import InvalidPrivateRelease
+        try:
+            if request.form.get("confirm_pilot") != "yes":
+                raise InvalidPrivateRelease("Confirme a publicacao privada sem ofuscacao.")
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            manifest_file = request.files.get("manifest")
+            if not manifest_file or not (manifest_file.filename or "").endswith(".properties"):
+                raise InvalidPrivateRelease("Anexe o manifesto .properties assinado offline.")
+            record = publish_pilot_original(
+                db, draft_id=draft_id, manifest_bytes=manifest_file.stream.read(16385),
+                published_by=session["usuario_email"],
+            )
+            if registrar_log:
+                registrar_log(
+                    "publicar_jar_original_piloto", "hype_mods", TABLE, draft_id,
+                    {"module_id": record["module_id"], "release": record["release"],
+                     "sha256": record["sha256"]},
+                )
+            flash("Original assinado liberado SOMENTE no piloto desta conta. "
+                  "Protecao continua obrigatoria para jogadores.", "sucesso")
+        except (InvalidPrivateRelease, ValueError) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Falha ao publicar original de teste: nada foi liberado.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
     @bp.post("/admin/modulos/releases/publicar-privado")
     def mod_release_publish_private():
         """Publish one admin-approved private JAR; no automatic signing/upload."""
