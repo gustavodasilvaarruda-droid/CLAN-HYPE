@@ -58,40 +58,7 @@ declare
   altered integer;
 begin
   if p_candidate is null
-    or coalesce(p_candidate->'protected'->>'sha256','') !~ '^[0-9a-f]{64}
-    or p_candidate->'automatic_review'->>'status' is distinct from 'passed'
-    or p_candidate->'automatic_review'->>'candidate_sha256'
-       is distinct from p_candidate->'protected'->>'sha256'
-    or p_candidate->'protected'->>'sha256' = p_sha256
-  then
-    return false;
-  end if;
-
-  update public.hype_mod_release_drafts d
-  set status = 'em_teste',
-      meta = (coalesce(d.meta, '{}'::jsonb) - 'manual_review' - 'automatic_review')
-             || p_candidate
-  where d.id::text = p_draft_id
-    and d.sha256 = p_sha256
-    and d.status in ('aguardando_protecao', 'em_teste')
-    and not (coalesce(d.meta, '{}'::jsonb) ? 'protected')
-    and exists (
-      select 1 from public.hype_mod_protection_jobs j
-      where j.id = p_job_id
-        and j.draft_id = p_draft_id
-        and j.original_sha256 = p_sha256
-        and j.module_id = d.module_id
-        and j.status = 'running'
-    );
-  get diagnostics altered = row_count;
-  return altered = 1;
-end;
-$$;
-revoke all on function public.hype_finish_mod_protection_draft(text,text,uuid,jsonb)
-  from public, anon, authenticated;
-grant execute on function public.hype_finish_mod_protection_draft(text,text,uuid,jsonb)
-  to service_role;
-
+    or coalesce(p_candidate->'protected'->>'sha256','') !~ '^[0-9a-f]{64}$'
     or p_candidate->'automatic_review'->>'status' is distinct from 'passed'
     or p_candidate->'automatic_review'->>'candidate_sha256'
        is distinct from p_candidate->'protected'->>'sha256'
