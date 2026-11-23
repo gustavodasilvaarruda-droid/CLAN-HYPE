@@ -412,6 +412,24 @@
       </section>
       <section class="hpub-stage" data-hpub-stage="publicar" id="hpub-publicar" aria-label="Etapa 4: publicação assinada">
       <div class="hpub-stage-title"><span class="hpub-stage-number">04 / 04</span><div><h2>Publicar atualização assinada</h2><p>Esta é a etapa final: exige candidato aprovado e manifesto assinado. Não use antes de concluir os testes da versão exata.</p></div></div>
+      <section class="hpub-release-picker" aria-label="Escolher qualquer versao enviada">
+        <h3>Escolha uma versão cadastrada</h3>
+        <p>Agora você pode localizar <strong>qualquer JAR já enviado</strong>, mesmo que ainda esteja em preparação. O site indica a próxima etapa; somente um candidato protegido, aprovado e assinado pode ser publicado para o Bootstrap.</p>
+        <label for="hpub-release-choice">Mod e versão</label>
+        <select id="hpub-release-choice" {% if not drafts %}disabled{% endif %}>
+          <option value="">Escolha um arquivo que já está no site...</option>
+          {% for item in drafts %}
+            {% set candidate = (item.meta or {}).get('protected') or {} %}
+            {% set ready = item.status == 'pronto_para_aprovacao' %}
+            {% set next_stage = 'publicar' if ready else ('teste' if candidate else 'envio') %}
+            <option value="{{ item.id }}" data-module="{{ item.module_id }}" data-status="{{ item.status }}" data-ready="{{ 'yes' if ready else 'no' }}" data-next-stage="{{ next_stage }}" data-next-step="{{ item.release_next_step }}">{{ item.module_id }} · {{ item.version }} — {{ item.status|replace('_', ' ') }}</option>
+          {% endfor %}
+        </select>
+        <p id="hpub-release-choice-status" class="hpub-release-picker-status" role="status" aria-live="polite">
+          {% if drafts %}Selecione uma versão para ver o caminho até a publicação.{% else %}Nenhum JAR foi cadastrado. Envie primeiro o original na etapa 2.{% endif %}
+        </p>
+        <button type="button" class="hype-v6-btn gold" id="hpub-release-choice-next" disabled>Abrir etapa da versão</button>
+      </section>
       {% if publish_enabled %}
         <hr>
         <h2>Canal do HYPE Client</h2>
@@ -421,8 +439,8 @@
           <label for="draft_publish">Versão aprovada</label>
           <select name="draft_id" id="draft_publish" required>
             <option value="">Selecione...</option>
-            {% for item in drafts if item.status == 'pronto_para_aprovacao' and item.module_id == 'hypeclient' %}
-              <option value="{{ item.id }}">{{ item.version }} — {{ item.sha256[:12] }}</option>
+            {% for item in drafts if item.module_id == 'hypeclient' %}
+              <option value="{{ item.id }}" {% if item.status != 'pronto_para_aprovacao' %}disabled{% endif %}>{{ item.version }} — {{ 'Pronta para publicar' if item.status == 'pronto_para_aprovacao' else item.release_next_step }}</option>
             {% endfor %}
           </select>
           <label for="manifest_publish">Manifesto assinado</label>
@@ -446,8 +464,8 @@
             <label for="private_draft">Mod privado aprovado</label>
             <select id="private_draft" name="draft_id" required>
               <option value="">Selecione a release aprovada...</option>
-              {% for item in drafts if item.status == 'pronto_para_aprovacao' and item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') %}
-                <option value="{{ item.id }}">{{ item.module_id }} · {{ item.version }} · {{ ((item.meta or {}).get('protected') or {}).get('sha256','')[:16] }}...</option>
+              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') %}
+                <option value="{{ item.id }}" {% if item.status != 'pronto_para_aprovacao' %}disabled{% endif %}>{{ item.module_id }} · {{ item.version }} — {{ 'Pronta para publicar' if item.status == 'pronto_para_aprovacao' else item.release_next_step }}</option>
               {% endfor %}
             </select>
             <label for="private_manifest">Manifesto assinado offline (.properties)</label>
