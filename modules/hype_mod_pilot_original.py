@@ -47,7 +47,7 @@ def _safe_draft(draft):
             not isinstance(sha, str) or not SHA.fullmatch(sha) or
             type(size) is not int or not 1000 <= size <= MAX_BYTES or
             not isinstance(path, str) or
-            not re.fullmatch(rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\\.jar", path)):
+            not re.fullmatch(rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\.jar", path)):
         raise InvalidPrivateRelease("Original nao elegivel para teste privado")
     return draft_id
 
