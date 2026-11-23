@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from modules.hype_mod_protection_queue import JOBS, jobs_for_drafts, queue_protection
+from modules.hype_mod_protection_queue import JOBS, jobs_for_drafts, queue_protection, queue_after_upload
 from modules.hype_mod_staging import BUCKET, TABLE, InvalidJar
 from services.hype_mod_protection_worker import (
     ProtectionError, _load_draft, _protector_argv, _run_protector,
@@ -154,6 +154,39 @@ class ProtectionQueueTests(unittest.TestCase):
         self.db.rows[TABLE][0]["storage_path"] = "hype_pokedex/extra/../segredo.jar"
         with self.assertRaises(ProtectionError):
             _load_draft(self.db, job)
+
+
+class AutoQueueAfterUploadTests(unittest.TestCase):
+    def setUp(self):
+        self.db = FakeDB()
+
+    def test_auto_upload_enfileira_original_sem_publicar(self):
+        job_id = queue_after_upload(self.db, {"id": 21}, "admin@example.com", enabled=True)
+        self.assertEqual(job_id, "job-1")
+        self.assertEqual(self.db.rows[JOBS][0]["status"], "queued")
+        self.assertEqual(self.db.rows[TABLE][0]["status"], "aguardando_protecao")
+        self.assertNotIn("protected", self.db.rows[TABLE][0]["meta"])
+
+    def test_modo_desativado_nao_enfileira(self):
+        self.assertIsNone(queue_after_upload(self.db, {"id": 21}, "admin@example.com"))
+        self.assertEqual(self.db.rows[JOBS], [])
+
+    def test_falha_de_identificador_nao_cria_job(self):
+        with self.assertRaises(RuntimeError):
+            queue_after_upload(self.db, {}, "admin@example.com", enabled=True)
+        self.assertEqual(self.db.rows[JOBS], [])
+
+    def test_mesmo_arquivo_nao_gera_job_duplicado(self):
+        queue_after_upload(self.db, {"id": 21}, "admin@example.com", enabled=True)
+        with self.assertRaises(InvalidJar):
+            queue_after_upload(self.db, {"id": 21}, "admin@example.com", enabled=True)
+        self.assertEqual(len(self.db.rows[JOBS]), 1)
+
+    def test_bucket_publico_impede_enfileiramento(self):
+        self.db.storage.public = True
+        with self.assertRaises(RuntimeError):
+            queue_after_upload(self.db, {"id": 21}, "admin@example.com", enabled=True)
+        self.assertEqual(self.db.rows[JOBS], [])
 
 
 class WorkerConfigurationTests(unittest.TestCase):
