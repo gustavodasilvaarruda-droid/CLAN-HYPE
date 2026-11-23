@@ -173,7 +173,7 @@ def read_original_for_admin_test(db, draft_id):
             or draft.get("status") not in ("aguardando_protecao", "em_teste")
             or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
             or not isinstance(path, str)
-            or not re.fullmatch(rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\\.jar", path)):
+            or not re.fullmatch(rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\.jar", path)):
         raise InvalidJar("Original indisponivel para teste privado.")
     assert_private_bucket(db.storage)
     raw = db.storage.from_(BUCKET).download(path)
