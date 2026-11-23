@@ -12,7 +12,7 @@
       <div class="hpub-launch-heading">
         <div>
           <strong>Canal estável HYPE</strong>
-          <p>Sem canal piloto separado: somente releases assinadas e publicadas entram na lista de atualizações. Enviar um JAR não publica seus arquivos.</p>
+          <p>O canal estável protegido permanece separado do piloto de teste individual. Só as releases assinadas e publicadas aparecem nas atualizações; enviar um JAR não o publica.</p>
         </div>
         {% if staging_enabled %}
           <button class="hype-v6-btn gold" type="button" data-hpub-next="publicar">Abrir publicação</button>
@@ -71,7 +71,7 @@
           BLOQUEADO — distribuição privada desativada por padrão
         {% endif %}
       </p>
-      <p><small>O HYPE Client usa seu próprio canal assinado. Os outros quatro mods usam catálogo autenticado com assinatura Ed25519. Nenhum arquivo é distribuído só por ser enviado ao site: é preciso original, build protegido diferente, revisão automática, teste em jogo do build exato, manifesto offline assinado e publicação administrativa.</small></p>
+      <p><small>O HYPE Client usa seu próprio canal assinado. Os outros quatro mods usam catálogo autenticado com assinatura Ed25519. No canal estável, nenhum arquivo é distribuído só por ser enviado ao site: é preciso original, build protegido diferente, revisão automática, teste em jogo do build exato, manifesto offline assinado e publicação administrativa. O piloto individual permite exclusivamente originais assinados, separado do canal estável.</small></p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         {% for module_id, module_name in [
           ('hypeclient','HYPE Client'),
