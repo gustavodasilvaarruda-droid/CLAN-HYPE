@@ -200,6 +200,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     # Explicit independent gate; must never be enabled by ordinary staging.
     private_publish_enabled = publish_enabled and os.getenv("HYPE_MOD_PRIVATE_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     from modules.hype_mod_pilot_scope import pilot_scope_status
+    from modules.hype_mod_pilot_original import pilot_original_enabled
     @bp.app_template_filter("hype_br_datetime")
     def hype_br_datetime(value):
         """Show upload timestamps in Brazil time, never fabricate missing dates."""
@@ -246,6 +247,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             sha = candidate.get("sha256")
             if row.get("status") == "rejeitado":
                 step = "Rejeitado — envie uma nova versão"
+            elif meta.get("pilot_original") and pilot_original_enabled():
+                step = "Original publicado somente no piloto; protegê-lo antes de distribuir"
             elif not sha:
                 step = "Falta um JAR candidato protegido"
             elif automatic.get("status") != "passed" or automatic.get("candidate_sha256") != sha:
@@ -275,6 +278,18 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             ).limit(100).execute().data or [])
             for row in rows:
                 result.append({**row, "channel_name": channel})
+        if pilot_original_enabled():
+            for draft in load_drafts():
+                pilot = (draft.get("meta") or {}).get("pilot_original") or {}
+                if pilot:
+                    result.append({
+                        "module_id": draft["module_id"],
+                        "version": draft["version"],
+                        "release": pilot["release"],
+                        "status": "published",
+                        "published_at": pilot.get("published_at"),
+                        "channel_name": "PILOTO ORIGINAL - CONTA UNICA",
+                    })
         return result
 
     def load_protection_jobs():
@@ -332,6 +347,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             protected_upload_enabled=protected_upload_enabled,
             original_test_download_enabled=original_test_download_enabled,
             private_publish_enabled=private_publish_enabled,
+            pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
             private_rollout_status=pilot_scope_status(),
             report=None, error=None,
         )
@@ -373,6 +389,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             protected_upload_enabled=protected_upload_enabled,
             original_test_download_enabled=original_test_download_enabled,
             private_publish_enabled=private_publish_enabled,
+            pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
             private_rollout_status=pilot_scope_status(),
             report=report, error=error,
         )
@@ -727,6 +744,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         original_path,
                     )):
                 raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
+            if (draft.get("meta") or {}).get("pilot_original"):
+                raise ValueError("Original ja publicado no piloto e nao pode ser apagado.")
             paths = [original_path]
             protected = (draft.get("meta") or {}).get("protected") or {}
             if protected:
