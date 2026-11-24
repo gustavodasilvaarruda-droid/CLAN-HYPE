@@ -48,7 +48,8 @@
 
     const originalChoice = root.querySelector('#pilot_original_draft');
     const protectedChoice = root.querySelector('#private_draft');
-    const clientChoice = root.querySelector('#draft_publish');
+    const unifiedPublishForm = root.querySelector('#hpub-unified-release-form');
+    const privatePublishAction = unifiedPublishForm?.getAttribute('action') || '';
 
     function setSelectedCard(id) {
       root.querySelectorAll('[data-hpub-file-card]').forEach(card => {
@@ -75,14 +76,15 @@
 
     function updateProtectedChoice() {
       const state = updatePublicationChoice(protectedChoice, '#hpub-protected-choice-note', '#hpub-submit-protected');
+      const option = protectedChoice?.selectedOptions[0];
+      const isClient = state.selected && option?.dataset.hpubMod === 'hypeclient';
+      if (unifiedPublishForm) {
+        // Only choose between two known server-generated URLs; both endpoints revalidate everything.
+        unifiedPublishForm.action = isClient ? unifiedPublishForm.dataset.hpubClientAction : privatePublishAction;
+      }
+      const submit = root.querySelector('#hpub-submit-protected');
+      if (submit) submit.textContent = isClient ? 'Publicar HYPE Client protegido' : 'Publicar protegido aprovado';
       const review = root.querySelector('#hpub-review-selected');
-      if (review) review.hidden = !state.selected || state.ready;
-      return state;
-    }
-
-    function updateClientChoice() {
-      const state = updatePublicationChoice(clientChoice, '#hpub-client-choice-note', '#hpub-submit-client');
-      const review = root.querySelector('#hpub-review-client');
       if (review) review.hidden = !state.selected || state.ready;
       return state;
     }
@@ -93,10 +95,6 @@
     });
     protectedChoice?.addEventListener('change', () => {
       const state = updateProtectedChoice();
-      setSelectedCard(state.id);
-    });
-    clientChoice?.addEventListener('change', () => {
-      const state = updateClientChoice();
       setSelectedCard(state.id);
     });
 
@@ -110,9 +108,6 @@
     }
     root.querySelector('#hpub-review-selected')?.addEventListener('click', () => {
       openSelectedReview(protectedChoice?.value);
-    });
-    root.querySelector('#hpub-review-client')?.addEventListener('click', () => {
-      openSelectedReview(clientChoice?.value);
     });
 
     root.querySelectorAll('[data-hpub-publish-original]').forEach(button => {
@@ -147,27 +142,16 @@
 
     root.querySelectorAll('[data-hpub-publish-protected]').forEach(button => {
       button.addEventListener('click', () => {
-        const client = button.dataset.hpubMod === 'hypeclient';
-        const input = client ? clientChoice : protectedChoice;
-        if (!input) {
-          focusArea(root.querySelector('#hpub-protected-release'), null);
-          return;
-        }
-        if (client) {
-          const extra = root.querySelector('#hpub-extra');
-          if (extra) extra.open = true;
-        }
-        input.value = button.dataset.hpubPublishProtected;
-        setSelectedCard(input.value);
-        if (client) updateClientChoice();
-        else updateProtectedChoice();
-        focusArea(client ? root.querySelector('#hpub-extra') : root.querySelector('#hpub-protected-release'), input);
+        if (!protectedChoice) return;
+        protectedChoice.value = button.dataset.hpubPublishProtected;
+        setSelectedCard(protectedChoice.value);
+        updateProtectedChoice();
+        focusArea(root.querySelector('#hpub-protected-release'), protectedChoice);
       });
     });
 
     updateOriginalChoice();
     updateProtectedChoice();
-    updateClientChoice();
   }
 
   if (document.readyState === 'loading') {

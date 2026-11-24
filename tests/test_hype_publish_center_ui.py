@@ -61,8 +61,8 @@ class PublishCenterUiTests(unittest.TestCase):
     def test_private_upload_is_distinct_from_private_bootstrap_release(self):
         self.assertIn("mod_release_original_test_download", self.html)
         self.assertIn("{% if pilot_original_enabled %}", self.html)
-        self.assertIn("{% if private_publish_enabled %}", self.html)
-        self.assertIn("{% if publish_enabled %}", self.html)
+        self.assertIn("{% if publish_enabled or private_publish_enabled %}", self.html)
+        self.assertIn("{% if publish_enabled or private_publish_enabled %}", self.html)
         self.assertIn("{% if staging_enabled %}", self.html)
         self.assertIn("Teste no Bootstrap indisponível", self.html)
         self.assertIn("manifesto ed25519", self.html.lower())
@@ -88,20 +88,35 @@ class PublishCenterUiTests(unittest.TestCase):
 
     def test_protected_picker_lists_pending_and_ready_without_early_release(self):
         self.assertIn('id="private_draft"', self.html)
-        self.assertIn('data-hpub-next="{{ item.release_next_step }}"', self.html)
+        self.assertIn('item.release_next_step', self.html)
         self.assertIn('id="hpub-review-selected"', self.html)
         self.assertIn('id="hpub-submit-protected" type="submit" class="hype-v6-btn gold" disabled', self.html)
-        self.assertIn('id="hpub-submit-client" type="submit" class="hype-v6-btn gold" disabled', self.html)
+        self.assertIn('data-hpub-client-action=', self.html)
+        self.assertIn('id="hpub-unified-release-form"', self.html)
         self.assertIn('name="manifest"', self.html)
         self.assertIn('name="confirm_release"', self.html)
 
     def test_selecting_stored_card_updates_publish_choice_and_review(self):
         for marker in ("[data-hpub-publish-original]", "[data-hpub-publish-protected]",
                        "function updatePublicationChoice(", "function openSelectedReview(",
-                       "submit.disabled = !ready", "setSelectedCard(input.value)", "updateProtectedChoice()"):
+                       "submit.disabled = !ready", "setSelectedCard(protectedChoice.value)", "updateProtectedChoice()"):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.js)
         self.assertIn("is-selected-for-publish", self.css)
+
+    def test_five_mods_share_one_protected_picker_with_server_routes(self):
+        self.assertIn("('hypeclient','hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai')", self.html)
+        self.assertIn('id="private_draft"', self.html)
+        self.assertIn('data-hpub-mod="{{ item.module_id }}"', self.html)
+        self.assertEqual(self.html.count('id="hpub-unified-release-form"'), 1)
+        self.assertNotIn('id="draft_publish"', self.html)
+        self.assertIn("url_for('hype_mod_admin.mod_release_publish_private')", self.html)
+        self.assertIn("url_for('hype_mod_admin.mod_release_publish')", self.html)
+        self.assertIn("unifiedPublishForm.action = isClient ? unifiedPublishForm.dataset.hpubClientAction : privatePublishAction", self.js)
+        self.assertIn("item.module_id == 'hypeclient'", self.html)
+        self.assertIn('data-hpub-ready="{{ \'no\' if original_client or original_published else \'yes\' }}"', self.html)
+        self.assertIn('canal de teste privado automático do Client ainda não existe', self.html)
+        self.assertNotIn('id="hpub-submit-client"', self.html)
 
     def test_responsive_and_accessible(self):
         self.assertIn('aria-label="Tipo de arquivo"', self.html)
