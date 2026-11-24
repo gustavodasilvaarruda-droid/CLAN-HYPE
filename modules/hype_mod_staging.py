@@ -193,7 +193,7 @@ def read_original_for_admin_test(db, draft_id):
     sha = draft.get("sha256")
     path = draft.get("storage_path")
     if (not valid_module_id(module_id)
-            or draft.get("status") not in ("aguardando_protecao", "em_teste")
+            or draft.get("status") not in ("aguardando_protecao", "em_teste", "pronto_para_aprovacao")
             or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
             or not isinstance(path, str)
             or not re.fullmatch(rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\.jar", path)):
