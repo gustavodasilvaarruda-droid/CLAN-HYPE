@@ -101,6 +101,52 @@ def find_pilot_original(db, module_id, *, sha256=None):
     return latest
 
 
+
+def pilot_selected_source(draft):
+    """Which signed release should this one-account Bootstrap pilot receive?"""
+    if _pilot_record(draft) is None:
+        raise InvalidPrivateRelease("Original piloto nao publicado")
+    source = (draft.get("meta") or {}).get("pilot_update_source", "original")
+    if source not in ("original", "protected"):
+        raise InvalidPrivateRelease("Canal piloto invalido")
+    return source
+
+
+def select_pilot_source(db, *, draft_id, source, selected_by):
+    """Owner-only switch, with no new public endpoint or unsigned downloads."""
+    if not pilot_original_enabled(selected_by):
+        raise InvalidPrivateRelease("Teste individual desativado")
+    if source not in ("original", "protected"):
+        raise InvalidPrivateRelease("Escolha original ou protegido")
+    try:
+        draft_id = str(UUID(str(draft_id)))
+    except (TypeError, ValueError) as exc:
+        raise InvalidPrivateRelease("Rascunho de teste invalido") from exc
+    rows = (db.table(DRAFTS).select(
+        "id,module_id,version,status,sha256,size_bytes,storage_path,meta"
+    ).eq("id", draft_id).limit(2).execute().data or [])
+    if len(rows) != 1:
+        raise InvalidPrivateRelease("Original piloto nao encontrado")
+    draft = rows[0]
+    pilot_selected_source(draft)
+    latest = find_pilot_original(db, draft["module_id"])
+    if latest is None or latest[0]["id"] != draft_id:
+        raise InvalidPrivateRelease("Selecione o original piloto mais recente")
+    if source == "protected":
+        from modules.hype_mod_private_releases import find_private_release
+        if find_private_release(db, draft["module_id"]) is None:
+            raise InvalidPrivateRelease("Nenhum protegido aprovado e assinado foi publicado")
+    meta = dict(draft.get("meta") or {})
+    meta["pilot_update_source"] = source
+    saved = (db.table(DRAFTS).update({"meta": meta})
+             .eq("id", draft_id).eq("status", draft["status"])
+             .execute().data or [])
+    if len(saved) != 1:
+        raise InvalidPrivateRelease("Nao foi possivel alterar o teste")
+    return {"module_id": draft["module_id"], "source": source}
+
+
+
 def download_pilot_original(db, draft):
     """Read private original, check metadata/hash and return only authenticated."""
     _safe_draft(draft)
@@ -157,6 +203,7 @@ def publish_pilot_original(db, *, draft_id, manifest_bytes, published_by):
         "published_by": published_by,
         "published_at": datetime.now(timezone.utc).isoformat(),
     }
+    meta["pilot_update_source"] = "original"
     saved = (db.table(DRAFTS).update({"meta": meta})
              .eq("id", draft_id).eq("status", draft["status"])
              .execute().data or [])
