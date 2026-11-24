@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 
 from modules.hype_mod_staging import (
-    TABLE, IDS, BUCKET, InvalidJar, assert_private_bucket, parse_draft_id,
+    TABLE, BUCKET, InvalidJar, assert_private_bucket, parse_draft_id, valid_module_id,
 )
 
 JOBS = "hype_mod_protection_jobs"
@@ -22,7 +22,7 @@ def queue_protection(db, draft_id, requested_by):
     if not rows:
         raise InvalidJar("Arquivo original nao encontrado.")
     draft = rows[0]
-    if draft.get("module_id") not in IDS or draft.get("status") not in ("aguardando_protecao", "em_teste"):
+    if not valid_module_id(draft.get("module_id")) or draft.get("status") not in ("aguardando_protecao", "em_teste"):
         raise InvalidJar("Somente originais pendentes ou em teste podem entrar na fila.")
     if (draft.get("meta") or {}).get("protected"):
         raise InvalidJar("Este arquivo ja possui um candidato protegido.")
