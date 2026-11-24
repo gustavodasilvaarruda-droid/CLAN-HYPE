@@ -100,7 +100,7 @@
             {% endif %}
           </div>
           {% if job and job.status in ('queued','running') %}<small class="hpub-file-job">Proteção: {{ 'na fila' if job.status == 'queued' else 'em processamento' }}</small>{% endif %}
-          {% if candidate or item.status in ('em_teste','pronto_para_aprovacao') %}
+          {% if candidate or item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') %}
           {% set automatic = (item.meta or {}).get('automatic_review') or {} %}
           <details class="hpub-file-review" id="hpub-review-{{ item.id }}">
             <summary>{% if item.status == 'pronto_para_aprovacao' %}Revisar aprovação{% elif candidate %}Testar e aprovar{% else %}Revisar arquivo{% endif %}</summary>
@@ -137,7 +137,9 @@
               <label for="hpub-decision-{{ item.id }}">Decisão</label>
               <select id="hpub-decision-{{ item.id }}" name="status" required>
                 <option value="" selected disabled>Selecione...</option>
-                {% if item.status == 'em_teste' and candidate %}
+                {% if item.status == 'aguardando_protecao' and not candidate %}
+                  <option value="em_teste">Iniciar testes</option>
+                {% elif item.status == 'em_teste' and candidate %}
                   <option value="pronto_para_aprovacao">Aprovar para publicação</option>
                 {% elif item.status == 'pronto_para_aprovacao' %}
                   <option value="em_teste">Voltar para testes</option>
@@ -215,6 +217,47 @@
       <p class="hpub-publish-security"><strong>Segurança:</strong> os dois modos exigem manifesto Ed25519 assinado no seu computador. A chave privada fica somente no seu computador. O Bootstrap ainda precisa de validação real no Minecraft.</p>
     </section>
 
+
+    <details class="hpub-compact" id="hpub-inspector" {% if report or error %}open{% endif %}>
+      <summary>Analisar arquivo <span>Conferir um JAR sem enviar ou armazenar</span></summary>
+      <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" class="hpub-extra-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="hpub-inspect-file">JAR Fabric para análise local em memória</label>
+        <input id="hpub-inspect-file" name="jar" type="file" accept=".jar" required>
+        <button type="submit" class="hype-v6-btn">Analisar arquivo</button>
+      </form>
+      {% if error %}<p role="alert" class="hpub-publish-blocked">{{ error }}</p>{% endif %}
+      {% if report %}
+        <p><strong>{{ report.name }} ({{ report.module_id }})</strong> · Versão {{ report.version }}</p>
+        <p>SHA-256: <code>{{ report.sha256 }}</code> · Tamanho: {{ report.size_bytes }} bytes</p>
+        <p>{% if report.requires_client %}Depende do HYPE Client{% else %}Sem dependência declarada do HYPE Client{% endif %}</p>
+        {% if report.compatibility.minecraft %}<p>Minecraft: {{ report.compatibility.minecraft }}</p>{% endif %}
+      {% endif %}
+    </details>
+    {% if protected_upload_enabled %}
+    <details class="hpub-compact" id="hpub-reuse-protected">
+      <summary>Vincular arquivo já armazenado <span>Opcional, sem reenviar o JAR</span></summary>
+      <p>Use somente quando você já tiver guardado o arquivo protegido. Os dois arquivos precisam ser do mesmo mod e versão.</p>
+      <form method="post" action="{{ url_for('hype_mod_admin.mod_release_link_existing') }}" class="hpub-extra-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="existing_original">Original em teste</label>
+        <select id="existing_original" name="draft_id" required>
+          <option value="">Selecione o original...</option>
+          {% for item in drafts if item.status == 'em_teste' and not (item.meta or {}).get('protected') %}
+            <option value="{{ item.id }}" data-mod="{{ item.module_id }}" data-version="{{ item.version }}" data-sha="{{ item.sha256 }}">{{ item.module_id }} · {{ item.version }} · {{ item.original_filename or 'Original' }}</option>
+          {% endfor %}
+        </select>
+        <label for="existing_candidate">Arquivo protegido já guardado</label>
+        <select id="existing_candidate" name="source_id" required>
+          <option value="">Selecione o candidato...</option>
+          {% for item in drafts if item.status in ('aguardando_protecao','em_teste') and not (item.meta or {}).get('protected') %}
+            <option value="{{ item.id }}" data-mod="{{ item.module_id }}" data-version="{{ item.version }}" data-sha="{{ item.sha256 }}">{{ item.module_id }} · {{ item.version }} · {{ item.original_filename or 'JAR' }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="hype-v6-btn">Vincular ao original</button>
+      </form>
+    </details>
+    {% endif %}
     <details class="hpub-compact" id="hpub-published">
       <summary>Versões publicadas <span>{{ published_releases|length }} no catálogo</span></summary>
       {% if published_releases %}
