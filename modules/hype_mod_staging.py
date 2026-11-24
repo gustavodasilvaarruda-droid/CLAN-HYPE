@@ -5,6 +5,7 @@ Feature flag is OFF by default. Never put service keys in templates or client JA
 from __future__ import annotations
 
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -45,6 +46,18 @@ def valid_module_id(module_id):
 
 class InvalidJar(ValueError):
     pass
+
+
+def original_owner_authorized(authenticated_email, environ=None):
+    """Somente o email do proprietario configurado no servidor pode baixar originais.
+
+    A identidade vem da sessao Flask assinada, nunca de query/body/header.
+    Sem configuracao o download fica bloqueado (fail closed).
+    """
+    env = os.environ if environ is None else environ
+    target = (env.get("HYPE_MOD_ORIGINAL_OWNER_EMAIL") or "").strip().lower()
+    account = authenticated_email.strip().lower() if isinstance(authenticated_email, str) else ""
+    return bool(target and account and hmac.compare_digest(account, target))
 
 
 def parse_draft_id(raw):
@@ -337,8 +350,10 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
 
     @bp.get("/admin/modulos/releases/original-teste/<draft_id>")
     def mod_release_original_test_download(draft_id):
-        """Admin-only download for local testing. NEVER a Bootstrap release."""
+        """Owner-only download for local testing. NEVER a Bootstrap release."""
         admin_only()
+        if not original_owner_authorized(session.get("usuario_email")):
+            abort(403)
         if not original_test_download_enabled or db is None:
             abort(404)
         try:
@@ -382,7 +397,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
-            original_test_download_enabled=original_test_download_enabled,
+            original_test_download_enabled=original_test_download_enabled and original_owner_authorized(session.get("usuario_email")),
             private_publish_enabled=private_publish_enabled,
             pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
             owner_pilot_enabled=owner_pilot_enabled(session.get("usuario_email")),
@@ -426,7 +441,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
-            original_test_download_enabled=original_test_download_enabled,
+            original_test_download_enabled=original_test_download_enabled and original_owner_authorized(session.get("usuario_email")),
             private_publish_enabled=private_publish_enabled,
             pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
             owner_pilot_enabled=owner_pilot_enabled(session.get("usuario_email")),
