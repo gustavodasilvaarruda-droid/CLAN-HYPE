@@ -206,5 +206,46 @@ class SignedCatalogueTests(unittest.TestCase):
                 self.assertEqual(client.get(endpoint).status_code, 503)
 
 
+    def test_public_signed_new_mod_binary_can_be_downloaded(self):
+        import io
+        from zipfile import ZipFile
+        with tempfile.TemporaryDirectory() as home:
+            mods_dir = Path(home) / "mods"
+            mods_dir.mkdir()
+            items = []
+            for mod_id in ("hypeclient", "hype_future_module"):
+                output = io.BytesIO()
+                with ZipFile(output, "w") as archive:
+                    archive.writestr("fabric.mod.json", json.dumps({
+                        "schemaVersion": 1, "id": mod_id, "version": "2.0.1"
+                    }))
+                    archive.writestr("content.bin", b"x" * 3000)
+                data = output.getvalue()
+                sha = hashlib.sha256(data).hexdigest()
+                (mods_dir / mod_id).mkdir()
+                (mods_dir / mod_id / f"{sha}.jar").write_bytes(data)
+                item = mod(mod_id, depends_on=("hypeclient",) if mod_id != "hypeclient" else ())
+                item.update({
+                    "sha256": sha, "size": len(data),
+                    "url": f"https://clan-hype.onrender.com/hype-updates/mods/{mod_id}/{sha}.jar"
+                })
+                items.append(item)
+            (mods_dir / "catalog.json").write_bytes(
+                self.signed_document(dict(self.unsigned, mods=items))
+            )
+            app = Flask(__name__)
+            app.config["TESTING"] = True
+            app.register_blueprint(hype_updates_bp)
+            with patch.dict(os.environ, {
+                "HYPE_UPDATES_DIR": home,
+                "HYPE_MULTI_MOD_CATALOG_ENABLED": "1",
+                "HYPE_MULTI_MOD_DOWNLOADS_ENABLED": "1",
+            }):
+                res = app.test_client().get("/hype-updates/mods/hype_future_module/" +
+                    items[1]["sha256"] + ".jar")
+                self.assertEqual(res.status_code, 200)
+                self.assertEqual(hashlib.sha256(res.data).hexdigest(), items[1]["sha256"])
+
+
 if __name__ == "__main__":
     unittest.main()
