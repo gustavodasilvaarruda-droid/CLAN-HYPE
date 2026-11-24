@@ -106,7 +106,7 @@ def download_owner_pilot(db, draft):
     if not isinstance(data, bytes) or len(data) != draft["size_bytes"]:
         raise InvalidPrivateRelease("Tamanho do original nao confere")
     validate_binary(data, expected_sha=draft["sha256"])
-    inspected = inspect_original(data)
+    inspected = inspect_original(data, allow_dynamic=True)
     if (inspected["module_id"] != draft["module_id"]
             or inspected["version"] != draft["version"]
             or inspected["size_bytes"] != draft["size_bytes"]):
