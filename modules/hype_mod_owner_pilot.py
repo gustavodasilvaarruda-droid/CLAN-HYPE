@@ -12,7 +12,7 @@ from modules.hype_mod_update_access import MOD_TO_SITE_MODULE
 from modules.hype_signed_release import SHA, VERSION, validate_binary
 
 OWNER_IDS = frozenset((*MOD_TO_SITE_MODULE, "hypeclient"))  # Legacy player release IDs stay fixed.
-OWNER_MOD_ID = re.compile(r"[a-z][a-z0-9_-]{1,63}\\Z")
+OWNER_MOD_ID = re.compile(r"[a-z][a-z0-9_-]{1,63}\Z")
 
 
 def valid_owner_mod_id(mod_id):
