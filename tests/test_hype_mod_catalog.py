@@ -74,7 +74,7 @@ class SignedCatalogueTests(unittest.TestCase):
         )
 
     def test_bad_module_id_path_is_rejected(self):
-        for mod_id in ("../private", "a/b", "UPPER", "x" * 100):
+        for mod_id in ("../private", "a/b", "UPPER", "x" * 100, "hypebootstrap"):
             unsigned = dict(self.unsigned, mods=[mod("hypeclient"), mod(mod_id)])
             with self.subTest(mod_id=mod_id), self.assertRaises(InvalidCatalogue):
                 verify_signed_catalogue(self.signed_document(unsigned))
