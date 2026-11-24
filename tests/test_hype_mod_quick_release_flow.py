@@ -165,6 +165,21 @@ class QuickReleaseFlowTests(unittest.TestCase):
         self.assertEqual(self.db.rows[TABLE][0]["status"], "pronto_para_aprovacao")
         self.assertEqual(self.db.storage.added, [])
 
+    def test_direct_publishing_replaces_legacy_private_channel(self):
+        template = (Path(__file__).resolve().parents[1] /
+                    "templates" / "admin_hype_mod_releases.html").read_text(encoding="utf-8")
+        Environment().parse(template)
+        self.assertIn('id="hpub-publish"', template)
+        self.assertIn('id="hpub-private-test"', template)
+        self.assertIn('id="hpub-protected-release"', template)
+        self.assertIn('Não precisa do JAR protegido', template)
+        self.assertEqual(template.count("url_for('hype_mod_admin.mod_release_publish_original_pilot')"), 1)
+        self.assertEqual(template.count("url_for('hype_mod_admin.mod_release_publish_private')"), 1)
+        self.assertNotIn("Canal privado: Pokédex", template)
+        self.assertIn('name="confirm_pilot"', template)
+        self.assertIn('name="confirm_release"', template)
+        self.assertIn('href="#hpub-publish"', template)
+
     def test_template_contains_quick_actions_and_valid_jinja(self):
         template = (Path(__file__).resolve().parents[1] /
                     "templates" / "admin_hype_mod_releases.html").read_text(encoding="utf-8")

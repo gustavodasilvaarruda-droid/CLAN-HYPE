@@ -144,3 +144,25 @@
   .hpub-advanced-content{padding:0 10px 10px}
   .hpub-quick-form form .hype-v6-btn{width:100%;justify-self:stretch}
 }
+
+
+/* Direct publish choices replace the legacy private-channel wizard. */
+.hpub-simple-publish{margin:20px 0;padding:22px;border:1px solid rgba(221,177,65,.38);border-radius:18px;background:linear-gradient(140deg,rgba(218,172,66,.09),rgba(13,18,28,.90))}
+.hpub-simple-publish-heading{display:flex;gap:14px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
+.hpub-simple-publish-heading h2{font-size:1.5rem;color:#f5d58d;margin:4px 0 6px}
+.hpub-simple-publish-heading p{color:#d4c9b2;line-height:1.5;margin:0}
+.hpub-publish-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.hpub-publish-card{border:1px solid rgba(218,178,90,.3);border-radius:14px;padding:18px;background:rgba(8,12,20,.55);min-width:0;display:flex;flex-direction:column;gap:10px}
+.hpub-publish-tag{color:#f4d28c;letter-spacing:.08em;font-size:.76rem;font-weight:800}
+.hpub-publish-card h3{color:#f4ead6;font-size:1.17rem;margin:0}
+.hpub-publish-card p{margin:0;color:#cfc5b6;line-height:1.5}
+.hpub-publish-form{display:grid;gap:10px;margin-top:auto}
+.hpub-publish-form label:not(.hpub-publish-confirm){color:#f1dfb7;font-weight:650;font-size:.92rem}
+.hpub-publish-form select,.hpub-publish-form input[type=file]{width:100%;box-sizing:border-box;min-width:0;border:1px solid rgba(210,169,61,.55);border-radius:10px;padding:11px;background:#10151f;color:#f7efe0}
+.hpub-publish-form input[type=file]{padding:10px}
+.hpub-publish-confirm{display:flex;align-items:flex-start;gap:9px;font-size:.87rem;color:#d4c9b2;line-height:1.35}
+.hpub-publish-confirm input{flex:0 0 auto;margin-top:2px}
+.hpub-publish-form .hype-v6-btn{width:100%;justify-content:center}
+.hpub-publish-blocked{border:1px solid rgba(241,186,76,.4);background:rgba(150,100,22,.12);border-radius:10px;padding:12px}
+.hpub-publish-security{color:#cfc5b6;margin:16px 0 0;line-height:1.5}
+@media(max-width:760px){.hpub-publish-grid{grid-template-columns:1fr}.hpub-simple-publish{padding:15px}.hpub-publish-card{padding:15px}}
