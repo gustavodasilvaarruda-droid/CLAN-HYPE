@@ -170,7 +170,7 @@
           <span class="hpub-publish-tag">SÓ MINHA CONTA</span>
           <h3>Teste privado · JAR original</h3>
           <p>Escolha um JAR já guardado em Meus arquivos. Não precisa do JAR protegido nem enviar novamente. {% if owner_pilot_enabled %}Os cinco mods, incluindo o HYPE Client, podem ser testados exclusivamente com seu Bootstrap piloto 0.9.{% else %}Os quatro mods privados usam seu Bootstrap autorizado; o HYPE Client original aparece apenas para consulta e teste manual, sem publicação automática.{% endif %}</p>
-          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_owner_pilot' if owner_pilot_enabled else 'hype_mod_admin.mod_release_publish_original_pilot') }}" enctype="multipart/form-data" class="hpub-publish-form">
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_owner_pilot') if owner_pilot_enabled else url_for('hype_mod_admin.mod_release_publish_original_pilot') }}" enctype="multipart/form-data" class="hpub-publish-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label for="pilot_original_draft">JAR original já armazenado</label>
             <select id="pilot_original_draft" name="draft_id" required>
