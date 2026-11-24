@@ -80,9 +80,12 @@ de acesso individual, permissões do painel, download de dependências externas,
 ofuscação ou instalação automática; **não habilitar em produção** até essas
 etapas estarem validadas. URLs do catálogo são públicas por design: mods
 restritos por permissão exigirão autorização antes da publicação.
-O validador está limitado aos cinco IDs já presentes no staging:
-hypeclient, hype_pokedex, hype_breed_calculator, hype_battlefield,
-hype_battle_ai. Outros IDs devem ser cadastrados e testados.
+O catálogo público assinado aceita IDs novos de mods sem modificar uma lista
+fixa no site (nomes seguros, até 128 entradas por catálogo). Isso **não torna
+públicos** os originais enviados ao staging privado. Somente JARs de
+distribuição aprovados e incluídos num catálogo assinado offline podem ser
+servidos. A distribuição continua desligada por padrão; habilitar somente
+após conferir o conteúdo público, URLs imutáveis e integridade dos JARs.
 
 Não ativar a flag em produção nem anunciar downloads a jogadores
 até haver arquivos oficiais protegidos, URLs válidas e bootstrap
