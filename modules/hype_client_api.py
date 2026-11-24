@@ -345,7 +345,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
     def owner_pilot_releases():
         """Opt-in private developer channel: no production manifest or public URLs."""
         import os
-        from modules.hype_mod_owner_pilot import OWNER_IDS, owner_pilot_enabled, find_owner_pilot
+        from modules.hype_mod_owner_pilot import owner_pilot_enabled, list_owner_pilots
         from modules.hype_mod_authenticated_updates import authorized_mod_ids
         email = g.hype_user["email"]
         if (not owner_pilot_enabled(email) or g.hype_user.get("cargo") != "lider"
@@ -353,13 +353,16 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
                 or os.getenv("HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED", "").lower() not in ("1", "true", "yes")):
             return fail("Recurso indisponivel.", 404)
         try:
-            ids = set(authorized_mod_ids(db, email, g.hype_user.get("cargo"), bool(is_member(email))))
-            ids.add("hypeclient")  # Client is reserved for the owner's dev-only channel.
+            from modules.hype_mod_update_access import MOD_TO_SITE_MODULE
+            allowed = set(authorized_mod_ids(db, email, g.hype_user.get("cargo"), bool(is_member(email))))
             releases = []
-            for mod_id in sorted(ids & OWNER_IDS):
-                found = find_owner_pilot(db, mod_id)
-                if found is not None:
-                    releases.append(found[1])
+            for draft, record in list_owner_pilots(db):
+                mod_id = record["id"]
+                # The existing four modules still obey per-module permissions.
+                # Newly registered owner-only modules remain invisible to everybody else.
+                if mod_id in MOD_TO_SITE_MODULE and mod_id not in allowed:
+                    continue
+                releases.append(record)
             return jsonify({"ok": True, "owner_pilot": True, "releases": releases})
         except Exception:
             return fail("Nao foi possivel consultar os testes privados.", 503)
@@ -372,18 +375,19 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         from flask import send_file
         from modules.hype_signed_release import SHA
         from modules.hype_mod_owner_pilot import (
-            OWNER_IDS, owner_pilot_enabled, find_owner_pilot, download_owner_pilot,
+            valid_owner_mod_id, owner_pilot_enabled, find_owner_pilot, download_owner_pilot,
         )
         from modules.hype_mod_authenticated_updates import may_account_receive_update
+        from modules.hype_mod_update_access import MOD_TO_SITE_MODULE
         email = g.hype_user["email"]
         if (not owner_pilot_enabled(email) or g.hype_user.get("cargo") != "lider"
                 or os.getenv("HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED", "").lower() not in ("1", "true", "yes")
                 or os.getenv("HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED", "").lower() not in ("1", "true", "yes")):
             return fail("Recurso indisponivel.", 404)
-        if mod_id not in OWNER_IDS or not SHA.fullmatch(sha256):
+        if not valid_owner_mod_id(mod_id) or not SHA.fullmatch(sha256):
             return fail("Arquivo nao encontrado.", 404)
         try:
-            if (mod_id != "hypeclient" and not may_account_receive_update(
+            if (mod_id not in ("hypeclient",) and mod_id in MOD_TO_SITE_MODULE and not may_account_receive_update(
                     db, mod_id, email, g.hype_user.get("cargo"), bool(is_member(email)))):
                 return fail("Sem permissao para este modulo.", 403)
             found = find_owner_pilot(db, mod_id, sha256=sha256)
@@ -396,7 +400,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
                      .eq("email", email).limit(2).execute().data or [])
             if (len(fresh) != 1 or fresh[0].get("cargo") != "lider"
                     or not owner_pilot_enabled(email)
-                    or (mod_id != "hypeclient" and not may_account_receive_update(
+                    or (mod_id in MOD_TO_SITE_MODULE and not may_account_receive_update(
                         db, mod_id, email, fresh[0]["cargo"], bool(is_member(email))))):
                 return fail("Permissao revogada antes do download.", 403)
             return send_file(payload, mimetype="application/java-archive", as_attachment=True,

@@ -50,7 +50,7 @@ def parse_draft_id(raw):
         raise ValueError("Identificador da versão inválido.") from None
 
 
-def inspect_original(raw):
+def inspect_original(raw, *, allow_dynamic=False):
     """Inspect ZIP metadata, content CRCs and a strict initial HYPE allowlist."""
     if not raw or len(raw) > MAX_UPLOAD:
         raise InvalidJar("Arquivo vazio ou maior que 10 MiB.")
@@ -79,8 +79,8 @@ def inspect_original(raw):
                 raise InvalidJar("Metadados Fabric inválidos.")
             module_id = metadata.get("id")
             version = metadata.get("version")
-            if not isinstance(module_id, str) or module_id not in IDS:
-                raise InvalidJar("Módulo não cadastrado nesta primeira etapa.")
+            if not isinstance(module_id, str) or (module_id not in IDS and not (allow_dynamic and re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", module_id) and module_id != "hypebootstrap")):
+                raise InvalidJar("Módulo não cadastrado ou identificador Fabric inválido.")
             if not isinstance(version, str) or not 0 < len(version) <= 120:
                 raise InvalidJar("Versão do mod inválida.")
             depends = metadata.get("depends") or {}
@@ -99,7 +99,7 @@ def inspect_original(raw):
                             pass  # Verify CRC for every ZIP member
             return {
                 "module_id": module_id,
-                "name": IDS[module_id],
+                "name": IDS.get(module_id, module_id),
                 "version": version,
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "size_bytes": len(raw),
@@ -169,7 +169,7 @@ def read_original_for_admin_test(db, draft_id):
     module_id = draft.get("module_id")
     sha = draft.get("sha256")
     path = draft.get("storage_path")
-    if (module_id not in IDS
+    if ((module_id not in IDS and not (isinstance(module_id, str) and re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", module_id) and module_id != "hypebootstrap"))
             or draft.get("status") not in ("aguardando_protecao", "em_teste")
             or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
             or not isinstance(path, str)
@@ -180,7 +180,7 @@ def read_original_for_admin_test(db, draft_id):
     if not isinstance(raw, bytes):
         raise InvalidJar("Leitura do JAR privado invalida.")
     validate_binary(raw, expected_sha=sha)
-    report = inspect_original(raw)
+    report = inspect_original(raw, allow_dynamic=True)
     if (report["module_id"] != module_id
             or report["version"] != draft.get("version")
             or report["sha256"] != sha):
@@ -248,7 +248,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             sha = candidate.get("sha256")
             if row.get("status") == "rejeitado":
                 step = "Rejeitado — envie uma nova versão"
-            elif meta.get("pilot_original") and pilot_original_enabled():
+            elif (meta.get("owner_pilot") and owner_pilot_enabled()) or (meta.get("pilot_original") and pilot_original_enabled()):
                 step = "Original publicado somente no piloto; protegê-lo antes de distribuir"
             elif not sha:
                 step = "Falta um JAR candidato protegido"
@@ -290,6 +290,18 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         "status": "published",
                         "published_at": pilot.get("published_at"),
                         "channel_name": "PILOTO ORIGINAL - CONTA UNICA",
+                    })
+        if owner_pilot_enabled(session.get("usuario_email")):
+            for draft in load_drafts():
+                pilot = (draft.get("meta") or {}).get("owner_pilot") or {}
+                if pilot:
+                    result.append({
+                        "module_id": draft["module_id"],
+                        "version": draft["version"],
+                        "release": pilot["release"],
+                        "status": "published",
+                        "published_at": pilot.get("published_at"),
+                        "channel_name": "TESTE PRIVADO DO PROPRIETARIO",
                     })
         return result
 
@@ -455,7 +467,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             return redirect(url_for("hype_mod_admin.mod_releases"))
         raw = file.stream.read(MAX_UPLOAD + 1)
         try:
-            report = inspect_original(raw)
+            report = inspect_original(raw, allow_dynamic=owner_pilot_enabled(session.get("usuario_email")))
         except InvalidJar as exc:
             flash(str(exc), "erro")
             return redirect(url_for("hype_mod_admin.mod_releases"))
@@ -775,7 +787,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             module_id = draft.get("module_id")
             sha = draft.get("sha256")
             original_path = draft.get("storage_path")
-            if (module_id not in IDS or not isinstance(sha, str)
+            if ((module_id not in IDS and not (owner_pilot_enabled(session.get("usuario_email")) and re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", str(module_id)))) or not isinstance(sha, str)
                     or not re.fullmatch(r"[0-9a-f]{64}", sha)
                     or not isinstance(original_path, str)
                     or not re.fullmatch(
@@ -783,7 +795,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         original_path,
                     )):
                 raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
-            if (draft.get("meta") or {}).get("pilot_original"):
+            if (draft.get("meta") or {}).get("pilot_original") or (draft.get("meta") or {}).get("owner_pilot"):
                 raise ValueError("Original ja publicado no piloto e nao pode ser apagado.")
             paths = [original_path]
             protected = (draft.get("meta") or {}).get("protected") or {}

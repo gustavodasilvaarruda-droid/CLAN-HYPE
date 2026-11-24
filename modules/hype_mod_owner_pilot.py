@@ -11,7 +11,13 @@ from modules.hype_mod_staging import assert_private_bucket, inspect_original
 from modules.hype_mod_update_access import MOD_TO_SITE_MODULE
 from modules.hype_signed_release import SHA, VERSION, validate_binary
 
-OWNER_IDS = frozenset((*MOD_TO_SITE_MODULE, "hypeclient"))
+OWNER_IDS = frozenset((*MOD_TO_SITE_MODULE, "hypeclient"))  # Legacy player release IDs stay fixed.
+OWNER_MOD_ID = re.compile(r"[a-z][a-z0-9_-]{1,63}\Z")
+
+
+def valid_owner_mod_id(mod_id):
+    """Allow new Fabric IDs only for the authenticated owner pilot, never public release."""
+    return isinstance(mod_id, str) and mod_id != "hypebootstrap" and OWNER_MOD_ID.fullmatch(mod_id) is not None
 BASE_URL = "https://clan-hype.onrender.com/api/hype/v1/updates/owner-pilot/mods/"
 
 
@@ -29,7 +35,7 @@ def _valid_original(draft):
         raise InvalidPrivateRelease("ID invalido") from exc
     mod_id, sha = draft.get("module_id"), draft.get("sha256")
     size, path, version = draft.get("size_bytes"), draft.get("storage_path"), draft.get("version")
-    if (mod_id not in OWNER_IDS
+    if (not valid_owner_mod_id(mod_id)
             or draft.get("status") not in ("aguardando_protecao", "em_teste", "pronto_para_aprovacao")
             or not isinstance(version, str) or not VERSION.fullmatch(version)
             or not isinstance(sha, str) or not SHA.fullmatch(sha)
@@ -57,7 +63,7 @@ def _record(draft):
 
 
 def find_owner_pilot(db, mod_id, sha256=None):
-    if mod_id not in OWNER_IDS:
+    if not valid_owner_mod_id(mod_id):
         return None
     if sha256 is not None and (not isinstance(sha256, str) or not SHA.fullmatch(sha256)):
         return None
@@ -75,6 +81,24 @@ def find_owner_pilot(db, mod_id, sha256=None):
     return latest
 
 
+def list_owner_pilots(db):
+    """Dynamic owner-only release catalogue from private, published originals."""
+    rows = (db.table(DRAFTS)
+            .select("id,module_id,version,status,sha256,size_bytes,storage_path,meta")
+            .order("created_at", desc=True).limit(1000).execute().data or [])
+    chosen = {}
+    for draft in rows:
+        if not (draft.get("meta") or {}).get("owner_pilot"):
+            continue
+        record = _record(draft)  # Corrupted record blocks catalogue; fail closed.
+        mod_id = record["id"]
+        if mod_id not in chosen or record["release"] > chosen[mod_id][1]["release"]:
+            chosen[mod_id] = (draft, record)
+    if len(chosen) > 100:
+        raise InvalidPrivateRelease("O piloto atingiu o limite de modulos")
+    return [chosen[mod_id] for mod_id in sorted(chosen)]
+
+
 def download_owner_pilot(db, draft):
     _valid_original(draft)
     assert_private_bucket(db.storage)
@@ -82,7 +106,7 @@ def download_owner_pilot(db, draft):
     if not isinstance(data, bytes) or len(data) != draft["size_bytes"]:
         raise InvalidPrivateRelease("Tamanho do original nao confere")
     validate_binary(data, expected_sha=draft["sha256"])
-    inspected = inspect_original(data)
+    inspected = inspect_original(data, allow_dynamic=True)
     if (inspected["module_id"] != draft["module_id"]
             or inspected["version"] != draft["version"]
             or inspected["size_bytes"] != draft["size_bytes"]):
