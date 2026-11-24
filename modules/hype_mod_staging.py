@@ -169,7 +169,7 @@ def read_original_for_admin_test(db, draft_id):
     module_id = draft.get("module_id")
     sha = draft.get("sha256")
     path = draft.get("storage_path")
-    if ((module_id not in IDS and not (owner_pilot_enabled(session.get("usuario_email")) and re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", str(module_id))))
+    if ((module_id not in IDS and not (isinstance(module_id, str) and re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", module_id) and module_id != "hypebootstrap"))
             or draft.get("status") not in ("aguardando_protecao", "em_teste")
             or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
             or not isinstance(path, str)
