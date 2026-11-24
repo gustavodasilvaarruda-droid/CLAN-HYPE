@@ -21,7 +21,7 @@ scope = {
     "BUCKET": "hype-mod-originals", "MAX_UPLOAD": 10 * 1024 * 1024,
     "MAX_ENTRIES": 8000, "MAX_UNCOMPRESSED": 300 * 1024 * 1024,
     "IDS": {"hype_pokedex": "HYPE Pokédex", "hypeclient": "HYPE Client"},
-    "MODULE_ID": re.compile(r"[a-z][a-z0-9_]{1,63}\\Z", re.ASCII),
+    "MODULE_ID": re.compile(r"[a-z][a-z0-9_]{1,63}\Z", re.ASCII),
     "ZipFile": ZipFile, "BadZipFile": BadZipFile, "hashlib": hashlib,
     "io": io, "json": json, "stat": stat,
 }
