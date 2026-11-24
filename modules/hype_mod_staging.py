@@ -180,7 +180,7 @@ def read_original_for_admin_test(db, draft_id):
     if not isinstance(raw, bytes):
         raise InvalidJar("Leitura do JAR privado invalida.")
     validate_binary(raw, expected_sha=sha)
-    report = inspect_original(raw)
+    report = inspect_original(raw, allow_dynamic=True)
     if (report["module_id"] != module_id
             or report["version"] != draft.get("version")
             or report["sha256"] != sha):
@@ -290,6 +290,18 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         "status": "published",
                         "published_at": pilot.get("published_at"),
                         "channel_name": "PILOTO ORIGINAL - CONTA UNICA",
+                    })
+        if owner_pilot_enabled(session.get("usuario_email")):
+            for draft in load_drafts():
+                pilot = (draft.get("meta") or {}).get("owner_pilot") or {}
+                if pilot:
+                    result.append({
+                        "module_id": draft["module_id"],
+                        "version": draft["version"],
+                        "release": pilot["release"],
+                        "status": "published",
+                        "published_at": pilot.get("published_at"),
+                        "channel_name": "TESTE PRIVADO DO PROPRIETARIO",
                     })
         return result
 
