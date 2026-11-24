@@ -201,7 +201,6 @@
           <h3>Publicar JAR protegido</h3>
           <p>Escolha um dos cinco mods guardados. O HYPE Client usa seu canal próprio automaticamente; se houver pendências, abra a revisão antes de publicar.</p>
           <form id="hpub-unified-release-form" method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_private') }}"
-                data-hpub-private-action="{{ url_for('hype_mod_admin.mod_release_publish_private') }}"
                 data-hpub-client-action="{{ url_for('hype_mod_admin.mod_release_publish') }}"
                 enctype="multipart/form-data" class="hpub-publish-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
