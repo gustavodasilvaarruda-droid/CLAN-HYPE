@@ -71,8 +71,9 @@ Requer simultaneamente `HYPE_MULTI_MOD_CATALOG_ENABLED=1` e
 `HYPE_MULTI_MOD_DOWNLOADS_ENABLED=1`. Busca JARs somente em
 `HYPE_UPDATES_DIR/mods/{id}/{sha256}.jar`, quando presentes no catálogo
 assinado e com tamanho e SHA-256 exatos. Não permite upload nem acesso aos
-originais/candidatos privados. O diretório do piloto é manual e a persistência
-em Render/Supabase ainda precisa ser implementada. Nenhum JAR é disponibilizado
+originais/candidatos privados. O diretório do piloto local é manual. O backend de leitura persistente em
+Supabase está preparado opcionalmente (abaixo), mas ainda depende de
+configuração segura, aprovação dos artefatos e testes ponta a ponta. Nenhum JAR é disponibilizado
 sem as duas flags e o catálogo assinado válido.
 
 ATENÇÃO: o piloto NÃO implementa o cadastro de releases por mod, controle
@@ -100,3 +101,68 @@ Java compatível. O cliente instalado atualmente NÃO lê esse catálogo.
 5. Integridade validada pelo cliente (não somente pelo servidor).
 6. Compatibilidade Fabric/Cobblemon, ausência de conflito com mods alheios.
 7. Aprovação explícita no site antes de qualquer publicação.
+
+## Etapa 2B — armazenamento persistente assinado (implementado no código; DESLIGADO)
+
+A partir desta PR, o site pode ler um catálogo e JARs de distribuição
+de um bucket **novo e privado**, exclusivo para artefatos finais aprovados:
+
+- Bucket Supabase: `hype-mod-distribution` (**public=false**).
+- Catálogo: `stable/1.21.1/catalog.json`.
+- JARs: `stable/1.21.1/mods/{id}/{sha256}.jar`.
+- Flag para usar Supabase em vez do diretório local:
+  `HYPE_MULTI_MOD_PUBLIC_STORAGE_ENABLED=1`.
+- Também exige `HYPE_MULTI_MOD_CATALOG_ENABLED=1` e, para servir
+  JARs, `HYPE_MULTI_MOD_DOWNLOADS_ENABLED=1`.
+
+Mesmo com as flags ligadas, **nenhum** arquivo do bucket
+`hype-mod-originals` ou da fila privada é disponibilizado por essas
+rotas. O servidor verifica que o bucket de distribuição é privado,
+valida assinatura Ed25519 do catálogo, pertença ao catálogo, tamanho
+e SHA-256 de cada arquivo antes de responder ao Bootstrap.
+
+A chave privada de assinatura deve permanecer **fora** do site e do
+repositório: não inserir chaves privadas em variáveis de ambiente
+web/Render ou em códigos cliente. Upload de original não cria release
+nem altera o catálogo. A publicação deve ser um passo distinto,
+**atômico quanto ao catálogo**: primeiro disponibilizar e conferir todos
+os JARs finais; somente depois substituir o objeto assinado
+`catalog.json`. A versão anterior do catálogo deve poder ser restaurada.
+
+A distribuição acima ainda depende de **criar e configurar o bucket
+privado**, gerar JARs protegidos, concluir revisão e assinatura externa,
+preencher os objetos e passar nos testes de rede e Minecraft. Não ativar
+as três flags antes desses passos. O Render não deve depender de disco
+efêmero para servir arquivos oficiais.
+
+## Novos mods enviados — sem whitelist fixa no staging
+
+Agora a análise privada de JARs aceita identificadores Fabric seguros
+compatíveis com `[a-z][a-z0-9_]{1,63}`, com exceção do identificador
+reservado `hypebootstrap`. O registro e a fila de proteção usam o
+mesmo validador. Os nomes amigáveis antigos continuam apenas para
+exibição; um ID novo recebe o nome de `fabric.mod.json`.
+
+Após revisão, aplicar **somente a migração revisada**
+`migrations/20261124_hype_dynamic_mod_ids.sql`, no momento coordenado
+com o deploy do código. Ela troca as CHECK constraints **somente**
+em `hype_mod_release_drafts` e `hype_mod_protection_jobs`.
+Não altera as regras de autorização dos módulos restritos nem publica
+automaticamente qualquer JAR.
+
+### Bloqueios restantes para o resultado pedido pelo proprietário
+
+1. Processar a fila real de proteção em worker isolado (há jobs aguardando);
+   teste estático ou renomeação não equivalem a ofuscação.
+2. Registrar aprovação manual por SHA exato, compatibilidade de Fabric e
+   permissão de distribuição antes de publicar.
+3. Produzir e assinar externamente o catálogo para a chave Ed25519 fixada
+   no Bootstrap 1.4 (ou coordenar uma rotação de chave, se necessária).
+4. Preencher o bucket `hype-mod-distribution`, testar entrega
+   dos JARs e só então habilitar flags no Render.
+5. Validar o Bootstrap em Minecraft 1.21.1 / Fabric 0.19.5 no launcher
+   Planeta: nova instalação, atualização, queda de rede e rollback.
+
+O jogador não precisa fazer login para baixar **releases públicas**.
+Módulos privados/restritos continuam exigindo a política de acesso
+correspondente; não liberar seus originais como atalho para eliminar login.
