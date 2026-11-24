@@ -63,6 +63,22 @@ class SignedCatalogueTests(unittest.TestCase):
         self.assertEqual(len(parsed["mods"]), 2)
         self.assertEqual(parsed["mods"][1]["depends_on"], ["hypeclient"])
 
+    def test_unbounded_registry_accepts_new_hype_mod_ids(self):
+        unsigned = dict(self.unsigned, mods=[
+            mod("hypeclient"),
+            mod("hype_new_arena", depends_on=("hypeclient",)),
+            mod("my_future_mod", depends_on=("hype_new_arena",)),
+        ])
+        self.assertEqual(
+            len(verify_signed_catalogue(self.signed_document(unsigned))["mods"]), 3
+        )
+
+    def test_bad_module_id_path_is_rejected(self):
+        for mod_id in ("../private", "a/b", "UPPER", "x" * 100):
+            unsigned = dict(self.unsigned, mods=[mod("hypeclient"), mod(mod_id)])
+            with self.subTest(mod_id=mod_id), self.assertRaises(InvalidCatalogue):
+                verify_signed_catalogue(self.signed_document(unsigned))
+
     def test_modified_data_is_rejected_even_when_signature_is_well_formed(self):
         raw = self.signed_document()
         tampered = raw.replace(b"2.0.1", b"2.0.2", 1)
@@ -117,9 +133,10 @@ class SignedCatalogueTests(unittest.TestCase):
         }):
             self.assertEqual(client.get("/hype-updates/mods/catalog.json").status_code, 404)
             (folder / "catalog.json").write_bytes(self.signed_document())
-            # Never reveal a mixed/restricted catalogue through the public pilot.
+            # A signed catalogue can contain any eligible publicly approved ID.
             response = client.get("/hype-updates/mods/catalog.json")
-            self.assertEqual(response.status_code, 403)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(response.json["mods"]), 2)
             only_client = dict(self.unsigned, mods=[mod("hypeclient")])
             (folder / "catalog.json").write_bytes(self.signed_document(only_client))
             response = client.get("/hype-updates/mods/catalog.json")
@@ -130,7 +147,7 @@ class SignedCatalogueTests(unittest.TestCase):
             self.assertEqual(client.get("/hype-updates/mods/catalog.json").status_code, 503)
 
 
-    def test_binary_download_is_opt_in_and_never_serves_private_mods(self):
+    def test_binary_download_is_opt_in_and_never_serves_unlisted_mods(self):
         import io
         from zipfile import ZipFile
 
@@ -172,9 +189,9 @@ class SignedCatalogueTests(unittest.TestCase):
                 "HYPE_MULTI_MOD_CATALOG_ENABLED": "1",
                 "HYPE_MULTI_MOD_DOWNLOADS_ENABLED": "1"
             }):
-                # A public SHA/URL is not a player's permission.
+                # A private file not named in the signed catalogue is invisible.
                 restricted = "/hype-updates/mods/hype_pokedex/" + "0" * 64 + ".jar"
-                self.assertEqual(client.get(restricted).status_code, 403)
+                self.assertEqual(client.get(restricted).status_code, 404)
                 res = client.get(endpoint)
                 self.assertEqual(res.status_code, 200)
                 self.assertEqual(res.data, jar)
