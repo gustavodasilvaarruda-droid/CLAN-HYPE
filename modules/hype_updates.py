@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, send_file
 from modules.hype_signed_release import InvalidRelease, validate_binary, SHA
 from modules.hype_mod_catalog import (InvalidCatalogue, verify_signed_catalogue,
-                                     MODULE_IDS, CATALOGUE_BASE_URL)
+                                     MODULE_ID, CATALOGUE_BASE_URL)
 
 hype_updates_bp = Blueprint('hype_updates', __name__)
 _RELEASE_NAME = re.compile(r'hypeclient-r[1-9][0-9]{0,8}\.jar\Z', re.ASCII)
@@ -196,10 +196,9 @@ def multi_mod_signed_catalogue():
     except (InvalidCatalogue, OSError):
         current_app.logger.exception('Invalid HYPE multi-mod signed catalogue')
         abort(503)
-    # The pilot catalogue is public. Never disclose restricted releases on it.
-    # A per-user signed/authorized catalogue is still required for multi-mod.
-    if any(item['id'] != 'hypeclient' for item in catalogue['mods']):
-        abort(403)
+    # This is a PUBLIC channel: it contains only administrator-approved,
+    # offline-signed distribution builds staged in HYPE_UPDATES_DIR/mods.
+    # Private Storage originals, restricted releases and drafts are not used here.
     response = make_response(raw, 200)
     response.headers['Content-Type'] = 'application/json; charset=utf-8'
     response.headers['Cache-Control'] = 'no-store, max-age=0'
@@ -220,12 +219,10 @@ def multi_mod_signed_binary(mod_id, sha256):
     if (os.getenv('HYPE_MULTI_MOD_CATALOG_ENABLED', '').lower() not in ('1', 'true', 'yes')
             or os.getenv('HYPE_MULTI_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')):
         abort(404)
-    if mod_id not in MODULE_IDS or not SHA.fullmatch(sha256):
+    if not MODULE_ID.fullmatch(mod_id) or not SHA.fullmatch(sha256):
         abort(404)
-    # Signed does not mean authorized. This legacy pilot URL has NO login;
-    # private mods must be served only by the future per-user download API.
-    if mod_id != 'hypeclient':
-        abort(403)
+    # Public URL without account checks. The offline-signed catalogue must
+    # contain ONLY distribution-approved builds, never private/restricted JARs.
     try:
         catalogue = verify_signed_catalogue(
             _safe_regular_file(_root() / 'mods', 'catalog.json').read_bytes()
