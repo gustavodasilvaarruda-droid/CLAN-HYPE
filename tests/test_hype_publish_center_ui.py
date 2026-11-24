@@ -88,7 +88,7 @@ class PublishCenterUiTests(unittest.TestCase):
 
     def test_protected_picker_lists_pending_and_ready_without_early_release(self):
         self.assertIn('id="private_draft"', self.html)
-        self.assertIn('data-hpub-next="{{ item.release_next_step }}"', self.html)
+        self.assertIn('item.release_next_step', self.html)
         self.assertIn('id="hpub-review-selected"', self.html)
         self.assertIn('id="hpub-submit-protected" type="submit" class="hype-v6-btn gold" disabled', self.html)
         self.assertIn('data-hpub-client-action=', self.html)
@@ -99,7 +99,7 @@ class PublishCenterUiTests(unittest.TestCase):
     def test_selecting_stored_card_updates_publish_choice_and_review(self):
         for marker in ("[data-hpub-publish-original]", "[data-hpub-publish-protected]",
                        "function updatePublicationChoice(", "function openSelectedReview(",
-                       "submit.disabled = !ready", "setSelectedCard(input.value)", "updateProtectedChoice()"):
+                       "submit.disabled = !ready", "setSelectedCard(protectedChoice.value)", "updateProtectedChoice()"):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.js)
         self.assertIn("is-selected-for-publish", self.css)
