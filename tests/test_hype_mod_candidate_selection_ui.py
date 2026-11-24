@@ -25,7 +25,7 @@ class CandidateSelectionTemplateTests(unittest.TestCase):
     def test_candidate_upload_keeps_explicit_association(self):
         self.assertIn('id="hpub-quick-target"', self.source)
         self.assertIn('id="hpub-quick-protected"', self.source)
-        self.assertIn("if not (item.meta or {}).get('protected')", self.source)
+        self.assertIn("and not (item.meta or {}).get('protected')", self.source)
         self.assertIn("url_for('hype_mod_admin.mod_release_protected_upload')", self.source)
 
     def test_stored_candidate_reuse_still_available_without_clutter(self):
