@@ -61,7 +61,7 @@ class PublishCenterUiTests(unittest.TestCase):
     def test_private_upload_is_distinct_from_private_bootstrap_release(self):
         self.assertIn("mod_release_original_test_download", self.html)
         self.assertIn("{% if pilot_original_enabled %}", self.html)
-        self.assertIn("{% if private_publish_enabled %}", self.html)
+        self.assertIn("{% if publish_enabled or private_publish_enabled %}", self.html)
         self.assertIn("{% if publish_enabled or private_publish_enabled %}", self.html)
         self.assertIn("{% if staging_enabled %}", self.html)
         self.assertIn("Teste no Bootstrap indisponível", self.html)
@@ -92,7 +92,7 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertIn('id="hpub-review-selected"', self.html)
         self.assertIn('id="hpub-submit-protected" type="submit" class="hype-v6-btn gold" disabled', self.html)
         self.assertIn('data-hpub-client-action=', self.html)
-        self.assertIn('data-hpub-private-action=', self.html)
+        self.assertIn('id="hpub-unified-release-form"', self.html)
         self.assertIn('name="manifest"', self.html)
         self.assertIn('name="confirm_release"', self.html)
 
@@ -112,7 +112,7 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertNotIn('id="draft_publish"', self.html)
         self.assertIn("url_for('hype_mod_admin.mod_release_publish_private')", self.html)
         self.assertIn("url_for('hype_mod_admin.mod_release_publish')", self.html)
-        self.assertIn("form.action = isClient ? form.dataset.hpubClientAction : form.dataset.hpubPrivateAction", self.js)
+        self.assertIn("unifiedPublishForm.action = isClient ? unifiedPublishForm.dataset.hpubClientAction : privatePublishAction", self.js)
         self.assertIn("item.module_id == 'hypeclient'", self.html)
         self.assertIn('data-hpub-ready="{{ \'no\' if original_client or original_published else \'yes\' }}"', self.html)
         self.assertIn('canal de teste privado automático do Client ainda não existe', self.html)
