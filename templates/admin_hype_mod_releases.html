@@ -61,7 +61,7 @@
       {% for item in drafts %}
         {% set candidate = (item.meta or {}).get('protected') or {} %}
         {% set job = protection_jobs.get(item.id|string) if protection_queue_enabled else None %}
-        <article class="hpub-file-card">
+        <article class="hpub-file-card" data-hpub-file-card="{{ item.id }}">
           <div class="hpub-file-top">
             <div><strong>{{ item.module_id }}</strong><small>Versão {{ item.version }} · {{ item.original_filename or 'JAR' }}</small></div>
             <span class="hpub-file-status">{{ item.status|replace('_',' ') }}</span>
@@ -84,11 +84,11 @@
             {% if staging_enabled %}
               <button type="button" class="hype-v6-btn" data-hpub-new-version>Nova versão</button>
             {% endif %}
-            {% if pilot_original_enabled and item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') and not (item.meta or {}).get('pilot_original') %}
-              <button type="button" class="hype-v6-btn" data-hpub-publish-original="{{ item.id }}">Testar original</button>
+            {% if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') and not (item.meta or {}).get('pilot_original') %}
+              <button type="button" class="hype-v6-btn" data-hpub-publish-original="{{ item.id }}">Selecionar original</button>
             {% endif %}
-            {% if item.status == 'pronto_para_aprovacao' and candidate %}
-              <button type="button" class="hype-v6-btn gold" data-hpub-publish-protected="{{ item.id }}" data-hpub-mod="{{ item.module_id }}">Publicar protegido</button>
+            {% if item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') %}
+              <button type="button" class="hype-v6-btn gold" data-hpub-publish-protected="{{ item.id }}" data-hpub-mod="{{ item.module_id }}">Selecionar para publicar</button>
             {% endif %}
             {% if item.status in ('aguardando_protecao','rejeitado') and not (item.meta or {}).get('pilot_original') %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}" onsubmit="return confirm('Apagar permanentemente este JAR privado? Versões publicadas não serão apagadas.');">
@@ -169,49 +169,59 @@
         <article class="hpub-publish-card hpub-publish-card-pilot" id="hpub-private-test">
           <span class="hpub-publish-tag">SÓ MINHA CONTA</span>
           <h3>Teste privado · JAR original</h3>
-          <p>Para testar no seu Bootstrap sem ofuscar. <strong>Não precisa do JAR protegido.</strong> O arquivo original não vai para os jogadores.</p>
-          {% if pilot_original_enabled %}
+          <p>Escolha um JAR já guardado em Meus arquivos. Não precisa do JAR protegido nem enviar novamente. Somente seu Bootstrap autorizado poderá recebê-lo depois da assinatura.</p>
           <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_original_pilot') }}" enctype="multipart/form-data" class="hpub-publish-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label for="pilot_original_draft">Original armazenado</label>
+            <label for="pilot_original_draft">JAR original já armazenado</label>
             <select id="pilot_original_draft" name="draft_id" required>
-              <option value="">Selecione o mod que quer testar...</option>
-              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') and not (item.meta or {}).get('pilot_original') %}
-                <option value="{{ item.id }}">{{ item.module_id }} · {{ item.version }}</option>
+              <option value="">Selecione o arquivo original...</option>
+              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') %}
+                <option value="{{ item.id }}" data-hpub-ready="{{ 'no' if (item.meta or {}).get('pilot_original') else 'yes' }}" data-hpub-next="{{ 'Este original já foi publicado no piloto. Envie outra versão para publicar novamente.' if (item.meta or {}).get('pilot_original') else 'Original selecionado. Falta anexar o manifesto assinado para publicar no seu Bootstrap.' }}">{{ item.module_id }} · {{ item.version }}{% if (item.meta or {}).get('pilot_original') %} · já publicado{% endif %}</option>
               {% endfor %}
             </select>
-            <label for="pilot_original_manifest">Manifesto assinado (.properties)</label>
-            <input id="pilot_original_manifest" name="manifest" type="file" accept=".properties" required>
-            <label class="hpub-publish-confirm"><input type="checkbox" name="confirm_pilot" value="yes" required> Confirmo que somente minha conta de teste pode receber este JAR original.</label>
-            <button type="submit" class="hype-v6-btn gold">Publicar teste privado</button>
+            <p id="hpub-original-choice-note" class="hpub-choice-note" role="status" aria-live="polite">Selecione um original de Meus arquivos para preparar o teste.</p>
+            {% if pilot_original_enabled %}
+              <label for="pilot_original_manifest">Manifesto assinado (.properties)</label>
+              <input id="pilot_original_manifest" name="manifest" type="file" accept=".properties" required>
+              <label class="hpub-publish-confirm"><input type="checkbox" name="confirm_pilot" value="yes" required> Confirmo que somente minha conta de teste pode receber este JAR original.</label>
+              <button id="hpub-submit-original" type="submit" class="hype-v6-btn gold" disabled>Publicar teste privado</button>
+            {% else %}
+              <p class="hpub-publish-blocked"><strong>Teste no Bootstrap indisponível por enquanto.</strong> Seus originais aparecem para seleção, mas a publicação está bloqueada até ativar o piloto restrito da sua conta no servidor e preparar a assinatura digital. Selecionar não libera o arquivo.</p>
+              <button type="button" class="hype-v6-btn" disabled>Publicação privada indisponível</button>
+            {% endif %}
           </form>
-          {% else %}
-          <p class="hpub-publish-blocked"><strong>Teste no Bootstrap indisponível por enquanto.</strong> Você já pode enviar e guardar seus JARs originais acima. A publicação na sua conta será liberada quando o piloto restrito for ativado no servidor.</p>
-          {% endif %}
         </article>
         <article class="hpub-publish-card hpub-publish-card-protected" id="hpub-protected-release">
           <span class="hpub-publish-tag">LANÇAMENTO PROTEGIDO</span>
           <h3>Publicar JAR protegido</h3>
-          <p>Selecione uma versão já aprovada. Escolha um JAR protegido aprovado e assinado. Só esta versão será liberada aos jogadores autorizados.</p>
-          {% if private_publish_enabled %}
+          <p>Selecione qualquer mod já guardado. Se ainda estiver em teste ou proteção, mostraremos o que falta antes de permitir a publicação.</p>
           <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_private') }}" enctype="multipart/form-data" class="hpub-publish-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label for="private_draft">JAR protegido aprovado</label>
+            <label for="private_draft">Arquivo guardado em Meus arquivos</label>
             <select id="private_draft" name="draft_id" required>
-              <option value="">Selecione uma versão aprovada...</option>
-              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status == 'pronto_para_aprovacao' %}
-                <option value="{{ item.id }}">{{ item.module_id }} · {{ item.version }}</option>
+              <option value="">Selecione o mod e a versão...</option>
+              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') %}
+                {% set candidate = (item.meta or {}).get('protected') or {} %}
+                {% set automatic = (item.meta or {}).get('automatic_review') or {} %}
+                {% set manual = (item.meta or {}).get('manual_review') or {} %}
+                {% set ready = item.status == 'pronto_para_aprovacao' and candidate.get('sha256') and automatic.get('status') == 'passed' and automatic.get('candidate_sha256') == candidate.get('sha256') and manual.get('candidate_sha256') == candidate.get('sha256') and manual.get('checks',{}).get('game_launch') and manual.get('checks',{}).get('menus') and manual.get('checks',{}).get('server_connection') and manual.get('checks',{}).get('no_crashes') %}
+                <option value="{{ item.id }}" data-hpub-ready="{{ 'yes' if ready else 'no' }}" data-hpub-next="{{ item.release_next_step }}">{{
+                  item.module_id }} · {{ item.version }} · {{ 'Pronto' if ready else item.status|replace('_',' ') }}</option>
               {% endfor %}
             </select>
-            <label for="private_manifest">Manifesto assinado (.properties)</label>
-            <input id="private_manifest" name="manifest" type="file" accept=".properties" required>
-            <label class="hpub-publish-confirm"><input type="checkbox" name="confirm_release" value="yes" required> Confirmo a revisão e os testes no Minecraft do JAR protegido escolhido.</label>
-            <button type="submit" class="hype-v6-btn gold">Publicar protegido aprovado</button>
+            <p id="hpub-protected-choice-note" class="hpub-choice-note" role="status" aria-live="polite">Selecione um arquivo. Apenas versões protegidas, verificadas e aprovadas podem ser publicadas.</p>
+            <button id="hpub-review-selected" class="hype-v6-btn" type="button" hidden>Abrir revisão do arquivo escolhido</button>
+            {% if private_publish_enabled %}
+              <label for="private_manifest">Manifesto assinado (.properties)</label>
+              <input id="private_manifest" name="manifest" type="file" accept=".properties" required>
+              <label class="hpub-publish-confirm"><input type="checkbox" name="confirm_release" value="yes" required> Confirmei os testes no Minecraft deste JAR protegido.</label>
+              <button id="hpub-submit-protected" type="submit" class="hype-v6-btn gold" disabled>Publicar protegido aprovado</button>
+            {% else %}
+              <p class="hpub-publish-blocked">Publicação protegida desativada no servidor. Você pode selecionar e revisar seus arquivos, mas não poderá liberá-los até a configuração do canal autorizado.</p>
+              <button type="button" class="hype-v6-btn" disabled>Publicação protegida indisponível</button>
+            {% endif %}
           </form>
-          <p class="hpub-quick-note">Não aparece? Use <strong>Vincular protegido</strong> no envio e <strong>Testar e aprovar</strong> no card do arquivo.</p>
-          {% else %}
-          <p class="hpub-publish-blocked">Publicação protegida desativada no servidor. Os JARs podem ser preparados e armazenados, mas não serão liberados aos jogadores.</p>
-          {% endif %}
+          <p class="hpub-quick-note">Para o HYPE Client, use o mesmo botão no arquivo: a seleção leva à publicação própria do Client. Nenhum original é liberado aos jogadores.</p>
         </article>
       </div>
       <p class="hpub-publish-security"><strong>Segurança:</strong> os dois modos exigem manifesto Ed25519 assinado no seu computador. A chave privada fica somente no seu computador. O Bootstrap ainda precisa de validação real no Minecraft.</p>
@@ -282,13 +292,19 @@
           <label for="draft_publish">Versão aprovada do HYPE Client</label>
           <select id="draft_publish" name="draft_id" required>
             <option value="">Selecione...</option>
-            {% for item in drafts if item.module_id == 'hypeclient' and item.status == 'pronto_para_aprovacao' %}
-              <option value="{{ item.id }}">{{ item.version }}</option>
+            {% for item in drafts if item.module_id == 'hypeclient' %}
+              {% set candidate = (item.meta or {}).get('protected') or {} %}
+              {% set automatic = (item.meta or {}).get('automatic_review') or {} %}
+              {% set manual = (item.meta or {}).get('manual_review') or {} %}
+              {% set ready = item.status == 'pronto_para_aprovacao' and candidate.get('sha256') and automatic.get('status') == 'passed' and automatic.get('candidate_sha256') == candidate.get('sha256') and manual.get('candidate_sha256') == candidate.get('sha256') %}
+              <option value="{{ item.id }}" data-hpub-ready="{{ 'yes' if ready else 'no' }}" data-hpub-next="{{ item.release_next_step }}">{{ item.version }} · {{ 'Pronto' if ready else item.status|replace('_',' ') }}</option>
             {% endfor %}
           </select>
+          <p id="hpub-client-choice-note" class="hpub-choice-note" role="status" aria-live="polite">Selecione a versão do Client. Somente versões aprovadas podem ser publicadas.</p>
+          <button id="hpub-review-client" type="button" class="hype-v6-btn" hidden>Abrir revisão do Client selecionado</button>
           <label for="manifest_publish">Manifesto assinado (.properties)</label>
           <input id="manifest_publish" name="manifest" type="file" accept=".properties" required>
-          <button type="submit" class="hype-v6-btn gold">Publicar HYPE Client</button>
+          <button id="hpub-submit-client" type="submit" class="hype-v6-btn gold" disabled>Publicar HYPE Client</button>
         </form>
       {% endif %}
       {% if pilot_original_enabled and test_channels %}

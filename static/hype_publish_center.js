@@ -46,15 +46,84 @@
       });
     });
 
-    root.querySelectorAll('[data-hpub-publish-original]').forEach(button => {
-      button.addEventListener('click', () => {
-        const input = root.querySelector('#pilot_original_draft');
-        if (!input) return;
-        input.value = button.dataset.hpubPublishOriginal;
-        focusArea(root.querySelector('#hpub-private-test'), input);
+    const originalChoice = root.querySelector('#pilot_original_draft');
+    const protectedChoice = root.querySelector('#private_draft');
+    const clientChoice = root.querySelector('#draft_publish');
+
+    function setSelectedCard(id) {
+      root.querySelectorAll('[data-hpub-file-card]').forEach(card => {
+        card.classList.toggle('is-selected-for-publish', Boolean(id) && card.dataset.hpubFileCard === id);
       });
+    }
+
+    function updatePublicationChoice(input, noteId, submitId) {
+      const option = input?.selectedOptions[0];
+      const selected = Boolean(option?.value);
+      const ready = selected && option.dataset.hpubReady === 'yes';
+      const note = root.querySelector(noteId);
+      const submit = root.querySelector(submitId);
+      if (note) note.textContent = selected
+        ? option.dataset.hpubNext || 'Confira as pendências desse arquivo.'
+        : 'Selecione um arquivo já guardado em Meus arquivos.';
+      if (submit) submit.disabled = !ready;
+      return { selected, ready, id: selected ? option.value : '' };
+    }
+
+    function updateOriginalChoice() {
+      return updatePublicationChoice(originalChoice, '#hpub-original-choice-note', '#hpub-submit-original');
+    }
+
+    function updateProtectedChoice() {
+      const state = updatePublicationChoice(protectedChoice, '#hpub-protected-choice-note', '#hpub-submit-protected');
+      const review = root.querySelector('#hpub-review-selected');
+      if (review) review.hidden = !state.selected || state.ready;
+      return state;
+    }
+
+    function updateClientChoice() {
+      const state = updatePublicationChoice(clientChoice, '#hpub-client-choice-note', '#hpub-submit-client');
+      const review = root.querySelector('#hpub-review-client');
+      if (review) review.hidden = !state.selected || state.ready;
+      return state;
+    }
+
+    originalChoice?.addEventListener('change', () => {
+      const state = updateOriginalChoice();
+      setSelectedCard(state.id);
+    });
+    protectedChoice?.addEventListener('change', () => {
+      const state = updateProtectedChoice();
+      setSelectedCard(state.id);
+    });
+    clientChoice?.addEventListener('change', () => {
+      const state = updateClientChoice();
+      setSelectedCard(state.id);
     });
 
+    function openSelectedReview(id) {
+      const review = Array.from(root.querySelectorAll('.hpub-file-review')).find(
+        panel => panel.id === 'hpub-review-' + id
+      );
+      if (!review) return;
+      review.open = true;
+      focusArea(review, review.querySelector('summary'));
+    }
+    root.querySelector('#hpub-review-selected')?.addEventListener('click', () => {
+      openSelectedReview(protectedChoice?.value);
+    });
+    root.querySelector('#hpub-review-client')?.addEventListener('click', () => {
+      openSelectedReview(clientChoice?.value);
+    });
+
+    root.querySelectorAll('[data-hpub-publish-original]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (!originalChoice) return;
+        originalChoice.value = button.dataset.hpubPublishOriginal;
+        setSelectedCard(originalChoice.value);
+        updateOriginalChoice();
+        focusArea(root.querySelector('#hpub-private-test'), originalChoice);
+      });
+    });
 
     const existingOriginal = root.querySelector('#existing_original');
     const existingCandidate = root.querySelector('#existing_candidate');
@@ -79,16 +148,26 @@
     root.querySelectorAll('[data-hpub-publish-protected]').forEach(button => {
       button.addEventListener('click', () => {
         const client = button.dataset.hpubMod === 'hypeclient';
-        const input = root.querySelector(client ? '#draft_publish' : '#private_draft');
-        if (!input) return;
+        const input = client ? clientChoice : protectedChoice;
+        if (!input) {
+          focusArea(root.querySelector('#hpub-protected-release'), null);
+          return;
+        }
         if (client) {
           const extra = root.querySelector('#hpub-extra');
           if (extra) extra.open = true;
         }
         input.value = button.dataset.hpubPublishProtected;
+        setSelectedCard(input.value);
+        if (client) updateClientChoice();
+        else updateProtectedChoice();
         focusArea(client ? root.querySelector('#hpub-extra') : root.querySelector('#hpub-protected-release'), input);
       });
     });
+
+    updateOriginalChoice();
+    updateProtectedChoice();
+    updateClientChoice();
   }
 
   if (document.readyState === 'loading') {
