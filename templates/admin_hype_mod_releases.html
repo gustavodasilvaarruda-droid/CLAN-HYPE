@@ -100,6 +100,66 @@
       {% endfor %}
       </div>
     </section>
+    <section class="hpub-simple-publish" id="hpub-publish" aria-labelledby="hpub-publish-title">
+      <div class="hpub-simple-publish-heading">
+        <div>
+          <span class="hype-v6-kicker">ATUALIZAÇÕES DO BOOTSTRAP</span>
+          <h2 id="hpub-publish-title">Testar ou publicar</h2>
+          <p>Use o arquivo que já está em <strong>Meus arquivos</strong>. Escolha um dos dois modos, sem repetir o envio.</p>
+        </div>
+        <span class="hpub-quick-pill">2 modos</span>
+      </div>
+      <div class="hpub-publish-grid">
+        <article class="hpub-publish-card hpub-publish-card-pilot" id="hpub-private-test">
+          <span class="hpub-publish-tag">SÓ MINHA CONTA</span>
+          <h3>Teste privado · JAR original</h3>
+          <p>Para testar no seu Bootstrap sem ofuscar. <strong>Não precisa do JAR protegido.</strong> O arquivo original não vai para os jogadores.</p>
+          {% if pilot_original_enabled %}
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_original_pilot') }}" enctype="multipart/form-data" class="hpub-publish-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="pilot_original_draft">Original armazenado</label>
+            <select id="pilot_original_draft" name="draft_id" required>
+              <option value="">Selecione o mod que quer testar...</option>
+              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') and not (item.meta or {}).get('pilot_original') %}
+                <option value="{{ item.id }}">{{ item.module_id }} · {{ item.version }}</option>
+              {% endfor %}
+            </select>
+            <label for="pilot_original_manifest">Manifesto assinado (.properties)</label>
+            <input id="pilot_original_manifest" name="manifest" type="file" accept=".properties" required>
+            <label class="hpub-publish-confirm"><input type="checkbox" name="confirm_pilot" value="yes" required> Confirmo que somente minha conta de teste pode receber este JAR original.</label>
+            <button type="submit" class="hype-v6-btn gold">Publicar teste privado</button>
+          </form>
+          {% else %}
+          <p class="hpub-publish-blocked">Teste privado ainda desativado no servidor. Você pode guardar o original acima, mas o Bootstrap não o receberá até o piloto ser ativado e restrito à sua conta.</p>
+          {% endif %}
+        </article>
+        <article class="hpub-publish-card hpub-publish-card-protected" id="hpub-protected-release">
+          <span class="hpub-publish-tag">LANÇAMENTO PROTEGIDO</span>
+          <h3>Publicar JAR protegido</h3>
+          <p>Selecione uma versão já aprovada. O site exige proteção, testes e assinatura antes de permitir a primeira publicação deste mod.</p>
+          {% if private_publish_enabled %}
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_private') }}" enctype="multipart/form-data" class="hpub-publish-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="private_draft">JAR protegido aprovado</label>
+            <select id="private_draft" name="draft_id" required>
+              <option value="">Selecione uma versão aprovada...</option>
+              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status == 'pronto_para_aprovacao' %}
+                <option value="{{ item.id }}">{{ item.module_id }} · {{ item.version }}</option>
+              {% endfor %}
+            </select>
+            <label for="private_manifest">Manifesto assinado (.properties)</label>
+            <input id="private_manifest" name="manifest" type="file" accept=".properties" required>
+            <label class="hpub-publish-confirm"><input type="checkbox" name="confirm_release" value="yes" required> Confirmo a revisão e os testes no Minecraft do JAR protegido escolhido.</label>
+            <button type="submit" class="hype-v6-btn gold">Publicar protegido aprovado</button>
+          </form>
+          <p class="hpub-quick-note">Seu mod não aparece na lista? Use <strong>Vincular protegido</strong> em Meus arquivos e conclua os testes em Gerenciamento avançado.</p>
+          {% else %}
+          <p class="hpub-publish-blocked">Publicação protegida desativada no servidor. Os JARs podem ser preparados e armazenados, mas não serão liberados aos jogadores.</p>
+          {% endif %}
+        </article>
+      </div>
+      <p class="hpub-publish-security"><strong>Segurança:</strong> os dois modos exigem manifesto Ed25519 assinado no seu computador. A chave privada nunca deve ser enviada ao site. O download e a instalação pelo Bootstrap ainda precisam de validação real no Minecraft.</p>
+    </section>
     <section class="hpub-launch-panel" aria-label="Estado da publicação normal">
       <div class="hpub-launch-heading">
         <div>
@@ -107,7 +167,7 @@
           <p>O canal estável protegido permanece separado do piloto de teste individual. Só as releases assinadas e publicadas aparecem nas atualizações; enviar um JAR não o publica.</p>
         </div>
         {% if staging_enabled %}
-          <button class="hype-v6-btn gold" type="button" data-hpub-next="publicar">Abrir publicação</button>
+          <a class="hype-v6-btn gold" href="#hpub-publish">Testar ou publicar</a>
         {% endif %}
       </div>
       <div class="hpub-launch-stats">
@@ -544,62 +604,6 @@
         </form>
       {% else %}
         <p><small>Publicação desativada. O modo de aprovação e entrega automática precisa de homologação e ativação separada no servidor.</small></p>
-      {% endif %}
-      <section class="hpub-release-picker" aria-label="Publicar original no piloto HYPE">
-        <h3>Teste do Bootstrap — JAR original, sem proteção</h3>
-        <p>Este caminho é SEPARADO do lançamento protegido. Serve somente para sua conta de teste e permite conferir se o Bootstrap detecta, baixa e instala a versão depois do fechamento do Minecraft. Não distribua o Bootstrap piloto para jogadores.</p>
-        {% if pilot_original_enabled %}
-          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_original_pilot') }}"
-                enctype="multipart/form-data" style="display:grid;gap:12px;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label for="pilot_original_draft">Original já armazenado no site</label>
-            <select id="pilot_original_draft" name="draft_id" required>
-              <option value="">Escolha o mod original para testar...</option>
-              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') %}
-                <option value="{{ item.id }}"
-                  {% if item.status == 'rejeitado' or (item.meta or {}).get('pilot_original') %}disabled{% endif %}>
-                  {{ item.module_id }} · {{ item.version }} — {{ 'Já publicado no piloto' if (item.meta or {}).get('pilot_original') else 'Original sem ofuscação' }}
-                </option>
-              {% endfor %}
-            </select>
-            <label for="pilot_original_manifest">Manifesto assinado offline (.properties) para este JAR original</label>
-            <input id="pilot_original_manifest" name="manifest" type="file" accept=".properties" required>
-            <p><small>A assinatura Ed25519 continua obrigatória. Assine o JAR original com a chave oficial fora do servidor, usando o comando <code>python -m modules.hype_manifest_signer --private-mod ...</code>. Enviar um original sozinho NÃO o publica.</small></p>
-            <label><input type="checkbox" name="confirm_pilot" value="yes" required>
-              Confirmo que este JAR NÃO está protegido e só deve ser oferecido ao Bootstrap da minha conta de teste.
-            </label>
-            <button type="submit" class="hype-v6-btn gold">Publicar original no piloto</button>
-          </form>
-        {% else %}
-          <p><small>Publicação de originais desativada. Para habilitar, o administrador do Render deve configurar <code>HYPE_MOD_PILOT_ORIGINAL_ENABLED=1</code> e restringir <code>HYPE_PRIVATE_MOD_ROLLOUT_SCOPE=single</code> à conta de teste. O download autenticado e a assinatura continuam necessários.</small></p>
-        {% endif %}
-      </section>
-      {% if private_publish_enabled %}
-        <section style="margin:22px 0;padding:16px;border:1px solid rgba(195,151,31,.4);border-radius:12px;">
-          <h2>Canal privado: Pokédex, Breed Calculator, Campo de Batalha e Battle AI</h2>
-          <p>Exclusivo para a primeira release de cada módulo restrito.
-          O arquivo candidato deve ter passado nas verificações automáticas
-          e nos quatro testes manuais, e o manifesto Ed25519 precisa estar
-          assinado com a chave OFFLINE autorizada. Não há troca automática de versões
-          já publicadas. O site não assina nem ofusca arquivos.</p>
-          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_private') }}"
-                enctype="multipart/form-data" style="display:grid;gap:12px;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label for="private_draft">Mod privado aprovado</label>
-            <select id="private_draft" name="draft_id" required>
-              <option value="">Selecione a release aprovada...</option>
-              {% for item in drafts if item.module_id in ('hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') %}
-                <option value="{{ item.id }}" {% if item.status != 'pronto_para_aprovacao' %}disabled{% endif %}>{{ item.module_id }} · {{ item.version }} — {{ 'Pronta para publicar' if item.status == 'pronto_para_aprovacao' else item.release_next_step }}</option>
-              {% endfor %}
-            </select>
-            <label for="private_manifest">Manifesto assinado offline (.properties)</label>
-            <input id="private_manifest" name="manifest" type="file" accept=".properties" required>
-            <label><input type="checkbox" name="confirm_release" value="yes" required>
-              Confirmo o SHA-256 do candidato, os testes no Minecraft e a publicação privada desta release.
-            </label>
-            <button type="submit" class="hype-v6-btn gold">Publicar primeira release privada aprovada</button>
-          </form>
-        </section>
       {% endif %}
       {% if pilot_original_enabled %}
       <section class="hpub-release-picker" aria-label="Escolher origem das atualizações para Bootstrap 0.8">
