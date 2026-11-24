@@ -13,6 +13,8 @@ from flask import Blueprint, abort, current_app, jsonify, make_response, redirec
 from modules.hype_signed_release import InvalidRelease, validate_binary, SHA
 from modules.hype_mod_catalog import (InvalidCatalogue, verify_signed_catalogue,
                                      MODULE_ID, CATALOGUE_BASE_URL)
+from modules.hype_mod_public_storage import read_catalogue, read_binary
+from werkzeug.exceptions import HTTPException
 
 hype_updates_bp = Blueprint('hype_updates', __name__)
 _RELEASE_NAME = re.compile(r'hypeclient-r[1-9][0-9]{0,8}\.jar\Z', re.ASCII)
@@ -179,6 +181,20 @@ def updates_health():
     return response
 
 
+def _public_storage_enabled():
+    return os.getenv('HYPE_MULTI_MOD_PUBLIC_STORAGE_ENABLED', '').lower() in ('1', 'true', 'yes')
+
+
+def _signed_public_catalogue():
+    if _public_storage_enabled():
+        # Persistent private storage. Never read from hype-mod-originals.
+        return read_catalogue(_release_db())
+    # Local testing/preview still works without any network or Supabase.
+    raw = _safe_regular_file(_root() / 'mods', 'catalog.json').read_bytes()
+    verify_signed_catalogue(raw)
+    return raw
+
+
 @hype_updates_bp.get('/hype-updates/mods/catalog.json')
 def multi_mod_signed_catalogue():
     """Preview-only signed catalogue for a future HYPE bootstrap (OFF by default).
@@ -189,12 +205,12 @@ def multi_mod_signed_catalogue():
     """
     if os.getenv('HYPE_MULTI_MOD_CATALOG_ENABLED', '').lower() not in ('1', 'true', 'yes'):
         abort(404)
-    path = _safe_regular_file(_root() / 'mods', 'catalog.json')
     try:
-        raw = path.read_bytes()
-        catalogue = verify_signed_catalogue(raw)
-    except (InvalidCatalogue, OSError):
-        current_app.logger.exception('Invalid HYPE multi-mod signed catalogue')
+        raw = _signed_public_catalogue()
+    except HTTPException:
+        raise
+    except Exception:
+        current_app.logger.exception('Unavailable or invalid signed public HYPE catalogue')
         abort(503)
     # This is a PUBLIC channel: it contains only administrator-approved,
     # offline-signed distribution builds staged in HYPE_UPDATES_DIR/mods.
@@ -224,30 +240,35 @@ def multi_mod_signed_binary(mod_id, sha256):
     # Public URL without account checks. The offline-signed catalogue must
     # contain ONLY distribution-approved builds, never private/restricted JARs.
     try:
-        catalogue = verify_signed_catalogue(
-            _safe_regular_file(_root() / 'mods', 'catalog.json').read_bytes()
-        )
-    except (InvalidCatalogue, OSError):
-        current_app.logger.exception('Invalid catalogue for HYPE pilot download')
+        catalogue = verify_signed_catalogue(_signed_public_catalogue())
+    except HTTPException:
+        raise
+    except Exception:
+        current_app.logger.exception('Invalid or unavailable public catalogue for download')
         abort(503)
     expected = next((item for item in catalogue['mods']
                      if item['id'] == mod_id and item['sha256'] == sha256), None)
     if (expected is None or
             expected['url'] != f'{CATALOGUE_BASE_URL}{mod_id}/{sha256}.jar'):
         abort(404)
-    path = _safe_regular_file(_root() / 'mods' / mod_id, f'{sha256}.jar')
     try:
-        if path.stat().st_size != expected['size']:
-            abort(503)
-        raw = path.read_bytes()
-        if len(raw) != expected['size']:
-            abort(503)
-        validate_binary(raw, expected_sha=sha256)
+        if _public_storage_enabled():
+            raw = read_binary(_release_db(), mod_id, sha256, expected['size'])
+        else:
+            path = _safe_regular_file(_root() / 'mods' / mod_id, f'{sha256}.jar')
+            if path.stat().st_size != expected['size']:
+                abort(503)
+            raw = path.read_bytes()
+            if len(raw) != expected['size']:
+                abort(503)
+            validate_binary(raw, expected_sha=sha256)
+    except HTTPException:
+        raise
     except InvalidRelease:
         current_app.logger.error('Failed integrity check for %s/%s', mod_id, sha256)
         abort(503)
-    except OSError:
-        current_app.logger.exception('Unable to read HYPE pilot binary')
+    except Exception:
+        current_app.logger.exception('Unable to read approved HYPE public distribution JAR')
         abort(503)
     return _deliver(io.BytesIO(raw), 'application/java-archive',
                     'public, max-age=31536000, immutable')
