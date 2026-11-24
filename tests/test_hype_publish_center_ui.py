@@ -77,6 +77,32 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertNotIn("sessionStorage", self.js)
         self.assertNotIn("data-hpub-stage", self.js)
 
+    def test_archived_files_are_selectable_even_if_private_pilot_off(self):
+        self.assertIn('id="pilot_original_draft"', self.html)
+        self.assertIn('data-hpub-publish-original="{{ item.id }}"', self.html)
+        self.assertNotIn('{% if pilot_original_enabled and item.module_id', self.html)
+        self.assertIn("HYPE_MOD_PILOT_ORIGINAL_ENABLED" if False else "Teste no Bootstrap indisponível", self.html)
+        self.assertIn('id="hpub-original-choice-note"', self.html)
+        self.assertIn('id="hpub-submit-original"', self.html)
+        self.assertIn('data-hpub-ready=', self.html)
+
+    def test_protected_picker_lists_pending_and_ready_without_early_release(self):
+        self.assertIn('id="private_draft"', self.html)
+        self.assertIn('data-hpub-next="{{ item.release_next_step }}"', self.html)
+        self.assertIn('id="hpub-review-selected"', self.html)
+        self.assertIn('id="hpub-submit-protected" type="submit" class="hype-v6-btn gold" disabled', self.html)
+        self.assertIn('id="hpub-submit-client" type="submit" class="hype-v6-btn gold" disabled', self.html)
+        self.assertIn('name="manifest"', self.html)
+        self.assertIn('name="confirm_release"', self.html)
+
+    def test_selecting_stored_card_updates_publish_choice_and_review(self):
+        for marker in ("[data-hpub-publish-original]", "[data-hpub-publish-protected]",
+                       "function updatePublicationChoice(", "function openSelectedReview(",
+                       "submit.disabled = !ready", "setSelectedCard(input.value)", "updateProtectedChoice()"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.js)
+        self.assertIn("is-selected-for-publish", self.css)
+
     def test_responsive_and_accessible(self):
         self.assertIn('aria-label="Tipo de arquivo"', self.html)
         self.assertIn("aria-pressed", self.js)
