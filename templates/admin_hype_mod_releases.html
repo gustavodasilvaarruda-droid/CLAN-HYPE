@@ -90,7 +90,7 @@
             <span>Publicação</span>
           </div>
           <div class="hpub-file-actions">
-            {% if original_test_download_enabled and item.status in ('aguardando_protecao', 'em_teste') %}
+            {% if original_test_download_enabled and item.status in ('aguardando_protecao', 'em_teste', 'pronto_para_aprovacao') %}
               <a class="hype-v6-btn" href="{{ url_for('hype_mod_admin.mod_release_original_test_download', draft_id=item.id) }}">Baixar original (privado)</a>
             {% endif %}
             {% if protection_queue_enabled and item.status in ('aguardando_protecao', 'em_teste') and not candidate and (not job or job.status == 'failed') %}
