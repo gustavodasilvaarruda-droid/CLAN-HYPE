@@ -292,6 +292,32 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     })
         return result
 
+    def load_test_channels():
+        """Owner-only per-module selection for the existing Bootstrap 0.8."""
+        if db is None or not pilot_original_enabled(session.get("usuario_email")):
+            return []
+        from modules.hype_mod_pilot_original import find_pilot_original, pilot_selected_source
+        from modules.hype_mod_private_releases import find_private_release
+        from modules.hype_mod_update_access import MOD_TO_SITE_MODULE
+        try:
+            channels = []
+            for mod_id in MOD_TO_SITE_MODULE:
+                pilot = find_pilot_original(db, mod_id)
+                protected = find_private_release(db, mod_id)
+                if pilot is None and protected is None:
+                    continue
+                channels.append({
+                    "module_id": mod_id,
+                    "original_draft_id": pilot[0]["id"] if pilot else None,
+                    "original_release": pilot[1]["release"] if pilot else None,
+                    "protected_release": protected[1]["release"] if protected else None,
+                    "source": pilot_selected_source(pilot[0]) if pilot else "protected",
+                })
+            return channels
+        except Exception:
+            flash("Nao foi possivel conferir os dois canais de teste.", "erro")
+            return []
+
     def load_protection_jobs():
         if db is None or not protection_queue_enabled:
             return {}
@@ -348,6 +374,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             original_test_download_enabled=original_test_download_enabled,
             private_publish_enabled=private_publish_enabled,
             pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
+            test_channels=load_test_channels(),
             private_rollout_status=pilot_scope_status(),
             report=None, error=None,
         )
@@ -390,6 +417,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             original_test_download_enabled=original_test_download_enabled,
             private_publish_enabled=private_publish_enabled,
             pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
+            test_channels=load_test_channels(),
             private_rollout_status=pilot_scope_status(),
             report=report, error=error,
         )
@@ -876,6 +904,35 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash(str(exc) or "Revisão inválida.", "erro")
         except Exception:
             flash("Não foi possível atualizar a revisão.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+    @bp.post("/admin/modulos/releases/selecionar-canal-teste")
+    def mod_release_select_test_channel():
+        """Select original or protected for ONE authorized Bootstrap pilot account."""
+        admin_only()
+        if db is None or not pilot_original_enabled(session.get("usuario_email")):
+            abort(404)
+        from modules.hype_mod_pilot_original import select_pilot_source
+        from modules.hype_mod_private_releases import InvalidPrivateRelease
+        try:
+            record = select_pilot_source(
+                db,
+                draft_id=parse_draft_id(request.form.get("draft_id")),
+                source=request.form.get("source"),
+                selected_by=session["usuario_email"],
+            )
+            if registrar_log:
+                registrar_log("selecionar_canal_teste_bootstrap", "hype_mods",
+                              TABLE, record["module_id"],
+                              {"source": record["source"]})
+            flash("Bootstrap piloto configurado para baixar o JAR "
+                  + ("original" if record["source"] == "original" else "protegido")
+                  + " desse mod. A atualizacao so ocorre com release assinada mais nova.",
+                  "sucesso")
+        except (ValueError, InvalidPrivateRelease) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Nao foi possivel trocar o canal de teste.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/publicar-original-piloto")
