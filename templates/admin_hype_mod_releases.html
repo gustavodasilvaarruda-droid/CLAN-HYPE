@@ -169,7 +169,7 @@
         <article class="hpub-publish-card hpub-publish-card-pilot" id="hpub-private-test">
           <span class="hpub-publish-tag">SÓ MINHA CONTA</span>
           <h3>Teste privado · JAR original</h3>
-          <p>Escolha um JAR já guardado em Meus arquivos. Não precisa proteger nem enviar novamente. Somente seu Bootstrap autorizado poderá recebê-lo depois da assinatura.</p>
+          <p>Escolha um JAR já guardado em Meus arquivos. Não precisa do JAR protegido nem enviar novamente. Somente seu Bootstrap autorizado poderá recebê-lo depois da assinatura.</p>
           <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_original_pilot') }}" enctype="multipart/form-data" class="hpub-publish-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label for="pilot_original_draft">JAR original já armazenado</label>
