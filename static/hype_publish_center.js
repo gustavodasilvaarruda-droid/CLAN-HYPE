@@ -12,6 +12,8 @@
     function chooseMode(type) {
       const selected = modes.find(button => button.dataset.hpubMode === type);
       if (!selected || selected.disabled) return false;
+      const manualPanel = root.querySelector('#hpub-manual-tools');
+      if (manualPanel) manualPanel.open = type === 'protected';
       modes.forEach(button => {
         const active = button === selected;
         button.classList.toggle('is-selected', active);
@@ -113,6 +115,8 @@
     root.querySelectorAll('[data-hpub-publish-original]').forEach(button => {
       button.addEventListener('click', () => {
         if (!originalChoice) return;
+        const publishing = root.querySelector('#hpub-publishing-tools');
+        if (publishing) publishing.open = true;
         originalChoice.value = button.dataset.hpubPublishOriginal;
         setSelectedCard(originalChoice.value);
         updateOriginalChoice();
@@ -143,11 +147,29 @@
     root.querySelectorAll('[data-hpub-publish-protected]').forEach(button => {
       button.addEventListener('click', () => {
         if (!protectedChoice) return;
+        const publishing = root.querySelector('#hpub-publishing-tools');
+        if (publishing) publishing.open = true;
         protectedChoice.value = button.dataset.hpubPublishProtected;
         setSelectedCard(protectedChoice.value);
         updateProtectedChoice();
         focusArea(root.querySelector('#hpub-protected-release'), protectedChoice);
       });
+    });
+
+    // No upload or release is triggered by the interface itself.
+    // Every POST is an explicit admin action with server-side authorization and CSRF.
+    const originalInput = root.querySelector('#hpub-quick-original');
+    const uploadForm = originalInput?.closest('form');
+    const uploadSubmit = uploadForm?.querySelector('[type="submit"]');
+    const defaultSubmitText = uploadSubmit?.textContent || '';
+    originalInput?.addEventListener('change', () => {
+      const file = originalInput.files?.[0];
+      const valid = Boolean(file && file.name.toLowerCase().endsWith('.jar')
+        && file.size > 0 && file.size <= 10 * 1024 * 1024);
+      if (uploadSubmit) {
+        uploadSubmit.disabled = Boolean(file) && !valid;
+        uploadSubmit.textContent = file && valid ? 'Enviar ' + file.name : defaultSubmitText;
+      }
     });
 
     updateOriginalChoice();
