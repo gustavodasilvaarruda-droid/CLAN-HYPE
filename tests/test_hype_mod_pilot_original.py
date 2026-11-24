@@ -17,7 +17,8 @@ from modules import hype_signed_release as signed
 from modules import hype_manifest_signer as signer
 from modules.hype_mod_pilot_original import (
     pilot_original_enabled, publish_pilot_original, find_pilot_original,
-    download_pilot_original, InvalidPrivateRelease,
+    download_pilot_original, pilot_selected_source, select_pilot_source,
+    InvalidPrivateRelease,
 )
 
 EMAIL = "test-owner@example.com"
@@ -167,6 +168,52 @@ class OwnerPilotTests(unittest.TestCase):
         db.storage.jars[draft["storage_path"]] = raw + b"x"
         with self.assertRaises((ValueError, InvalidPrivateRelease)):
             download_pilot_original(db, db.rows[0])
+
+
+    def test_owner_can_switch_between_signed_original_and_protected(self):
+        db, raw, draft = fixture_db()
+        manifest = signer.sign_private_mod_manifest(raw, self.key, 3)
+        publish_pilot_original(db, draft_id=draft["id"],
+                               manifest_bytes=manifest, published_by=EMAIL)
+        self.assertEqual(pilot_selected_source(find_pilot_original(db, MODULE)[0]), "original")
+        with patch("modules.hype_mod_private_releases.find_private_release",
+                   return_value=(object(), {"release": 4})):
+            changed = select_pilot_source(db, draft_id=draft["id"],
+                                          source="protected", selected_by=EMAIL)
+        self.assertEqual(changed["source"], "protected")
+        self.assertEqual(pilot_selected_source(find_pilot_original(db, MODULE)[0]), "protected")
+        select_pilot_source(db, draft_id=draft["id"],
+                            source="original", selected_by=EMAIL)
+        self.assertEqual(pilot_selected_source(find_pilot_original(db, MODULE)[0]), "original")
+
+    def test_protected_pilot_blocked_until_protected_release_is_published(self):
+        db, raw, draft = fixture_db()
+        publish_pilot_original(db, draft_id=draft["id"],
+                               manifest_bytes=signer.sign_private_mod_manifest(raw, self.key, 1),
+                               published_by=EMAIL)
+        with patch("modules.hype_mod_private_releases.find_private_release", return_value=None):
+            with self.assertRaises(InvalidPrivateRelease):
+                select_pilot_source(db, draft_id=draft["id"],
+                                    source="protected", selected_by=EMAIL)
+        self.assertEqual(pilot_selected_source(find_pilot_original(db, MODULE)[0]), "original")
+
+    def test_other_account_cannot_change_pilot_delivery(self):
+        db, raw, draft = fixture_db()
+        publish_pilot_original(db, draft_id=draft["id"],
+                               manifest_bytes=signer.sign_private_mod_manifest(raw, self.key, 1),
+                               published_by=EMAIL)
+        with self.assertRaises(InvalidPrivateRelease):
+            select_pilot_source(db, draft_id=draft["id"],
+                                source="original", selected_by="outsider@example.com")
+
+    def test_invalid_pilot_source_fails_closed(self):
+        db, raw, draft = fixture_db()
+        publish_pilot_original(db, draft_id=draft["id"],
+                               manifest_bytes=signer.sign_private_mod_manifest(raw, self.key, 1),
+                               published_by=EMAIL)
+        draft["meta"]["pilot_update_source"] = "unsigned"
+        with self.assertRaises(InvalidPrivateRelease):
+            pilot_selected_source(draft)
 
 
 if __name__ == "__main__":
