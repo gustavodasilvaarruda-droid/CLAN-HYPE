@@ -65,7 +65,7 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertIn("{% if publish_enabled %}", self.html)
         self.assertIn("{% if staging_enabled %}", self.html)
         self.assertIn("Teste no Bootstrap indisponível", self.html)
-        self.assertIn("manifesto Ed25519", self.html.lower())
+        self.assertIn("manifesto ed25519", self.html.lower())
 
     def test_javascript_keeps_quick_upload_working_without_wizard(self):
         self.assertIn("function chooseMode(type)", self.js)
