@@ -178,15 +178,23 @@ class QuickReleaseFlowTests(unittest.TestCase):
         self.assertNotIn("Canal privado: Pokédex", template)
         self.assertIn('name="confirm_pilot"', template)
         self.assertIn('name="confirm_release"', template)
-        self.assertIn('href="#hpub-publish"', template)
+        self.assertIn('data-hpub-publish-original=', template)
+        self.assertIn('data-hpub-publish-protected=', template)
+        self.assertIn('id="hpub-published"', template)
+        self.assertNotIn('id="hpub-advanced"', template)
+        self.assertNotIn('hpub-stepper', template)
+        self.assertNotIn('data-hpub-stage=', template)
 
     def test_template_contains_quick_actions_and_valid_jinja(self):
         template = (Path(__file__).resolve().parents[1] /
                     "templates" / "admin_hype_mod_releases.html").read_text(encoding="utf-8")
         Environment().parse(template)
-        for marker in ('id="hpub-quick"', 'id="hpub-advanced"',
+        for marker in ('id="hpub-quick"', 'id="hpub-publish"',
                        'data-hpub-mode="original"', 'data-hpub-mode="protected"',
                        'data-hpub-new-version', 'data-hpub-select-protected',
+                       'hpub-file-review', 'test_game_launch', 'test_menus',
+                       'test_server_connection', 'test_no_crashes',
+                       'mod_release_review', 'mod_release_verify',
                        'mod_release_delete', 'mod_release_upload'):
             self.assertIn(marker, template)
 
