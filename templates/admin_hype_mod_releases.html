@@ -506,6 +506,42 @@
           </form>
         </section>
       {% endif %}
+      {% if pilot_original_enabled %}
+      <section class="hpub-release-picker" aria-label="Escolher origem das atualizações para Bootstrap 0.8">
+        <h3>Bootstrap 0.8 — Escolher qual JAR baixar no teste</h3>
+        <p>Teste as duas situações separadamente: <strong>JAR original, sem proteção</strong> ou
+          <strong>JAR protegido</strong>. A escolha é feita por mod e só afeta sua conta de teste.
+          O Bootstrap continua verificando o manifesto Ed25519 e o SHA-256 antes de instalar.</p>
+        {% for channel in test_channels %}
+        <article style="border:1px solid rgba(195,151,31,.3);border-radius:12px;padding:14px;margin:12px 0;">
+          <h4 style="margin:0 0 8px;">{{ channel.module_id }}</h4>
+          <p style="margin:0 0 10px;"><small>
+            {% if channel.original_release %}Original assinado: release {{ channel.original_release }}{% else %}Original: ainda não publicado{% endif %}
+            · {% if channel.protected_release %}Protegido assinado: release {{ channel.protected_release }}{% else %}Protegido: ainda não publicado{% endif %}
+          </small></p>
+          {% if channel.original_draft_id %}
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_select_test_channel') }}" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="draft_id" value="{{ channel.original_draft_id }}">
+            <label style="display:grid;gap:6px;flex:1;min-width:200px;">
+              <strong>Arquivo recebido pelo Bootstrap</strong>
+              <select name="source" required>
+                <option value="original" {% if channel.source == 'original' %}selected{% endif %}>Original sem proteção (teste privado)</option>
+                <option value="protected" {% if channel.source == 'protected' %}selected{% endif %} {% if not channel.protected_release %}disabled{% endif %}>Protegido e aprovado{% if not channel.protected_release %} — indisponível{% endif %}</option>
+              </select>
+            </label>
+            <button type="submit" class="hype-v6-btn gold">Salvar modo de teste</button>
+          </form>
+          {% else %}
+            <p><small>Somente o protegido está disponível para este mod. Publique um original assinado no piloto para poder alternar entre as duas opções.</small></p>
+          {% endif %}
+        </article>
+        {% else %}
+          <p>Nenhuma release privada assinada disponível para escolher. Publique um original de teste ou uma release protegida primeiro.</p>
+        {% endfor %}
+        <p><small><strong>Para testar a troca:</strong> cada nova atualização precisa ter um número de release superior ao já instalado. Feche o Minecraft para permitir a instalação pelo Bootstrap. Não distribua o JAR original nem o Bootstrap piloto aos jogadores.</small></p>
+      </section>
+      {% endif %}
       <div class="hpub-footer"><button type="button" class="hype-v6-btn" data-hpub-prev="teste">← Voltar aos testes</button><span>A publicação é separada da instalação automática no Minecraft.</span></div>
       </section>
     {% else %}
