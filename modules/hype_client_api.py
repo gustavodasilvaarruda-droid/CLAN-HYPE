@@ -347,7 +347,7 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         import os
         from modules.hype_mod_authenticated_updates import authorized_mod_ids
         from modules.hype_mod_private_releases import find_private_release
-        from modules.hype_mod_pilot_original import pilot_original_enabled, find_pilot_original
+        from modules.hype_mod_pilot_original import pilot_original_enabled, find_pilot_original, pilot_selected_source
         from modules.hype_mod_pilot_scope import can_account_download_private_mods
         if (os.getenv('HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED', '').lower() not in ('1', 'true', 'yes')
                 or os.getenv('HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')
@@ -358,10 +358,12 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
             ids = authorized_mod_ids(db, email, g.hype_user.get('cargo'), bool(is_member(email)))
             releases = []
             for mod_id in ids:
-                # Single-account pilot is opt-in; the protected catalogue is unchanged.
-                item = (find_pilot_original(db, mod_id)
-                        if pilot_original_enabled(email) else None)
-                if item is None:
+                # Explicit owner choice; the normal protected catalogue remains intact.
+                pilot = (find_pilot_original(db, mod_id)
+                         if pilot_original_enabled(email) else None)
+                if pilot is not None and pilot_selected_source(pilot[0]) == "original":
+                    item = pilot
+                else:
                     item = find_private_release(db, mod_id)
                 if item is not None:
                     releases.append(item[1])
