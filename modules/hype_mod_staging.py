@@ -33,7 +33,7 @@ IDS = {
     "hype_battle_ai": "HYPE Battle AI",
 }
 # Familiar display names only. This is NOT a module allowlist.
-MODULE_ID = re.compile(r"[a-z][a-z0-9_]{1,63}\\Z", re.ASCII)
+MODULE_ID = re.compile(r"[a-z][a-z0-9_]{1,63}\Z", re.ASCII)
 
 
 def valid_module_id(module_id):
@@ -61,7 +61,7 @@ def parse_draft_id(raw):
 
 
 def inspect_original(raw):
-    """Inspect ZIP metadata, content CRCs and a strict initial HYPE allowlist."""
+    """Inspect ZIP metadata and CRCs for any safe owner-uploaded Fabric mod ID."""
     if not raw or len(raw) > MAX_UPLOAD:
         raise InvalidJar("Arquivo vazio ou maior que 10 MiB.")
     try:
