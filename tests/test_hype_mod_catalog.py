@@ -247,5 +247,97 @@ class SignedCatalogueTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(res.data).hexdigest(), items[1]["sha256"])
 
 
+    def test_persistent_supabase_bucket_serves_only_signed_approved_artifacts(self):
+        import io
+        from types import SimpleNamespace
+        from zipfile import ZipFile
+
+        class FakePrivateStorage:
+            public = False
+
+            def __init__(self, objects):
+                self.objects = objects
+                self.used_buckets = []
+
+            def get_bucket(self, name):
+                self.used_buckets.append(name)
+                if name != "hype-mod-distribution":
+                    raise AssertionError("Private originals MUST NOT be accessed")
+                return {"public": self.public}
+
+            def from_(self, name):
+                self.used_buckets.append(name)
+                if name != "hype-mod-distribution":
+                    raise AssertionError("Unexpected storage bucket")
+                return self
+
+            def download(self, path):
+                return self.objects[path]
+
+        entries, files = [], {}
+        for mid in ("hypeclient", "hype_new_module_2027"):
+            output = io.BytesIO()
+            with ZipFile(output, "w") as archive:
+                archive.writestr("fabric.mod.json", json.dumps({
+                    "schemaVersion": 1, "id": mid, "version": "2.0.1"
+                }))
+                archive.writestr("content.bin", b"x" * 3000)
+            content = output.getvalue()
+            sha = hashlib.sha256(content).hexdigest()
+            item = mod(mid, depends_on=("hypeclient",) if mid != "hypeclient" else ())
+            item.update({
+                "sha256": sha, "size": len(content),
+                "url": f"https://clan-hype.onrender.com/hype-updates/mods/{mid}/{sha}.jar"
+            })
+            entries.append(item)
+            files[f"stable/1.21.1/mods/{mid}/{sha}.jar"] = content
+        cat_path = "stable/1.21.1/catalog.json"
+        files[cat_path] = self.signed_document(dict(self.unsigned, mods=entries))
+        store = FakePrivateStorage(files)
+
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        app.register_blueprint(hype_updates_bp)
+        app.extensions["hype_release_db"] = SimpleNamespace(storage=store)
+        client = app.test_client()
+        allowed = {
+            "HYPE_MULTI_MOD_PUBLIC_STORAGE_ENABLED": "1",
+            "HYPE_MULTI_MOD_CATALOG_ENABLED": "1",
+            "HYPE_MULTI_MOD_DOWNLOADS_ENABLED": "1",
+        }
+        with patch.dict(os.environ, allowed):
+            catalog_response = client.get("/hype-updates/mods/catalog.json")
+            self.assertEqual(catalog_response.status_code, 200)
+            self.assertEqual(catalog_response.data, files[cat_path])
+            self.assertEqual(len(catalog_response.json["mods"]), 2)
+            path = "/hype-updates/mods/" + entries[1]["id"] + "/" + entries[1]["sha256"] + ".jar"
+            self.assertEqual(client.get(path).data,
+                             files["stable/1.21.1/mods/" + entries[1]["id"] +
+                                   "/" + entries[1]["sha256"] + ".jar"])
+            self.assertEqual(client.get(
+                "/hype-updates/mods/hype_new_module_2027/" + "0" * 64 + ".jar"
+            ).status_code, 404)
+
+            # Invalid data in the distribution bucket can never reach players.
+            key = "stable/1.21.1/mods/" + entries[1]["id"] + "/" + entries[1]["sha256"] + ".jar"
+            original = files[key]
+            files[key] = b"unapproved"
+            self.assertEqual(client.get(path).status_code, 503)
+            files[key] = original
+
+            # An accidentally public storage bucket must fail closed.
+            store.public = True
+            self.assertEqual(client.get(path).status_code, 503)
+            self.assertEqual(client.get("/hype-updates/mods/catalog.json").status_code, 503)
+            store.public = False
+
+            # Never return an unsigned or modified catalogue from storage.
+            files[cat_path] = b"unsigned"
+            self.assertEqual(client.get("/hype-updates/mods/catalog.json").status_code, 503)
+
+        self.assertNotIn("hype-mod-originals", store.used_buckets)
+
+
+
 if __name__ == "__main__":
     unittest.main()
