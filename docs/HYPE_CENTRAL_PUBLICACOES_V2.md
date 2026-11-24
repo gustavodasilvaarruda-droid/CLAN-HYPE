@@ -64,3 +64,17 @@ O worker não assina, aprova ou publica releases automaticamente.
 8. Testar atualização do Bootstrap separado, sem expor originais.
 
 A PR #101 é uma primeira entrega de código, **não** uma versão implantada no site.
+
+## Novos IDs de mods
+
+A migracao `sql/20261124_hype_mod_dynamic_ids_staging.sql` remove a lista
+de cinco IDs dos CHECKs de **rascunhos** e **fila de protecao**, aceitando
+identificadores Fabric validos. Ela nao altera as tabelas de publicacao
+assinada; a distribuicao de novos IDs sera uma etapa separada.
+
+## Baixar o original depois da aprovacao
+
+A rota privada do painel tambem permite baixar o original
+`pronto_para_aprovacao`. Continua restrita ao email do proprietario
+e preserva a verificacao SHA-256; JARs rejeitados ou excluidos nao
+ficam acessiveis nessa rota.
