@@ -45,7 +45,8 @@ class CandidateSelectionTemplateTests(unittest.TestCase):
         self.assertIn('name="candidate_sha256"', self.source)
 
     def test_publish_remains_separate_action(self):
-        self.assertIn('id="draft_publish"', self.source)
+        self.assertIn('id="private_draft"', self.source)
+        self.assertIn('data-hpub-client-action=', self.source)
         self.assertIn("url_for('hype_mod_admin.mod_release_publish')", self.source)
         self.assertIn("url_for('hype_mod_admin.mod_release_review')", self.source)
 
