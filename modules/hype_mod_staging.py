@@ -543,10 +543,18 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             if not rows:
                 abort(404)
             draft = rows[0]
-            if draft["status"] != "em_teste":
-                raise InvalidJar("Coloque a versão em teste antes de registrar o build protegido.")
+            # Quick upload can transition a pending original to test in one
+            # guarded operation. Never race a protection worker for the same JAR.
+            if draft["status"] not in ("aguardando_protecao", "em_teste"):
+                raise InvalidJar("O original precisa estar pendente ou em teste.")
             if (draft.get("meta") or {}).get("protected"):
                 raise InvalidJar("Já existe um candidato neste registro. Crie um novo rascunho para outro JAR, preservando o histórico.")
+            if draft["status"] == "aguardando_protecao" and protection_queue_enabled:
+                from modules.hype_mod_protection_queue import JOBS
+                jobs = (db.table(JOBS).select("status")
+                        .eq("draft_id", str(draft_id)).limit(1).execute().data or [])
+                if jobs and jobs[0].get("status") in ("queued", "running"):
+                    raise InvalidJar("O original já está na fila de proteção. Aguarde o worker terminar.")
             assert_private_bucket(db.storage)
             original = db.storage.from_(BUCKET).download(draft["storage_path"])
             validate_binary(original, expected_sha=draft["sha256"])
@@ -572,8 +580,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     original, raw, {**draft, "meta": meta}
                 )
                 meta.pop("manual_review", None)
-                saved = (db.table(TABLE).update({"meta": meta})
-                         .eq("id", draft_id).eq("status", "em_teste").execute())
+                saved = (db.table(TABLE).update({"meta": meta, "status": "em_teste"})
+                         .eq("id", draft_id).eq("status", draft["status"]).execute())
                 if not saved.data:
                     raise RuntimeError("Registro alterado durante o envio.")
             except Exception:

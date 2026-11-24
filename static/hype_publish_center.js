@@ -42,6 +42,8 @@
       });
       remember(step);
       if (scroll) {
+        const advanced = root.querySelector('#hpub-advanced');
+        if (advanced) advanced.open = true;
         root.querySelector('.hpub-stepper')?.scrollIntoView({
           behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
           block: 'start'
@@ -55,6 +57,41 @@
       if (!control || control.disabled || !root.contains(control)) return;
       const choice = control.dataset.hpubGoto || control.dataset.hpubNext || control.dataset.hpubPrev;
       activate(choice, true);
+    });
+    // Simple upload: visual preference only; every form still posts to the
+    // existing server-validated private-storage endpoints.
+    const modeButtons = Array.from(root.querySelectorAll('[data-hpub-mode]'));
+    const panels = Array.from(root.querySelectorAll('[data-hpub-upload-panel]'));
+    function chooseMode(mode) {
+      const button = modeButtons.find(item => item.dataset.hpubMode === mode);
+      if (!button || button.disabled) return false;
+      modeButtons.forEach(item => {
+        const active = item === button;
+        item.classList.toggle('is-selected', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
+      panels.forEach(panel => {
+        panel.hidden = panel.dataset.hpubUploadPanel !== mode;
+      });
+      return true;
+    }
+    modeButtons.forEach(button => button.addEventListener('click', () => chooseMode(button.dataset.hpubMode)));
+    root.querySelectorAll('[data-hpub-select-protected]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (!chooseMode('protected')) return;
+        const target = root.querySelector('#hpub-quick-target');
+        if (target) target.value = button.dataset.hpubSelectProtected;
+        const quick = root.querySelector('#hpub-quick');
+        quick?.scrollIntoView({behavior:'smooth',block:'start'});
+        target?.focus({preventScroll:true});
+      });
+    });
+    root.querySelectorAll('[data-hpub-new-version]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (!chooseMode('original')) return;
+        root.querySelector('#hpub-quick')?.scrollIntoView({behavior:'smooth',block:'start'});
+        root.querySelector('#hpub-quick-original')?.focus({preventScroll:true});
+      });
     });
     // A complete inventory is shown even when no release is approved.
     // Navigation never submits a publish form or bypasses server-side validation.
