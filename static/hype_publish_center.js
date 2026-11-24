@@ -48,6 +48,8 @@
 
     const originalChoice = root.querySelector('#pilot_original_draft');
     const protectedChoice = root.querySelector('#private_draft');
+    const unifiedPublishForm = root.querySelector('#hpub-unified-release-form');
+    const privatePublishAction = unifiedPublishForm?.getAttribute('action') || '';
 
     function setSelectedCard(id) {
       root.querySelectorAll('[data-hpub-file-card]').forEach(card => {
@@ -76,10 +78,9 @@
       const state = updatePublicationChoice(protectedChoice, '#hpub-protected-choice-note', '#hpub-submit-protected');
       const option = protectedChoice?.selectedOptions[0];
       const isClient = state.selected && option?.dataset.hpubMod === 'hypeclient';
-      const form = root.querySelector('#hpub-unified-release-form');
-      if (form) {
+      if (unifiedPublishForm) {
         // Only choose between two known server-generated URLs; both endpoints revalidate everything.
-        form.action = isClient ? form.dataset.hpubClientAction : form.dataset.hpubPrivateAction;
+        unifiedPublishForm.action = isClient ? unifiedPublishForm.dataset.hpubClientAction : privatePublishAction;
       }
       const submit = root.querySelector('#hpub-submit-protected');
       if (submit) submit.textContent = isClient ? 'Publicar HYPE Client protegido' : 'Publicar protegido aprovado';
