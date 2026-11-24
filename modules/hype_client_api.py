@@ -340,6 +340,70 @@ def create_hype_client_api_blueprint(db, secret, get_permissions, is_member,
         return jsonify({'ok': True, 'mods': allowed})
 
 
+    @api.get('/updates/owner-pilot/releases')
+    @secure
+    def owner_pilot_releases():
+        """Opt-in private developer channel: no production manifest or public URLs."""
+        import os
+        from modules.hype_mod_owner_pilot import OWNER_IDS, owner_pilot_enabled, find_owner_pilot
+        from modules.hype_mod_authenticated_updates import authorized_mod_ids
+        email = g.hype_user["email"]
+        if (not owner_pilot_enabled(email) or g.hype_user.get("cargo") != "lider"
+                or os.getenv("HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED", "").lower() not in ("1", "true", "yes")
+                or os.getenv("HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED", "").lower() not in ("1", "true", "yes")):
+            return fail("Recurso indisponivel.", 404)
+        try:
+            ids = set(authorized_mod_ids(db, email, g.hype_user.get("cargo"), bool(is_member(email))))
+            ids.add("hypeclient")  # Client is reserved for the owner's dev-only channel.
+            releases = []
+            for mod_id in sorted(ids & OWNER_IDS):
+                found = find_owner_pilot(db, mod_id)
+                if found is not None:
+                    releases.append(found[1])
+            return jsonify({"ok": True, "owner_pilot": True, "releases": releases})
+        except Exception:
+            return fail("Nao foi possivel consultar os testes privados.", 503)
+
+    @api.get('/updates/owner-pilot/mods/<mod_id>/<sha256>.jar')
+    @secure
+    def owner_pilot_binary(mod_id, sha256):
+        """Serve unprotected ORIGINAL only after rechecking owner login and permissions."""
+        import os
+        from flask import send_file
+        from modules.hype_signed_release import SHA
+        from modules.hype_mod_owner_pilot import (
+            OWNER_IDS, owner_pilot_enabled, find_owner_pilot, download_owner_pilot,
+        )
+        from modules.hype_mod_authenticated_updates import may_account_receive_update
+        email = g.hype_user["email"]
+        if (not owner_pilot_enabled(email) or g.hype_user.get("cargo") != "lider"
+                or os.getenv("HYPE_AUTH_MOD_ENTITLEMENTS_ENABLED", "").lower() not in ("1", "true", "yes")
+                or os.getenv("HYPE_PRIVATE_MOD_DOWNLOADS_ENABLED", "").lower() not in ("1", "true", "yes")):
+            return fail("Recurso indisponivel.", 404)
+        if mod_id not in OWNER_IDS or not SHA.fullmatch(sha256):
+            return fail("Arquivo nao encontrado.", 404)
+        try:
+            if (mod_id != "hypeclient" and not may_account_receive_update(
+                    db, mod_id, email, g.hype_user.get("cargo"), bool(is_member(email)))):
+                return fail("Sem permissao para este modulo.", 403)
+            found = find_owner_pilot(db, mod_id, sha256=sha256)
+            if found is None:
+                return fail("Arquivo nao encontrado.", 404)
+            original, _metadata = found
+            payload = download_owner_pilot(db, original)
+            # Race-safe: repeat authorization AFTER reading the private JAR.
+            fresh = (db.table("usuarios_clan").select("email,cargo")
+                     .eq("email", email).limit(2).execute().data or [])
+            if (len(fresh) != 1 or fresh[0].get("cargo") != "lider"
+                    or not owner_pilot_enabled(email)
+                    or (mod_id != "hypeclient" and not may_account_receive_update(
+                        db, mod_id, email, fresh[0]["cargo"], bool(is_member(email))))):
+                return fail("Permissao revogada antes do download.", 403)
+            return send_file(payload, mimetype="application/java-archive", as_attachment=True,
+                             download_name=f"{mod_id}-{sha256}.jar", conditional=False, max_age=0)
+        except Exception:
+            return fail("Falha ao validar download privado.", 503)
+
     @api.get('/updates/releases')
     @secure
     def signed_private_releases():

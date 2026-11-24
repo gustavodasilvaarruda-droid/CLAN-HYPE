@@ -169,25 +169,29 @@
         <article class="hpub-publish-card hpub-publish-card-pilot" id="hpub-private-test">
           <span class="hpub-publish-tag">SÓ MINHA CONTA</span>
           <h3>Teste privado · JAR original</h3>
-          <p>Escolha um JAR já guardado em Meus arquivos. Não precisa do JAR protegido nem enviar novamente. Os quatro mods privados usam seu Bootstrap autorizado; o HYPE Client original aparece apenas para consulta e teste manual, sem publicação automática.</p>
-          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_original_pilot') }}" enctype="multipart/form-data" class="hpub-publish-form">
+          <p>Escolha um JAR já guardado em Meus arquivos. Não precisa do JAR protegido nem enviar novamente. {% if owner_pilot_enabled %}Os cinco mods, incluindo o HYPE Client, podem ser testados exclusivamente com seu Bootstrap piloto 0.9.{% else %}Os quatro mods privados usam seu Bootstrap autorizado; o HYPE Client original aparece apenas para consulta e teste manual, sem publicação automática.{% endif %}</p>
+          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_owner_pilot') if owner_pilot_enabled else url_for('hype_mod_admin.mod_release_publish_original_pilot') }}" enctype="multipart/form-data" class="hpub-publish-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label for="pilot_original_draft">JAR original já armazenado</label>
             <select id="pilot_original_draft" name="draft_id" required>
               <option value="">Selecione o arquivo original...</option>
               {% for item in drafts if item.module_id in ('hypeclient','hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') %}
                 {% set original_client = item.module_id == 'hypeclient' %}
-                {% set original_published = (item.meta or {}).get('pilot_original') %}
+                {% set original_published = (item.meta or {}).get('owner_pilot' if owner_pilot_enabled else 'pilot_original') %}
                 <option value="{{ item.id }}"
-                  data-hpub-ready="{{ 'no' if original_client or original_published else 'yes' }}"
-                  data-hpub-next="{{ 'HYPE Client: o original pode ser armazenado e baixado para teste manual, mas o canal de teste privado automático do Client ainda não existe. Não é permitido publicar o original como release estável.' if original_client else ('Este original já foi publicado no piloto. Envie outra versão.' if original_published else 'Original selecionado. Assine o manifesto no seu computador antes de publicar apenas para sua conta.') }}"
-                >{{ 'HYPE Client' if original_client else item.module_id }} · {{ item.version }}{% if original_published %} · já publicado{% elif original_client %} · teste automático indisponível{% endif %}</option>
+                  data-hpub-ready="{{ 'no' if original_published or (original_client and not owner_pilot_enabled) else 'yes' }}"
+                  data-hpub-next="{{ 'HYPE Client: o original pode ser armazenado e baixado para teste manual, mas o canal de teste privado automático do Client ainda não existe. Não é permitido publicar o original como release estável.' if original_client and not owner_pilot_enabled else ('Este original já foi publicado no piloto. Envie outra versão.' if original_published else ('Original selecionado. Confirme a publicação exclusiva para sua conta.' if owner_pilot_enabled else 'Original selecionado. Assine o manifesto no seu computador antes de publicar apenas para sua conta.')) }}"
+                >{{ 'HYPE Client' if original_client else item.module_id }} · {{ item.version }}{% if original_published %} · já publicado{% elif original_client and not owner_pilot_enabled %} · teste automático indisponível{% endif %}</option>
               {% endfor %}
             </select>
             <p id="hpub-original-choice-note" class="hpub-choice-note" role="status" aria-live="polite">Selecione um original de Meus arquivos para preparar o teste.</p>
             {% if pilot_original_enabled %}
+              {% if not owner_pilot_enabled %}
               <label for="pilot_original_manifest">Manifesto assinado (.properties)</label>
               <input id="pilot_original_manifest" name="manifest" type="file" accept=".properties" required>
+              {% else %}
+              <p class="hpub-quick-note">Piloto exclusivo do proprietário. Sem manifesto manual. O Bootstrap 0.9 de teste exige autenticação e verifica o SHA-256 do JAR antes de instalar.</p>
+              {% endif %}
               <label class="hpub-publish-confirm"><input type="checkbox" name="confirm_pilot" value="yes" required> Confirmo que somente minha conta de teste pode receber este JAR original.</label>
               <button id="hpub-submit-original" type="submit" class="hype-v6-btn gold" disabled>Publicar teste privado</button>
             {% else %}
@@ -236,7 +240,7 @@
           <p class="hpub-quick-note">O HYPE Client aparece com os outros mods, mas mantém seu endereço e manifesto assinados próprios. Nenhum JAR original é distribuído aos jogadores.</p>
         </article>
       </div>
-      <p class="hpub-publish-security"><strong>Segurança:</strong> os dois modos exigem manifesto Ed25519 assinado no seu computador. A chave privada fica somente no seu computador. O Bootstrap ainda precisa de validação real no Minecraft.</p>
+      <p class="hpub-publish-security"><strong>Segurança:</strong> as versões destinadas aos jogadores exigem manifesto Ed25519 assinado no seu computador. A chave privada fica somente no seu computador. O Bootstrap ainda precisa de validação real no Minecraft.</p>
     </section>
 
 

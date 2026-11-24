@@ -201,6 +201,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     private_publish_enabled = publish_enabled and os.getenv("HYPE_MOD_PRIVATE_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     from modules.hype_mod_pilot_scope import pilot_scope_status
     from modules.hype_mod_pilot_original import pilot_original_enabled
+    from modules.hype_mod_owner_pilot import owner_pilot_enabled
     @bp.app_template_filter("hype_br_datetime")
     def hype_br_datetime(value):
         """Show upload timestamps in Brazil time, never fabricate missing dates."""
@@ -374,6 +375,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             original_test_download_enabled=original_test_download_enabled,
             private_publish_enabled=private_publish_enabled,
             pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
+            owner_pilot_enabled=owner_pilot_enabled(session.get("usuario_email")),
             test_channels=load_test_channels(),
             private_rollout_status=pilot_scope_status(),
             report=None, error=None,
@@ -417,6 +419,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             original_test_download_enabled=original_test_download_enabled,
             private_publish_enabled=private_publish_enabled,
             pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
+            owner_pilot_enabled=owner_pilot_enabled(session.get("usuario_email")),
             test_channels=load_test_channels(),
             private_rollout_status=pilot_scope_status(),
             report=report, error=error,
@@ -941,6 +944,35 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash(str(exc), "erro")
         except Exception:
             flash("Nao foi possivel trocar o canal de teste.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+    @bp.post("/admin/modulos/releases/publicar-original-proprietario")
+    def mod_release_publish_owner_pilot():
+        """Authenticated owner-only DEV channel; never publishes to stable players."""
+        admin_only()
+        if db is None or not owner_pilot_enabled(session.get("usuario_email")):
+            abort(404)
+        from modules.hype_mod_owner_pilot import publish_owner_pilot
+        from modules.hype_mod_private_releases import InvalidPrivateRelease
+        try:
+            if request.form.get("confirm_pilot") != "yes":
+                raise InvalidPrivateRelease("Confirme que so sua conta recebera o JAR original.")
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            record = publish_owner_pilot(
+                db, draft_id=draft_id, published_by=session["usuario_email"],
+            )
+            if registrar_log:
+                registrar_log(
+                    "publicar_original_piloto_proprietario", "hype_mods", TABLE, draft_id,
+                    {"module_id": record["module_id"], "release": record["release"],
+                     "sha256": record["sha256"]},
+                )
+            flash("Atualizacao original disponivel APENAS no seu Bootstrap de teste 0.9. "
+                  "Nenhum JAR foi publicado para jogadores.", "sucesso")
+        except (InvalidPrivateRelease, ValueError) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Falha ao liberar original de teste: nenhum JAR foi publicado.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/publicar-original-piloto")
