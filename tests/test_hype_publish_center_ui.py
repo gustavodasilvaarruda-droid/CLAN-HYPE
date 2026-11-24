@@ -60,6 +60,8 @@ class PublishCenterUiTests(unittest.TestCase):
 
     def test_private_upload_is_distinct_from_private_bootstrap_release(self):
         self.assertIn("mod_release_original_test_download", self.html)
+        self.assertIn("mod_release_publish_owner_pilot", self.html)
+        self.assertIn("{% if not owner_pilot_enabled %}", self.html)
         self.assertIn("{% if pilot_original_enabled %}", self.html)
         self.assertIn("{% if publish_enabled or private_publish_enabled %}", self.html)
         self.assertIn("{% if publish_enabled or private_publish_enabled %}", self.html)
@@ -114,7 +116,7 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertIn("url_for('hype_mod_admin.mod_release_publish')", self.html)
         self.assertIn("unifiedPublishForm.action = isClient ? unifiedPublishForm.dataset.hpubClientAction : privatePublishAction", self.js)
         self.assertIn("item.module_id == 'hypeclient'", self.html)
-        self.assertIn('data-hpub-ready="{{ \'no\' if original_client or original_published else \'yes\' }}"', self.html)
+        self.assertIn('data-hpub-ready="{{ \'no\' if original_published or (original_client and not owner_pilot_enabled) else \'yes\' }}"', self.html)
         self.assertIn('canal de teste privado automático do Client ainda não existe', self.html)
         self.assertNotIn('id="hpub-submit-client"', self.html)
 
