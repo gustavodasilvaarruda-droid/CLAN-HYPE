@@ -198,3 +198,8 @@
  .hpub-file-actions .hype-v6-btn{min-height:40px}
  .hpub-review-form button,.hpub-extra-form button{width:100%;justify-self:stretch}
 }
+
+/* Select an archived JAR for a signed release without another upload. */
+.hpub-file-card.is-selected-for-publish{border-color:#f5cd70;box-shadow:inset 0 0 0 1px rgba(245,205,112,.45);background:linear-gradient(130deg,rgba(203,151,48,.15),rgba(10,15,23,.85))}
+.hpub-choice-note{margin:0;color:#f1d59e!important;font-size:.88rem;line-height:1.45;border-left:3px solid rgba(229,187,94,.68);padding:7px 10px;background:rgba(205,157,72,.075);border-radius:0 8px 8px 0}
+.hpub-publish-form button:disabled{opacity:.55;cursor:not-allowed}
