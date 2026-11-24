@@ -78,7 +78,7 @@ def verify_signed_catalogue(raw):
         sha = item["sha256"]
         size = item["size"]
         deps = item["depends_on"]
-        if not isinstance(mod_id, str) or not MODULE_ID.fullmatch(mod_id) or mod_id in seen:
+        if not isinstance(mod_id, str) or not MODULE_ID.fullmatch(mod_id) or mod_id == 'hypebootstrap' or mod_id in seen:
             raise InvalidCatalogue("Mod desconhecido ou duplicado.")
         if not isinstance(version, str) or not signed.VERSION.fullmatch(version):
             raise InvalidCatalogue("Versão de mod inválida.")
