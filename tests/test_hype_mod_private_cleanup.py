@@ -55,6 +55,8 @@ class Query:
             source = self.db.drafts
         elif self.table == "hype_mod_published_releases":
             source = self.db.published
+        elif self.table == "hype_mod_restricted_releases":
+            source = self.db.restricted
         elif self.table == "hype_mod_protection_jobs":
             source = self.db.jobs
         else:
@@ -70,6 +72,7 @@ class Database:
     def __init__(self):
         self.drafts = []
         self.published = []
+        self.restricted = []
         self.jobs = []
         self.storage = Storage()
 
@@ -156,6 +159,32 @@ class PrivateCleanupTests(unittest.TestCase):
         self.delete()
         self.assertEqual(len(self.db.drafts), 1)
         self.assertEqual(self.db.storage.removed, [])
+
+    def test_owner_pilot_original_must_not_be_deleted(self):
+        self.login()
+        self.db.drafts[0]["meta"] = {"owner_pilot": {"release": 1}}
+        self.db.jobs.append({"id": "job-test", "draft_id": self.draft_id,
+                             "status": "queued"})
+        self.assertEqual(self.delete().status_code, 302)
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(len(self.db.jobs), 1)
+        self.assertEqual(self.db.storage.removed, [])
+
+    def test_restricted_catalog_preserved_even_when_disabled(self):
+        self.login()
+        for match in ("draft", "storage"):
+            with self.subTest(match=match):
+                self.db.drafts[0]["status"] = "rejeitado"
+                self.db.restricted[:] = [{
+                    "release": 1,
+                    "draft_id": self.draft_id if match == "draft" else str(uuid4()),
+                    "storage_path": "another/path.jar" if match == "draft" else self.original,
+                    "status": "disabled",
+                }]
+                self.assertEqual(self.delete().status_code, 302)
+                self.assertEqual(len(self.db.drafts), 1)
+                self.assertEqual(self.db.storage.removed, [])
+        self.db.restricted.clear()
 
     def test_idle_linked_jobs_can_be_deleted_with_pending_draft(self):
         self.login()
