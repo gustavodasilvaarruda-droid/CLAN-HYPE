@@ -51,7 +51,7 @@ def parse_draft_id(raw):
 
 
 def inspect_original(raw):
-    """Inspect ZIP metadata, content CRCs and a strict initial HYPE allowlist."""
+    """Inspect any valid Fabric mod JAR before adding it to the private mod library."""
     if not raw or len(raw) > MAX_UPLOAD:
         raise InvalidJar("Arquivo vazio ou maior que 10 MiB.")
     try:
@@ -79,8 +79,8 @@ def inspect_original(raw):
                 raise InvalidJar("Metadados Fabric inválidos.")
             module_id = metadata.get("id")
             version = metadata.get("version")
-            if not isinstance(module_id, str) or module_id not in IDS:
-                raise InvalidJar("Módulo não cadastrado nesta primeira etapa.")
+            if not isinstance(module_id, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", module_id):
+                raise InvalidJar("ID Fabric inválido. Envie um JAR com fabric.mod.json válido.")
             if not isinstance(version, str) or not 0 < len(version) <= 120:
                 raise InvalidJar("Versão do mod inválida.")
             depends = metadata.get("depends") or {}
@@ -99,7 +99,8 @@ def inspect_original(raw):
                             pass  # Verify CRC for every ZIP member
             return {
                 "module_id": module_id,
-                "name": IDS[module_id],
+                "name": (metadata.get("name")[:120] if isinstance(metadata.get("name"), str)
+                         and metadata.get("name") else IDS.get(module_id, module_id)),
                 "version": version,
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "size_bytes": len(raw),
@@ -247,11 +248,11 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             manual = meta.get("manual_review") or {}
             sha = candidate.get("sha256")
             if row.get("status") == "rejeitado":
-                step = "Rejeitado — envie uma nova versão"
+                step = "Arquivo arquivado como rejeitado — reabra para testar"
             elif meta.get("pilot_original") and pilot_original_enabled():
                 step = "Original publicado somente no piloto; protegê-lo antes de distribuir"
             elif not sha:
-                step = "Falta um JAR candidato protegido"
+                step = "JAR armazenado. Disponível para teste privado; distribuição requer aprovação."
             elif automatic.get("status") != "passed" or automatic.get("candidate_sha256") != sha:
                 step = "Falta validar a integridade do candidato"
             elif manual.get("candidate_sha256") != sha:
@@ -261,6 +262,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             else:
                 step = "Aguardando manifesto assinado e publicação"
             row["release_next_step"] = step
+            row["display_name"] = (meta.get("mod_name") or IDS.get(row["module_id"], row["module_id"]))
         return rows
 
     def load_published_releases():
@@ -334,6 +336,53 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             {draft_id: job for draft_id, job in jobs.items() if draft_id in visible_ids},
             sum(1 for draft_id in jobs if draft_id not in visible_ids),
         )
+
+
+    @bp.get("/admin/modulos/releases/arquivo/<draft_id>/baixar")
+    def mod_release_library_download(draft_id):
+        """Admin-only file download. No releases or Bootstrap catalogues are modified."""
+        admin_only()
+        if not staging_enabled or db is None:
+            abort(404)
+        try:
+            selected_id = parse_draft_id(draft_id)
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,size_bytes,storage_path,original_filename"
+            ).eq("id", selected_id).limit(1).execute().data or [])
+            if len(rows) != 1:
+                abort(404)
+            record = rows[0]
+            mod_id, sha, path = record.get("module_id"), record.get("sha256"), record.get("storage_path")
+            if (not isinstance(mod_id, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", mod_id)
+                    or not isinstance(sha, str) or not re.fullmatch(r"[a-f0-9]{64}", sha)
+                    or not isinstance(path, str)
+                    or not re.fullmatch(
+                        rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\.jar", path)):
+                abort(404)
+            assert_private_bucket(db.storage)
+            binary = db.storage.from_(BUCKET).download(path)
+            validate_binary(binary, expected_sha=sha)
+            info = inspect_original(binary)
+            if (info["module_id"] != mod_id or info["version"] != record.get("version")
+                    or info["size_bytes"] != record.get("size_bytes")):
+                abort(404)
+        except (InvalidJar, InvalidRelease, ValueError, TypeError, KeyError):
+            abort(404)
+        except Exception as exc:
+            from werkzeug.exceptions import HTTPException
+            if isinstance(exc, HTTPException):
+                raise
+            abort(503)
+        from werkzeug.utils import secure_filename
+        name = secure_filename(record.get("original_filename") or "") or f"{mod_id}-{sha[:12]}.jar"
+        if not name.lower().endswith(".jar"):
+            name += ".jar"
+        response = send_file(io.BytesIO(binary), mimetype="application/java-archive",
+                             as_attachment=True, download_name=name, max_age=0)
+        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @bp.get("/admin/modulos/releases/original-teste/<draft_id>")
     def mod_release_original_test_download(draft_id):
@@ -541,13 +590,15 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 "original_filename": (file.filename or "")[:200], "storage_path": path,
                 "uploaded_by": session["usuario_email"], "status": "aguardando_protecao",
                 "meta": {"has_mixins": report["has_mixins"], "requires_client": report["requires_client"],
-                         "compatibility": report["compatibility"], "static_audit": static_audit},
+                         "compatibility": report["compatibility"], "static_audit": static_audit,
+                         "library_upload": True, "mod_name": report["name"]},
             }).execute()
             if registrar_log:
-                registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
+                registrar_log("upload_jar_biblioteca", "hype_mods", "hype_mod_release_drafts",
                               (saved.data or [{}])[0].get("id"),
                               {"modulo": report["module_id"], "sha256": report["sha256"]})
-            if protection_queue_enabled:
+            if protection_queue_enabled and request.form.get("solicitar_protecao") == "yes":
+                # Opção legada explicitamente solicitada; nunca enfileirar upload comum.
                 # Enfileira automaticamente apenas depois do upload privado e
                 # do registro do draft. Falha na fila nao apaga o original.
                 try:
@@ -578,7 +629,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         "sucesso",
                     )
             else:
-                flash("Original armazenado em privado. Ainda NÃO foi protegido ou publicado.", "sucesso")
+                flash(f"Arquivo recebido! {report['name']} · {report['version']} guardado na biblioteca privada. Nenhuma atualização foi publicada.", "sucesso")
         except Exception:
             if uploaded:
                 try:
@@ -831,7 +882,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             if any(meta.get(k) for k in ("protected", "owner_pilot", "pilot_original")):
                 raise InvalidJar("Esta versão já tem candidato ou registro de publicação; envie outro original.")
             mod_id, sha, path = draft["module_id"], draft["sha256"], draft["storage_path"]
-            if (mod_id not in IDS or not isinstance(sha, str)
+            if (not isinstance(mod_id, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", mod_id)
+                    or not isinstance(sha, str)
                     or not re.fullmatch(r"[a-f0-9]{64}", sha)
                     or not isinstance(path, str)
                     or not re.fullmatch(
@@ -911,7 +963,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             module_id = draft.get("module_id")
             sha = draft.get("sha256")
             original_path = draft.get("storage_path")
-            if (module_id not in IDS or not isinstance(sha, str)
+            if (not isinstance(module_id, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", module_id)
+                    or not isinstance(sha, str)
                     or not re.fullmatch(r"[0-9a-f]{64}", sha)
                     or not isinstance(original_path, str)
                     or not re.fullmatch(
