@@ -211,6 +211,31 @@ def read_original_for_admin_test(db, draft_id):
     return raw, report
 
 
+def stop_queued_protection_before_delete(db, draft_id):
+    """Block deletion of running work; cancel queued work before removing its draft.
+
+    A conditional status update prevents a worker from claiming the same job
+    after cancellation. If a worker claimed it first, deletion is refused.
+    """
+    from modules.hype_mod_protection_queue import JOBS
+
+    jobs = (db.table(JOBS).select("id,status")
+            .eq("draft_id", str(draft_id)).limit(1).execute().data or [])
+    if not jobs:
+        return
+    job = jobs[0]
+    if job.get("status") == "running":
+        raise ValueError("A proteção já começou. Espere terminar antes de excluir.")
+    if job.get("status") == "queued":
+        canceled = (db.table(JOBS).update({
+            "status": "failed",
+            "failure_reason": "Cancelado antes da exclusao do rascunho.",
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", job["id"]).eq("status", "queued").execute().data or [])
+        if not canceled:
+            raise ValueError("A proteção começou durante a exclusão. Atualize a página.")
+
+
 def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     """Offer admin-only, non-persistent inspection; retain opt-in private staging."""
     staging_enabled = os.getenv("HYPE_MOD_STAGING_ENABLED", "").lower() in ("1", "true", "yes")
@@ -343,7 +368,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             return []
 
     def load_protection_jobs():
-        if db is None or not protection_queue_enabled:
+        # Show existing queued/running jobs even if accepting NEW jobs is disabled.
+        if db is None:
             return {}
         from modules.hype_mod_protection_queue import jobs_for_drafts
         return jobs_for_drafts(db)
@@ -508,9 +534,13 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                          "compatibility": report["compatibility"], "static_audit": static_audit},
             }).execute()
             if registrar_log:
-                registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
-                              (saved.data or [{}])[0].get("id"),
-                              {"modulo": report["module_id"], "sha256": report["sha256"]})
+                try:
+                    registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
+                                  (saved.data or [{}])[0].get("id"),
+                                  {"modulo": report["module_id"], "sha256": report["sha256"]})
+                except Exception:
+                    # Audit outage must never remove a JAR after the draft was committed.
+                    pass
             if protection_queue_enabled:
                 # Enfileira automaticamente apenas depois do upload privado e
                 # do registro do draft. Falha na fila nao apaga o original.
@@ -837,6 +867,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     raise ValueError("Este arquivo faz parte de uma publicação e não pode ser apagado.")
 
             assert_private_bucket(db.storage)
+            stop_queued_protection_before_delete(db, draft_id)
             # Delete the database record first. A published release's FK protects
             # it even if another admin starts publication between the two checks.
             # Then remove ONLY the paths belonging to this now-deleted draft.
