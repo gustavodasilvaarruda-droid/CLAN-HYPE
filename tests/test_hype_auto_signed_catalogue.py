@@ -17,7 +17,8 @@ from cryptography.hazmat.primitives.serialization import (
 from modules import hype_signed_release as signed
 from modules.hype_auto_signed_catalogue import (
     AutoCatalogUnavailable, signed_catalog_for_uploaded_client,
-    uploaded_client_binary,
+    uploaded_client_binary, signed_catalog_for_uploaded_mods,
+    uploaded_mod_binary, verify_auto_catalogue,
 )
 from modules.hype_mod_catalog import verify_signed_catalogue
 from modules.hype_updates import _auto_client_distribution_enabled
@@ -121,12 +122,24 @@ class RenderSignerTests(unittest.TestCase):
 
     def test_rejected_or_non_library_record_never_published(self):
         self.row["status"] = "rejeitado"
-        with self.assertRaises(AutoCatalogUnavailable):
-            signed_catalog_for_uploaded_client(Db(self.row, self.data))
+        self.assertEqual(verify_auto_catalogue(signed_catalog_for_uploaded_mods(
+            Db(self.row, self.data)))["mods"], [])
         self.row["status"] = "aguardando_protecao"
         self.row["meta"] = {"library_upload": False}
+        self.assertEqual(verify_auto_catalogue(signed_catalog_for_uploaded_mods(
+            Db(self.row, self.data)))["mods"], [])
+
+    def test_other_fabric_mod_can_be_signed_and_downloaded(self):
+        import copy
+        row = copy.deepcopy(self.row)
+        row["module_id"] = "hype_pokedex"
+        row["storage_path"] = f"hype_pokedex/{'b' * 32}/{self.sha}.jar"
+        # This JAR still carries hypeclient metadata so integrity checking fails.
+        db = Db(row, self.data)
+        signed_doc = verify_auto_catalogue(signed_catalog_for_uploaded_mods(db))
+        self.assertEqual([x["id"] for x in signed_doc["mods"]], ["hype_pokedex"])
         with self.assertRaises(AutoCatalogUnavailable):
-            signed_catalog_for_uploaded_client(Db(self.row, self.data))
+            uploaded_mod_binary(db, "hype_pokedex", self.sha)
 
     def test_different_public_key_rejected(self):
         with patch.object(signed, "PUBLIC_KEY_DER_B64", base64.b64encode(
