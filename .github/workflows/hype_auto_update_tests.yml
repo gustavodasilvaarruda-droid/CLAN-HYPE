@@ -4,8 +4,10 @@ on:
     paths:
       - 'modules/hype_updates.py'
       - 'modules/hype_mod_catalog.py'
+      - 'modules/hype_auto_signed_catalogue.py'
       - 'tests/test_hype_updates.py'
       - 'tests/test_hype_mod_catalog.py'
+      - 'tests/test_hype_auto_signed_catalogue.py'
       - '.github/workflows/hype_auto_update_tests.yml'
   push:
     branches:
@@ -13,8 +15,10 @@ on:
     paths:
       - 'modules/hype_updates.py'
       - 'modules/hype_mod_catalog.py'
+      - 'modules/hype_auto_signed_catalogue.py'
       - 'tests/test_hype_updates.py'
       - 'tests/test_hype_mod_catalog.py'
+      - 'tests/test_hype_auto_signed_catalogue.py'
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -26,3 +30,4 @@ jobs:
       - run: python -m pip install 'Flask>=3,<4' 'cryptography>=46.0.4,<47'
       - run: python -m unittest discover -s tests -p test_hype_updates.py -v
       - run: python -m unittest discover -s tests -p test_hype_mod_catalog.py -v
+      - run: python -m unittest discover -s tests -p test_hype_auto_signed_catalogue.py -v

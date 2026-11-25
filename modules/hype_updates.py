@@ -15,6 +15,12 @@ from modules.hype_mod_catalog import (InvalidCatalogue, verify_signed_catalogue,
                                      MODULE_IDS, CATALOGUE_BASE_URL)
 
 hype_updates_bp = Blueprint('hype_updates', __name__)
+
+
+def _auto_client_distribution_enabled():
+    """Never expose library uploads unless both explicit release switches are on."""
+    return (os.getenv('HYPE_AUTO_SIGNED_CATALOG_ENABLED', '').lower() in ('1', 'true', 'yes')
+            and os.getenv('HYPE_AUTO_SIGNED_DOWNLOADS_ENABLED', '').lower() in ('1', 'true', 'yes'))
 _RELEASE_NAME = re.compile(r'hypeclient-r[1-9][0-9]{0,8}\.jar\Z', re.ASCII)
 
 
@@ -187,6 +193,20 @@ def multi_mod_signed_catalogue():
     expose or publish any mod JARs. Keep disabled until the matching signed
     binary endpoints and new Java bootstrap have passed end-to-end testing.
     """
+    if _auto_client_distribution_enabled():
+        from modules.hype_auto_signed_catalogue import (
+            AutoCatalogUnavailable, signed_catalog_for_uploaded_client,
+        )
+        try:
+            raw = signed_catalog_for_uploaded_client(_release_db())
+        except AutoCatalogUnavailable:
+            current_app.logger.exception('Unable to produce signed HYPE Client catalog')
+            abort(503)
+        response = make_response(raw, 200)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, max-age=0'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
     if os.getenv('HYPE_MULTI_MOD_CATALOG_ENABLED', '').lower() not in ('1', 'true', 'yes'):
         abort(404)
     path = _safe_regular_file(_root() / 'mods', 'catalog.json')
@@ -217,6 +237,25 @@ def multi_mod_signed_binary(mod_id, sha256):
     readable through this route. Never enable for restricted modules until the
     authorization/entitlements policy is implemented.
     """
+    if _auto_client_distribution_enabled():
+        if mod_id != 'hypeclient' or not SHA.fullmatch(sha256):
+            abort(404)
+        from modules.hype_auto_signed_catalogue import (
+            AutoCatalogUnavailable, signed_catalog_for_uploaded_client,
+            uploaded_client_binary,
+        )
+        try:
+            db = _release_db()
+            signed_catalog = verify_signed_catalogue(signed_catalog_for_uploaded_client(db))
+            expected = signed_catalog['mods'][0]
+            if expected['id'] != mod_id or expected['sha256'] != sha256:
+                abort(404)
+            raw = uploaded_client_binary(db, sha256)
+        except AutoCatalogUnavailable:
+            current_app.logger.exception('HYPE Client signed binary unavailable')
+            abort(503)
+        return _deliver(io.BytesIO(raw), 'application/java-archive',
+                        'public, max-age=31536000, immutable')
     if (os.getenv('HYPE_MULTI_MOD_CATALOG_ENABLED', '').lower() not in ('1', 'true', 'yes')
             or os.getenv('HYPE_MULTI_MOD_DOWNLOADS_ENABLED', '').lower() not in ('1', 'true', 'yes')):
         abort(404)
