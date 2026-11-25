@@ -381,7 +381,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     or not isinstance(path, str)
                     or not re.fullmatch(
                         rf"{re.escape(draft['module_id'])}/{re.escape(str(selected_id))}/protected/"
-                        rf"[a-f0-9]{{32}}/{sha}\\.jar", path)):
+                        rf"[a-f0-9]{{32}}/{sha}\.jar", path)):
                 abort(404)
             assert_private_bucket(db.storage)
             original = db.storage.from_(BUCKET).download(draft["storage_path"])
@@ -835,7 +835,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     or not re.fullmatch(r"[a-f0-9]{64}", sha)
                     or not isinstance(path, str)
                     or not re.fullmatch(
-                        rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\\.jar", path)):
+                        rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\.jar", path)):
                 raise InvalidJar("Caminho do original inválido; teste bloqueado.")
             # Never reactivate a file connected to an immutable publication.
             for catalog in (PUBLISHED, "hype_mod_restricted_releases"):
