@@ -268,3 +268,12 @@
  .hpub-file-actions .hype-v6-btn{min-height:40px}
 }
 @media(prefers-reduced-motion:reduce){.hpub-file-card{transition:none}}
+
+
+/* Biblioteca de versões: busca e filtro acessíveis sem recarregar a página. */
+.hpub-library-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(170px,1fr);gap:12px;margin:13px 0 18px}
+.hpub-library-filters label{display:grid;gap:6px;color:#d7c9ae;font-size:.82rem}
+.hpub-library-filters :is(input,select){width:100%;min-width:0;min-height:44px;padding:10px 13px;color:#f6eee1;background:#101926;border:1px solid rgba(222,180,98,.35);border-radius:10px}
+.hpub-library-filters input::placeholder{color:#8a93a1}
+.hpub-file-card[hidden],#hpub-library-no-results[hidden]{display:none!important}
+@media(max-width:520px){.hpub-library-filters{grid-template-columns:minmax(0,1fr)}}
