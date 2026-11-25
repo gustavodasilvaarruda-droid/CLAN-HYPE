@@ -219,6 +219,29 @@ class ClientPilotSixPrivateTests(unittest.TestCase):
             f"/admin/modulos/releases/protegido-teste/{self.id}"
         ).status_code, 404)
 
+    def test_library_download_requires_owner_session(self):
+        res = self.client.get(f"/admin/modulos/releases/arquivo/{self.id}/baixar")
+        self.assertEqual(res.status_code, 403)
+
+    def test_library_download_accepts_archived_jar_without_candidate(self):
+        self.login()
+        res = self.client.get(f"/admin/modulos/releases/arquivo/{self.id}/baixar")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data, self.original)
+        self.assertEqual(res.headers["Cache-Control"], "private, no-store, max-age=0")
+        self.assertIn("attachment", res.headers["Content-Disposition"])
+        self.assertEqual(self.record["status"], "rejeitado")
+        self.assertEqual(self.db.rows["hype_mod_published_releases"], [])
+
+    def test_library_download_rejects_corruption_and_public_bucket(self):
+        self.login()
+        url = f"/admin/modulos/releases/arquivo/{self.id}/baixar"
+        self.db.storage.blobs[self.origpath] = self.original + b"tampered"
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.db.storage.blobs[self.origpath] = self.original
+        self.db.storage.public = True
+        self.assertEqual(self.client.get(url).status_code, 503)
+
     def test_public_bucket_never_yields_test_jar(self):
         self.login()
         self.ready_candidate()
