@@ -170,6 +170,65 @@ class PrivateCleanupTests(unittest.TestCase):
         self.assertEqual(len(self.db.jobs), 1)
         self.assertEqual(self.db.storage.removed, [])
 
+    def test_rejected_owner_pilot_can_be_withdrawn_and_deleted(self):
+        self.login()
+        self.db.drafts[0]["status"] = "rejeitado"
+        self.db.drafts[0]["meta"] = {
+            "owner_pilot": {"release": 1, "published_by": "admin@example.com"}
+        }
+        self.db.jobs.append({"id": "job-stale", "draft_id": self.draft_id, "status": "queued"})
+        response = self.client.post("/admin/modulos/releases/excluir", data={
+            "draft_id": self.draft_id,
+            "confirm_delete": "yes",
+            "confirm_owner_pilot_retire": "yes",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.db.drafts, [])
+        self.assertEqual(self.db.jobs, [])
+        self.assertEqual(self.db.storage.removed, [self.original])
+
+    def test_owner_pilot_requires_explicit_retirement_and_same_publisher(self):
+        self.login()
+        self.db.drafts[0]["status"] = "rejeitado"
+        self.db.drafts[0]["meta"] = {
+            "owner_pilot": {"release": 1, "published_by": "other@example.com"}
+        }
+        self.client.post("/admin/modulos/releases/excluir", data={
+            "draft_id": self.draft_id,
+            "confirm_delete": "yes",
+            "confirm_owner_pilot_retire": "yes",
+        })
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(self.db.storage.removed, [])
+        self.db.drafts[0]["meta"]["owner_pilot"]["published_by"] = "admin@example.com"
+        self.delete()
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(self.db.storage.removed, [])
+
+    def test_owner_pilot_referenced_or_running_remains_immutable(self):
+        self.login()
+        self.db.drafts[0]["status"] = "rejeitado"
+        self.db.drafts[0]["meta"] = {
+            "owner_pilot": {"release": 1, "published_by": "admin@example.com"}
+        }
+        payload = {
+            "draft_id": self.draft_id, "confirm_delete": "yes",
+            "confirm_owner_pilot_retire": "yes",
+        }
+        self.db.restricted.append({
+            "release": 1, "draft_id": self.draft_id,
+            "storage_path": self.original, "status": "disabled",
+        })
+        self.client.post("/admin/modulos/releases/excluir", data=payload)
+        self.assertEqual(len(self.db.drafts), 1)
+        self.db.restricted.clear()
+        self.db.jobs.append({
+            "id": "job-running", "draft_id": self.draft_id, "status": "running",
+        })
+        self.client.post("/admin/modulos/releases/excluir", data=payload)
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(self.db.storage.removed, [])
+
     def test_restricted_catalog_preserved_even_when_disabled(self):
         self.login()
         for match in ("draft", "storage"):
