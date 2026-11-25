@@ -1,14 +1,19 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}HYPE | Central de Publicação de Mods{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='hype_publish_center.css') }}?v=4">
+<link rel="stylesheet" href="{{ url_for('static', filename='hype_publish_center.css') }}?v=5">
 <section class="hype-v6-page hpub-page" id="hpub-app">
   <div class="hype-v6-panel" style="padding:26px;">
     <p><a href="{{ url_for('hype_mod_admin.painel') }}">← Gerenciador de Módulos</a></p>
     <header class="hpub-hero">
-      <span class="hype-v6-kicker">HYPE ADMIN • NOVA CENTRAL DE PUBLICAÇÕES</span>
-      <h1>Seus mods. Uma única publicação.</h1>
-      <p class="hpub-subtitle">Envie o JAR uma vez, teste primeiro só na sua conta e publique para o clã apenas após aprovar a versão protegida.</p>
+      <div class="hpub-hero-top">
+        <div class="hpub-hero-copy">
+          <span class="hype-v6-kicker">♛ CLAN HYPE • PAINEL DO PROPRIETÁRIO</span>
+          <h1>Central de <em>Publicações</em></h1>
+          <p class="hpub-subtitle">HYPE 5.0 · Envie o JAR original uma vez. Acompanhe a proteção e teste a cópia antes de autorizar qualquer publicação para jogadores.</p>
+        </div>
+        <div class="hpub-hero-emblem" aria-hidden="true"><span>♛</span><strong>H</strong><small>CLAN HYPE</small></div>
+      </div>
       <div class="hpub-summary" aria-label="Resumo da Central">
         <div><strong>{{ drafts|length }}</strong><span>arquivos guardados</span></div>
         <div><strong>{{ protection_jobs.values()|selectattr('status','equalto','queued')|list|length }}</strong><span>na fila dos arquivos exibidos</span></div>
@@ -17,8 +22,9 @@
       {% if unmatched_protection_jobs > 0 %}
       <p class="hpub-quick-note" role="status">{{ unmatched_protection_jobs }} registro(s) antigos de proteção não correspondem aos arquivos exibidos. Preservados para auditoria; nenhum será publicado automaticamente.</p>
       {% endif %}
-      <div class="hpub-flow"><span><b>01</b> Enviar</span><span><b>02</b> Testar comigo</span><span><b>03</b> Aprovar protegido</span><span><b>04</b> Publicar</span></div>
+      <div class="hpub-flow" aria-label="Etapas do processo"><span><b>01</b> Enviar</span><span><b>02</b> Proteger</span><span><b>03</b> Validar</span><span><b>04</b> Testar</span><span><b>05</b> Aprovar e publicar</span></div>
     </header>
+    <div class="hpub-workspace">
     <section class="hpub-quick" id="hpub-quick" aria-labelledby="hpub-quick-title">
       <div class="hpub-quick-heading">
         <div>
@@ -68,6 +74,19 @@
       <p class="hpub-quick-unavailable">Envio desativado no servidor. Os arquivos existentes continuam protegidos; habilite o armazenamento privado antes de enviar.</p>
       {% endif %}
     </section>
+    <aside class="hpub-guide" aria-labelledby="hpub-guide-title">
+      <span class="hype-v6-kicker">PROCESSO HYPE</span>
+      <h2 id="hpub-guide-title">Como funciona?</h2>
+      <ol class="hpub-guide-list">
+        <li><b>01</b><span>Envie o JAR original uma única vez.</span></li>
+        <li><b>02</b><span>O original fica guardado em armazenamento privado.</span></li>
+        <li><b>03</b><span>A fila solicita uma cópia protegida ao processador, quando estiver configurado.</span></li>
+        <li><b>04</b><span>Confira a validação e teste o JAR protegido no Minecraft.</span></li>
+        <li><b>05</b><span>Depois dos testes, aprove e publique com manifesto assinado.</span></li>
+      </ol>
+      <p class="hpub-guide-state" role="status">{% if protection_queue_enabled %}Fila de proteção disponível. O processamento depende de um worker configurado e ativo.{% else %}Proteção automática ainda não ativada. O envio salva o original em privado, sem publicar.{% endif %}</p>
+    </aside>
+    </div>
     <section class="hpub-library" aria-labelledby="hpub-library-title">
       <div class="hpub-library-heading"><div><h2 id="hpub-library-title">Meus mods e versões</h2><p>HYPE Client primeiro. Envie uma versão nova sem sobrescrever nem perder o original anterior.</p></div><span id="hpub-visible-count" aria-live="polite">{{ drafts|length }} arquivo(s)</span></div>
       <div class="hpub-library-filters" role="search" aria-label="Filtrar versões dos mods">
@@ -88,6 +107,8 @@
       {% for item in ordered_drafts %}
         {% set candidate = (item.meta or {}).get('protected') or {} %}
         {% set job = protection_jobs.get(item.id|string) %}
+        {% set automatic = (item.meta or {}).get('automatic_review') or {} %}
+        {% set candidate_checked = candidate.get('sha256') and automatic.get('status') == 'passed' and automatic.get('candidate_sha256') == candidate.get('sha256') %}
         <article class="hpub-file-card {{ 'is-client' if item.module_id == 'hypeclient' else '' }}" data-hpub-file-card="{{ item.id }}" data-hpub-search="{{ item.module_id ~ ' ' ~ item.version ~ ' ' ~ (item.original_filename or '') }}" data-hpub-file-status="{{ item.status }}" data-hpub-job-status="{{ job.status if job else '' }}">
           <div class="hpub-file-top">
             <div><strong>{{ 'HYPE Client' if item.module_id == 'hypeclient' else item.module_id }}</strong>{% if item.module_id == 'hypeclient' %}<span class="hpub-client-label">MOD ESSENCIAL · PRIMEIRO TESTE</span>{% endif %}<small>Versão {{ item.version }} · {{ item.original_filename or 'JAR' }}</small></div>
@@ -95,11 +116,12 @@
           </div>
           {% if item.status == 'em_teste' and not (item.meta or {}).get('owner_pilot') %}<p class="hpub-file-note">Marcar como “em teste” não instala o mod. Para experimentar, selecione “Testar só na minha conta” e libere o piloto privado, se estiver habilitado.</p>{% endif %}
           <p class="hpub-file-note">{% if job and job.status == 'queued' %}Original salvo. Aguardando o processador de proteção.{% elif job and job.status == 'running' %}Preparando uma cópia protegida; seu original fica intacto.{% elif job and job.status == 'failed' %}A proteção falhou: {{ job.failure_reason or 'verifique o worker' }}.{% elif candidate %}Cópia protegida pronta para testes privados e aprovação.{% elif (item.meta or {}).get("pilot_original") %}Original disponível apenas no piloto privado.{% else %}Original armazenado em privado, ainda sem cópia protegida.{% endif %}</p>
-          <div class="hpub-card-track" aria-label="Etapas do mod">
-            <span class="is-done">Original</span>
-            <span class="{{ 'is-done' if candidate else ('is-working' if job and job.status in ('queued','running') else '') }}">Proteção</span>
-            <span class="{{ 'is-done' if item.status == 'pronto_para_aprovacao' else ('is-working' if item.status == 'em_teste' and candidate else '') }}">Testes</span>
-            <span>Publicação</span>
+          <div class="hpub-card-track" role="list" aria-label="Progresso real desta versão">
+            <span role="listitem" class="is-done"><b aria-hidden="true">✓</b>Recebido</span>
+            <span role="listitem" class="{{ 'is-done' if candidate else ('is-working' if job and job.status in ('queued','running') else ('is-failed' if job and job.status == 'failed' else '')) }}"><b aria-hidden="true">{{ '✓' if candidate else '02' }}</b>Proteção</span>
+            <span role="listitem" class="{{ 'is-done' if candidate_checked else ('is-working' if candidate else '') }}"><b aria-hidden="true">{{ '✓' if candidate_checked else '03' }}</b>Validação</span>
+            <span role="listitem" class="{{ 'is-done' if item.status == 'pronto_para_aprovacao' and candidate_checked else ('is-working' if candidate_checked and item.status == 'em_teste' else '') }}"><b aria-hidden="true">{{ '✓' if item.status == 'pronto_para_aprovacao' and candidate_checked else '04' }}</b>Testes</span>
+            <span role="listitem"><b aria-hidden="true">05</b>Publicação</span>
           </div>
           <div class="hpub-file-actions">
             {% if original_test_download_enabled and item.status in ('aguardando_protecao', 'em_teste', 'pronto_para_aprovacao') %}

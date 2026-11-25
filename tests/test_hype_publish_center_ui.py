@@ -145,5 +145,29 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertIn(".hpub-file-review", self.css)
 
 
+    def test_black_gold_hype_5_layout_preserves_server_truth(self):
+        self.assertIn('Central de <em>Publicações</em>', self.html)
+        self.assertIn('class="hpub-hero-emblem"', self.html)
+        self.assertIn('class="hpub-guide"', self.html)
+        self.assertIn('class="hpub-workspace"', self.html)
+        self.assertIn('role="list" aria-label="Progresso real desta versão"', self.html)
+        self.assertIn("candidate_checked", self.html)
+        self.assertIn("automatic.get('candidate_sha256') == candidate.get('sha256')", self.html)
+        self.assertIn("O processamento só acontece quando o worker estiver ativo.", self.html)
+        self.assertIn("Proteção automática ainda não ativada.", self.html)
+        self.assertIn("item.status == 'pronto_para_aprovacao' and candidate", self.html)
+        self.assertIn("preto e dourado oficial", self.css)
+        self.assertIn("hype_publish_center.css') }}?v=5", self.html)
+
+    def test_mobile_workflow_shows_five_steps_without_fake_release(self):
+        self.assertIn('aria-label="Etapas do processo"', self.html)
+        for label in ("Recebido", "Proteção", "Validação", "Testes", "Publicação"):
+            self.assertIn(label, self.html)
+        self.assertIn("@media(max-width:1050px)", self.css)
+        self.assertIn("@media(max-width:480px)", self.css)
+        self.assertIn(":focus-visible", self.css)
+        self.assertIn("name=\"confirm_release\"", self.html)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,25 @@
+name: HYPE publication center UI
+
+on:
+  pull_request:
+    paths:
+      - "templates/admin_hype_mod_releases.html"
+      - "static/hype_publish_center.css"
+      - "tests/test_hype_publish_center_ui.py"
+      - ".github/workflows/hype_publish_center_ui.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publishing-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare Jinja parser
+        run: python3 -m pip install 'Jinja2>=3.1,<4'
+      - name: Test template syntax and safety gates
+        run: python3 -m unittest discover -s tests -p 'test_hype_publish_center_ui.py' -v
