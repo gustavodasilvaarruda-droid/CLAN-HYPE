@@ -195,10 +195,10 @@ def multi_mod_signed_catalogue():
     """
     if _auto_client_distribution_enabled():
         from modules.hype_auto_signed_catalogue import (
-            AutoCatalogUnavailable, signed_catalog_for_uploaded_client,
+            AutoCatalogUnavailable, signed_catalog_for_uploaded_mods,
         )
         try:
-            raw = signed_catalog_for_uploaded_client(_release_db())
+            raw = signed_catalog_for_uploaded_mods(_release_db())
         except AutoCatalogUnavailable:
             current_app.logger.exception('Unable to produce signed HYPE Client catalog')
             abort(503)
@@ -238,19 +238,20 @@ def multi_mod_signed_binary(mod_id, sha256):
     authorization/entitlements policy is implemented.
     """
     if _auto_client_distribution_enabled():
-        if mod_id != 'hypeclient' or not SHA.fullmatch(sha256):
-            abort(404)
         from modules.hype_auto_signed_catalogue import (
-            AutoCatalogUnavailable, signed_catalog_for_uploaded_client,
-            uploaded_client_binary,
+            AutoCatalogUnavailable, MOD_ID, signed_catalog_for_uploaded_mods,
+            uploaded_mod_binary, verify_auto_catalogue,
         )
+        if not MOD_ID.fullmatch(mod_id) or not SHA.fullmatch(sha256):
+            abort(404)
         try:
             db = _release_db()
-            signed_catalog = verify_signed_catalogue(signed_catalog_for_uploaded_client(db))
-            expected = signed_catalog['mods'][0]
-            if expected['id'] != mod_id or expected['sha256'] != sha256:
+            signed_catalog = verify_auto_catalogue(signed_catalog_for_uploaded_mods(db))
+            expected = next((item for item in signed_catalog['mods']
+                             if item['id'] == mod_id and item['sha256'] == sha256), None)
+            if expected is None:
                 abort(404)
-            raw = uploaded_client_binary(db, sha256)
+            raw = uploaded_mod_binary(db, mod_id, sha256)
         except AutoCatalogUnavailable:
             current_app.logger.exception('HYPE Client signed binary unavailable')
             abort(503)
