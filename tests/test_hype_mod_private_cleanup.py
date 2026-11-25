@@ -55,6 +55,8 @@ class Query:
             source = self.db.drafts
         elif self.table == "hype_mod_published_releases":
             source = self.db.published
+        elif self.table == "hype_mod_protection_jobs":
+            source = self.db.jobs
         else:
             raise AssertionError(self.table)
         rows = [r for r in source if all(r.get(key) == value for key, value in self.filters)]
@@ -68,6 +70,7 @@ class Database:
     def __init__(self):
         self.drafts = []
         self.published = []
+        self.jobs = []
         self.storage = Storage()
 
     def table(self, name):
@@ -153,6 +156,19 @@ class PrivateCleanupTests(unittest.TestCase):
         self.delete()
         self.assertEqual(len(self.db.drafts), 1)
         self.assertEqual(self.db.storage.removed, [])
+
+    def test_any_linked_protection_job_blocks_deletion(self):
+        self.login()
+        for status in ("queued", "running", "failed", "completed"):
+            with self.subTest(status=status):
+                self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
+                                    "status": status}]
+                self.assertEqual(self.delete().status_code, 302)
+                self.assertEqual(len(self.db.drafts), 1)
+                self.assertEqual(self.db.storage.removed, [])
+        self.db.jobs.clear()
+        self.assertEqual(self.delete().status_code, 302)
+        self.assertEqual(self.db.drafts, [])
 
     def test_published_storage_path_blocks_cleanup(self):
         self.login()

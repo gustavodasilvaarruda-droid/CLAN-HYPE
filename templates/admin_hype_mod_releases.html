@@ -11,9 +11,12 @@
       <p class="hpub-subtitle">Envie o JAR uma vez, teste primeiro só na sua conta e publique para o clã apenas após aprovar a versão protegida.</p>
       <div class="hpub-summary" aria-label="Resumo da Central">
         <div><strong>{{ drafts|length }}</strong><span>arquivos guardados</span></div>
-        <div><strong>{{ protection_jobs.values()|selectattr('status','equalto','queued')|list|length }}</strong><span>na fila de proteção</span></div>
+        <div><strong>{{ protection_jobs.values()|selectattr('status','equalto','queued')|list|length }}</strong><span>na fila dos arquivos exibidos</span></div>
         <div><strong>{{ published_releases|length }}</strong><span>publicações registradas</span></div>
       </div>
+      {% if unmatched_protection_jobs > 0 %}
+      <p class="hpub-quick-note" role="status">{{ unmatched_protection_jobs }} registro(s) antigos de proteção não correspondem aos arquivos exibidos. Preservados para auditoria; nenhum será publicado automaticamente.</p>
+      {% endif %}
       <div class="hpub-flow"><span><b>01</b> Enviar</span><span><b>02</b> Testar comigo</span><span><b>03</b> Aprovar protegido</span><span><b>04</b> Publicar</span></div>
     </header>
     <section class="hpub-quick" id="hpub-quick" aria-labelledby="hpub-quick-title">
@@ -121,7 +124,7 @@
             {% if item.status == 'pronto_para_aprovacao' and candidate %}
               <button type="button" class="hype-v6-btn gold" data-hpub-publish-protected="{{ item.id }}" data-hpub-mod="{{ item.module_id }}">Publicar versão aprovada</button>
             {% endif %}
-            {% if item.status in ('aguardando_protecao','rejeitado') and not (item.meta or {}).get('pilot_original') and (not job or job.status not in ('queued','running')) %}
+            {% if item.status in ('aguardando_protecao','rejeitado') and not (item.meta or {}).get('pilot_original') and not job %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}" onsubmit="return confirm('Apagar permanentemente este JAR privado? Versões publicadas não serão apagadas.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="draft_id" value="{{ item.id }}">
@@ -168,7 +171,7 @@
               <label for="hpub-decision-{{ item.id }}">Decisão</label>
               <select id="hpub-decision-{{ item.id }}" name="status" required>
                 <option value="" selected disabled>Selecione...</option>
-                {% if item.status == 'aguardando_protecao' and not candidate %}
+                {% if item.status == 'aguardando_protecao' and not candidate and not (job and job.status in ('queued','running')) %}
                   <option value="em_teste">Marcar como em teste (não instala)</option>
                 {% elif item.status == 'em_teste' and candidate %}
                   <option value="pronto_para_aprovacao">Aprovar para publicação</option>

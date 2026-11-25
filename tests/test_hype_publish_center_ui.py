@@ -45,6 +45,14 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertIn('Publicar versão aprovada', self.html)
         self.assertNotIn('Selecionar para publicar', self.html)
 
+    def test_queue_counts_only_visible_files_and_blocks_unsafe_delete(self):
+        staging = (ROOT / "modules" / "hype_mod_staging.py").read_text(encoding="utf-8")
+        self.assertIn("unmatched_protection_jobs", self.html)
+        self.assertIn("na fila dos arquivos exibidos", self.html)
+        self.assertIn("not (job and job.status in ('queued','running'))", self.html)
+        self.assertIn("linked_jobs", staging)
+        self.assertIn("A exclusão está bloqueada", staging)
+
     def test_required_protected_release_approval_is_preserved(self):
         endpoints = (
             "mod_release_upload",

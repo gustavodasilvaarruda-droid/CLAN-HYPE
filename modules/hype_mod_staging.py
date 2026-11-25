@@ -319,11 +319,21 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash("Nao foi possivel conferir os dois canais de teste.", "erro")
             return []
 
-    def load_protection_jobs():
-        if db is None or not protection_queue_enabled:
-            return {}
+    def load_protection_jobs(drafts):
+        """Show queued counts only for currently displayed files.
+
+        Historical jobs without a displayed draft are preserved for audit,
+        never silently deleted or counted as actionable mods.
+        """
+        if db is None:
+            return {}, 0
         from modules.hype_mod_protection_queue import jobs_for_drafts
-        return jobs_for_drafts(db)
+        jobs = jobs_for_drafts(db)
+        visible_ids = {str(row["id"]) for row in drafts}
+        return (
+            {draft_id: job for draft_id, job in jobs.items() if draft_id in visible_ids},
+            sum(1 for draft_id in jobs if draft_id not in visible_ids),
+        )
 
     @bp.get("/admin/modulos/releases/original-teste/<draft_id>")
     def mod_release_original_test_download(draft_id):
@@ -357,9 +367,9 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             except Exception:
                 flash("Erro ao consultar rascunhos no banco.", "erro")
         try:
-            protection_jobs = load_protection_jobs()
+            protection_jobs, unmatched_protection_jobs = load_protection_jobs(drafts)
         except Exception:
-            protection_jobs = {}
+            protection_jobs, unmatched_protection_jobs = {}, 0
             flash("Nao foi possivel consultar a fila de protecao.", "erro")
         try:
             published_releases = load_published_releases()
@@ -370,6 +380,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             "admin_hype_mod_releases.html", drafts=drafts,
             published_releases=published_releases,
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
+            unmatched_protection_jobs=unmatched_protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
             original_test_download_enabled=original_test_download_enabled,
@@ -401,9 +412,9 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             drafts = []
             flash("Nao foi possivel carregar a lista de JARs armazenados.", "erro")
         try:
-            protection_jobs = load_protection_jobs()
+            protection_jobs, unmatched_protection_jobs = load_protection_jobs(drafts)
         except Exception:
-            protection_jobs = {}
+            protection_jobs, unmatched_protection_jobs = {}, 0
             flash("Nao foi possivel consultar a fila de protecao.", "erro")
         try:
             published_releases = load_published_releases()
@@ -414,6 +425,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             "admin_hype_mod_releases.html", drafts=drafts,
             published_releases=published_releases,
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
+            unmatched_protection_jobs=unmatched_protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
             original_test_download_enabled=original_test_download_enabled,
@@ -800,6 +812,16 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         )):
                     raise ValueError("Caminho do build protegido inválido; exclusão bloqueada.")
                 paths.append(protected_path)
+
+            # Protection jobs are retained for audit; deleting their draft would
+            # create a dangling queued/running/failed/completed job. This check
+            # runs even when the automatic worker is disabled.
+            from modules.hype_mod_protection_queue import JOBS
+            linked_jobs = (db.table(JOBS).select("id,status")
+                           .eq("draft_id", str(draft_id)).limit(1).execute().data or [])
+            if linked_jobs:
+                raise ValueError("Este arquivo possui um trabalho de proteção associado. "
+                                 "A exclusão está bloqueada até revisão administrativa da fila.")
 
             # Never delete a release referenced in the catalog, including disabled
             # releases retained for rollback and old versions still in use.
