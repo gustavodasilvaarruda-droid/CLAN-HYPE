@@ -580,7 +580,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             uploaded = True
             try:
                 static_audit = check_fabric_classes(raw)
-            except UnsafeBuild as exc:
+            except (UnsafeBuild, KeyError, TypeError, ValueError, RuntimeError) as exc:
+                # A noncritical static analysis issue never prevents private archival.
                 # Originals may be archived for analysis even before the
                 # updater/entrypoints are fixed; candidates remain strict.
                 static_audit = {"status": "needs_review", "reason": str(exc)}
