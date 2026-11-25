@@ -57,7 +57,7 @@ def original_owner_authorized(authenticated_email, environ=None):
     env = os.environ if environ is None else environ
     target = (env.get("HYPE_MOD_ORIGINAL_OWNER_EMAIL") or "").strip().lower()
     account = authenticated_email.strip().lower() if isinstance(authenticated_email, str) else ""
-    return bool(target and account and hmac.compare_digest(account, target))
+    return bool(target and account and hmac.compare_digest(account.encode('utf-8'), target.encode('utf-8')))
 
 
 def parse_draft_id(raw):
