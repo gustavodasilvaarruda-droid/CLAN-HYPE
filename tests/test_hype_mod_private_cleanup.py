@@ -157,18 +157,52 @@ class PrivateCleanupTests(unittest.TestCase):
         self.assertEqual(len(self.db.drafts), 1)
         self.assertEqual(self.db.storage.removed, [])
 
-    def test_any_linked_protection_job_blocks_deletion(self):
+    def test_idle_linked_jobs_can_be_deleted_with_pending_draft(self):
         self.login()
-        for status in ("queued", "running", "failed", "completed"):
+        for status in ("queued", "failed", "completed"):
             with self.subTest(status=status):
+                self.db.storage.removed.clear()
+                self.db.drafts[:] = [{
+                    "id": self.draft_id, "module_id": "hypeclient",
+                    "version": "TEST-1", "status": "aguardando_protecao",
+                    "sha256": self.sha, "storage_path": self.original, "meta": {},
+                }]
                 self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
                                     "status": status}]
                 self.assertEqual(self.delete().status_code, 302)
-                self.assertEqual(len(self.db.drafts), 1)
-                self.assertEqual(self.db.storage.removed, [])
-        self.db.jobs.clear()
+                self.assertEqual(self.db.drafts, [])
+                self.assertEqual(self.db.jobs, [])
+                self.assertEqual(self.db.storage.removed, [self.original])
+
+    def test_running_job_blocks_deletion(self):
+        self.login()
+        self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
+                            "status": "running"}]
+        self.assertEqual(self.delete().status_code, 302)
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(len(self.db.jobs), 1)
+        self.assertEqual(self.db.storage.removed, [])
+
+    def test_rejected_with_failed_job_can_be_deleted(self):
+        self.login()
+        self.db.drafts[0]["status"] = "rejeitado"
+        self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
+                            "status": "failed"}]
         self.assertEqual(self.delete().status_code, 302)
         self.assertEqual(self.db.drafts, [])
+        self.assertEqual(self.db.jobs, [])
+        self.assertEqual(self.db.storage.removed, [self.original])
+
+    def test_published_reference_prevents_job_cancellation(self):
+        self.login()
+        self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
+                            "status": "queued"}]
+        self.db.published.append({"release": 2, "draft_id": self.draft_id,
+                                  "storage_path": "old.jar", "status": "disabled"})
+        self.delete()
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(len(self.db.jobs), 1)
+        self.assertEqual(self.db.storage.removed, [])
 
     def test_published_storage_path_blocks_cleanup(self):
         self.login()
