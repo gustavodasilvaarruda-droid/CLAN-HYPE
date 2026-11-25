@@ -1,4 +1,4 @@
-// HYPE Release Center: small, explicit controls. Server validates every upload and publication.
+// HYPE unified mod library: all uploads stay private; release authorization stays server-side.
 (() => {
   'use strict';
 
@@ -6,187 +6,115 @@
     const root = document.getElementById('hpub-app');
     if (!root) return;
 
-    // Client-side filters only change presentation; permissions and releases remain server-side.
-    const libraryCards = Array.from(root.querySelectorAll('[data-hpub-file-card]'));
-    const librarySearch = root.querySelector('#hpub-library-search');
-    const libraryStage = root.querySelector('#hpub-library-stage');
+    const cards = Array.from(root.querySelectorAll('[data-hpub-file-card]'));
+    const groups = Array.from(root.querySelectorAll('[data-hpub-mod-group]'));
+    const search = root.querySelector('#hpub-library-search');
+    const stage = root.querySelector('#hpub-library-stage');
     const visibleCount = root.querySelector('#hpub-visible-count');
     const noResults = root.querySelector('#hpub-library-no-results');
-    const normalizeText = text => String(text || '').normalize('NFD')
+    const normalize = value => String(value || '').normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
     function filterLibrary() {
-      const query = normalizeText(librarySearch?.value.trim());
-      const filter = libraryStage?.value || 'all';
-      let visible = 0;
-      libraryCards.forEach(card => {
-        const state = card.dataset.hpubFileStatus || '';
-        const job = card.dataset.hpubJobStatus || '';
-        const matchesText = normalizeText(card.dataset.hpubSearch).includes(query);
-        const matchesStage = filter === 'all'
-          || (filter === 'rejected' && state === 'rejeitado')
-          || (filter === 'review' && ['em_teste', 'pronto_para_aprovacao'].includes(state))
-          || (filter === 'pending' && state !== 'rejeitado'
-              && (state === 'aguardando_protecao' || ['queued', 'running', 'failed'].includes(job)));
-        card.hidden = !(matchesText && matchesStage);
-        if (!card.hidden) visible += 1;
+      const query = normalize(search?.value.trim());
+      const filter = stage?.value || 'all';
+      let count = 0;
+      cards.forEach(card => {
+        const status = card.dataset.hpubFileStatus || '';
+        const matches = normalize(card.dataset.hpubSearch).includes(query);
+        const stateMatches = filter === 'all'
+          || (filter === 'rejected' && status === 'rejeitado')
+          || (filter === 'saved' && status !== 'rejeitado');
+        card.hidden = !(matches && stateMatches);
+        if (!card.hidden) count++;
       });
-      if (visibleCount) visibleCount.textContent = visible + ' de ' + libraryCards.length + ' arquivo(s)';
-      if (noResults) noResults.hidden = visible > 0 || libraryCards.length === 0;
+      groups.forEach(group => {
+        const hasVisibleFile = Array.from(group.querySelectorAll('[data-hpub-file-card]'))
+          .some(card => !card.hidden);
+        group.hidden = !hasVisibleFile;
+        if (hasVisibleFile && query) group.open = true;
+      });
+      if (visibleCount) visibleCount.textContent = count + ' de ' + cards.length + ' arquivo(s)';
+      if (noResults) noResults.hidden = count > 0 || cards.length === 0;
     }
 
-    librarySearch?.addEventListener('input', filterLibrary);
-    libraryStage?.addEventListener('change', filterLibrary);
+    search?.addEventListener('input', filterLibrary);
+    stage?.addEventListener('change', filterLibrary);
     filterLibrary();
 
-    const modes = Array.from(root.querySelectorAll('[data-hpub-mode]'));
-    const uploadPanels = Array.from(root.querySelectorAll('[data-hpub-upload-panel]'));
+    const upload = root.querySelector('#hpub-unified-upload-form');
+    const fileInput = root.querySelector('#hpub-quick-file');
+    const uploadButton = root.querySelector('#hpub-submit-upload');
+    const fileNote = root.querySelector('#hpub-upload-file-note');
+    const progress = root.querySelector('#hpub-upload-progress');
+    const defaultLabel = uploadButton?.textContent || 'Enviar arquivo';
+    const limit = 10 * 1024 * 1024;
 
-    function chooseMode(type) {
-      const selected = modes.find(button => button.dataset.hpubMode === type);
-      if (!selected || selected.disabled) return false;
-      const manualPanel = root.querySelector('#hpub-manual-tools');
-      if (manualPanel) manualPanel.open = type === 'protected';
-      modes.forEach(button => {
-        const active = button === selected;
-        button.classList.toggle('is-selected', active);
-        button.setAttribute('aria-pressed', String(active));
-      });
-      uploadPanels.forEach(panel => { panel.hidden = panel.dataset.hpubUploadPanel !== type; });
-      return true;
+    function fileError(file) {
+      if (!file) return 'Escolha um arquivo .jar.';
+      if (!file.name.toLowerCase().endsWith('.jar')) return 'O arquivo precisa terminar em .jar.';
+      if (file.size === 0) return 'O arquivo está vazio.';
+      if (file.size > limit) return 'Este JAR passa de 10 MiB. Escolha uma versão menor.';
+      return '';
     }
 
-    function focusArea(area, input) {
-      area?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      input?.focus({ preventScroll: true });
-    }
-
-    modes.forEach(button => {
-      button.addEventListener('click', () => chooseMode(button.dataset.hpubMode));
+    fileInput?.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      const error = file ? fileError(file) : '';
+      if (uploadButton) {
+        uploadButton.disabled = Boolean(error);
+        uploadButton.textContent = !file || error ? defaultLabel : 'Enviar ' + file.name;
+      }
+      if (fileNote) fileNote.textContent = error || (file
+        ? file.name + ' · ' + (file.size / 1048576).toFixed(2) + ' MiB · será armazenado no grupo do mod'
+        : 'Escolha um JAR Fabric, independente de ser original ou modificado.');
     });
 
-    root.querySelectorAll('[data-hpub-select-protected]').forEach(button => {
-      button.addEventListener('click', () => {
-        if (!chooseMode('protected')) return;
-        const target = root.querySelector('#hpub-quick-target');
-        if (target) target.value = button.dataset.hpubSelectProtected;
-        focusArea(root.querySelector('#hpub-quick'), target);
-      });
+    upload?.addEventListener('submit', event => {
+      const error = fileError(fileInput?.files?.[0]);
+      if (error) {
+        event.preventDefault();
+        if (fileNote) fileNote.textContent = error;
+        return;
+      }
+      if (uploadButton) {
+        uploadButton.disabled = true;
+        uploadButton.textContent = 'Enviando arquivo...';
+      }
+      if (progress) {
+        progress.hidden = false;
+        progress.textContent = 'Enviando para a biblioteca privada. Aguarde a confirmação do site.';
+      }
     });
 
     root.querySelectorAll('[data-hpub-new-version]').forEach(button => {
       button.addEventListener('click', () => {
-        if (!chooseMode('original')) return;
-        focusArea(root.querySelector('#hpub-quick'), root.querySelector('#hpub-quick-original'));
+        const target = root.querySelector('#hpub-quick');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        fileInput?.focus({ preventScroll: true });
       });
     });
 
-    const originalChoice = root.querySelector('#pilot_original_draft');
-    const protectedChoice = root.querySelector('#private_draft');
-    const unifiedPublishForm = root.querySelector('#hpub-unified-release-form');
-    const privatePublishAction = unifiedPublishForm?.getAttribute('action') || '';
-
-    function setSelectedCard(id) {
-      root.querySelectorAll('[data-hpub-file-card]').forEach(card => {
-        card.classList.toggle('is-selected-for-publish', Boolean(id) && card.dataset.hpubFileCard === id);
-      });
-    }
-
-    function updatePublicationChoice(input, noteId, submitId) {
-      const option = input?.selectedOptions[0];
-      const selected = Boolean(option?.value);
-      const ready = selected && option.dataset.hpubReady === 'yes';
-      const note = root.querySelector(noteId);
-      const submit = root.querySelector(submitId);
-      if (note) note.textContent = selected
-        ? option.dataset.hpubNext || 'Confira as pendências desse arquivo.'
-        : 'Selecione um arquivo já guardado em Meus arquivos.';
-      if (submit) submit.disabled = !ready;
-      return { selected, ready, id: selected ? option.value : '' };
-    }
-
-    function updateOriginalChoice() {
-      return updatePublicationChoice(originalChoice, '#hpub-original-choice-note', '#hpub-submit-original');
-    }
-
-    function updateProtectedChoice() {
-      const state = updatePublicationChoice(protectedChoice, '#hpub-protected-choice-note', '#hpub-submit-protected');
-      const option = protectedChoice?.selectedOptions[0];
-      const isClient = state.selected && option?.dataset.hpubMod === 'hypeclient';
-      if (unifiedPublishForm) {
-        // Only choose between two known server-generated URLs; both endpoints revalidate everything.
-        unifiedPublishForm.action = isClient ? unifiedPublishForm.dataset.hpubClientAction : privatePublishAction;
+    const releaseForm = root.querySelector('#hpub-unified-release-form');
+    const releaseSelect = root.querySelector('#private_draft');
+    const releaseButton = root.querySelector('#hpub-submit-release');
+    const releaseNote = root.querySelector('#hpub-release-choice-note');
+    const standardAction = releaseForm?.getAttribute('action') || '';
+    function updateReleaseChoice() {
+      const option = releaseSelect?.selectedOptions[0];
+      const chosen = Boolean(option?.value);
+      const ready = chosen && option.dataset.hpubReady === 'yes';
+      if (releaseForm) {
+        releaseForm.action = chosen && option.dataset.hpubMod === 'hypeclient'
+          ? releaseForm.dataset.hpubClientAction : standardAction;
       }
-      const submit = root.querySelector('#hpub-submit-protected');
-      if (submit) submit.textContent = isClient ? 'Publicar HYPE Client protegido' : 'Publicar protegido aprovado';
-      const review = root.querySelector('#hpub-review-selected');
-      if (review) review.hidden = !state.selected || state.ready;
-      return state;
+      if (releaseButton) releaseButton.disabled = !ready;
+      if (releaseNote) releaseNote.textContent = chosen
+        ? option.dataset.hpubNext || 'Confira os requisitos da versão.'
+        : 'Selecione um arquivo da biblioteca para conferir a publicação.';
     }
-
-    originalChoice?.addEventListener('change', () => {
-      const state = updateOriginalChoice();
-      setSelectedCard(state.id);
-    });
-    protectedChoice?.addEventListener('change', () => {
-      const state = updateProtectedChoice();
-      setSelectedCard(state.id);
-    });
-
-    function openSelectedReview(id) {
-      const review = Array.from(root.querySelectorAll('.hpub-file-review')).find(
-        panel => panel.id === 'hpub-review-' + id
-      );
-      if (!review) return;
-      review.open = true;
-      focusArea(review, review.querySelector('summary'));
-    }
-    root.querySelector('#hpub-review-selected')?.addEventListener('click', () => {
-      openSelectedReview(protectedChoice?.value);
-    });
-
-    root.querySelectorAll('[data-hpub-publish-original]').forEach(button => {
-      button.addEventListener('click', () => {
-        if (!originalChoice) return;
-        const publishing = root.querySelector('#hpub-publishing-tools');
-        if (publishing) publishing.open = true;
-        originalChoice.value = button.dataset.hpubPublishOriginal;
-        setSelectedCard(originalChoice.value);
-        updateOriginalChoice();
-        focusArea(root.querySelector('#hpub-private-test'), originalChoice);
-      });
-    });
-
-    root.querySelectorAll('[data-hpub-publish-protected]').forEach(button => {
-      button.addEventListener('click', () => {
-        if (!protectedChoice) return;
-        const publishing = root.querySelector('#hpub-publishing-tools');
-        if (publishing) publishing.open = true;
-        protectedChoice.value = button.dataset.hpubPublishProtected;
-        setSelectedCard(protectedChoice.value);
-        updateProtectedChoice();
-        focusArea(root.querySelector('#hpub-protected-release'), protectedChoice);
-      });
-    });
-
-    // No upload or release is triggered by the interface itself.
-    // Every POST is an explicit admin action with server-side authorization and CSRF.
-    const originalInput = root.querySelector('#hpub-quick-original');
-    const uploadForm = originalInput?.closest('form');
-    const uploadSubmit = uploadForm?.querySelector('[type="submit"]');
-    const defaultSubmitText = uploadSubmit?.textContent || '';
-    originalInput?.addEventListener('change', () => {
-      const file = originalInput.files?.[0];
-      const valid = Boolean(file && file.name.toLowerCase().endsWith('.jar')
-        && file.size > 0 && file.size <= 10 * 1024 * 1024);
-      if (uploadSubmit) {
-        uploadSubmit.disabled = Boolean(file) && !valid;
-        uploadSubmit.textContent = file && valid ? 'Enviar ' + file.name : defaultSubmitText;
-      }
-    });
-
-    updateOriginalChoice();
-    updateProtectedChoice();
+    releaseSelect?.addEventListener('change', updateReleaseChoice);
+    updateReleaseChoice();
   }
 
   if (document.readyState === 'loading') {
