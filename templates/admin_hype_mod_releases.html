@@ -11,7 +11,7 @@
       <p class="hpub-subtitle">Envie um único JAR original. A cópia vai para proteção; o arquivo original continua privado. Nada chega aos jogadores sem seus testes e aprovação.</p>
       <div class="hpub-summary" aria-label="Resumo da Central">
         <div><strong>{{ drafts|length }}</strong><span>arquivos guardados</span></div>
-        <div><strong>{{ protection_jobs.values()|selectattr('status','equalto','queued')|list|length if protection_queue_enabled else 0 }}</strong><span>na fila de proteção</span></div>
+        <div><strong>{{ protection_jobs.values()|selectattr('status','equalto','queued')|list|length }}</strong><span>na fila de proteção</span></div>
         <div><strong>{{ published_releases|length }}</strong><span>publicações registradas</span></div>
       </div>
       <div class="hpub-flow"><span><b>01</b> Enviar</span><span><b>02</b> Proteger</span><span><b>03</b> Testar</span><span><b>04</b> Aprovar</span></div>
@@ -71,13 +71,26 @@
       {% endif %}
     </section>
     <section class="hpub-library" aria-labelledby="hpub-library-title">
-      <div class="hpub-library-heading"><div><h2 id="hpub-library-title">Meus mods e versões</h2><p>HYPE Client primeiro. Envie uma versão nova sem sobrescrever nem perder o original anterior.</p></div><span>{{ drafts|length }} arquivo(s)</span></div>
+      <div class="hpub-library-heading"><div><h2 id="hpub-library-title">Meus mods e versões</h2><p>HYPE Client primeiro. Envie uma versão nova sem sobrescrever nem perder o original anterior.</p></div><span id="hpub-visible-count" aria-live="polite">{{ drafts|length }} arquivo(s)</span></div>
+      <div class="hpub-library-filters" role="search" aria-label="Filtrar versões dos mods">
+        <label for="hpub-library-search">Buscar mod ou versão
+          <input id="hpub-library-search" type="search" placeholder="Ex.: Pokédex, 1.2, HYPE Client" autocomplete="off">
+        </label>
+        <label for="hpub-library-stage">Etapa
+          <select id="hpub-library-stage">
+            <option value="all">Todas as etapas</option>
+            <option value="pending">Aguardando proteção</option>
+            <option value="review">Testes e aprovação</option>
+            <option value="rejected">Rejeitados</option>
+          </select>
+        </label>
+      </div>
       <div class="hpub-library-grid">
       {% set ordered_drafts = (drafts|selectattr('module_id','equalto','hypeclient')|list) + (drafts|rejectattr('module_id','equalto','hypeclient')|list) %}
       {% for item in ordered_drafts %}
         {% set candidate = (item.meta or {}).get('protected') or {} %}
-        {% set job = protection_jobs.get(item.id|string) if protection_queue_enabled else None %}
-        <article class="hpub-file-card {{ 'is-client' if item.module_id == 'hypeclient' else '' }}" data-hpub-file-card="{{ item.id }}">
+        {% set job = protection_jobs.get(item.id|string) %}
+        <article class="hpub-file-card {{ 'is-client' if item.module_id == 'hypeclient' else '' }}" data-hpub-file-card="{{ item.id }}" data-hpub-search="{{ item.module_id ~ ' ' ~ item.version ~ ' ' ~ (item.original_filename or '') }}" data-hpub-file-status="{{ item.status }}" data-hpub-job-status="{{ job.status if job else '' }}">
           <div class="hpub-file-top">
             <div><strong>{{ 'HYPE Client' if item.module_id == 'hypeclient' else item.module_id }}</strong>{% if item.module_id == 'hypeclient' %}<span class="hpub-client-label">MOD ESSENCIAL · PRIMEIRO TESTE</span>{% endif %}<small>Versão {{ item.version }} · {{ item.original_filename or 'JAR' }}</small></div>
             <span class="hpub-file-status" data-status="{{ job.status if job and job.status in ('queued','running','failed') else item.status }}">{{ 'Em processamento' if job and job.status == 'running' else ('Na fila' if job and job.status == 'queued' else ('Falha na proteção' if job and job.status == 'failed' else item.status|replace('_',' '))) }}</span>
@@ -112,7 +125,7 @@
             {% if item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') %}
               <button type="button" class="hype-v6-btn gold" data-hpub-publish-protected="{{ item.id }}" data-hpub-mod="{{ item.module_id }}">Selecionar para publicar</button>
             {% endif %}
-            {% if item.status in ('aguardando_protecao','rejeitado') and not (item.meta or {}).get('pilot_original') %}
+            {% if item.status in ('aguardando_protecao','rejeitado') and not (item.meta or {}).get('pilot_original') and (not job or job.status not in ('queued','running')) %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}" onsubmit="return confirm('Apagar permanentemente este JAR privado? Versões publicadas não serão apagadas.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="draft_id" value="{{ item.id }}">
@@ -177,6 +190,7 @@
         <div class="hpub-empty">Nenhum JAR armazenado. Envie o primeiro arquivo original acima.</div>
       {% endfor %}
       </div>
+      <p id="hpub-library-no-results" class="hpub-empty" role="status" hidden>Nenhuma versão encontrada. Ajuste a busca ou o filtro.</p>
     </section>
     <details class="hpub-publish-disclosure" id="hpub-publishing-tools">
       <summary><span><strong>Testar e publicar</strong><small>Área separada para testes privados, revisão e assinatura</small></span><span aria-hidden="true">⌄</span></summary>
