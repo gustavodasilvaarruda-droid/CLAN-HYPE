@@ -59,13 +59,17 @@
               <a href="{{ url_for('hype_mod_admin.mod_release_library_download', draft_id=item.id) }}"
                  class="hpub-small-button">Baixar</a>
               {% if item.status in ('aguardando_protecao','rejeitado')
-                    and not meta.get('pilot_original') and not meta.get('owner_pilot')
+                    and not meta.get('pilot_original')
+                    and (not meta.get('owner_pilot') or item.status == 'rejeitado')
                     and not meta.get('protected') and (not job or job.status != 'running') %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}"
-                    onsubmit="return confirm('Apagar este arquivo da biblioteca?');">
+                    onsubmit="return confirm({% if meta.get('owner_pilot') %}'Este arquivo está em um teste antigo do proprietário. Retirar do teste e apagar definitivamente?'{% else %}'Apagar este arquivo da biblioteca?'{% endif %});">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="draft_id" value="{{ item.id }}">
                 <input type="hidden" name="confirm_delete" value="yes">
+                {% if meta.get('owner_pilot') %}
+                <input type="hidden" name="confirm_owner_pilot_retire" value="yes">
+                {% endif %}
                 <button type="submit" class="hpub-delete-button">Apagar</button>
               </form>
               {% endif %}

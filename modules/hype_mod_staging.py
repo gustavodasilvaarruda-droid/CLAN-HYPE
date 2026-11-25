@@ -937,8 +937,22 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         original_path,
                     )):
                 raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
-            if any((draft.get("meta") or {}).get(key) for key in ("pilot_original", "owner_pilot")):
-                raise ValueError("Original publicado em um canal piloto e nao pode ser apagado.")
+            pilot_meta = draft.get("meta") or {}
+            # An old owner-only test release can be retired explicitly. This is
+            # never allowed for signed public, restricted or pilot_original releases.
+            if pilot_meta.get("pilot_original"):
+                raise ValueError("Arquivo vinculado a um piloto assinado; não pode ser apagado.")
+            owner_pilot = pilot_meta.get("owner_pilot")
+            if owner_pilot:
+                publisher = owner_pilot.get("published_by") if isinstance(owner_pilot, dict) else None
+                email = session.get("usuario_email")
+                if (request.form.get("confirm_owner_pilot_retire") != "yes"
+                        or not isinstance(publisher, str) or not isinstance(email, str)
+                        or publisher.strip().casefold() != email.strip().casefold()):
+                    raise ValueError(
+                        "Este JAR foi liberado num teste particular. Confirme "
+                        "a retirada desse teste para apagá-lo."
+                    )
             paths = [original_path]
             protected = (draft.get("meta") or {}).get("protected") or {}
             if protected:
@@ -1016,6 +1030,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     registrar_log("excluir_jar_privado", "hype_mods", TABLE, draft_id,
                                   {"modulo": module_id, "status": state,
                                    "sha256": sha, "arquivos": len(paths),
+                                   "owner_pilot_retired": bool(owner_pilot),
                                    "protection_job_cancelled": job["id"] if job else None,
                                    "previous_job_status": job["status"] if job else None})
                 except Exception:
