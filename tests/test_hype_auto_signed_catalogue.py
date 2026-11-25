@@ -86,6 +86,7 @@ class RenderSignerTests(unittest.TestCase):
         self.row = {
             "module_id": "hypeclient", "version": "1.4", "sha256": self.sha,
             "size_bytes": len(self.data), "status": "aguardando_protecao",
+            "original_filename": "HYPE-CLIENT-1.4.jar",
             "storage_path": f"hypeclient/{'a' * 32}/{self.sha}.jar",
             "meta": {"library_upload": True},
             "created_at": "2026-11-25T22:00:00Z",
@@ -128,6 +129,24 @@ class RenderSignerTests(unittest.TestCase):
         self.row["meta"] = {"library_upload": False}
         self.assertEqual(verify_auto_catalogue(signed_catalog_for_uploaded_mods(
             Db(self.row, self.data)))["mods"], [])
+
+    def test_explicit_test_and_preview_builds_are_never_public(self):
+        blocked = (
+            "HYPE-CLIENT-PILOTO-NAO-DISTRIBUIR.jar",
+            "HYPE-POKEDEX-BETA8-TESTE.jar",
+            "HYPE-BREED-PREVIEW03-VALIDACAO.jar",
+            "HYPE-CAMPO-EXPERIMENTAL.jar",
+            "HYPE-CLIENT-ALPHA7.jar",
+            "HYPE-CLIENT-NÃO DISTRIBUIR.jar",
+        )
+        from modules.hype_auto_signed_catalogue import _eligible
+        for filename in blocked:
+            with self.subTest(filename=filename):
+                row = dict(self.row, original_filename=filename)
+                self.assertFalse(_eligible(row))
+        self.assertTrue(_eligible(self.row))
+        self.assertFalse(_eligible(dict(self.row, version="1.4-preview.3")))
+        self.assertFalse(_eligible(dict(self.row, original_filename=None)))
 
     def test_other_fabric_mod_can_be_signed_and_downloaded(self):
         import copy
