@@ -6,6 +6,7 @@ Only a trusted offline signer may produce an accepted Ed25519 signature.
 """
 import base64
 import json
+import re
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.serialization import load_der_public_key
@@ -13,10 +14,10 @@ from cryptography.hazmat.primitives.serialization import load_der_public_key
 from modules import hype_signed_release as signed
 
 CATALOGUE_BASE_URL = "https://clan-hype.onrender.com/hype-updates/mods/"
-MODULE_IDS = frozenset({
-    "hypeclient", "hype_pokedex", "hype_breed_calculator",
-    "hype_battlefield", "hype_battle_ai",
-})
+# IDs are not a hard-coded allowlist: new HYPE mods can be released without a deploy.
+# Directory traversal and ambiguous IDs are still forbidden.
+MODULE_ID = re.compile(r"[a-z][a-z0-9_]{1,63}\Z", re.ASCII)
+MAX_MODS = 128
 MAX_CATALOGUE_BYTES = 256 * 1024
 
 
@@ -63,7 +64,7 @@ def verify_signed_catalogue(raw):
         raise InvalidCatalogue("Plataforma ou canal incompatível.")
 
     mods = document["mods"]
-    if not isinstance(mods, list) or not 1 <= len(mods) <= len(MODULE_IDS):
+    if not isinstance(mods, list) or not 1 <= len(mods) <= MAX_MODS:
         raise InvalidCatalogue("Lista de mods inválida.")
     seen = set()
     dependencies = {}
@@ -77,7 +78,7 @@ def verify_signed_catalogue(raw):
         sha = item["sha256"]
         size = item["size"]
         deps = item["depends_on"]
-        if not isinstance(mod_id, str) or mod_id not in MODULE_IDS or mod_id in seen:
+        if not isinstance(mod_id, str) or not MODULE_ID.fullmatch(mod_id) or mod_id == 'hypebootstrap' or mod_id in seen:
             raise InvalidCatalogue("Mod desconhecido ou duplicado.")
         if not isinstance(version, str) or not signed.VERSION.fullmatch(version):
             raise InvalidCatalogue("Versão de mod inválida.")
@@ -90,7 +91,7 @@ def verify_signed_catalogue(raw):
         if item["url"] != f"{CATALOGUE_BASE_URL}{mod_id}/{sha}.jar":
             raise InvalidCatalogue("URL de mod não é oficial ou não corresponde ao hash.")
         if (not isinstance(deps, list)
-                or any(not isinstance(dep, str) or dep not in MODULE_IDS for dep in deps)
+                or any(not isinstance(dep, str) or not MODULE_ID.fullmatch(dep) for dep in deps)
                 or len(deps) != len(set(deps)) or mod_id in deps):
             raise InvalidCatalogue("Dependências internas inválidas.")
         dependencies[mod_id] = deps

@@ -32,6 +32,16 @@ IDS = {
     "hype_battlefield": "HYPE Campo de Batalha",
     "hype_battle_ai": "HYPE Battle AI",
 }
+# Familiar display names only. This is NOT a module allowlist.
+MODULE_ID = re.compile(r"[a-z][a-z0-9_]{1,63}\Z", re.ASCII)
+
+
+def valid_module_id(module_id):
+    """Accept future owner-uploaded Fabric mods without a site code deploy."""
+    return (isinstance(module_id, str) and
+            MODULE_ID.fullmatch(module_id) is not None and
+            module_id != "hypebootstrap")
+
 
 class InvalidJar(ValueError):
     pass
@@ -51,7 +61,7 @@ def parse_draft_id(raw):
 
 
 def inspect_original(raw):
-    """Inspect ZIP metadata, content CRCs and a strict initial HYPE allowlist."""
+    """Inspect ZIP metadata and CRCs for any safe owner-uploaded Fabric mod ID."""
     if not raw or len(raw) > MAX_UPLOAD:
         raise InvalidJar("Arquivo vazio ou maior que 10 MiB.")
     try:
@@ -79,8 +89,8 @@ def inspect_original(raw):
                 raise InvalidJar("Metadados Fabric inválidos.")
             module_id = metadata.get("id")
             version = metadata.get("version")
-            if not isinstance(module_id, str) or module_id not in IDS:
-                raise InvalidJar("Módulo não cadastrado nesta primeira etapa.")
+            if not valid_module_id(module_id):
+                raise InvalidJar("ID de mod Fabric inválido ou reservado.")
             if not isinstance(version, str) or not 0 < len(version) <= 120:
                 raise InvalidJar("Versão do mod inválida.")
             depends = metadata.get("depends") or {}
@@ -99,7 +109,7 @@ def inspect_original(raw):
                             pass  # Verify CRC for every ZIP member
             return {
                 "module_id": module_id,
-                "name": IDS[module_id],
+                "name": IDS.get(module_id, str(metadata.get("name") or module_id)[:120]),
                 "version": version,
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "size_bytes": len(raw),
@@ -169,7 +179,7 @@ def read_original_for_admin_test(db, draft_id):
     module_id = draft.get("module_id")
     sha = draft.get("sha256")
     path = draft.get("storage_path")
-    if (module_id not in IDS
+    if (not valid_module_id(module_id)
             or draft.get("status") not in ("aguardando_protecao", "em_teste")
             or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
             or not isinstance(path, str)
@@ -787,7 +797,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             module_id = draft.get("module_id")
             sha = draft.get("sha256")
             original_path = draft.get("storage_path")
-            if (module_id not in IDS or not isinstance(sha, str)
+            if (not valid_module_id(module_id) or not isinstance(sha, str)
                     or not re.fullmatch(r"[0-9a-f]{64}", sha)
                     or not isinstance(original_path, str)
                     or not re.fullmatch(

@@ -1,0 +1,51 @@
+name: HYPE multi-mod signed distribution
+
+on:
+  push:
+    paths:
+      - "modules/hype_mod_catalog.py"
+      - "modules/hype_mod_public_storage.py"
+      - "modules/hype_mod_staging.py"
+      - "modules/hype_mod_protection_queue.py"
+      - "modules/hype_updates.py"
+      - "tests/test_hype_mod_catalog.py"
+      - "tests/test_hype_mod_dynamic_ids.py"
+      - "migrations/20261124_hype_dynamic_mod_ids.sql"
+      - ".github/workflows/hype_multi_mod_distribution_tests.yml"
+  pull_request:
+    paths:
+      - "modules/hype_mod_catalog.py"
+      - "modules/hype_mod_public_storage.py"
+      - "modules/hype_mod_staging.py"
+      - "modules/hype_mod_protection_queue.py"
+      - "modules/hype_updates.py"
+      - "tests/test_hype_mod_catalog.py"
+      - "tests/test_hype_mod_dynamic_ids.py"
+      - "migrations/20261124_hype_dynamic_mod_ids.sql"
+      - ".github/workflows/hype_multi_mod_distribution_tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "Flask>=3,<4" "cryptography>=46,<47"
+      - name: Syntax check changed modules
+        run: |
+          python -m py_compile modules/hype_mod_catalog.py modules/hype_mod_public_storage.py modules/hype_mod_staging.py modules/hype_mod_protection_queue.py modules/hype_updates.py
+      - name: Run catalog and signed binary tests
+        run: python -m unittest discover -s tests -p "test_hype_mod_catalog.py" -v
+      - name: Run dynamic upload ID tests
+        run: python -m unittest discover -s tests -p "test_hype_mod_dynamic_ids.py" -v
+      - name: Run existing update route tests
+        run: python -m unittest discover -s tests -p "test_hype_updates.py" -v
