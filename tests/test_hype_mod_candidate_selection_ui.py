@@ -20,7 +20,7 @@ class CandidateSelectionTemplateTests(unittest.TestCase):
         self.assertIn('id="hpub-quick-target"', self.source)
         self.assertIn('name="draft_id" required', self.source)
         self.assertIn("item.status in ('aguardando_protecao','em_teste')", self.source)
-        self.assertIn('value="em_teste">Iniciar testes', self.source)
+        self.assertIn('value="em_teste">Marcar como em teste (não instala)', self.source)
 
     def test_candidate_upload_keeps_explicit_association(self):
         self.assertIn('id="hpub-quick-target"', self.source)
@@ -28,15 +28,12 @@ class CandidateSelectionTemplateTests(unittest.TestCase):
         self.assertIn("and not (item.meta or {}).get('protected')", self.source)
         self.assertIn("url_for('hype_mod_admin.mod_release_protected_upload')", self.source)
 
-    def test_stored_candidate_reuse_still_available_without_clutter(self):
-        self.assertIn('id="hpub-reuse-protected"', self.source)
-        self.assertIn('id="existing_original"', self.source)
-        self.assertIn('id="existing_candidate"', self.source)
-        self.assertIn('name="source_id" required', self.source)
-        self.assertIn("url_for('hype_mod_admin.mod_release_link_existing')", self.source)
+    def test_unnecessary_candidate_reuse_form_is_removed(self):
+        self.assertNotIn('id="hpub-reuse-protected"', self.source)
+        self.assertNotIn('id="existing_original"', self.source)
+        self.assertNotIn('id="existing_candidate"', self.source)
         javascript = (TEMPLATE.parents[1] / "static" / "hype_publish_center.js").read_text(encoding="utf-8")
-        self.assertIn("opt.dataset.sha !== src.dataset.sha", javascript)
-        self.assertIn("opt.dataset.version === src.dataset.version", javascript)
+        self.assertNotIn("existingCandidate", javascript)
 
     def test_review_never_defaults_to_approval(self):
         self.assertIn('value="" selected disabled>Selecione...', self.source)

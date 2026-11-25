@@ -8,19 +8,14 @@
     <header class="hpub-hero">
       <span class="hype-v6-kicker">HYPE ADMIN • NOVA CENTRAL DE PUBLICAÇÕES</span>
       <h1>Seus mods. Uma única publicação.</h1>
-      <p class="hpub-subtitle">Envie um único JAR original. A cópia vai para proteção; o arquivo original continua privado. Nada chega aos jogadores sem seus testes e aprovação.</p>
+      <p class="hpub-subtitle">Envie o JAR uma vez, teste primeiro só na sua conta e publique para o clã apenas após aprovar a versão protegida.</p>
       <div class="hpub-summary" aria-label="Resumo da Central">
         <div><strong>{{ drafts|length }}</strong><span>arquivos guardados</span></div>
         <div><strong>{{ protection_jobs.values()|selectattr('status','equalto','queued')|list|length }}</strong><span>na fila de proteção</span></div>
         <div><strong>{{ published_releases|length }}</strong><span>publicações registradas</span></div>
       </div>
-      <div class="hpub-flow"><span><b>01</b> Enviar</span><span><b>02</b> Proteger</span><span><b>03</b> Testar</span><span><b>04</b> Aprovar</span></div>
+      <div class="hpub-flow"><span><b>01</b> Enviar</span><span><b>02</b> Testar comigo</span><span><b>03</b> Aprovar protegido</span><span><b>04</b> Publicar</span></div>
     </header>
-    <section class="hpub-priority" aria-labelledby="hpub-priority-title">
-      <span class="hpub-priority-index">01</span>
-      <div><span class="hype-v6-kicker">PRIMEIRO TESTE</span><h2 id="hpub-priority-title">HYPE Client</h2><p>Vamos começar pelo Client, que é a base necessária para os outros mods HYPE. A Pokédex e os demais entram depois dos testes do Client.</p></div>
-      <span class="hpub-priority-tag">Prioridade</span>
-    </section>
     <section class="hpub-quick" id="hpub-quick" aria-labelledby="hpub-quick-title">
       <div class="hpub-quick-heading">
         <div>
@@ -95,6 +90,7 @@
             <div><strong>{{ 'HYPE Client' if item.module_id == 'hypeclient' else item.module_id }}</strong>{% if item.module_id == 'hypeclient' %}<span class="hpub-client-label">MOD ESSENCIAL · PRIMEIRO TESTE</span>{% endif %}<small>Versão {{ item.version }} · {{ item.original_filename or 'JAR' }}</small></div>
             <span class="hpub-file-status" data-status="{{ job.status if job and job.status in ('queued','running','failed') else item.status }}">{{ 'Em processamento' if job and job.status == 'running' else ('Na fila' if job and job.status == 'queued' else ('Falha na proteção' if job and job.status == 'failed' else item.status|replace('_',' '))) }}</span>
           </div>
+          {% if item.status == 'em_teste' and not (item.meta or {}).get('owner_pilot') %}<p class="hpub-file-note">Marcar como “em teste” não instala o mod. Para experimentar, selecione “Testar só na minha conta” e libere o piloto privado, se estiver habilitado.</p>{% endif %}
           <p class="hpub-file-note">{% if job and job.status == 'queued' %}Original salvo. Aguardando o processador de proteção.{% elif job and job.status == 'running' %}Preparando uma cópia protegida; seu original fica intacto.{% elif job and job.status == 'failed' %}A proteção falhou: {{ job.failure_reason or 'verifique o worker' }}.{% elif candidate %}Cópia protegida pronta para testes privados e aprovação.{% elif (item.meta or {}).get("pilot_original") %}Original disponível apenas no piloto privado.{% else %}Original armazenado em privado, ainda sem cópia protegida.{% endif %}</p>
           <div class="hpub-card-track" aria-label="Etapas do mod">
             <span class="is-done">Original</span>
@@ -120,10 +116,10 @@
               <button type="button" class="hype-v6-btn" data-hpub-new-version data-hpub-version-module="{{ item.module_id }}">Enviar nova versão</button>
             {% endif %}
             {% if item.module_id in ('hypeclient','hype_pokedex','hype_breed_calculator','hype_battlefield','hype_battle_ai') and item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') and not (item.meta or {}).get('pilot_original') %}
-              <button type="button" class="hype-v6-btn" data-hpub-publish-original="{{ item.id }}">Selecionar original</button>
+              <button type="button" class="hype-v6-btn" data-hpub-publish-original="{{ item.id }}">Testar só na minha conta</button>
             {% endif %}
-            {% if item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') %}
-              <button type="button" class="hype-v6-btn gold" data-hpub-publish-protected="{{ item.id }}" data-hpub-mod="{{ item.module_id }}">Selecionar para publicar</button>
+            {% if item.status == 'pronto_para_aprovacao' and candidate %}
+              <button type="button" class="hype-v6-btn gold" data-hpub-publish-protected="{{ item.id }}" data-hpub-mod="{{ item.module_id }}">Publicar versão aprovada</button>
             {% endif %}
             {% if item.status in ('aguardando_protecao','rejeitado') and not (item.meta or {}).get('pilot_original') and (not job or job.status not in ('queued','running')) %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}" onsubmit="return confirm('Apagar permanentemente este JAR privado? Versões publicadas não serão apagadas.');">
@@ -138,7 +134,7 @@
           {% if candidate or item.status in ('aguardando_protecao','em_teste','pronto_para_aprovacao') %}
           {% set automatic = (item.meta or {}).get('automatic_review') or {} %}
           <details class="hpub-file-review" id="hpub-review-{{ item.id }}">
-            <summary>{% if item.status == 'pronto_para_aprovacao' %}Revisar aprovação{% elif candidate %}Testar e aprovar{% else %}Revisar arquivo{% endif %}</summary>
+            <summary>{% if item.status == 'pronto_para_aprovacao' %}Revisar aprovação{% elif candidate %}Testar e aprovar{% else %}Acompanhar testes{% endif %}</summary>
             {% if candidate %}
               <p><strong>Protegido:</strong> SHA-256 <code title="{{ candidate.sha256 }}">{{ candidate.sha256[:16] }}…</code></p>
               {% if automatic.get('status') == 'passed' and automatic.get('candidate_sha256') == candidate.get('sha256') %}
@@ -173,7 +169,7 @@
               <select id="hpub-decision-{{ item.id }}" name="status" required>
                 <option value="" selected disabled>Selecione...</option>
                 {% if item.status == 'aguardando_protecao' and not candidate %}
-                  <option value="em_teste">Iniciar testes</option>
+                  <option value="em_teste">Marcar como em teste (não instala)</option>
                 {% elif item.status == 'em_teste' and candidate %}
                   <option value="pronto_para_aprovacao">Aprovar para publicação</option>
                 {% elif item.status == 'pronto_para_aprovacao' %}
@@ -181,7 +177,7 @@
                 {% endif %}
                 <option value="rejeitado">Rejeitar arquivo</option>
               </select>
-              <button type="submit" class="hype-v6-btn">Salvar revisão</button>
+              <button type="submit" class="hype-v6-btn">Salvar etapa</button>
             </form>
           </details>
           {% endif %}
@@ -193,20 +189,20 @@
       <p id="hpub-library-no-results" class="hpub-empty" role="status" hidden>Nenhuma versão encontrada. Ajuste a busca ou o filtro.</p>
     </section>
     <details class="hpub-publish-disclosure" id="hpub-publishing-tools">
-      <summary><span><strong>Testar e publicar</strong><small>Área separada para testes privados, revisão e assinatura</small></span><span aria-hidden="true">⌄</span></summary>
+      <summary><span><strong>Testar ou publicar</strong><small>Escolha o mod enviado, sem reenviar o JAR</small></span><span aria-hidden="true">⌄</span></summary>
     <section class="hpub-simple-publish" id="hpub-publish" aria-labelledby="hpub-publish-title">
       <div class="hpub-simple-publish-heading">
         <div>
           <span class="hype-v6-kicker">ATUALIZAÇÕES DO BOOTSTRAP</span>
-          <h2 id="hpub-publish-title">Testar ou publicar</h2>
-          <p>Escolha o arquivo de <strong>Meus arquivos</strong> e publique no canal certo.</p>
+          <h2 id="hpub-publish-title">Teste privado ou publicação para jogadores</h2>
+          <p>Primeiro, experimente no seu Bootstrap. Só depois libere a versão protegida para os jogadores.</p>
         </div>
         <span class="hpub-quick-pill">2 modos</span>
       </div>
       <div class="hpub-publish-grid">
         <article class="hpub-publish-card hpub-publish-card-pilot" id="hpub-private-test">
           <span class="hpub-publish-tag">SÓ MINHA CONTA</span>
-          <h3>Teste privado · JAR original</h3>
+          <h3>Testar só na minha conta</h3>
           <p>Escolha um JAR já guardado em Meus arquivos. Não precisa do JAR protegido nem enviar novamente. {% if owner_pilot_enabled %}Os cinco mods, incluindo o HYPE Client, podem ser testados exclusivamente com seu Bootstrap piloto 0.9.{% else %}Os quatro mods privados usam seu Bootstrap autorizado; o HYPE Client original aparece apenas para consulta e teste manual, sem publicação automática.{% endif %}</p>
           <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_owner_pilot') if owner_pilot_enabled else url_for('hype_mod_admin.mod_release_publish_original_pilot') }}" enctype="multipart/form-data" class="hpub-publish-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -231,7 +227,7 @@
               <p class="hpub-quick-note">Piloto exclusivo do proprietário. Sem manifesto manual. O Bootstrap 0.9 de teste exige autenticação e verifica o SHA-256 do JAR antes de instalar.</p>
               {% endif %}
               <label class="hpub-publish-confirm"><input type="checkbox" name="confirm_pilot" value="yes" required> Confirmo que somente minha conta de teste pode receber este JAR original.</label>
-              <button id="hpub-submit-original" type="submit" class="hype-v6-btn gold" disabled>Publicar teste privado</button>
+              <button id="hpub-submit-original" type="submit" class="hype-v6-btn gold" disabled>Liberar para meu Bootstrap (teste)</button>
             {% else %}
               <p class="hpub-publish-blocked"><strong>Teste no Bootstrap indisponível por enquanto.</strong> Seus originais aparecem para seleção, mas a publicação está bloqueada até ativar o piloto restrito da sua conta no servidor e preparar a assinatura digital. Selecionar não libera o arquivo.</p>
               <button type="button" class="hype-v6-btn" disabled>Publicação privada indisponível</button>
@@ -240,7 +236,7 @@
         </article>
         <article class="hpub-publish-card hpub-publish-card-protected" id="hpub-protected-release">
           <span class="hpub-publish-tag">LANÇAMENTO PROTEGIDO</span>
-          <h3>Publicar JAR protegido</h3>
+          <h3>Publicar para os jogadores</h3>
           <p>Escolha uma versão pronta. O HYPE Client usa seu canal próprio automaticamente; se houver pendências, abra a revisão antes de publicar.</p>
           <form id="hpub-unified-release-form" method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_private') }}"
                 data-hpub-client-action="{{ url_for('hype_mod_admin.mod_release_publish') }}"
@@ -283,48 +279,21 @@
 
 
     </details>
-    <details class="hpub-compact" id="hpub-inspector" {% if report or error %}open{% endif %}>
-      <summary>Analisar arquivo <span>Conferir um JAR sem enviar ou armazenar</span></summary>
-      <form method="post" action="{{ url_for('hype_mod_admin.mod_release_inspect') }}" enctype="multipart/form-data" class="hpub-extra-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label for="hpub-inspect-file">JAR Fabric para análise local em memória</label>
-        <input id="hpub-inspect-file" name="jar" type="file" accept=".jar" required>
-        <button type="submit" class="hype-v6-btn">Analisar arquivo</button>
-      </form>
+    {# Routes de inspeção antigas ainda retornam resultado quando acessadas; não exibimos o formulário duplicado. #}
+    {% if report or error %}
+    <section class="hpub-compact" id="hpub-inspection-result" aria-live="polite">
+      <h2>Resultado da verificação</h2>
       {% if error %}<p role="alert" class="hpub-publish-blocked">{{ error }}</p>{% endif %}
       {% if report %}
-        <p><strong>{{ report.name }} ({{ report.module_id }})</strong> · Versão {{ report.version }}</p>
-        <p>SHA-256: <code>{{ report.sha256 }}</code> · Tamanho: {{ report.size_bytes }} bytes</p>
-        <p>{% if report.requires_client %}Depende do HYPE Client{% else %}Sem dependência declarada do HYPE Client{% endif %}</p>
-        {% if report.compatibility.minecraft %}<p>Minecraft: {{ report.compatibility.minecraft }}</p>{% endif %}
+      <p><strong>{{ report.name }} ({{ report.module_id }})</strong> · Versão {{ report.version }}</p>
+      <p>SHA-256: <code>{{ report.sha256 }}</code> · Tamanho: {{ report.size_bytes }} bytes</p>
+      <p>{% if report.requires_client %}Depende do HYPE Client{% else %}Sem dependência declarada do HYPE Client{% endif %}</p>
+      {% if report.compatibility.minecraft %}<p>Minecraft: {{ report.compatibility.minecraft }}</p>{% endif %}
       {% endif %}
-    </details>
-    {% if protected_upload_enabled %}
-    <details class="hpub-compact" id="hpub-reuse-protected">
-      <summary>Vincular arquivo já armazenado <span>Opcional, sem reenviar o JAR</span></summary>
-      <p>Use somente quando você já tiver guardado o arquivo protegido. Os dois arquivos precisam ser do mesmo mod e versão.</p>
-      <form method="post" action="{{ url_for('hype_mod_admin.mod_release_link_existing') }}" class="hpub-extra-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label for="existing_original">Original em teste</label>
-        <select id="existing_original" name="draft_id" required>
-          <option value="">Selecione o original...</option>
-          {% for item in drafts if item.status == 'em_teste' and not (item.meta or {}).get('protected') %}
-            <option value="{{ item.id }}" data-mod="{{ item.module_id }}" data-version="{{ item.version }}" data-sha="{{ item.sha256 }}">{{ item.module_id }} · {{ item.version }} · {{ item.original_filename or 'Original' }}</option>
-          {% endfor %}
-        </select>
-        <label for="existing_candidate">Arquivo protegido já guardado</label>
-        <select id="existing_candidate" name="source_id" required>
-          <option value="">Selecione o candidato...</option>
-          {% for item in drafts if item.status in ('aguardando_protecao','em_teste') and not (item.meta or {}).get('protected') %}
-            <option value="{{ item.id }}" data-mod="{{ item.module_id }}" data-version="{{ item.version }}" data-sha="{{ item.sha256 }}">{{ item.module_id }} · {{ item.version }} · {{ item.original_filename or 'JAR' }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="hype-v6-btn">Vincular ao original</button>
-      </form>
-    </details>
+    </section>
     {% endif %}
     <details class="hpub-compact" id="hpub-published">
-      <summary>Versões publicadas <span>{{ published_releases|length }} no catálogo</span></summary>
+      <summary>Histórico de publicações <span>{{ published_releases|length }} versão(ões) publicada(s)</span></summary>
       {% if published_releases %}
         <div class="hpub-publication-grid">
         {% for release in published_releases %}
@@ -336,26 +305,7 @@
       {% endif %}
       <p><small>{% if private_rollout_status == 'single_ready' %}Distribuição: somente a conta habilitada.{% elif private_rollout_status == 'clan_ready' %}Distribuição: membros autenticados com permissão.{% else %}Downloads do canal protegido restritos ou bloqueados no servidor.{% endif %}</small></p>
     </details>
-    {% if pilot_original_enabled and test_channels %}
-    <details class="hpub-compact" id="hpub-extra">
-      <summary>Opções adicionais <span>Canais privados de teste</span></summary>
-        <h3>Escolher fonte do Bootstrap de teste</h3>
-        <p>Troque entre original e protegido somente para sua conta de teste, sem afetar o clã.</p>
-        {% for channel in test_channels if channel.original_draft_id %}
-          <form method="post" action="{{ url_for('hype_mod_admin.mod_release_select_test_channel') }}" class="hpub-extra-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="draft_id" value="{{ channel.original_draft_id }}">
-            <label for="hpub-source-{{ loop.index }}">{{ channel.module_id }}</label>
-            <select id="hpub-source-{{ loop.index }}" name="source" required>
-              <option value="original" {% if channel.source == 'original' %}selected{% endif %}>JAR original (teste privado)</option>
-              <option value="protected" {% if channel.source == 'protected' %}selected{% endif %} {% if not channel.protected_release %}disabled{% endif %}>JAR protegido aprovado{% if not channel.protected_release %} (indisponível){% endif %}</option>
-            </select>
-            <button type="submit" class="hype-v6-btn">Salvar canal</button>
-          </form>
-        {% endfor %}
-    </details>
-    {% endif %}
   </div>
 </section>
-<script src="{{ url_for('static', filename='hype_publish_center.js') }}?v=4" defer></script>
+<script src="{{ url_for('static', filename='hype_publish_center.js') }}?v=5" defer></script>
 {% endblock %}

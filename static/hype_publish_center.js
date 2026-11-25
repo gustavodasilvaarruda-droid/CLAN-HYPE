@@ -157,26 +157,6 @@
       });
     });
 
-    const existingOriginal = root.querySelector('#existing_original');
-    const existingCandidate = root.querySelector('#existing_candidate');
-    function filterExistingCandidates() {
-      if (!existingOriginal || !existingCandidate) return;
-      const src = existingOriginal.selectedOptions[0];
-      Array.from(existingCandidate.options).forEach(opt => {
-        if (!opt.value) return;
-        const compatible = Boolean(src?.value)
-          && opt.value !== src.value
-          && opt.dataset.mod === src.dataset.mod
-          && opt.dataset.version === src.dataset.version
-          && opt.dataset.sha !== src.dataset.sha;
-        opt.disabled = !compatible;
-        opt.hidden = !compatible;
-      });
-      if (existingCandidate.selectedOptions[0]?.disabled) existingCandidate.value = '';
-    }
-    existingOriginal?.addEventListener('change', filterExistingCandidates);
-    filterExistingCandidates();
-
     root.querySelectorAll('[data-hpub-publish-protected]').forEach(button => {
       button.addEventListener('click', () => {
         if (!protectedChoice) return;
