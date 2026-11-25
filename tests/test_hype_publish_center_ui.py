@@ -51,7 +51,9 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertIn("na fila dos arquivos exibidos", self.html)
         self.assertIn("not (job and job.status in ('queued','running'))", self.html)
         self.assertIn("linked_jobs", staging)
-        self.assertIn("A exclusão está bloqueada", staging)
+        self.assertIn("A proteção deste arquivo está em andamento", staging)
+        self.assertIn("A fila de proteção mudou durante a exclusão", staging)
+        self.assertIn("(not job or job.status != 'running')", self.html)
 
     def test_required_protected_release_approval_is_preserved(self):
         endpoints = (
