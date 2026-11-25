@@ -357,6 +357,55 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
+
+    @bp.get("/admin/modulos/releases/protegido-teste/<draft_id>")
+    def mod_release_protected_test_download(draft_id):
+        """Download ONLY the reviewed candidate for an admin's local game test.
+
+        This endpoint never appears in the public or Bootstrap catalogues.
+        """
+        admin_only()
+        if not staging_enabled or db is None:
+            abort(404)
+        try:
+            selected_id = parse_draft_id(draft_id)
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,storage_path,meta"
+            ).eq("id", selected_id).limit(1).execute().data or [])
+            if not rows or rows[0].get("status") not in ("em_teste", "pronto_para_aprovacao"):
+                abort(404)
+            draft = rows[0]
+            protected = (draft.get("meta") or {}).get("protected") or {}
+            sha, path = protected.get("sha256"), protected.get("storage_path")
+            if (not isinstance(sha, str) or not re.fullmatch(r"[a-f0-9]{64}", sha)
+                    or not isinstance(path, str)
+                    or not re.fullmatch(
+                        rf"{re.escape(draft['module_id'])}/{re.escape(str(selected_id))}/protected/"
+                        rf"[a-f0-9]{{32}}/{sha}\\.jar", path)):
+                abort(404)
+            assert_private_bucket(db.storage)
+            original = db.storage.from_(BUCKET).download(draft["storage_path"])
+            candidate = db.storage.from_(BUCKET).download(path)
+            validate_binary(original, expected_sha=draft["sha256"])
+            audit_candidate_pair(original, candidate, draft)
+        except (InvalidJar, InvalidRelease, UnsafeBuild, ValueError, KeyError, TypeError):
+            abort(404)
+        except Exception as exc:
+            from werkzeug.exceptions import HTTPException
+            if isinstance(exc, HTTPException):
+                raise
+            abort(503)
+        response = send_file(
+            io.BytesIO(candidate), mimetype="application/java-archive",
+            as_attachment=True,
+            download_name=f"{draft['module_id']}-protegido-teste-{sha[:12]}.jar",
+            max_age=0,
+        )
+        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
     @bp.get("/admin/modulos/releases")
     def mod_releases():
         admin_only()
@@ -759,6 +808,70 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash(str(exc), "erro")
         except Exception:
             flash("Não foi possível verificar os arquivos privados. Não aprove até corrigir.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+
+    @bp.post("/admin/modulos/releases/reabrir-teste")
+    def mod_release_reopen_rejected():
+        """Explicitly retry an archived original; no new upload or publication."""
+        admin_only()
+        if not staging_enabled or db is None:
+            abort(404)
+        try:
+            if request.form.get("confirm_retry") != "yes":
+                raise InvalidJar("Confirme a reabertura para teste privado.")
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,size_bytes,storage_path,meta"
+            ).eq("id", draft_id).limit(1).execute().data or [])
+            if not rows or rows[0].get("status") != "rejeitado":
+                raise InvalidJar("Somente originais rejeitados podem ser reabertos.")
+            draft = rows[0]
+            meta = dict(draft.get("meta") or {})
+            if any(meta.get(k) for k in ("protected", "owner_pilot", "pilot_original")):
+                raise InvalidJar("Esta versão já tem candidato ou registro de publicação; envie outro original.")
+            mod_id, sha, path = draft["module_id"], draft["sha256"], draft["storage_path"]
+            if (mod_id not in IDS or not isinstance(sha, str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", sha)
+                    or not isinstance(path, str)
+                    or not re.fullmatch(
+                        rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\\.jar", path)):
+                raise InvalidJar("Caminho do original inválido; teste bloqueado.")
+            # Never reactivate a file connected to an immutable publication.
+            for catalog in (PUBLISHED, "hype_mod_restricted_releases"):
+                if (db.table(catalog).select("release").eq("draft_id", draft_id)
+                        .limit(1).execute().data or []):
+                    raise InvalidJar("Este original já pertence a uma publicação.")
+            from modules.hype_mod_protection_queue import JOBS
+            running = (db.table(JOBS).select("status").eq("draft_id", str(draft_id))
+                       .limit(10).execute().data or [])
+            if any(j.get("status") in ("queued", "running") for j in running):
+                raise InvalidJar("A fila está processando este arquivo. Aguarde.")
+            assert_private_bucket(db.storage)
+            original = db.storage.from_(BUCKET).download(path)
+            validate_binary(original, expected_sha=sha)
+            report = inspect_original(original)
+            if ((report["module_id"], report["version"], report["size_bytes"])
+                    != (mod_id, draft["version"], draft["size_bytes"])):
+                raise InvalidJar("O original armazenado não corresponde ao registro.")
+            meta.pop("automatic_review", None)
+            meta.pop("manual_review", None)
+            updated = (db.table(TABLE).update({
+                "status": "aguardando_protecao", "meta": meta,
+            }).eq("id", draft_id).eq("status", "rejeitado").execute())
+            if not updated.data:
+                raise InvalidJar("O estado mudou. Atualize a página e tente de novo.")
+            if registrar_log:
+                try:
+                    registrar_log("reabrir_original_para_teste", "hype_mods", TABLE,
+                                  draft_id, {"sha256": sha, "publicado": False})
+                except Exception:
+                    pass
+            flash("Original reaberto para teste privado. Vincule agora o Piloto 6 protegido; ninguém recebeu atualização.", "sucesso")
+        except (InvalidJar, InvalidRelease, ValueError, UnsafeBuild) as exc:
+            flash(str(exc), "erro")
+        except Exception:
+            flash("Não foi possível reabrir o original privado. Confira o armazenamento e a fila.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/excluir")
