@@ -35,6 +35,15 @@ class PublishCenterUiTests(unittest.TestCase):
         self.assertIn("hype_publish_center.js", self.html)
         self.assertIn("hype_publish_center.css", self.html)
 
+    def test_unnecessary_panels_are_not_shown(self):
+        for unused in ('id="hpub-inspector"', 'id="hpub-reuse-protected"', 'id="hpub-extra"'):
+            self.assertNotIn(unused, self.html)
+        self.assertIn('Histórico de publicações', self.html)
+        self.assertIn('Testar só na minha conta', self.html)
+        self.assertIn('Marcar como em teste (não instala)', self.html)
+        self.assertIn('Publicar versão aprovada', self.html)
+        self.assertNotIn('Selecionar para publicar', self.html)
+
     def test_required_protected_release_approval_is_preserved(self):
         endpoints = (
             "mod_release_upload",
@@ -44,7 +53,6 @@ class PublishCenterUiTests(unittest.TestCase):
             "mod_release_publish",
             "mod_release_publish_private",
             "mod_release_publish_original_pilot",
-            "mod_release_select_test_channel",
             "mod_release_delete",
         )
         for endpoint in endpoints:
