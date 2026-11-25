@@ -24,9 +24,9 @@ def jar(marker):
             ]},
             "depends": {"minecraft": "1.21.1", "java": ">=21"},
         }))
-        archive.writestr("br/clanhype/client/HypeClient.class", b"\\xca\\xfe\\xba\\xbe" + b"x" * 1024)
+        archive.writestr("br/clanhype/client/HypeClient.class", b"\xca\xfe\xba\xbe" + b"x" * 1024)
         archive.writestr("br/clanhype/client/update/HypeAutoUpdateClient.class",
-                         b"\\xca\\xfe\\xba\\xbe" + b"y" * 1024)
+                         b"\xca\xfe\xba\xbe" + b"y" * 1024)
         archive.writestr("assets/hype/test.txt", marker * 64)
     return output.getvalue()
 
