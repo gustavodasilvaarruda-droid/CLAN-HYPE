@@ -35,6 +35,7 @@ class Query:
         self.table = table
         self.filters = []
         self.is_delete = False
+        self.update_fields = None
 
     def select(self, *_fields):
         return self
@@ -50,17 +51,26 @@ class Query:
         self.is_delete = True
         return self
 
+    def update(self, fields):
+        self.update_fields = fields
+        return self
+
     def execute(self):
         if self.table == "hype_mod_release_drafts":
             source = self.db.drafts
         elif self.table == "hype_mod_published_releases":
             source = self.db.published
+        elif self.table == "hype_mod_protection_jobs":
+            source = self.db.jobs
         else:
             raise AssertionError(self.table)
         rows = [r for r in source if all(r.get(key) == value for key, value in self.filters)]
         if self.is_delete:
             for row in rows:
                 source.remove(row)
+        elif self.update_fields is not None:
+            for row in rows:
+                row.update(self.update_fields)
         return SimpleNamespace(data=[row.copy() for row in rows])
 
 
@@ -68,6 +78,7 @@ class Database:
     def __init__(self):
         self.drafts = []
         self.published = []
+        self.jobs = []
         self.storage = Storage()
 
     def table(self, name):
@@ -135,6 +146,25 @@ class PrivateCleanupTests(unittest.TestCase):
         }}
         self.assertEqual(self.delete().status_code, 302)
         self.assertEqual(self.db.storage.removed, [self.original, protected])
+
+    def test_queued_job_is_canceled_before_draft_deletion(self):
+        self.login()
+        job = {"id": str(uuid4()), "draft_id": self.draft_id, "status": "queued"}
+        self.db.jobs.append(job)
+        self.delete()
+        self.assertEqual(self.db.drafts, [])
+        self.assertEqual(job["status"], "failed")
+        self.assertIn("Cancelado", job["failure_reason"])
+        self.assertEqual(self.db.storage.removed, [self.original])
+
+    def test_running_job_blocks_deletion(self):
+        self.login()
+        self.db.jobs.append({
+            "id": str(uuid4()), "draft_id": self.draft_id, "status": "running"
+        })
+        self.delete()
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(self.db.storage.removed, [])
 
     def test_testing_and_approved_builds_are_not_deleted(self):
         self.login()

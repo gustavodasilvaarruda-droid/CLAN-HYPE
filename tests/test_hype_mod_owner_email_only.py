@@ -16,6 +16,7 @@ class OwnerReleaseCenterTests(unittest.TestCase):
         self.env_patch = patch.dict(os.environ, {
             "HYPE_PRIVATE_MOD_ROLLOUT_SCOPE": "single",
             "HYPE_PRIVATE_MOD_TESTER_EMAIL": OWNER,
+            "HYPE_MOD_ORIGINAL_OWNER_EMAIL": OWNER,
             "HYPE_MOD_STAGING_ENABLED": "0",
             "HYPE_MOD_ORIGINAL_TEST_DOWNLOAD_ENABLED": "0",
         })
@@ -56,6 +57,11 @@ class OwnerReleaseCenterTests(unittest.TestCase):
         # 404 confirms the owner passed admin_only and hit a disabled endpoint.
         path = f"/admin/modulos/releases/original-teste/{DRAFT_ID}"
         self.assertEqual(self.as_user(OWNER.upper(), path).status_code, 404)
+
+    def test_original_owner_config_is_required_even_if_rollout_allows_user(self):
+        path = f"/admin/modulos/releases/original-teste/{DRAFT_ID}"
+        with patch.dict(os.environ, {"HYPE_MOD_ORIGINAL_OWNER_EMAIL": ""}):
+            self.assertEqual(self.as_user(OWNER, path).status_code, 403)
 
     def test_missing_config_fails_closed_for_owner(self):
         with patch.dict(os.environ, {"HYPE_PRIVATE_MOD_TESTER_EMAIL": ""}):

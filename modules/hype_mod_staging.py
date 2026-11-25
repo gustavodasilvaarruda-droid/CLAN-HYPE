@@ -5,6 +5,7 @@ Feature flag is OFF by default. Never put service keys in templates or client JA
 from __future__ import annotations
 
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -45,6 +46,18 @@ def valid_module_id(module_id):
 
 class InvalidJar(ValueError):
     pass
+
+
+def original_owner_authorized(authenticated_email, environ=None):
+    """Somente o email do proprietario configurado no servidor pode baixar originais.
+
+    A identidade vem da sessao Flask assinada, nunca de query/body/header.
+    Sem configuracao o download fica bloqueado (fail closed).
+    """
+    env = os.environ if environ is None else environ
+    target = (env.get("HYPE_MOD_ORIGINAL_OWNER_EMAIL") or "").strip().lower()
+    account = authenticated_email.strip().lower() if isinstance(authenticated_email, str) else ""
+    return bool(target and account and hmac.compare_digest(account.encode('utf-8'), target.encode('utf-8')))
 
 
 def parse_draft_id(raw):
@@ -180,7 +193,7 @@ def read_original_for_admin_test(db, draft_id):
     sha = draft.get("sha256")
     path = draft.get("storage_path")
     if (not valid_module_id(module_id)
-            or draft.get("status") not in ("aguardando_protecao", "em_teste")
+            or draft.get("status") not in ("aguardando_protecao", "em_teste", "pronto_para_aprovacao")
             or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha)
             or not isinstance(path, str)
             or not re.fullmatch(rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\.jar", path)):
@@ -196,6 +209,31 @@ def read_original_for_admin_test(db, draft_id):
             or report["sha256"] != sha):
         raise InvalidJar("Arquivo privado nao corresponde a versao registrada.")
     return raw, report
+
+
+def stop_queued_protection_before_delete(db, draft_id):
+    """Block deletion of running work; cancel queued work before removing its draft.
+
+    A conditional status update prevents a worker from claiming the same job
+    after cancellation. If a worker claimed it first, deletion is refused.
+    """
+    from modules.hype_mod_protection_queue import JOBS
+
+    jobs = (db.table(JOBS).select("id,status")
+            .eq("draft_id", str(draft_id)).limit(1).execute().data or [])
+    if not jobs:
+        return
+    job = jobs[0]
+    if job.get("status") == "running":
+        raise ValueError("A proteção já começou. Espere terminar antes de excluir.")
+    if job.get("status") == "queued":
+        canceled = (db.table(JOBS).update({
+            "status": "failed",
+            "failure_reason": "Cancelado antes da exclusao do rascunho.",
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", job["id"]).eq("status", "queued").execute().data or [])
+        if not canceled:
+            raise ValueError("A proteção começou durante a exclusão. Atualize a página.")
 
 
 def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
@@ -330,15 +368,18 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             return []
 
     def load_protection_jobs():
-        if db is None or not protection_queue_enabled:
+        # Show existing queued/running jobs even if accepting NEW jobs is disabled.
+        if db is None:
             return {}
         from modules.hype_mod_protection_queue import jobs_for_drafts
         return jobs_for_drafts(db)
 
     @bp.get("/admin/modulos/releases/original-teste/<draft_id>")
     def mod_release_original_test_download(draft_id):
-        """Admin-only download for local testing. NEVER a Bootstrap release."""
+        """Owner-only download for local testing. NEVER a Bootstrap release."""
         admin_only()
+        if not original_owner_authorized(session.get("usuario_email")):
+            abort(403)
         if not original_test_download_enabled or db is None:
             abort(404)
         try:
@@ -382,7 +423,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
-            original_test_download_enabled=original_test_download_enabled,
+            original_test_download_enabled=original_test_download_enabled and original_owner_authorized(session.get("usuario_email")),
             private_publish_enabled=private_publish_enabled,
             pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
             owner_pilot_enabled=owner_pilot_enabled(session.get("usuario_email")),
@@ -426,7 +467,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
             staging_enabled=staging_enabled, publish_enabled=publish_enabled,
             protected_upload_enabled=protected_upload_enabled,
-            original_test_download_enabled=original_test_download_enabled,
+            original_test_download_enabled=original_test_download_enabled and original_owner_authorized(session.get("usuario_email")),
             private_publish_enabled=private_publish_enabled,
             pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
             owner_pilot_enabled=owner_pilot_enabled(session.get("usuario_email")),
@@ -493,9 +534,13 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                          "compatibility": report["compatibility"], "static_audit": static_audit},
             }).execute()
             if registrar_log:
-                registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
-                              (saved.data or [{}])[0].get("id"),
-                              {"modulo": report["module_id"], "sha256": report["sha256"]})
+                try:
+                    registrar_log("upload_jar_original", "hype_mods", "hype_mod_release_drafts",
+                                  (saved.data or [{}])[0].get("id"),
+                                  {"modulo": report["module_id"], "sha256": report["sha256"]})
+                except Exception:
+                    # Audit outage must never remove a JAR after the draft was committed.
+                    pass
             if protection_queue_enabled:
                 # Enfileira automaticamente apenas depois do upload privado e
                 # do registro do draft. Falha na fila nao apaga o original.
@@ -822,6 +867,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     raise ValueError("Este arquivo faz parte de uma publicação e não pode ser apagado.")
 
             assert_private_bucket(db.storage)
+            stop_queued_protection_before_delete(db, draft_id)
             # Delete the database record first. A published release's FK protects
             # it even if another admin starts publication between the two checks.
             # Then remove ONLY the paths belonging to this now-deleted draft.

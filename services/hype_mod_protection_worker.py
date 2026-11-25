@@ -19,8 +19,8 @@ from uuid import uuid4
 from modules.hype_mod_build_checks import check_candidate_compatibility
 from modules.hype_mod_protection_queue import JOBS
 from modules.hype_mod_staging import (
-    BUCKET, IDS, MAX_UPLOAD, TABLE, InvalidJar,
-    assert_private_bucket, audit_candidate_pair, inspect_original, parse_draft_id,
+    BUCKET, MAX_UPLOAD, TABLE, InvalidJar,
+    assert_private_bucket, audit_candidate_pair, inspect_original, parse_draft_id, valid_module_id,
 )
 from modules.hype_signed_release import validate_binary
 
@@ -88,7 +88,7 @@ def _load_draft(db, job):
         raise ProtectionError("Original nao encontrado.")
     d = rows[0]
     if (d.get("status") not in ("aguardando_protecao", "em_teste")
-            or d.get("module_id") not in IDS
+            or not valid_module_id(d.get("module_id"))
             or d.get("sha256") != job["job_sha256"]
             or (d.get("meta") or {}).get("protected")):
         raise ProtectionError("Original mudou desde o pedido de protecao.")
