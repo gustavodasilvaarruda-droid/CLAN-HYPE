@@ -279,6 +279,19 @@
 
 
     </details>
+    {# Routes de inspeção antigas ainda retornam resultado quando acessadas; não exibimos o formulário duplicado. #}
+    {% if report or error %}
+    <section class="hpub-compact" id="hpub-inspection-result" aria-live="polite">
+      <h2>Resultado da verificação</h2>
+      {% if error %}<p role="alert" class="hpub-publish-blocked">{{ error }}</p>{% endif %}
+      {% if report %}
+      <p><strong>{{ report.name }} ({{ report.module_id }})</strong> · Versão {{ report.version }}</p>
+      <p>SHA-256: <code>{{ report.sha256 }}</code> · Tamanho: {{ report.size_bytes }} bytes</p>
+      <p>{% if report.requires_client %}Depende do HYPE Client{% else %}Sem dependência declarada do HYPE Client{% endif %}</p>
+      {% if report.compatibility.minecraft %}<p>Minecraft: {{ report.compatibility.minecraft }}</p>{% endif %}
+      {% endif %}
+    </section>
+    {% endif %}
     <details class="hpub-compact" id="hpub-published">
       <summary>Histórico de publicações <span>{{ published_releases|length }} versão(ões) publicada(s)</span></summary>
       {% if published_releases %}
