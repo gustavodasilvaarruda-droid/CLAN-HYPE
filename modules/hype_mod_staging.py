@@ -843,9 +843,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         .limit(1).execute().data or []):
                     raise InvalidJar("Este original já pertence a uma publicação.")
             from modules.hype_mod_protection_queue import JOBS
-            running = (db.table(JOBS).select("status").eq("draft_id", str(draft_id))
-                       .limit(10).execute().data or [])
-            if any(j.get("status") in ("queued", "running") for j in running):
+            # Old rejected originals may still have queued jobs. Remove only
+            # idle jobs after validating the archived original. Compare-and-
+            # delete prevents a worker from claiming a job mid-retry.
+            stale_jobs = (db.table(JOBS).select("id,status").eq("draft_id", str(draft_id))
+                          .limit(100).execute().data or [])
+            if len(stale_jobs) >= 100 or any(
+                j.get("status") not in ("queued", "failed", "completed") for j in stale_jobs
+            ):
                 raise InvalidJar("A fila está processando este arquivo. Aguarde.")
             assert_private_bucket(db.storage)
             original = db.storage.from_(BUCKET).download(path)
@@ -854,6 +859,12 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             if ((report["module_id"], report["version"], report["size_bytes"])
                     != (mod_id, draft["version"], draft["size_bytes"])):
                 raise InvalidJar("O original armazenado não corresponde ao registro.")
+            for job in stale_jobs:
+                removed = (db.table(JOBS).delete()
+                           .eq("id", job["id"]).eq("draft_id", str(draft_id))
+                           .eq("status", job["status"]).execute().data or [])
+                if not removed:
+                    raise InvalidJar("A fila mudou durante a reabertura. Atualize a página.")
             meta.pop("automatic_review", None)
             meta.pop("manual_review", None)
             updated = (db.table(TABLE).update({

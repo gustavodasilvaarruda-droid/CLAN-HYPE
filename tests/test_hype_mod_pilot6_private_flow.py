@@ -53,6 +53,7 @@ class Query:
         self.db, self.name = db, name
         self.filters = []
         self.changes = None
+        self.is_delete = False
 
     def select(self, *_fields):
         return self
@@ -68,13 +69,21 @@ class Query:
         self.changes = changes
         return self
 
+    def delete(self):
+        self.is_delete = True
+        return self
+
     def execute(self):
         rows = self.db.rows[self.name]
         matched = [item for item in rows if all(item.get(k) == v for k, v in self.filters)]
         if self.changes:
             for item in matched:
                 item.update(self.changes)
-        return SimpleNamespace(data=[dict(item) for item in matched])
+        copied = [dict(item) for item in matched]
+        if self.is_delete:
+            for item in matched:
+                rows.remove(item)
+        return SimpleNamespace(data=copied)
 
 
 class Database:
@@ -154,6 +163,24 @@ class ClientPilotSixPrivateTests(unittest.TestCase):
         self.assertEqual(self.record["status"], "aguardando_protecao")
         self.assertEqual(self.db.rows["hype_mod_published_releases"], [])
         self.assertEqual(self.db.storage.blobs[self.origpath], self.original)
+
+    def test_rejected_original_with_queued_job_can_be_reopened(self):
+        self.login()
+        self.db.rows["hype_mod_protection_jobs"].append({
+            "id": str(uuid4()), "draft_id": self.id, "status": "queued",
+        })
+        self.assertEqual(self.retry().status_code, 302)
+        self.assertEqual(self.record["status"], "aguardando_protecao")
+        self.assertEqual(self.db.rows["hype_mod_protection_jobs"], [])
+        self.assertEqual(self.db.storage.blobs[self.origpath], self.original)
+
+    def test_running_job_blocks_reopening_without_deleting(self):
+        self.login()
+        job = {"id": str(uuid4()), "draft_id": self.id, "status": "running"}
+        self.db.rows["hype_mod_protection_jobs"].append(job)
+        self.assertEqual(self.retry().status_code, 302)
+        self.assertEqual(self.record["status"], "rejeitado")
+        self.assertEqual(self.db.rows["hype_mod_protection_jobs"], [job])
 
     def test_retry_never_undoes_published_or_protected_record(self):
         self.login()
