@@ -39,6 +39,7 @@ class PublishCenterUiTests(unittest.TestCase):
         for unused in ('id="hpub-inspector"', 'id="hpub-reuse-protected"', 'id="hpub-extra"'):
             self.assertNotIn(unused, self.html)
         self.assertIn('Histórico de publicações', self.html)
+        self.assertIn('id="hpub-inspection-result"', self.html)
         self.assertIn('Testar só na minha conta', self.html)
         self.assertIn('Marcar como em teste (não instala)', self.html)
         self.assertIn('Publicar versão aprovada', self.html)
