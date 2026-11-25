@@ -165,36 +165,30 @@ class QuickReleaseFlowTests(unittest.TestCase):
         self.assertEqual(self.db.rows[TABLE][0]["status"], "pronto_para_aprovacao")
         self.assertEqual(self.db.storage.added, [])
 
-    def test_direct_publishing_replaces_legacy_private_channel(self):
+    def test_one_upload_replaces_original_protected_wizard(self):
         template = (Path(__file__).resolve().parents[1] /
                     "templates" / "admin_hype_mod_releases.html").read_text(encoding="utf-8")
         Environment().parse(template)
+        self.assertIn('id="hpub-quick"', template)
         self.assertIn('id="hpub-publish"', template)
-        self.assertIn('id="hpub-private-test"', template)
-        self.assertIn('id="hpub-protected-release"', template)
-        self.assertIn('Não precisa do JAR protegido', template)
-        self.assertEqual(template.count("url_for('hype_mod_admin.mod_release_publish_original_pilot')"), 1)
-        self.assertEqual(template.count("url_for('hype_mod_admin.mod_release_publish_private')"), 1)
-        self.assertNotIn("Canal privado: Pokédex", template)
-        self.assertIn('name="confirm_pilot"', template)
+        self.assertIn('id="hpub-unified-upload-form"', template)
+        self.assertEqual(template.count('name="jar"'), 1)
+        self.assertIn('data-hpub-mod-group', template)
+        self.assertIn("mod_release_library_download", template)
+        self.assertIn("mod_release_publish_owner_pilot", template)
+        self.assertIn("mod_release_publish_private", template)
         self.assertIn('name="confirm_release"', template)
-        self.assertIn('data-hpub-publish-original=', template)
-        self.assertIn('data-hpub-publish-protected=', template)
         self.assertIn('id="hpub-published"', template)
-        self.assertNotIn('id="hpub-advanced"', template)
-        self.assertNotIn('hpub-stepper', template)
-        self.assertNotIn('data-hpub-stage=', template)
+        self.assertNotIn('data-hpub-mode="protected"', template)
+        self.assertNotIn('hpub-quick-protected', template)
+        self.assertNotIn('mod_release_protected_upload', template)
 
     def test_template_contains_quick_actions_and_valid_jinja(self):
         template = (Path(__file__).resolve().parents[1] /
                     "templates" / "admin_hype_mod_releases.html").read_text(encoding="utf-8")
         Environment().parse(template)
-        for marker in ('id="hpub-quick"', 'id="hpub-publish"',
-                       'data-hpub-mode="original"', 'data-hpub-mode="protected"',
-                       'data-hpub-new-version', 'data-hpub-select-protected',
-                       'hpub-file-review', 'test_game_launch', 'test_menus',
-                       'test_server_connection', 'test_no_crashes',
-                       'mod_release_review', 'mod_release_verify',
+        for marker in ('id="hpub-quick"', 'id="hpub-publishing-tools"',
+                       'data-hpub-new-version', 'data-hpub-file-card',
                        'mod_release_delete', 'mod_release_upload'):
             self.assertIn(marker, template)
 
