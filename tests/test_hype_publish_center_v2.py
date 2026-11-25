@@ -64,6 +64,19 @@ class PublishCenterV2Tests(unittest.TestCase):
         self.assertIn('type="submit"', self.template)
         self.assertNotIn("sessionStorage", self.js)
 
+    def test_search_and_stage_filters_are_accessible(self):
+        self.assertIn('id="hpub-library-search"', self.template)
+        self.assertIn('id="hpub-library-stage"', self.template)
+        self.assertIn('data-hpub-file-status="{{ item.status }}"', self.template)
+        self.assertIn('id="hpub-library-no-results"', self.template)
+        self.assertIn("function filterLibrary()", self.js)
+        self.assertIn("librarySearch?.addEventListener('input', filterLibrary)", self.js)
+        self.assertIn("libraryStage?.addEventListener('change', filterLibrary)", self.js)
+        self.assertIn(".hpub-file-card[hidden]", self.css)
+
+    def test_delete_action_hidden_for_active_protection_job(self):
+        self.assertIn("job.status not in ('queued','running')", self.template)
+
     def test_dark_responsive_design(self):
         self.assertIn('.hpub-priority', self.css)
         self.assertIn('.hpub-flow', self.css)
