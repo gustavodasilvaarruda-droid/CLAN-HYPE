@@ -11,6 +11,8 @@ class HypeOriginalOwnerAccessTests(unittest.TestCase):
         self.assertTrue(original_owner_authorized("OWNER@example.com", env))
         self.assertFalse(original_owner_authorized("admin2@example.com", env))
         self.assertFalse(original_owner_authorized("owner@example.com.evil", env))
+        self.assertFalse(original_owner_authorized("á@example.com", env))
+        self.assertFalse(original_owner_authorized(12345, env))
 
     def test_sem_configuracao_nunca_libera(self):
         self.assertFalse(original_owner_authorized("owner@example.com", {}))
