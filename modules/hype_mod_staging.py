@@ -795,8 +795,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         original_path,
                     )):
                 raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
-            if (draft.get("meta") or {}).get("pilot_original"):
-                raise ValueError("Original ja publicado no piloto e nao pode ser apagado.")
+            if any((draft.get("meta") or {}).get(key) for key in ("pilot_original", "owner_pilot")):
+                raise ValueError("Original publicado em um canal piloto e nao pode ser apagado.")
             paths = [original_path]
             protected = (draft.get("meta") or {}).get("protected") or {}
             if protected:
@@ -827,13 +827,17 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
 
             # Never delete a release referenced in the catalog, including disabled
             # releases retained for rollback and old versions still in use.
-            if (db.table(PUBLISHED).select("release").eq("draft_id", draft_id)
-                    .limit(1).execute().data or []):
-                raise ValueError("Esta versão está vinculada a uma publicação e não pode ser apagada.")
-            for path in paths:
-                if (db.table(PUBLISHED).select("release").eq("storage_path", path)
+            # Both the Client and the restricted-mod catalogues can retain
+            # previously published files for rollback, even when disabled.
+            # If either catalogue is unavailable, fail closed: do not delete.
+            for catalog in (PUBLISHED, "hype_mod_restricted_releases"):
+                if (db.table(catalog).select("release").eq("draft_id", draft_id)
                         .limit(1).execute().data or []):
-                    raise ValueError("Este arquivo faz parte de uma publicação e não pode ser apagado.")
+                    raise ValueError("Esta versão está vinculada a uma publicação e não pode ser apagada.")
+                for path in paths:
+                    if (db.table(catalog).select("release").eq("storage_path", path)
+                            .limit(1).execute().data or []):
+                        raise ValueError("Este arquivo faz parte de uma publicação e não pode ser apagado.")
 
             assert_private_bucket(db.storage)
             # Cancel pending protection only after all publication checks passed.
