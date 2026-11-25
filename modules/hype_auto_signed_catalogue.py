@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import unicodedata
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -27,6 +28,24 @@ MOD_ID = re.compile(r"[a-z][a-z0-9_-]{1,63}\Z", re.ASCII)
 MAX_MODS = 100
 MAX_CATALOGUE_BYTES = 256 * 1024
 RELEASE_STATES = frozenset(("aguardando_protecao", "em_teste", "pronto_para_aprovacao"))
+# A library upload is not permission to distribute an explicitly marked test build.
+NON_DISTRIBUTABLE = re.compile(
+    r"(?:^|[^a-z0-9])(?:nao[ _-]*distribuir|piloto|teste|test|"
+    r"experimental|preview[0-9]*|alpha[0-9]*|beta[0-9]*|validacao)"
+    r"(?=[^a-z0-9]|$)", re.ASCII
+)
+
+
+def _safe_public_build(row):
+    filename, version = row.get("original_filename"), row.get("version")
+    if (not isinstance(filename, str) or not filename.lower().endswith(".jar")
+            or "/" in filename or chr(92) in filename
+            or not isinstance(version, str)):
+        return False
+    # Canonicalise accents so NAO-DISTRIBUIR and NÃO DISTRIBUIR agree.
+    label = unicodedata.normalize("NFKD", filename + " " + version)
+    label = label.encode("ascii", "ignore").decode("ascii").lower()
+    return NON_DISTRIBUTABLE.search(label) is None
 
 
 class AutoCatalogUnavailable(ValueError):
@@ -63,7 +82,7 @@ def _eligible(row):
         row.get("module_id"), row.get("version"), row.get("sha256"),
         row.get("storage_path"), row.get("size_bytes"),
     )
-    if row.get("status") not in RELEASE_STATES:
+    if row.get("status") not in RELEASE_STATES or not _safe_public_build(row):
         return False
     if not isinstance(row.get("meta"), dict) or row["meta"].get("library_upload") is not True:
         return False
@@ -87,7 +106,7 @@ def _eligible(row):
 def _uploaded_rows(db):
     try:
         return (db.table(TABLE)
-                .select("module_id,version,sha256,size_bytes,storage_path,status,meta,created_at")
+                .select("module_id,version,sha256,size_bytes,storage_path,status,meta,original_filename,created_at")
                 .order("created_at", desc=True)
                 .limit(1000)
                 .execute().data or [])
