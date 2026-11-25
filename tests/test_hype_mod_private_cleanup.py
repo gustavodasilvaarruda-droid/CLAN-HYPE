@@ -55,6 +55,8 @@ class Query:
             source = self.db.drafts
         elif self.table == "hype_mod_published_releases":
             source = self.db.published
+        elif self.table == "hype_mod_restricted_releases":
+            source = self.db.restricted
         elif self.table == "hype_mod_protection_jobs":
             source = self.db.jobs
         else:
@@ -70,6 +72,7 @@ class Database:
     def __init__(self):
         self.drafts = []
         self.published = []
+        self.restricted = []
         self.jobs = []
         self.storage = Storage()
 
@@ -157,18 +160,78 @@ class PrivateCleanupTests(unittest.TestCase):
         self.assertEqual(len(self.db.drafts), 1)
         self.assertEqual(self.db.storage.removed, [])
 
-    def test_any_linked_protection_job_blocks_deletion(self):
+    def test_owner_pilot_original_must_not_be_deleted(self):
         self.login()
-        for status in ("queued", "running", "failed", "completed"):
-            with self.subTest(status=status):
-                self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
-                                    "status": status}]
+        self.db.drafts[0]["meta"] = {"owner_pilot": {"release": 1}}
+        self.db.jobs.append({"id": "job-test", "draft_id": self.draft_id,
+                             "status": "queued"})
+        self.assertEqual(self.delete().status_code, 302)
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(len(self.db.jobs), 1)
+        self.assertEqual(self.db.storage.removed, [])
+
+    def test_restricted_catalog_preserved_even_when_disabled(self):
+        self.login()
+        for match in ("draft", "storage"):
+            with self.subTest(match=match):
+                self.db.drafts[0]["status"] = "rejeitado"
+                self.db.restricted[:] = [{
+                    "release": 1,
+                    "draft_id": self.draft_id if match == "draft" else str(uuid4()),
+                    "storage_path": "another/path.jar" if match == "draft" else self.original,
+                    "status": "disabled",
+                }]
                 self.assertEqual(self.delete().status_code, 302)
                 self.assertEqual(len(self.db.drafts), 1)
                 self.assertEqual(self.db.storage.removed, [])
-        self.db.jobs.clear()
+        self.db.restricted.clear()
+
+    def test_idle_linked_jobs_can_be_deleted_with_pending_draft(self):
+        self.login()
+        for status in ("queued", "failed", "completed"):
+            with self.subTest(status=status):
+                self.db.storage.removed.clear()
+                self.db.drafts[:] = [{
+                    "id": self.draft_id, "module_id": "hypeclient",
+                    "version": "TEST-1", "status": "aguardando_protecao",
+                    "sha256": self.sha, "storage_path": self.original, "meta": {},
+                }]
+                self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
+                                    "status": status}]
+                self.assertEqual(self.delete().status_code, 302)
+                self.assertEqual(self.db.drafts, [])
+                self.assertEqual(self.db.jobs, [])
+                self.assertEqual(self.db.storage.removed, [self.original])
+
+    def test_running_job_blocks_deletion(self):
+        self.login()
+        self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
+                            "status": "running"}]
+        self.assertEqual(self.delete().status_code, 302)
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(len(self.db.jobs), 1)
+        self.assertEqual(self.db.storage.removed, [])
+
+    def test_rejected_with_failed_job_can_be_deleted(self):
+        self.login()
+        self.db.drafts[0]["status"] = "rejeitado"
+        self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
+                            "status": "failed"}]
         self.assertEqual(self.delete().status_code, 302)
         self.assertEqual(self.db.drafts, [])
+        self.assertEqual(self.db.jobs, [])
+        self.assertEqual(self.db.storage.removed, [self.original])
+
+    def test_published_reference_prevents_job_cancellation(self):
+        self.login()
+        self.db.jobs[:] = [{"id": "job-test", "draft_id": self.draft_id,
+                            "status": "queued"}]
+        self.db.published.append({"release": 2, "draft_id": self.draft_id,
+                                  "storage_path": "old.jar", "status": "disabled"})
+        self.delete()
+        self.assertEqual(len(self.db.drafts), 1)
+        self.assertEqual(len(self.db.jobs), 1)
+        self.assertEqual(self.db.storage.removed, [])
 
     def test_published_storage_path_blocks_cleanup(self):
         self.login()

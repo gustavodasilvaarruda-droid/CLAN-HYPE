@@ -146,8 +146,8 @@
             {% if item.status == 'pronto_para_aprovacao' and candidate %}
               <button type="button" class="hype-v6-btn gold" data-hpub-publish-protected="{{ item.id }}" data-hpub-mod="{{ item.module_id }}">Publicar versão aprovada</button>
             {% endif %}
-            {% if item.status in ('aguardando_protecao','rejeitado') and not (item.meta or {}).get('pilot_original') and not job %}
-              <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}" onsubmit="return confirm('Apagar permanentemente este JAR privado? Versões publicadas não serão apagadas.');">
+            {% if item.status in ('aguardando_protecao','rejeitado') and not (item.meta or {}).get('pilot_original') and not (item.meta or {}).get('owner_pilot') and (not job or job.status != 'running') %}
+              <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}" onsubmit="return confirm('Excluir permanentemente este JAR privado? Trabalhos de proteção aguardando na fila serão cancelados. Versões publicadas não serão afetadas.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="draft_id" value="{{ item.id }}">
                 <input type="hidden" name="confirm_delete" value="yes">

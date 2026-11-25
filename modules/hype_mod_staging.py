@@ -795,8 +795,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         original_path,
                     )):
                 raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
-            if (draft.get("meta") or {}).get("pilot_original"):
-                raise ValueError("Original ja publicado no piloto e nao pode ser apagado.")
+            if any((draft.get("meta") or {}).get(key) for key in ("pilot_original", "owner_pilot")):
+                raise ValueError("Original publicado em um canal piloto e nao pode ser apagado.")
             paths = [original_path]
             protected = (draft.get("meta") or {}).get("protected") or {}
             if protected:
@@ -813,27 +813,42 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     raise ValueError("Caminho do build protegido inválido; exclusão bloqueada.")
                 paths.append(protected_path)
 
-            # Protection jobs are retained for audit; deleting their draft would
-            # create a dangling queued/running/failed/completed job. This check
-            # runs even when the automatic worker is disabled.
+            # Keep actively running protection locked. An idle queued/failed/
+            # completed job may be removed when its private draft is deleted.
+            # The job row is removed with a status compare-and-delete so a worker
+            # that just claimed the job cannot be cancelled underneath it.
             from modules.hype_mod_protection_queue import JOBS
             linked_jobs = (db.table(JOBS).select("id,status")
                            .eq("draft_id", str(draft_id)).limit(1).execute().data or [])
-            if linked_jobs:
-                raise ValueError("Este arquivo possui um trabalho de proteção associado. "
-                                 "A exclusão está bloqueada até revisão administrativa da fila.")
+            job = linked_jobs[0] if linked_jobs else None
+            if job and job["status"] not in ("queued", "failed", "completed"):
+                raise ValueError("A proteção deste arquivo está em andamento. "
+                                 "Aguarde a conclusão para poder excluí-lo.")
 
             # Never delete a release referenced in the catalog, including disabled
             # releases retained for rollback and old versions still in use.
-            if (db.table(PUBLISHED).select("release").eq("draft_id", draft_id)
-                    .limit(1).execute().data or []):
-                raise ValueError("Esta versão está vinculada a uma publicação e não pode ser apagada.")
-            for path in paths:
-                if (db.table(PUBLISHED).select("release").eq("storage_path", path)
+            # Both the Client and the restricted-mod catalogues can retain
+            # previously published files for rollback, even when disabled.
+            # If either catalogue is unavailable, fail closed: do not delete.
+            for catalog in (PUBLISHED, "hype_mod_restricted_releases"):
+                if (db.table(catalog).select("release").eq("draft_id", draft_id)
                         .limit(1).execute().data or []):
-                    raise ValueError("Este arquivo faz parte de uma publicação e não pode ser apagado.")
+                    raise ValueError("Esta versão está vinculada a uma publicação e não pode ser apagada.")
+                for path in paths:
+                    if (db.table(catalog).select("release").eq("storage_path", path)
+                            .limit(1).execute().data or []):
+                        raise ValueError("Este arquivo faz parte de uma publicação e não pode ser apagado.")
 
             assert_private_bucket(db.storage)
+            # Cancel pending protection only after all publication checks passed.
+            # Comparing the status guards a queued -> running worker race.
+            if job:
+                removed_job = (db.table(JOBS).delete().eq("id", job["id"])
+                               .eq("draft_id", str(draft_id))
+                               .eq("status", job["status"]).execute().data or [])
+                if not removed_job:
+                    raise ValueError("A fila de proteção mudou durante a exclusão. "
+                                     "Atualize a página e tente novamente.")
             # Delete the database record first. A published release's FK protects
             # it even if another admin starts publication between the two checks.
             # Then remove ONLY the paths belonging to this now-deleted draft.
@@ -858,7 +873,9 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 try:
                     registrar_log("excluir_jar_privado", "hype_mods", TABLE, draft_id,
                                   {"modulo": module_id, "status": state,
-                                   "sha256": sha, "arquivos": len(paths)})
+                                   "sha256": sha, "arquivos": len(paths),
+                                   "protection_job_cancelled": job["id"] if job else None,
+                                   "previous_job_status": job["status"] if job else None})
                 except Exception:
                     pass
             flash("JAR privado antigo excluído com segurança.", "sucesso")
