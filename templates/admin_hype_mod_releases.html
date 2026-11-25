@@ -44,7 +44,10 @@
         </form>
         <p class="hpub-quick-note">{% if protection_queue_enabled %}O envio coloca o original na fila de proteção. O processamento só acontece quando o worker estiver ativo.{% else %}O original fica privado, mas a fila automática de proteção está desativada no servidor.{% endif %} Não há publicação automática para os jogadores.</p>
       </div>
-      <details class="hpub-manual-tools" id="hpub-manual-tools"><summary>Opções técnicas · vincular protegido manualmente</summary><p>Somente para recuperação ou testes; normalmente você envia apenas o original.</p>
+      <details class="hpub-manual-tools" id="hpub-manual-tools"><summary>Etapa 2 · Já tenho o JAR protegido — enviar para teste privado</summary><p>Vincule o Piloto 6 ao original da mesma versão. Isso não publica nem atualiza os jogadores.</p>
+      {% if not protected_upload_enabled %}
+      <p class="hpub-quick-unavailable" role="alert">Envio protegido desativado no servidor. É preciso habilitar HYPE_MOD_PROTECTED_UPLOAD_ENABLED=1 na configuração privada antes de vincular o Piloto 6. Nenhum arquivo foi publicado.</p>
+      {% endif %}
       <div class="hpub-mode-picker" role="group" aria-label="Tipo de arquivo">
         <button type="button" class="hpub-mode is-selected" data-hpub-mode="original" aria-pressed="true">
           <strong>JAR original</strong><small>Guardar seu original. Testes no Bootstrap só na sua conta</small>
@@ -124,6 +127,17 @@
             <span role="listitem"><b aria-hidden="true">05</b>Publicação</span>
           </div>
           <div class="hpub-file-actions">
+            {% if candidate and item.status in ('em_teste', 'pronto_para_aprovacao') %}
+              <a class="hype-v6-btn gold" href="{{ url_for('hype_mod_admin.mod_release_protected_test_download', draft_id=item.id) }}">Baixar protegido para teste</a>
+            {% endif %}
+            {% if staging_enabled and item.status == 'rejeitado' and not candidate and not (item.meta or {}).get('pilot_original') and not (item.meta or {}).get('owner_pilot') %}
+              <form method="post" action="{{ url_for('hype_mod_admin.mod_release_reopen_rejected') }}" onsubmit="return confirm('Reabrir este original privado para vincular outro candidato? Nada será publicado.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="draft_id" value="{{ item.id }}">
+                <input type="hidden" name="confirm_retry" value="yes">
+                <button type="submit" class="hype-v6-btn gold">Reabrir para teste</button>
+              </form>
+            {% endif %}
             {% if original_test_download_enabled and item.status in ('aguardando_protecao', 'em_teste', 'pronto_para_aprovacao') %}
               <a class="hype-v6-btn" href="{{ url_for('hype_mod_admin.mod_release_original_test_download', draft_id=item.id) }}">Baixar original (privado)</a>
             {% endif %}
