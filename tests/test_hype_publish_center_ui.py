@@ -42,7 +42,7 @@ class MinimalModLibraryTests(unittest.TestCase):
         for old in ("status</", "hpub-file-status", "hpub-publishing-tools",
                     "hpub-summary", "hpub-flow", "hpub-publish",
                     "manifest", "confirm_release", "owner_pilot_enabled",
-                    "mod_release_publish", "Protegido", "original", "hpub-stepper"):
+                    "mod_release_publish", "JAR protegido", "hpub-stepper"):
             with self.subTest(old=old):
                 self.assertNotIn(old, self.html)
 
