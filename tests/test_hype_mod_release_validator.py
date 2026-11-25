@@ -3,6 +3,7 @@ import ast
 import hashlib
 import io
 import json
+import re
 import stat
 import unittest
 from pathlib import Path
@@ -21,7 +22,7 @@ scope = {
     "MAX_ENTRIES": 8000, "MAX_UNCOMPRESSED": 300 * 1024 * 1024,
     "IDS": {"hype_pokedex": "HYPE Pokédex", "hypeclient": "HYPE Client"},
     "ZipFile": ZipFile, "BadZipFile": BadZipFile, "hashlib": hashlib,
-    "io": io, "json": json, "stat": stat,
+    "io": io, "json": json, "stat": stat, "re": re,
 }
 exec(fragment, scope)
 inspect_original = scope["inspect_original"]
@@ -70,8 +71,15 @@ class TestReleaseValidation(unittest.TestCase):
         info = inspect_original(make_jar(depends={"hypeclient": "*"}))
         self.assertTrue(info["requires_client"])
 
-    def test_reject_unknown_preview_and_malformed_id(self):
-        for value in ("hype_auto_ovo_updater", "hype_battle_royale", [], None):
+    def test_accept_new_valid_fabric_mod_ids(self):
+        for value in ("hype_auto_ovo_updater", "hype_battle_royale", "hypebootstrap"):
+            with self.subTest(value=value):
+                info = inspect_original(make_jar(mod_id=value))
+                self.assertEqual(info["module_id"], value)
+                self.assertEqual(info["name"], value)
+
+    def test_reject_malformed_ids(self):
+        for value in ("../escape", "A_B", "a", "x" * 100, [], None):
             with self.subTest(value=value), self.assertRaises(InvalidJar):
                 inspect_original(make_jar(mod_id=value))
 
