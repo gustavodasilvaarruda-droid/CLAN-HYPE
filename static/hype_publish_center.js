@@ -6,12 +6,47 @@
     const root = document.getElementById('hpub-app');
     if (!root) return;
 
+    // Client-side filters only change presentation; permissions and releases remain server-side.
+    const libraryCards = Array.from(root.querySelectorAll('[data-hpub-file-card]'));
+    const librarySearch = root.querySelector('#hpub-library-search');
+    const libraryStage = root.querySelector('#hpub-library-stage');
+    const visibleCount = root.querySelector('#hpub-visible-count');
+    const noResults = root.querySelector('#hpub-library-no-results');
+    const normalizeText = text => String(text || '').normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+    function filterLibrary() {
+      const query = normalizeText(librarySearch?.value.trim());
+      const filter = libraryStage?.value || 'all';
+      let visible = 0;
+      libraryCards.forEach(card => {
+        const state = card.dataset.hpubFileStatus || '';
+        const job = card.dataset.hpubJobStatus || '';
+        const matchesText = normalizeText(card.dataset.hpubSearch).includes(query);
+        const matchesStage = filter === 'all'
+          || (filter === 'rejected' && state === 'rejeitado')
+          || (filter === 'review' && ['em_teste', 'pronto_para_aprovacao'].includes(state))
+          || (filter === 'pending' && state !== 'rejeitado'
+              && (state === 'aguardando_protecao' || ['queued', 'running', 'failed'].includes(job)));
+        card.hidden = !(matchesText && matchesStage);
+        if (!card.hidden) visible += 1;
+      });
+      if (visibleCount) visibleCount.textContent = visible + ' de ' + libraryCards.length + ' arquivo(s)';
+      if (noResults) noResults.hidden = visible > 0 || libraryCards.length === 0;
+    }
+
+    librarySearch?.addEventListener('input', filterLibrary);
+    libraryStage?.addEventListener('change', filterLibrary);
+    filterLibrary();
+
     const modes = Array.from(root.querySelectorAll('[data-hpub-mode]'));
     const uploadPanels = Array.from(root.querySelectorAll('[data-hpub-upload-panel]'));
 
     function chooseMode(type) {
       const selected = modes.find(button => button.dataset.hpubMode === type);
       if (!selected || selected.disabled) return false;
+      const manualPanel = root.querySelector('#hpub-manual-tools');
+      if (manualPanel) manualPanel.open = type === 'protected';
       modes.forEach(button => {
         const active = button === selected;
         button.classList.toggle('is-selected', active);
@@ -113,6 +148,8 @@
     root.querySelectorAll('[data-hpub-publish-original]').forEach(button => {
       button.addEventListener('click', () => {
         if (!originalChoice) return;
+        const publishing = root.querySelector('#hpub-publishing-tools');
+        if (publishing) publishing.open = true;
         originalChoice.value = button.dataset.hpubPublishOriginal;
         setSelectedCard(originalChoice.value);
         updateOriginalChoice();
@@ -143,11 +180,29 @@
     root.querySelectorAll('[data-hpub-publish-protected]').forEach(button => {
       button.addEventListener('click', () => {
         if (!protectedChoice) return;
+        const publishing = root.querySelector('#hpub-publishing-tools');
+        if (publishing) publishing.open = true;
         protectedChoice.value = button.dataset.hpubPublishProtected;
         setSelectedCard(protectedChoice.value);
         updateProtectedChoice();
         focusArea(root.querySelector('#hpub-protected-release'), protectedChoice);
       });
+    });
+
+    // No upload or release is triggered by the interface itself.
+    // Every POST is an explicit admin action with server-side authorization and CSRF.
+    const originalInput = root.querySelector('#hpub-quick-original');
+    const uploadForm = originalInput?.closest('form');
+    const uploadSubmit = uploadForm?.querySelector('[type="submit"]');
+    const defaultSubmitText = uploadSubmit?.textContent || '';
+    originalInput?.addEventListener('change', () => {
+      const file = originalInput.files?.[0];
+      const valid = Boolean(file && file.name.toLowerCase().endsWith('.jar')
+        && file.size > 0 && file.size <= 10 * 1024 * 1024);
+      if (uploadSubmit) {
+        uploadSubmit.disabled = Boolean(file) && !valid;
+        uploadSubmit.textContent = file && valid ? 'Enviar ' + file.name : defaultSubmitText;
+      }
     });
 
     updateOriginalChoice();
