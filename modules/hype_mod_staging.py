@@ -325,7 +325,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         Historical jobs without a displayed draft are preserved for audit,
         never silently deleted or counted as actionable mods.
         """
-        if db is None or not protection_queue_enabled:
+        if db is None:
             return {}, 0
         from modules.hype_mod_protection_queue import jobs_for_drafts
         jobs = jobs_for_drafts(db)
