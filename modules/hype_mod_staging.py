@@ -458,41 +458,25 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     @bp.get("/admin/modulos/releases")
     def mod_releases():
         admin_only()
-        drafts = []
-        if db is not None:
-            try:
-                drafts = load_drafts()
-            except Exception:
-                flash("Erro ao consultar rascunhos no banco.", "erro")
         try:
-            protection_jobs, unmatched_protection_jobs = load_protection_jobs(drafts)
+            drafts = load_drafts()
         except Exception:
-            protection_jobs, unmatched_protection_jobs = {}, 0
-            flash("Nao foi possivel consultar a fila de protecao.", "erro")
+            drafts = []
+            flash("Não foi possível carregar a biblioteca de mods.", "erro")
         try:
-            published_releases = load_published_releases()
+            protection_jobs, _ = load_protection_jobs(drafts)
         except Exception:
-            published_releases = []
-            flash("Nao foi possivel consultar o catalogo de publicacoes.", "erro")
+            protection_jobs = {}
+            # Delete route rechecks jobs and rejects active operations.
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
-            published_releases=published_releases,
-            protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
-            unmatched_protection_jobs=unmatched_protection_jobs,
-            staging_enabled=staging_enabled, publish_enabled=publish_enabled,
-            protected_upload_enabled=protected_upload_enabled,
-            original_test_download_enabled=original_test_download_enabled,
-            private_publish_enabled=private_publish_enabled,
-            pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
-            owner_pilot_enabled=owner_pilot_enabled(session.get("usuario_email")),
-            test_channels=load_test_channels(),
-            private_rollout_status=pilot_scope_status(),
+            protection_jobs=protection_jobs, staging_enabled=staging_enabled,
             report=None, error=None,
         )
 
     @bp.post("/admin/modulos/releases/analisar")
     def mod_release_inspect():
-        """Analyze a supplied JAR in memory only. Never store or publish it."""
+        """Legacy in-memory inspector; does not upload or publish anything."""
         admin_only()
         file = request.files.get("jar")
         report, error = None, None
@@ -503,35 +487,13 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 report = inspect_original(file.stream.read(MAX_UPLOAD + 1))
             except InvalidJar as exc:
                 error = str(exc)
-        # Inspection must never make the stored versions disappear from the UI.
         try:
             drafts = load_drafts()
         except Exception:
             drafts = []
-            flash("Nao foi possivel carregar a lista de JARs armazenados.", "erro")
-        try:
-            protection_jobs, unmatched_protection_jobs = load_protection_jobs(drafts)
-        except Exception:
-            protection_jobs, unmatched_protection_jobs = {}, 0
-            flash("Nao foi possivel consultar a fila de protecao.", "erro")
-        try:
-            published_releases = load_published_releases()
-        except Exception:
-            published_releases = []
-            flash("Nao foi possivel consultar o catalogo de publicacoes.", "erro")
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
-            published_releases=published_releases,
-            protection_queue_enabled=protection_queue_enabled, protection_jobs=protection_jobs,
-            unmatched_protection_jobs=unmatched_protection_jobs,
-            staging_enabled=staging_enabled, publish_enabled=publish_enabled,
-            protected_upload_enabled=protected_upload_enabled,
-            original_test_download_enabled=original_test_download_enabled,
-            private_publish_enabled=private_publish_enabled,
-            pilot_original_enabled=pilot_original_enabled(session.get("usuario_email")),
-            owner_pilot_enabled=owner_pilot_enabled(session.get("usuario_email")),
-            test_channels=load_test_channels(),
-            private_rollout_status=pilot_scope_status(),
+            protection_jobs={}, staging_enabled=staging_enabled,
             report=report, error=error,
         )
 
@@ -578,13 +540,10 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 file_options={"content-type": "application/java-archive", "upsert": "false"},
             )
             uploaded = True
-            try:
-                static_audit = check_fabric_classes(raw)
-            except (UnsafeBuild, KeyError, TypeError, ValueError, RuntimeError) as exc:
-                # A noncritical static analysis issue never prevents private archival.
-                # Originals may be archived for analysis even before the
-                # updater/entrypoints are fixed; candidates remain strict.
-                static_audit = {"status": "needs_review", "reason": str(exc)}
+            # No protection or advanced class analysis during a simple upload.
+            # Strict Fabric/ZIP/CRC validation was already done by inspect_original.
+            # The release pipeline still performs full checks before distribution.
+            static_audit = {"status": "not_requested"}
             saved = db.table(TABLE).insert({
                 "module_id": report["module_id"], "version": report["version"],
                 "sha256": report["sha256"], "size_bytes": report["size_bytes"],
@@ -595,9 +554,14 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                          "library_upload": True, "mod_name": report["name"]},
             }).execute()
             if registrar_log:
-                registrar_log("upload_jar_biblioteca", "hype_mods", "hype_mod_release_drafts",
-                              (saved.data or [{}])[0].get("id"),
-                              {"modulo": report["module_id"], "sha256": report["sha256"]})
+                try:
+                    registrar_log("upload_jar_biblioteca", "hype_mods", TABLE,
+                                  (saved.data or [{}])[0].get("id"),
+                                  {"modulo": report["module_id"], "sha256": report["sha256"]})
+                except Exception:
+                    # Logging is best-effort; a saved private upload must not
+                    # be rolled back merely because audit logging is unavailable.
+                    pass
             if protection_queue_enabled and request.form.get("solicitar_protecao") == "yes":
                 # Opção legada explicitamente solicitada; nunca enfileirar upload comum.
                 # Enfileira automaticamente apenas depois do upload privado e

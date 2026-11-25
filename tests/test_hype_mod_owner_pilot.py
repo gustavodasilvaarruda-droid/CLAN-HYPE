@@ -123,12 +123,15 @@ class OwnerPilotTests(unittest.TestCase):
         self.assertNotIn('public=True', route)
 
     def test_signed_player_paths_stay_separate(self):
+        backend = (Path(__file__).resolve().parents[1] / "modules" /
+                   "hype_mod_staging.py").read_text(encoding="utf-8")
         template = (Path(__file__).resolve().parents[1] / "templates" /
                     "admin_hype_mod_releases.html").read_text(encoding="utf-8")
-        self.assertIn("mod_release_publish_owner_pilot", template)
-        self.assertIn("{% if not owner_pilot_enabled %}", template)
-        self.assertIn("mod_release_publish_private", template)
-        self.assertIn("mod_release_publish", template)
+        self.assertIn("def mod_release_publish_owner_pilot():", backend)
+        self.assertIn("def mod_release_publish_private():", backend)
+        self.assertIn("def mod_release_publish():", backend)
+        self.assertNotIn("mod_release_publish", template)
+        self.assertNotIn("manifest", template)
 
 
 if __name__ == "__main__":

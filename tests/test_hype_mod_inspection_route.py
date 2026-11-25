@@ -63,7 +63,8 @@ class TestSafeInspector(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertNotIn('id="hpub-inspector"', html)
-        self.assertIn("Meus mods e arquivos", html)
+        self.assertIn("Meus", html)
+        self.assertIn("Mods", html)
         self.assertNotIn("Guardar original em privado", html)
         self.assertEqual(
             self.client.post("/admin/modulos/releases/upload").status_code, 404

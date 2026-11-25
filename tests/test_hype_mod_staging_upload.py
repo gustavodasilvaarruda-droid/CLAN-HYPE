@@ -126,6 +126,37 @@ class PrivateUploadTests(unittest.TestCase):
         self.assertEqual(draft["sha256"], self.db.storage.uploads[0][0].split("/")[-1].removesuffix(".jar"))
         self.assertEqual(self.client.get("/hype-updates/manifest.properties").status_code, 404)
 
+    def test_audit_log_failure_does_not_rollback_saved_jar(self):
+        self.login()
+        self.app = Flask(__name__)
+        self.app.config.update(TESTING=True, SECRET_KEY="test")
+        second = Blueprint("hype_mod_admin", __name__)
+        @second.get("/admin/modulos")
+        def painel():
+            return "ok"
+        def failing_log(*_args, **_kwargs):
+            raise RuntimeError("audit service unavailable")
+        register_mod_release_routes(second, lambda: True, failing_log, self.db)
+        self.app.register_blueprint(second)
+        client = self.app.test_client()
+        with client.session_transaction() as session:
+            session["usuario_email"] = "admin@example.com"
+        result = client.post("/admin/modulos/releases/upload", data={
+            "jar": (io.BytesIO(sample_jar()), "hypeclient-test.jar")
+        }, content_type="multipart/form-data")
+        self.assertEqual(result.status_code, 302)
+        self.assertEqual(len(self.db.saved), 1)
+        self.assertEqual(self.db.storage.removed, [])
+
+    def test_basic_upload_does_not_run_advanced_protection(self):
+        self.login()
+        with patch("modules.hype_mod_staging.check_fabric_classes",
+                   side_effect=AssertionError("advanced scan not requested")):
+            response = self.upload()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(self.db.saved), 1)
+        self.assertEqual(self.db.saved[0]["meta"]["static_audit"]["status"], "not_requested")
+
     def test_public_bucket_blocks_upload(self):
         self.login()
         self.db.storage.is_public = True

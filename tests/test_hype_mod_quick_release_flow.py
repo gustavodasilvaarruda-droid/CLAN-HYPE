@@ -165,30 +165,22 @@ class QuickReleaseFlowTests(unittest.TestCase):
         self.assertEqual(self.db.rows[TABLE][0]["status"], "pronto_para_aprovacao")
         self.assertEqual(self.db.storage.added, [])
 
-    def test_one_upload_replaces_original_protected_wizard(self):
+    def test_one_jar_upload_ui_without_publish_wizard(self):
         template = (Path(__file__).resolve().parents[1] /
                     "templates" / "admin_hype_mod_releases.html").read_text(encoding="utf-8")
         Environment().parse(template)
-        self.assertIn('id="hpub-quick"', template)
-        self.assertIn('id="hpub-publish"', template)
         self.assertIn('id="hpub-unified-upload-form"', template)
         self.assertEqual(template.count('name="jar"'), 1)
-        self.assertIn('data-hpub-mod-group', template)
-        self.assertIn("mod_release_library_download", template)
-        self.assertIn("mod_release_publish_owner_pilot", template)
-        self.assertIn("mod_release_publish_private", template)
-        self.assertIn('name="confirm_release"', template)
-        self.assertIn('id="hpub-published"', template)
-        self.assertNotIn('data-hpub-mode="protected"', template)
-        self.assertNotIn('hpub-quick-protected', template)
+        self.assertIn('data-hpub-mod-folder', template)
+        self.assertIn('mod_release_library_download', template)
         self.assertNotIn('mod_release_protected_upload', template)
+        self.assertNotIn('hpub-publishing-tools', template)
 
-    def test_template_contains_quick_actions_and_valid_jinja(self):
+    def test_template_has_only_necessary_actions(self):
         template = (Path(__file__).resolve().parents[1] /
                     "templates" / "admin_hype_mod_releases.html").read_text(encoding="utf-8")
         Environment().parse(template)
-        for marker in ('id="hpub-quick"', 'id="hpub-publishing-tools"',
-                       'data-hpub-new-version', 'data-hpub-file-card',
+        for marker in ('id="hpub-quick-file"', 'hpub-folder', 'hpub-jar-entry',
                        'mod_release_delete', 'mod_release_upload'):
             self.assertIn(marker, template)
 
