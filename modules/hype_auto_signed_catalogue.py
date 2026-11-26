@@ -12,7 +12,6 @@ import hashlib
 import json
 import os
 import re
-import unicodedata
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -28,25 +27,15 @@ MOD_ID = re.compile(r"[a-z][a-z0-9_-]{1,63}\Z", re.ASCII)
 MAX_MODS = 100
 MAX_CATALOGUE_BYTES = 256 * 1024
 RELEASE_STATES = frozenset(("aguardando_protecao", "em_teste", "pronto_para_aprovacao"))
-# A library upload is not permission to distribute an explicitly marked test build.
-NON_DISTRIBUTABLE = re.compile(
-    r"(?:^|[^a-z0-9])(?:nao[ _-]*distribuir|piloto|teste|test|"
-    r"experimental|preview[0-9]*|alpha[0-9]*|beta[0-9]*|"
-    r"rc[0-9]*|release[ _-]*candidate|dev|snapshot|validacao)"
-    r"(?=[^a-z0-9]|$)", re.ASCII
-)
-
-
+# The authenticated admin's valid library upload is the distribution decision.
+# Filenames and Fabric versions may contain PILOTO, TESTE, ALPHA, BETA, etc.
+# Never infer an opt-out from user-provided text: preserve the owner's choice.
 def _safe_public_build(row):
     filename, version = row.get("original_filename"), row.get("version")
-    if (not isinstance(filename, str) or not filename.lower().endswith(".jar")
-            or "/" in filename or chr(92) in filename
-            or not isinstance(version, str)):
-        return False
-    # Canonicalise accents so NAO-DISTRIBUIR and NÃO DISTRIBUIR agree.
-    label = unicodedata.normalize("NFKD", filename + " " + version)
-    label = label.encode("ascii", "ignore").decode("ascii").lower()
-    return NON_DISTRIBUTABLE.search(label) is None
+    return (isinstance(filename, str)
+            and filename.lower().endswith(".jar")
+            and "/" not in filename and chr(92) not in filename
+            and isinstance(version, str))
 
 
 class AutoCatalogUnavailable(ValueError):
