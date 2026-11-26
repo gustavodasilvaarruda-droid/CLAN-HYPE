@@ -78,8 +78,9 @@ def _eligible(row):
         return False
     if not isinstance(mod_id, str) or not MOD_ID.fullmatch(mod_id):
         return False
-    if mod_id == "hypebootstrap":
-        return False  # The running updater never attempts to replace itself.
+    if mod_id in ("hypebootstrap", "hypeegg"):
+        # Bootstrap manages itself separately. HYPE Egg is not a CLAN HYPE mod.
+        return False
     if not isinstance(version, str) or not signed.VERSION.fullmatch(version):
         return False
     if not isinstance(sha, str) or not signed.SHA.fullmatch(sha):
