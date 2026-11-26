@@ -172,6 +172,21 @@ class RenderSignerTests(unittest.TestCase):
             row["module_id"] for row in rows
         ])
 
+    def test_external_hypeegg_never_enters_player_catalogue(self):
+        from modules.hype_auto_signed_catalogue import _eligible, latest_uploaded_mods
+        excluded = dict(
+            self.row,
+            module_id="hypeegg",
+            version="1.5.1-preview66",
+            original_filename="HYPE-EGG-TESTE.jar",
+            storage_path=f"hypeegg/{'a' * 32}/{self.sha}.jar",
+        )
+        self.assertFalse(_eligible(excluded))
+        with patch("modules.hype_auto_signed_catalogue._uploaded_rows",
+                   return_value=[excluded, self.row]):
+            document = verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))
+        self.assertEqual([item["id"] for item in document["mods"]], ["hypeclient"])
+
     def test_newest_admin_upload_wins_even_if_version_downgraded(self):
         from modules.hype_auto_signed_catalogue import latest_uploaded_mods
         latest = dict(self.row, version="0.5-alpha", original_filename="PILOTO.jar")
