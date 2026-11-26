@@ -146,7 +146,8 @@ class RenderSignerTests(unittest.TestCase):
                 row = dict(self.row, original_filename=filename)
                 self.assertFalse(_eligible(row))
         self.assertTrue(_eligible(self.row))
-        self.assertFalse(_eligible(dict(self.row, version="1.4-preview.3")))\n        self.assertFalse(_eligible(dict(self.row, version="3.0.0-rc.71")))
+        self.assertFalse(_eligible(dict(self.row, version="1.4-preview.3")))
+        self.assertFalse(_eligible(dict(self.row, version="3.0.0-rc.71")))
         self.assertFalse(_eligible(dict(self.row, original_filename=None)))
 
     def test_other_fabric_mod_can_be_signed_and_downloaded(self):
