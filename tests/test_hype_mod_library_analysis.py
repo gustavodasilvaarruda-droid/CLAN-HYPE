@@ -145,7 +145,7 @@ class LibraryAnalysisTests(unittest.TestCase):
         self.assertEqual(response.mimetype, "application/zip")
         with ZipFile(io.BytesIO(response.data)) as archive:
             self.assertEqual(sorted(archive.namelist()), ["analise.json", "original.jar"])
-            self.assertEqual(archive.read("original.jar"), valid_jar())
+            self.assertEqual(archive.read("original.jar"), self.db.storage.raw)
             report = json.loads(archive.read("analise.json"))
             self.assertEqual(report["mod"]["fabric_id"], "hypeclient")
             self.assertEqual(report["mod"]["sha256"], self.db.record["sha256"])
