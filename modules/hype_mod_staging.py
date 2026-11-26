@@ -384,6 +384,74 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
+    @bp.get("/admin/modulos/releases/arquivo/<draft_id>/analisar")
+    def mod_release_library_analyze(draft_id):
+        """Admin-only read-only inspection or export of a private library JAR."""
+        admin_only()
+        if not staging_enabled or db is None:
+            abort(404)
+        from flask import jsonify
+        from modules.hype_mod_library_analysis import (
+            build_private_analysis_package, report_for_verified_jar,
+        )
+
+        try:
+            selected_id = parse_draft_id(draft_id)
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,size_bytes,storage_path,original_filename,created_at"
+            ).eq("id", selected_id).limit(1).execute().data or [])
+            if len(rows) != 1:
+                abort(404)
+            record = rows[0]
+            mod_id = record.get("module_id")
+            sha = record.get("sha256")
+            path = record.get("storage_path")
+            # Never trust user-supplied names or paths as Storage locations.
+            if (not isinstance(mod_id, str)
+                    or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", mod_id)
+                    or not isinstance(sha, str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", sha)
+                    or not isinstance(path, str)
+                    or not re.fullmatch(
+                        rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\\.jar", path
+                    )):
+                abort(404)
+
+            assert_private_bucket(db.storage)
+            binary = db.storage.from_(BUCKET).download(path)
+            validate_binary(binary, expected_sha=sha)
+            inspected = inspect_original(binary)
+            if (inspected["module_id"] != mod_id
+                    or inspected["version"] != record.get("version")
+                    or inspected["size_bytes"] != record.get("size_bytes")):
+                abort(404)
+            report = report_for_verified_jar(binary, record, inspected)
+        except (InvalidJar, InvalidRelease, ValueError, TypeError, KeyError):
+            abort(404)
+        except Exception as exc:
+            from werkzeug.exceptions import HTTPException
+            if isinstance(exc, HTTPException):
+                raise
+            abort(503)
+
+        formato = request.args.get("formato", "json")
+        if formato == "json":
+            response = jsonify(report)
+        elif formato == "pacote":
+            data = build_private_analysis_package(binary, report)
+            response = send_file(
+                io.BytesIO(data), mimetype="application/zip",
+                as_attachment=True, download_name=f"{mod_id}-analise-privada.zip",
+                max_age=0,
+            )
+        else:
+            abort(400)
+        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
     @bp.get("/admin/modulos/releases/original-teste/<draft_id>")
     def mod_release_original_test_download(draft_id):
         """Admin-only download for local testing. NEVER a Bootstrap release."""
