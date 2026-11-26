@@ -31,7 +31,7 @@ RELEASE_STATES = frozenset(("aguardando_protecao", "em_teste", "pronto_para_apro
 # A library upload is not permission to distribute an explicitly marked test build.
 NON_DISTRIBUTABLE = re.compile(
     r"(?:^|[^a-z0-9])(?:nao[ _-]*distribuir|piloto|teste|test|"
-    r"experimental|preview[0-9]*|alpha[0-9]*|beta[0-9]*|validacao)"
+    r"experimental|preview[0-9]*|alpha[0-9]*|beta[0-9]*|"\n    r"rc[0-9]*|release[ _-]*candidate|dev|snapshot|validacao)"
     r"(?=[^a-z0-9]|$)", re.ASCII
 )
 
