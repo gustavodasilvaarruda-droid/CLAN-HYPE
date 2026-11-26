@@ -413,7 +413,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     or not re.fullmatch(r"[a-f0-9]{64}", sha)
                     or not isinstance(path, str)
                     or not re.fullmatch(
-                        rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\\.jar", path
+                        rf"{re.escape(mod_id)}/[a-f0-9]{{32}}/{sha}\.jar", path
                     )):
                 abort(404)
 
