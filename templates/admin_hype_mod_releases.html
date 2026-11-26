@@ -7,7 +7,7 @@
     <header class="hpub-top">
       <div class="hpub-eyebrow">CLAN HYPE</div>
       <h1>Meus <em>Mods</em></h1>
-      <p>Envie seu JAR. O site identifica o mod e guarda o arquivo no lugar certo.</p>
+      <p>Envie seu JAR ou analise os arquivos existentes. O relatório e o pacote são privados e não publicam atualizações.</p>
     </header>
 
     <section class="hpub-send" aria-labelledby="hpub-send-heading">
@@ -57,7 +57,11 @@
             </div>
             <div class="hpub-jar-actions">
               <a href="{{ url_for('hype_mod_admin.mod_release_library_download', draft_id=item.id) }}"
-                 class="hpub-small-button">Baixar</a>
+                 class="hpub-small-button">Baixar JAR</a>
+              <a href="{{ url_for('hype_mod_admin.mod_release_library_analyze', draft_id=item.id) }}"
+                 class="hpub-small-button" target="_blank" rel="noopener">Analisar</a>
+              <a href="{{ url_for('hype_mod_admin.mod_release_library_analyze', draft_id=item.id, formato='pacote') }}"
+                 class="hpub-small-button">JAR + relatório</a>
               {% if item.status in ('aguardando_protecao','rejeitado')
                     and not meta.get('pilot_original')
                     and (not meta.get('owner_pilot') or item.status == 'rejeitado')
