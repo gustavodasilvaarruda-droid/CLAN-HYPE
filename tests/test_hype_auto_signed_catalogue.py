@@ -130,8 +130,9 @@ class RenderSignerTests(unittest.TestCase):
         self.assertEqual(verify_auto_catalogue(signed_catalog_for_uploaded_mods(
             Db(self.row, self.data)))["mods"], [])
 
-    def test_explicit_test_and_preview_builds_are_never_public(self):
-        blocked = (
+    def test_admin_uploads_are_public_regardless_of_test_labels(self):
+        from modules.hype_auto_signed_catalogue import _eligible
+        filenames = (
             "HYPE-CLIENT-PILOTO-NAO-DISTRIBUIR.jar",
             "HYPE-POKEDEX-BETA8-TESTE.jar",
             "HYPE-BREED-PREVIEW03-VALIDACAO.jar",
@@ -140,15 +141,45 @@ class RenderSignerTests(unittest.TestCase):
             "HYPE-BATTLE-AI-3.0.0-rc.71.jar",
             "HYPE-CLIENT-NÃO DISTRIBUIR.jar",
         )
-        from modules.hype_auto_signed_catalogue import _eligible
-        for filename in blocked:
+        for filename in filenames:
             with self.subTest(filename=filename):
-                row = dict(self.row, original_filename=filename)
-                self.assertFalse(_eligible(row))
-        self.assertTrue(_eligible(self.row))
-        self.assertFalse(_eligible(dict(self.row, version="1.4-preview.3")))
-        self.assertFalse(_eligible(dict(self.row, version="3.0.0-rc.71")))
-        self.assertFalse(_eligible(dict(self.row, original_filename=None)))
+                self.assertTrue(_eligible(dict(self.row, original_filename=filename)))
+        for version in ("1.4-preview.3", "3.0.0-rc.71", "R7.19-ALPHA7-PREVIEW10.0.42"):
+            with self.subTest(version=version):
+                self.assertTrue(_eligible(dict(self.row, version=version)))
+        for filename in (None, "../bad.jar", "folder/malicious.jar", "bad.txt"):
+            with self.subTest(filename=filename):
+                self.assertFalse(_eligible(dict(self.row, original_filename=filename)))
+
+    def test_all_library_mods_are_included_even_experimental(self):
+        from modules.hype_auto_signed_catalogue import latest_uploaded_mods
+        rows = []
+        for mod_id, version, filename in (
+            ("hypeclient", "R7.19-ALPHA7-PREVIEW10.0.42", "PILOTO-NAO-DISTRIBUIR.jar"),
+            ("hype_pokedex", "2.0.0-beta.8", "TESTE-POKEDEX.jar"),
+            ("hype_breed_calculator", "2.0-preview.3", "BREED-VALIDACAO.jar"),
+            ("hype_battlefield", "0.4.13-alpha.r5.3+3-terrains-v3", "CAMPO-EXPERIMENTAL.jar"),
+            ("hype_battle_ai", "3.0.0-rc.71-v30.9q-forced-switch-repair", "BATTLE-AI.jar"),
+            ("cobblemonextendedbattleui", "0.10.0", "BATTLE-UI.jar"),
+        ):
+            rows.append(dict(
+                self.row, module_id=mod_id, version=version, original_filename=filename,
+                storage_path=f"{mod_id}/{'a' * 32}/{self.sha}.jar",
+            ))
+        with patch("modules.hype_auto_signed_catalogue._uploaded_rows", return_value=rows):
+            catalogue = verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))
+        self.assertEqual([item["id"] for item in catalogue["mods"]], [
+            row["module_id"] for row in rows
+        ])
+
+    def test_newest_admin_upload_wins_even_if_version_downgraded(self):
+        from modules.hype_auto_signed_catalogue import latest_uploaded_mods
+        latest = dict(self.row, version="0.5-alpha", original_filename="PILOTO.jar")
+        older = dict(self.row, version="2.0", original_filename="PRODUCAO.jar")
+        with patch("modules.hype_auto_signed_catalogue._uploaded_rows",
+                   return_value=[latest, older]):
+            self.assertEqual(latest_uploaded_mods(self.db)[0]["version"], "0.5-alpha")
+
 
     def test_other_fabric_mod_can_be_signed_and_downloaded(self):
         import copy
