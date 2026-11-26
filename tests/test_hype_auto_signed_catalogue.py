@@ -137,6 +137,7 @@ class RenderSignerTests(unittest.TestCase):
             "HYPE-BREED-PREVIEW03-VALIDACAO.jar",
             "HYPE-CAMPO-EXPERIMENTAL.jar",
             "HYPE-CLIENT-ALPHA7.jar",
+            "HYPE-BATTLE-AI-3.0.0-rc.71.jar",
             "HYPE-CLIENT-NÃO DISTRIBUIR.jar",
         )
         from modules.hype_auto_signed_catalogue import _eligible
@@ -145,7 +146,7 @@ class RenderSignerTests(unittest.TestCase):
                 row = dict(self.row, original_filename=filename)
                 self.assertFalse(_eligible(row))
         self.assertTrue(_eligible(self.row))
-        self.assertFalse(_eligible(dict(self.row, version="1.4-preview.3")))
+        self.assertFalse(_eligible(dict(self.row, version="1.4-preview.3")))\n        self.assertFalse(_eligible(dict(self.row, version="3.0.0-rc.71")))
         self.assertFalse(_eligible(dict(self.row, original_filename=None)))
 
     def test_other_fabric_mod_can_be_signed_and_downloaded(self):
