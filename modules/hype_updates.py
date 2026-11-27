@@ -6,6 +6,7 @@ must be signed OFFLINE and explicitly staged before a manifest is published.
 import os
 import re
 import io
+import hashlib
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -185,6 +186,83 @@ def updates_health():
     return response
 
 
+def _update_switch(name):
+    return os.getenv(name, '').strip().lower() in ('1', 'true', 'yes')
+
+
+@hype_updates_bp.get('/hype-updates/mods/health')
+def multi_mod_updates_health():
+    """Safe, read-only diagnostics for the channel consumed by HYPE Bootstrap.
+
+    A library upload is not necessarily an available signed release. Report the
+    *effective* channel and switch state, without exposing secrets, draft
+    filenames, storage paths, private metadata or entitlement details.
+    """
+    auto_catalog = _update_switch('HYPE_AUTO_SIGNED_CATALOG_ENABLED')
+    auto_downloads = _update_switch('HYPE_AUTO_SIGNED_DOWNLOADS_ENABLED')
+    legacy_catalog = _update_switch('HYPE_MULTI_MOD_CATALOG_ENABLED')
+    legacy_downloads = _update_switch('HYPE_MULTI_MOD_DOWNLOADS_ENABLED')
+
+    mode = ('auto-signed' if auto_catalog and auto_downloads
+            else 'legacy-signed' if legacy_catalog else 'disabled')
+    state = {
+        'service': 'hype-multi-mod-updates',
+        'mode': mode,
+        'catalogue_enabled': (auto_catalog and auto_downloads) or legacy_catalog,
+        'downloads_enabled': ((auto_catalog and auto_downloads)
+                              or (legacy_catalog and legacy_downloads)),
+        'catalogue_valid': False,
+        'ready': False,
+        'reason': 'disabled',
+    }
+
+    if mode == 'auto-signed':
+        try:
+            from modules.hype_auto_signed_catalogue import (
+                signed_catalog_for_uploaded_mods, verify_auto_catalogue,
+            )
+            db = current_app.extensions.get('hype_release_db')
+            if db is None:
+                state['reason'] = 'release_db_unavailable'
+            else:
+                raw = signed_catalog_for_uploaded_mods(db)
+                checked = verify_auto_catalogue(raw)
+                state['catalogue_valid'] = True
+                state['revision'] = hashlib.sha256(raw).hexdigest()[:16]
+                state['mod_count'] = len(checked['mods'])
+                state['ready'] = bool(checked['mods'])
+                state['reason'] = 'ok' if state['ready'] else 'empty_catalogue'
+        except Exception:
+            current_app.logger.exception('HYPE multi-mod catalogue health failed')
+            state['reason'] = 'auto_catalogue_unavailable'
+    elif mode == 'legacy-signed':
+        try:
+            raw = _safe_regular_file(_root() / 'mods', 'catalog.json').read_bytes()
+            verified = verify_signed_catalogue(raw)
+            if any(item['id'] != 'hypeclient' for item in verified['mods']):
+                state['reason'] = 'legacy_public_modules_restricted'
+            else:
+                state['catalogue_valid'] = True
+                state['revision'] = hashlib.sha256(raw).hexdigest()[:16]
+                state['mod_count'] = len(verified['mods'])
+                state['ready'] = bool(verified['mods']) and legacy_downloads
+                state['reason'] = (
+                    'ok' if state['ready']
+                    else 'downloads_disabled' if not legacy_downloads
+                    else 'empty_catalogue'
+                )
+        except Exception:
+            state['reason'] = 'legacy_catalogue_unavailable'
+    elif auto_catalog != auto_downloads:
+        state['reason'] = 'auto_switches_incomplete'
+
+    state['binary_contents_checked'] = False
+    response = jsonify(state)
+    response.headers['Cache-Control'] = 'no-store, max-age=0'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
 @hype_updates_bp.get('/hype-updates/mods/catalog.json')
 def multi_mod_signed_catalogue():
     """Preview-only signed catalogue for a future HYPE bootstrap (OFF by default).
@@ -204,6 +282,7 @@ def multi_mod_signed_catalogue():
             abort(503)
         response = make_response(raw, 200)
         response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        response.headers['X-HYPE-Catalog-Revision'] = hashlib.sha256(raw).hexdigest()[:16]
         response.headers['Cache-Control'] = 'no-store, max-age=0'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
@@ -222,6 +301,7 @@ def multi_mod_signed_catalogue():
         abort(403)
     response = make_response(raw, 200)
     response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    response.headers['X-HYPE-Catalog-Revision'] = hashlib.sha256(raw).hexdigest()[:16]
     response.headers['Cache-Control'] = 'no-store, max-age=0'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
