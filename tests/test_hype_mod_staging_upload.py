@@ -126,6 +126,33 @@ class PrivateUploadTests(unittest.TestCase):
         self.assertEqual(draft["sha256"], self.db.storage.uploads[0][0].split("/")[-1].removesuffix(".jar"))
         self.assertEqual(self.client.get("/hype-updates/manifest.properties").status_code, 404)
 
+    def test_ajax_upload_reports_draft_id_without_redirect(self):
+        self.login()
+        response = self.client.post("/admin/modulos/releases/upload", data={
+            "jar": (io.BytesIO(sample_jar()), "hypeclient-test.jar")
+        }, content_type="multipart/form-data", headers={"X-HYPE-BATCH": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.is_json)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["draft_id"], "1")
+        self.assertEqual(len(self.db.saved), 1)
+
+    def test_ajax_invalid_upload_fails_without_saving(self):
+        self.login()
+        response = self.client.post("/admin/modulos/releases/upload", data={
+            "jar": (io.BytesIO(b"invalid"), "bad.jar")
+        }, content_type="multipart/form-data", headers={"X-HYPE-BATCH": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()["ok"])
+        self.assertEqual(self.db.saved, [])
+
+    def test_ajax_requires_admin_session(self):
+        response = self.client.post("/admin/modulos/releases/upload", data={
+            "jar": (io.BytesIO(sample_jar()), "hypeclient-test.jar")
+        }, content_type="multipart/form-data", headers={"X-HYPE-BATCH": "1"})
+        self.assertEqual(response.status_code, 403)
+
     def test_audit_log_failure_does_not_rollback_saved_jar(self):
         self.login()
         self.app = Flask(__name__)
