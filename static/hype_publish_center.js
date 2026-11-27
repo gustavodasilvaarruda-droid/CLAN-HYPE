@@ -239,7 +239,7 @@
       });
       updateCount();
       if (!selected) {
-        say('Nenhum arquivo liberado para exclusão. Para retirar um mod ativo, escolha manualmente 'Apagar e retirar do Bootstrap' na pasta desse mod.', true);
+        say("Nenhum arquivo antigo selecionável. Para retirar o mod ativo, escolha 'Apagar e retirar do Bootstrap' na pasta dele.", true);
       }
     });
     root.querySelector('#hpub-clear-choices')?.addEventListener('click', () => {
