@@ -7,7 +7,10 @@
     <header class="hpub-top">
       <div class="hpub-eyebrow">CLAN HYPE</div>
       <h1>Meus <em>Mods</em></h1>
-      <p>Envie seu JAR ou analise os arquivos existentes. O relatório e o pacote são privados e não publicam atualizações.</p>
+      <p>Envie um JAR para guardar na biblioteca. Quando estiver pronto, clique em <strong>Publicar no Bootstrap</strong> para distribuir a atualização automaticamente.</p>
+      {% if not quick_publish_enabled %}
+      <p class="hpub-warning" role="status">Publicação automática ainda não ativada no servidor. Os arquivos enviados continuam privados.</p>
+      {% endif %}
     </header>
 
     <section class="hpub-send" aria-labelledby="hpub-send-heading">
@@ -62,7 +65,21 @@
                  class="hpub-small-button" target="_blank" rel="noopener">Analisar</a>
               <a href="{{ url_for('hype_mod_admin.mod_release_library_analyze', draft_id=item.id, formato='pacote') }}"
                  class="hpub-small-button">JAR + relatório</a>
+              {% if meta.get('bootstrap_publication') and meta.bootstrap_publication.sha256 == item.sha256 %}
+              <span class="hpub-small-button" aria-label="Esta versão foi publicada no catálogo do Bootstrap">✓ Publicado no Bootstrap</span>
+              {% endif %}
+              {% if quick_publish_enabled and item.status != 'rejeitado'
+                    and item.module_id not in ('hypebootstrap', 'hypeegg') %}
+              <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_bootstrap') }}"
+                    onsubmit="return confirm('PUBLICAÇÃO PARA TODOS: esse JAR poderá ser baixado por qualquer jogador que tenha o Bootstrap. O arquivo NÃO será ofuscado automaticamente. Publicar mesmo assim?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="draft_id" value="{{ item.id }}">
+                <input type="hidden" name="confirm_public_distribution" value="yes">
+                <button type="submit" class="hpub-small-button">Publicar no Bootstrap</button>
+              </form>
+              {% endif %}
               {% if item.status in ('aguardando_protecao','rejeitado')
+                    and not meta.get('bootstrap_publication')
                     and not meta.get('pilot_original')
                     and (not meta.get('owner_pilot') or item.status == 'rejeitado')
                     and not meta.get('protected') and (not job or job.status != 'running') %}
