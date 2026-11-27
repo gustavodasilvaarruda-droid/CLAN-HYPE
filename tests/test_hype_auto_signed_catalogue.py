@@ -264,6 +264,88 @@ class RenderSignerTests(unittest.TestCase):
                 verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))["mods"], []
             )
 
+    def test_simple_publish_requires_explicit_receipt_for_each_jar(self):
+        from modules.hype_auto_signed_catalogue import latest_uploaded_mods
+        with patch.dict(os.environ, {"HYPE_AUTO_SIMPLE_PUBLISH_ENABLED": "1"}):
+            self.assertEqual(latest_uploaded_mods(self.db), [])
+            self.assertEqual(
+                verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))["mods"], []
+            )
+            self.row["meta"]["bootstrap_publication"] = {
+                "source": "original", "module_id": "hypeclient",
+                "version": self.row["version"], "sha256": self.sha,
+                "published_by": "admin@example.test",
+                "published_at": "2026-11-27T03:00:00+00:00",
+            }
+            catalog = verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))
+            self.assertEqual(catalog["mods"][0]["sha256"], self.sha)
+            self.assertEqual(uploaded_mod_binary(self.db, "hypeclient", self.sha), self.data)
+            self.row["meta"]["bootstrap_publication"]["sha256"] = "f" * 64
+            self.assertEqual(
+                verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))["mods"], []
+            )
+            with self.assertRaises(AutoCatalogUnavailable):
+                uploaded_mod_binary(self.db, "hypeclient", self.sha)
+
+    def test_simple_publish_does_not_publish_rejected_jar(self):
+        self.row["meta"]["bootstrap_publication"] = {
+            "source": "original", "module_id": "hypeclient",
+            "version": "1.4", "sha256": self.sha,
+            "published_by": "admin@example.test",
+            "published_at": "2026-11-27T03:00:00+00:00",
+        }
+        self.row["status"] = "rejeitado"
+        with patch.dict(os.environ, {"HYPE_AUTO_SIMPLE_PUBLISH_ENABLED": "1"}):
+            self.assertEqual(
+                verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))["mods"], []
+            )
+
+    def test_simple_publish_orders_by_publication_time_not_upload_time(self):
+        from modules.hype_auto_signed_catalogue import latest_uploaded_mods
+        first = dict(self.row)
+        first["meta"] = {
+            "library_upload": True,
+            "bootstrap_publication": {
+                "source": "original", "module_id": "hypeclient",
+                "version": "1.4", "sha256": first["sha256"],
+                "published_by": "admin@example.test",
+                "published_at": "2026-11-27T05:00:00+00:00",
+            },
+        }
+        first["created_at"] = "2026-11-25T20:00:00Z"
+        buf = io.BytesIO()
+        with ZipFile(buf, "w") as archive:
+            archive.writestr("fabric.mod.json", json.dumps({
+                "schemaVersion": 1, "id": "hypeclient",
+                "version": "1.4", "name": "HYPE Client",
+            }))
+            archive.writestr("assets/padding.bin", b"Z" * 1400)
+        newer_upload_data = buf.getvalue()
+        newer_sha = hashlib.sha256(newer_upload_data).hexdigest()
+        newer_upload = dict(self.row)
+        newer_upload["sha256"] = newer_sha
+        newer_upload["size_bytes"] = len(newer_upload_data)
+        newer_upload["storage_path"] = f"hypeclient/{'b'*32}/{newer_sha}.jar"
+        newer_upload["created_at"] = "2026-11-27T04:00:00Z"
+        newer_upload["meta"] = {
+            "library_upload": True,
+            "bootstrap_publication": {
+                "source": "original", "module_id": "hypeclient",
+                "version": "1.4", "sha256": newer_sha,
+                "published_by": "admin@example.test",
+                "published_at": "2026-11-27T04:30:00+00:00",
+            },
+        }
+        class MultiDb:
+            def table(self, name):
+                self.name = name
+                return Query([newer_upload.copy(), first.copy()])
+        with patch.dict(os.environ, {"HYPE_AUTO_SIMPLE_PUBLISH_ENABLED": "1"}):
+            selected = latest_uploaded_mods(MultiDb())
+            self.assertEqual(len(selected), 1)
+            self.assertEqual(selected[0]["sha256"], first["sha256"])
+            self.assertNotEqual(selected[0]["sha256"], newer_sha)
+
     def test_both_distribution_switches_are_required(self):
         for flag_a, flag_b, expected in [
             ("0", "0", False), ("1", "0", False), ("0", "1", False), ("1", "1", True),

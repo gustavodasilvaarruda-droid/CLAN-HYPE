@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+from datetime import datetime
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -65,6 +66,36 @@ def _load_signing_key():
         raise AutoCatalogUnavailable("Chave de assinatura invalida ou incompativel") from exc
 
 
+def _simple_publish_enabled():
+    return os.getenv("HYPE_AUTO_SIMPLE_PUBLISH_ENABLED", "").strip().lower() in ("1", "true", "yes")
+
+
+def _explicit_publication(row):
+    """Only the exact original JAR explicitly published by the site owner is eligible.
+
+    The record is immutable with respect to module identity and SHA, and is
+    checked again on every catalog generation / binary download.
+    """
+    if not _simple_publish_enabled():
+        return True
+    meta = row.get("meta") or {}
+    publication = meta.get("bootstrap_publication")
+    if not isinstance(publication, dict):
+        return False
+    if (publication.get("source") != "original"
+            or publication.get("module_id") != row.get("module_id")
+            or publication.get("version") != row.get("version")
+            or publication.get("sha256") != row.get("sha256")
+            or not isinstance(publication.get("published_by"), str)
+            or not publication["published_by"].strip()):
+        return False
+    try:
+        when = datetime.fromisoformat(str(publication.get("published_at", "")))
+    except (TypeError, ValueError):
+        return False
+    return when.tzinfo is not None and when.utcoffset() is not None
+
+
 def _eligible(row):
     if not isinstance(row, dict):
         return False
@@ -73,6 +104,8 @@ def _eligible(row):
         row.get("storage_path"), row.get("size_bytes"),
     )
     if row.get("status") not in RELEASE_STATES or not _safe_public_build(row):
+        return False
+    if not _explicit_publication(row):
         return False
     if not isinstance(row.get("meta"), dict) or row["meta"].get("library_upload") is not True:
         return False
@@ -151,7 +184,17 @@ def latest_uploaded_mods(db):
     """One latest eligible library upload per Fabric mod ID, newest first."""
     result = []
     seen = set()
-    for row in _uploaded_rows(db):
+    rows = _uploaded_rows(db)
+    if _simple_publish_enabled():
+        # Publication time, not upload time, decides the active version.
+        # Re-publishing an older JAR is an intentional rollback.
+        def publication_time(row):
+            meta = row.get("meta")
+            publication = meta.get("bootstrap_publication") if isinstance(meta, dict) else None
+            timestamp = publication.get("published_at") if isinstance(publication, dict) else None
+            return timestamp if isinstance(timestamp, str) else ""
+        rows.sort(key=publication_time, reverse=True)
+    for row in rows:
         if _eligible(row) and row["module_id"] not in seen:
             release = _release_candidate(row)
             if release is None:
