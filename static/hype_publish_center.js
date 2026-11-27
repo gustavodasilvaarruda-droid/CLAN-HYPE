@@ -27,7 +27,8 @@
         action: el.value, id: el.dataset.draftId,
         modId: el.dataset.modId,
         ownerPilot: el.dataset.ownerPilot === '1',
-        duplicate: el.dataset.duplicate === '1'
+        duplicate: el.dataset.duplicate === '1',
+        active: el.dataset.active === '1'
       }));
 
     function say(message, error = false) {
@@ -87,17 +88,18 @@
       return result;
     }
 
-    async function performAction(action, id, ownerPilot = false, duplicate = false) {
+    async function performAction(action, id, ownerPilot = false, duplicate = false, active = false) {
       if (action === 'publish') {
         return post(toolbar.dataset.publishUrl, fields({
           draft_id: id, confirm_public_distribution: 'yes'
         }));
       }
-      if (action === 'delete') {
+      if (action === 'delete' || action === 'delete_active') {
         return post(toolbar.dataset.deleteUrl, fields({
           draft_id: id, confirm_delete: 'yes',
           confirm_owner_pilot_retire: ownerPilot ? 'yes' : 'no',
-          confirm_duplicate_retire: duplicate ? 'yes' : 'no'
+          confirm_duplicate_retire: duplicate ? 'yes' : 'no',
+          confirm_live_retire: active || action === 'delete_active' ? 'yes' : 'no'
         }));
       }
       throw new Error('Ação desconhecida.');
@@ -136,11 +138,13 @@
 
       const willPublish = Boolean(publishNew?.checked && files.length)
         || actions.some(t => t.action === 'publish');
-      const willDelete = actions.some(t => t.action === 'delete');
+      const willDelete = actions.some(t => t.action === 'delete' || t.action === 'delete_active');
+      const willRetireActive = actions.some(t => t.action === 'delete_active');
       let confirmation = 'Confirmar ' + files.length + ' novo(s) arquivo(s) e '
         + actions.length + ' ação(ões) selecionada(s)?';
       if (willPublish) confirmation += '\n\nOs JARs publicados poderão ser baixados publicamente, sem ofuscação automática.';
-      if (willDelete) confirmation += '\n\nOs arquivos privados selecionados para exclusão serão removidos definitivamente.';
+      if (willDelete) confirmation += '\n\nOs arquivos escolhidos para exclusão serão removidos definitivamente.';
+      if (willRetireActive) confirmation += '\n\nATENÇÃO: mods ATIVOS selecionados serão retirados do Bootstrap. Versões antigas NÃO voltarão automaticamente. Arquivos já instalados nos PCs não serão desinstalados.';
       if (!window.confirm(confirmation)) return;
 
       busy = true;
@@ -149,20 +153,9 @@
       const completed = [];
       const failures = [];
 
-      // Existing actions first; new uploads published afterwards take precedence.
-      for (const task of actions) {
-        say('Aplicando alterações: ' + (completed.length + failures.length + 1) + '/' + (actions.length + files.length) + '...');
-        try {
-          const result = await performAction(task.action, task.id, task.ownerPilot, task.duplicate);
-          completed.push((task.action === 'publish' ? 'Publicado: ' : 'Apagado: ') + task.modId);
-          if (result.messages?.length) {
-            // Per-file server messages are retained in the status summary.
-          }
-        } catch (err) {
-          failures.push(task.modId + ': ' + err.message);
-        }
-      }
-
+      // Send and publish replacements first; only then remove older versions.
+      // A failed new release must never leave an active mod deleted by accident.
+      let uploadFailed = false;
       for (const file of files) {
         say('Enviando ' + file.name + '...');
         try {
@@ -178,7 +171,25 @@
             completed.push('Publicado: ' + file.name);
           }
         } catch (err) {
+          uploadFailed = true;
           failures.push(file.name + ': ' + err.message);
+        }
+      }
+
+      for (const task of actions) {
+        if (task.action === 'delete_active' && files.length && publishNew?.checked && uploadFailed) {
+          failures.push(task.modId + ': retirada cancelada porque a publicação do novo JAR falhou.');
+          continue;
+        }
+        say('Aplicando alterações: ' + (completed.length + failures.length + 1) + '/' + (actions.length + files.length) + '...');
+        try {
+          const result = await performAction(task.action, task.id, task.ownerPilot, task.duplicate, task.active);
+          completed.push((task.action === 'publish' ? 'Publicado: ' : task.action === 'delete_active' ? 'Retirado e apagado: ' : 'Apagado: ') + task.modId);
+          if (result.messages?.length) {
+            // Per-file server messages are retained in the status summary.
+          }
+        } catch (err) {
+          failures.push(task.modId + ': ' + err.message);
         }
       }
 
@@ -228,7 +239,7 @@
       });
       updateCount();
       if (!selected) {
-        say('Nenhum arquivo liberado para exclusão. As versões ativas estão protegidas; apenas cópias repetidas e rascunhos podem ser apagados.', true);
+        say("Nenhum arquivo antigo selecionável. Para retirar o mod ativo, escolha 'Apagar e retirar do Bootstrap' na pasta dele.", true);
       }
     });
     root.querySelector('#hpub-clear-choices')?.addEventListener('click', () => {

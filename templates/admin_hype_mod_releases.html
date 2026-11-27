@@ -1,7 +1,7 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}HYPE | Mods{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='hype_publish_center.css') }}?v=10">
+<link rel="stylesheet" href="{{ url_for('static', filename='hype_publish_center.css') }}?v=11">
 <section class="hpub-page" id="hpub-app">
   <div class="hpub-shell">
     <header class="hpub-top">
@@ -42,12 +42,12 @@
              data-publish-url="{{ url_for('hype_mod_admin.mod_release_distribute_bootstrap') if quick_publish_enabled else '' }}"
              data-delete-url="{{ url_for('hype_mod_admin.mod_release_delete') }}">
       <input type="hidden" id="hpub-batch-csrf" value="{{ csrf_token() }}">
-      <p>Marque publicações e exclusões. Só uma versão por mod fica ativa no Bootstrap; cópias antigas idênticas podem ser apagadas sem afetá-la.</p>
+      <p>Marque os arquivos que deseja apagar ou publicar. Você também pode retirar um mod ativo do Bootstrap. Para atualizar, basta enviar o novo JAR do mesmo ID Fabric e publicar: ele substitui o anterior.</p>
       <div class="hpub-batch-controls">
         {% if quick_publish_enabled %}
         <button type="button" class="hpub-small-button" id="hpub-mark-newest">Marcar últimas para publicar</button>
         {% endif %}
-        <button type="button" class="hpub-small-button" id="hpub-mark-deletable">Marcar arquivos que posso apagar</button>
+        <button type="button" class="hpub-small-button" id="hpub-mark-deletable">Marcar antigos e rascunhos para apagar</button>
         <button type="button" class="hpub-small-button" id="hpub-clear-choices">Limpar seleção</button>
         <button type="button" class="hpub-main-button" id="hpub-save-batch">Salvar tudo</button>
       </div>
@@ -57,7 +57,7 @@
 
     <section class="hpub-library" aria-labelledby="hpub-library-title">
       <h2 id="hpub-library-title">Arquivos por mod</h2>
-      <p class="hpub-library-help">O selo <strong>Ativo no Bootstrap</strong> indica o único arquivo selecionado para baixar. As cópias repetidas ficam identificadas para limpeza. Nenhum arquivo será apagado sem você confirmar.</p>
+      <p class="hpub-library-help"><strong>Ativo no Bootstrap:</strong> é a versão que o atualizador entrega agora. <strong>Apagar e retirar</strong> remove essa versão do catálogo; mods já instalados no PC não são desinstalados automaticamente. Nenhum arquivo será apagado sem confirmação.</p>
       {% for mod_id, mod_files in drafts|groupby('module_id') %}
       <details class="hpub-folder" data-hpub-mod-folder {% if mod_id == 'hypeclient' %}open{% endif %}>
         <summary>
@@ -88,10 +88,9 @@
             {% set can_publish = quick_publish_enabled and item.status != 'rejeitado'
                   and item.module_id not in ('hypebootstrap', 'hypeegg')
                   and not is_active and not is_duplicate %}
-            {% set can_delete = item.status in ('aguardando_protecao','rejeitado')
-                  and (not published_before or is_duplicate) and not meta.get('pilot_original')
-                  and (not meta.get('owner_pilot') or item.status == 'rejeitado')
-                  and not meta.get('protected') and (not job or job.status != 'running') %}
+            {% set can_delete = item.status in ('aguardando_protecao','rejeitado','em_teste','pronto_para_aprovacao','protegido')
+                  and not meta.get('pilot_original')
+                  and (not job or job.status not in ('running','processing')) %}
             <div class="hpub-jar-actions">
               <a href="{{ url_for('hype_mod_admin.mod_release_library_download', draft_id=item.id) }}"
                  class="hpub-small-button">Baixar JAR</a>
@@ -117,15 +116,16 @@
               {% endif %}
               {% if can_delete %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}"
-                    onsubmit="return confirm({% if meta.get('owner_pilot') %}'Este arquivo está em um teste antigo do proprietário. Retirar do teste e apagar definitivamente?'{% else %}'Apagar este arquivo da biblioteca?'{% endif %});">
+                    onsubmit="return confirm({% if is_active %}'ATENÇÃO: retirar o mod ativo do Bootstrap e apagar o JAR? Versões antigas NÃO serão reativadas automaticamente. Jogadores que já têm o mod instalado continuarão com ele até outra atualização.'{% elif meta.get('owner_pilot') %}'Este arquivo está em um teste antigo do proprietário. Retirar do teste e apagar definitivamente?'{% else %}'Apagar este arquivo da biblioteca?'{% endif %});">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="draft_id" value="{{ item.id }}">
                 <input type="hidden" name="confirm_delete" value="yes">
-                {% if is_duplicate %}<input type="hidden" name="confirm_duplicate_retire" value="yes">{% endif %}
+                {% if published_before %}<input type="hidden" name="confirm_duplicate_retire" value="yes">{% endif %}
+                {% if is_active %}<input type="hidden" name="confirm_live_retire" value="yes">{% endif %}
                 {% if meta.get('owner_pilot') %}
                 <input type="hidden" name="confirm_owner_pilot_retire" value="yes">
                 {% endif %}
-                <button type="submit" class="hpub-delete-button">Apagar</button>
+                <button type="submit" class="hpub-delete-button">{{ "Apagar e retirar do Bootstrap" if is_active else "Apagar" }}</button>
               </form>
               {% endif %}
               {% if can_publish or can_delete %}
@@ -136,11 +136,18 @@
                         data-mod-id="{{ item.module_id }}"
                         data-newest="{{ '1' if loop.first else '0' }}"
                         data-published="{{ '1' if is_active or is_duplicate or is_history else '0' }}"
-                        data-duplicate="{{ '1' if is_duplicate else '0' }}"
+                        data-duplicate="{{ '1' if published_before else '0' }}"
+                        data-active="{{ '1' if is_active else '0' }}"
                         data-owner-pilot="{{ '1' if meta.get('owner_pilot') else '0' }}">
                   <option value="">Não alterar</option>
                   {% if can_publish %}<option value="publish">{{ "Restaurar versão" if is_history else "Publicar atualização" }}</option>{% endif %}
-                  {% if can_delete %}<option value="delete">{{ "Apagar cópia repetida" if is_duplicate else "Apagar da biblioteca" }}</option>{% endif %}
+                  {% if can_delete %}
+                    {% if is_active %}
+                    <option value="delete_active">Apagar e retirar do Bootstrap</option>
+                    {% else %}
+                    <option value="delete">{{ "Apagar cópia repetida" if is_duplicate else "Apagar da biblioteca" }}</option>
+                    {% endif %}
+                  {% endif %}
                 </select>
               </label>
               {% endif %}

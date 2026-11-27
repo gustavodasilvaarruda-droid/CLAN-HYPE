@@ -12,7 +12,7 @@ from modules.hype_mod_staging import register_mod_release_routes
 
 class Query:
     def __init__(self, db, table):
-        self.db, self.table, self.filters, self.deleting = db, table, [], False
+        self.db, self.table, self.filters, self.deleting, self.updating = db, table, [], False, None
 
     def select(self, *_):
         return self
@@ -31,6 +31,10 @@ class Query:
         self.deleting = True
         return self
 
+    def update(self, payload):
+        self.updating = payload
+        return self
+
     def execute(self):
         source = getattr(self.db, self.table)
         result = [row for row in source
@@ -38,6 +42,9 @@ class Query:
         if self.deleting:
             for row in result:
                 source.remove(row)
+        if self.updating is not None:
+            for row in result:
+                row.update(self.updating)
         return SimpleNamespace(data=[dict(row) for row in result])
 
 
@@ -112,10 +119,11 @@ class DuplicateCleanupTests(unittest.TestCase):
         with self.client.session_transaction() as s:
             s["usuario_email"] = "test-owner@example.test"
 
-    def delete(self, row, confirmed=True):
+    def delete(self, row, confirmed=True, retire_active=False):
         return self.client.post("/admin/modulos/releases/excluir", data={
             "draft_id": row["id"], "confirm_delete": "yes",
             "confirm_duplicate_retire": "yes" if confirmed else "no",
+            "confirm_live_retire": "yes" if retire_active else "no",
         }, headers={"X-HYPE-BATCH": "1"})
 
     def test_delete_query_includes_all_eligibility_fields(self):
@@ -156,13 +164,44 @@ class DuplicateCleanupTests(unittest.TestCase):
         from modules.hype_auto_signed_catalogue import latest_uploaded_mods
         self.assertEqual(latest_uploaded_mods(self.db)[0]["id"], self.active["id"])
 
-    def test_old_different_binary_is_not_a_duplicate(self):
+    def test_old_different_binary_can_be_removed_without_affecting_active(self):
         self.old["sha256"] = "b" * 64
         self.old["storage_path"] = f"hype_pokedex/{uuid4().hex}/{'b' * 64}.jar"
         self.old["meta"]["bootstrap_publication"]["sha256"] = "b" * 64
         response = self.delete(self.old)
+        self.assertTrue(response.get_json()["ok"])
+        self.assertEqual(len(self.db.hype_mod_release_drafts), 1)
+        self.assertEqual(self.db.hype_mod_release_drafts[0]["id"], self.active["id"])
+
+    def test_active_removal_does_not_reactivate_old_release(self):
+        self.old["sha256"] = "b" * 64
+        self.old["storage_path"] = f"hype_pokedex/{uuid4().hex}/{'b' * 64}.jar"
+        self.old["meta"]["bootstrap_publication"]["sha256"] = "b" * 64
+        result = self.delete(self.active, retire_active=True)
+        self.assertTrue(result.get_json()["ok"], result.get_json())
+        self.assertEqual(self.db.hype_mod_release_drafts, [self.old])
+        self.assertEqual(self.db.storage.removed, [self.active["storage_path"]])
+        self.assertNotIn("bootstrap_publication", self.old["meta"])
+        self.assertIn("bootstrap_retired", self.old["meta"])
+        from modules.hype_auto_signed_catalogue import latest_uploaded_mods
+        self.assertEqual(latest_uploaded_mods(self.db), [])
+
+    def test_retired_old_release_can_be_deleted_after_active_removed(self):
+        self.assertTrue(self.delete(self.active, retire_active=True).get_json()["ok"])
+        self.assertTrue(self.delete(self.old, confirmed=True).get_json()["ok"])
+        self.assertEqual(self.db.hype_mod_release_drafts, [])
+        self.assertEqual(len(self.db.storage.removed), 2)
+
+    def test_linked_active_release_is_not_deleted_even_with_confirmation(self):
+        self.db.hype_mod_restricted_releases.append({
+            "draft_id": self.active["id"],
+            "release": 55,
+            "storage_path": self.active["storage_path"],
+        })
+        response = self.delete(self.active, retire_active=True)
         self.assertFalse(response.get_json()["ok"])
         self.assertEqual(len(self.db.hype_mod_release_drafts), 2)
+        self.assertEqual(self.db.storage.removed, [])
 
     def test_linked_release_keeps_published_duplicate(self):
         self.db.hype_mod_published_releases.append({
