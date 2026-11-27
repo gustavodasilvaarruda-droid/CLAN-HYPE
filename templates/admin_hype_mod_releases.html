@@ -1,13 +1,13 @@
 {% extends 'hype_app_base.html' %}
 {% block title %}HYPE | Mods{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='hype_publish_center.css') }}?v=8">
+<link rel="stylesheet" href="{{ url_for('static', filename='hype_publish_center.css') }}?v=9">
 <section class="hpub-page" id="hpub-app">
   <div class="hpub-shell">
     <header class="hpub-top">
       <div class="hpub-eyebrow">CLAN HYPE</div>
       <h1>Meus <em>Mods</em></h1>
-      <p>Envie um JAR para guardar na biblioteca. Quando estiver pronto, clique em <strong>Publicar no Bootstrap</strong> para distribuir a atualização automaticamente.</p>
+      <p>Escolha vários JARs, marque os mods que deseja publicar ou apagar e use <strong>Salvar tudo</strong> uma única vez. A página não será recarregada.</p>
       {% if not quick_publish_enabled %}
       <p class="hpub-warning" role="status">Publicação automática ainda não ativada no servidor. Os arquivos enviados continuam privados.</p>
       {% endif %}
@@ -22,16 +22,38 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <label class="hpub-drop" for="hpub-quick-file">
             <span class="hpub-file-icon" aria-hidden="true">↑</span>
-            <strong>Escolher arquivo .jar</strong>
-            <span id="hpub-upload-file-note">JAR Fabric · até 10 MiB</span>
+            <strong>Escolher arquivos .jar</strong>
+            <span id="hpub-upload-file-note">Vários JARs Fabric · até 10 MiB por arquivo</span>
           </label>
-          <input id="hpub-quick-file" name="jar" type="file" accept=".jar,application/java-archive" required>
-          <button class="hpub-main-button" id="hpub-submit-upload" type="submit">Enviar arquivo</button>
+          <input id="hpub-quick-file" name="jar" type="file" accept=".jar,application/java-archive" multiple>
+          {% if quick_publish_enabled %}
+          <label class="hpub-upload-check"><input type="checkbox" id="hpub-publish-new"> Publicar os novos arquivos no Bootstrap ao salvar (JAR original público)</label>
+          {% endif %}
+          <button class="hpub-main-button" id="hpub-submit-upload" type="submit">Enviar arquivos</button>
         </form>
       {% else %}
         <p class="hpub-warning" role="alert">O envio está desativado. Os arquivos já armazenados continuam preservados.</p>
       {% endif %}
     </section>
+
+    {% if staging_enabled %}
+    <section class="hpub-batch-toolbar" id="hpub-batch-toolbar" aria-label="Ações em lote"
+             data-upload-url="{{ url_for('hype_mod_admin.mod_release_upload') }}"
+             data-publish-url="{{ url_for('hype_mod_admin.mod_release_distribute_bootstrap') if quick_publish_enabled else '' }}"
+             data-delete-url="{{ url_for('hype_mod_admin.mod_release_delete') }}">
+      <input type="hidden" id="hpub-batch-csrf" value="{{ csrf_token() }}">
+      <p>Prepare tudo na tela e confirme uma vez só. As ações podem ser selecionadas individualmente ou em grupo.</p>
+      <div class="hpub-batch-controls">
+        {% if quick_publish_enabled %}
+        <button type="button" class="hpub-small-button" id="hpub-mark-newest">Marcar últimas para publicar</button>
+        {% endif %}
+        <button type="button" class="hpub-small-button" id="hpub-mark-deletable">Marcar pendentes para apagar</button>
+        <button type="button" class="hpub-small-button" id="hpub-clear-choices">Limpar seleção</button>
+        <button type="button" class="hpub-main-button" id="hpub-save-batch">Salvar tudo</button>
+      </div>
+      <p id="hpub-batch-status" class="hpub-batch-status" role="status" aria-live="polite">Nenhuma alteração selecionada.</p>
+    </section>
+    {% endif %}
 
     <section class="hpub-library" aria-labelledby="hpub-library-title">
       <h2 id="hpub-library-title">Arquivos por mod</h2>
@@ -58,6 +80,13 @@
               <strong>{{ item.original_filename or (item.module_id ~ '.jar') }}</strong>
               <small>{{ item.version }} · {{ (item.size_bytes|int / 1048576)|round(2) }} MiB · {{ item.created_at|hype_br_datetime }}</small>
             </div>
+            {% set can_publish = quick_publish_enabled and item.status != 'rejeitado'
+                  and item.module_id not in ('hypebootstrap', 'hypeegg') %}
+            {% set can_delete = item.status in ('aguardando_protecao','rejeitado')
+                  and not meta.get('bootstrap_publication') and not meta.get('pilot_original')
+                  and (not meta.get('owner_pilot') or item.status == 'rejeitado')
+                  and not meta.get('protected') and (not job or job.status != 'running') %}
+            {% set already_published = meta.get('bootstrap_publication') and meta.bootstrap_publication.sha256 == item.sha256 %}
             <div class="hpub-jar-actions">
               <a href="{{ url_for('hype_mod_admin.mod_release_library_download', draft_id=item.id) }}"
                  class="hpub-small-button">Baixar JAR</a>
@@ -65,24 +94,19 @@
                  class="hpub-small-button" target="_blank" rel="noopener">Analisar</a>
               <a href="{{ url_for('hype_mod_admin.mod_release_library_analyze', draft_id=item.id, formato='pacote') }}"
                  class="hpub-small-button">JAR + relatório</a>
-              {% if meta.get('bootstrap_publication') and meta.bootstrap_publication.sha256 == item.sha256 %}
+              {% if already_published %}
               <span class="hpub-small-button" aria-label="Esta versão foi publicada no catálogo do Bootstrap">✓ Publicado no Bootstrap</span>
               {% endif %}
-              {% if quick_publish_enabled and item.status != 'rejeitado'
-                    and item.module_id not in ('hypebootstrap', 'hypeegg') %}
+              {% if can_publish %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_distribute_bootstrap') }}"
                     onsubmit="return confirm('PUBLICAÇÃO PARA TODOS: esse JAR poderá ser baixado por qualquer jogador que tenha o Bootstrap. O arquivo NÃO será ofuscado automaticamente. Publicar mesmo assim?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="draft_id" value="{{ item.id }}">
                 <input type="hidden" name="confirm_public_distribution" value="yes">
-                <button type="submit" class="hpub-small-button">Publicar no Bootstrap</button>
+                <button type="submit" class="hpub-small-button">{{ "Republicar no Bootstrap" if already_published else "Publicar no Bootstrap" }}</button>
               </form>
               {% endif %}
-              {% if item.status in ('aguardando_protecao','rejeitado')
-                    and not meta.get('bootstrap_publication')
-                    and not meta.get('pilot_original')
-                    and (not meta.get('owner_pilot') or item.status == 'rejeitado')
-                    and not meta.get('protected') and (not job or job.status != 'running') %}
+              {% if can_delete %}
               <form method="post" action="{{ url_for('hype_mod_admin.mod_release_delete') }}"
                     onsubmit="return confirm({% if meta.get('owner_pilot') %}'Este arquivo está em um teste antigo do proprietário. Retirar do teste e apagar definitivamente?'{% else %}'Apagar este arquivo da biblioteca?'{% endif %});">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -93,6 +117,21 @@
                 {% endif %}
                 <button type="submit" class="hpub-delete-button">Apagar</button>
               </form>
+              {% endif %}
+              {% if can_publish or can_delete %}
+              <label class="hpub-batch-choice">
+                <span>Ação no próximo salvamento</span>
+                <select class="hpub-batch-select"
+                        data-draft-id="{{ item.id }}"
+                        data-mod-id="{{ item.module_id }}"
+                        data-newest="{{ '1' if loop.first else '0' }}"
+                        data-published="{{ '1' if already_published else '0' }}"
+                        data-owner-pilot="{{ '1' if meta.get('owner_pilot') else '0' }}">
+                  <option value="">Não alterar</option>
+                  {% if can_publish %}<option value="publish">{{ "Republicar" if already_published else "Publicar atualização" }}</option>{% endif %}
+                  {% if can_delete %}<option value="delete">Apagar da biblioteca</option>{% endif %}
+                </select>
+              </label>
               {% endif %}
             </div>
           </div>
@@ -118,5 +157,5 @@
     {% endif %}
   </div>
 </section>
-<script src="{{ url_for('static', filename='hype_publish_center.js') }}?v=8" defer></script>
+<script src="{{ url_for('static', filename='hype_publish_center.js') }}?v=9" defer></script>
 {% endblock %}

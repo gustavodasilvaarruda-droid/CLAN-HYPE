@@ -48,3 +48,23 @@
 .hpub-page :is(button,a,input,summary,label):focus-visible{outline:2px solid #f4d88d;outline-offset:3px}
 @media(max-width:560px){.hpub-page{padding:6px;margin:7px auto}.hpub-jar-entry{align-items:flex-start;flex-direction:column}.hpub-jar-actions{width:100%}.hpub-small-button{flex:1;justify-content:center}.hpub-drop span:last-child{padding-left:0;margin-top:0}}
 @media(prefers-reduced-motion:reduce){.hpub-fold-arrow{transition:none}}
+
+
+/* Batch queue stays on screen while requests are processed in sequence. */
+.hpub-batch-toolbar{display:none;margin:10px 0 25px;padding:19px;border:1px solid rgba(236,199,111,.28);border-radius:16px;background:rgba(210,160,65,.065)}
+.hpub-batch-toolbar>p:first-of-type{color:#c9c1b0;margin:0 0 13px;line-height:1.5}
+.hpub-js-enhanced .hpub-batch-toolbar{display:block}
+.hpub-batch-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.hpub-batch-controls .hpub-main-button{margin-left:auto}
+.hpub-batch-status{color:#ddc999;font-size:.88rem;overflow-wrap:anywhere;margin:13px 0 0}
+.hpub-batch-status.hpub-batch-error{color:#ffbbbb}
+.hpub-upload-check{display:flex;gap:10px;align-items:center;font-size:.9rem;color:#e3d0a2}
+.hpub-upload-check input{width:18px;height:18px;accent-color:#d6ae5a}
+.hpub-batch-choice{display:none;min-width:174px;flex-direction:column;gap:5px;font-size:.75rem;color:#c9c2b7}
+.hpub-batch-select{width:100%;min-height:38px;padding:7px 10px;border-radius:10px;border:1px solid rgba(219,175,96,.48);background:#151c27;color:#f2dba9;font:inherit;font-size:.83rem}
+.hpub-js-enhanced .hpub-batch-choice{display:flex}
+.hpub-js-enhanced .hpub-jar-actions>form{display:none}
+.hpub-js-enhanced #hpub-submit-upload{display:none}
+.hpub-js-enhanced .hpub-batch-choice select:focus-visible{outline:2px solid #f4d88d;outline-offset:2px}
+.hpub-js-enhanced[aria-busy=true] .hpub-batch-controls button{cursor:wait;opacity:.62}
+@media(max-width:560px){.hpub-batch-controls{display:grid;grid-template-columns:1fr 1fr}.hpub-batch-controls .hpub-main-button{grid-column:1 / -1;margin:0;width:100%}.hpub-batch-choice{width:100%;min-width:0}.hpub-batch-toolbar{padding:14px}}

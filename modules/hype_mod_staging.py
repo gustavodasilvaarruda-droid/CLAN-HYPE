@@ -253,6 +253,18 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 and os.getenv("HYPE_AUTO_REQUIRE_APPROVED_CANDIDATE", "").lower()
                 not in ("1", "true", "yes"))
 
+    def respond_to_library(draft_id=None):
+        """Keep legacy HTML forms working; batch UI receives an explicit result."""
+        if request.headers.get("X-HYPE-BATCH") == "1":
+            from flask import jsonify, get_flashed_messages
+            messages = get_flashed_messages(with_categories=True)
+            return jsonify({
+                "ok": not any(category in ("erro", "error", "danger") for category, _ in messages),
+                "messages": [{"type": category, "text": message} for category, message in messages],
+                "draft_id": str(draft_id) if draft_id is not None else None,
+            })
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
     def load_drafts():
         """Display the actual release blockers without changing publication rules."""
         if db is None:
@@ -617,7 +629,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             abort(404)
         if request.form.get("confirm_public_distribution") != "yes":
             flash("Confirme a publicação pública do JAR para o Bootstrap.", "erro")
-            return redirect(url_for("hype_mod_admin.mod_releases"))
+            return respond_to_library()
 
         try:
             from modules.hype_auto_signed_catalogue import (
@@ -696,7 +708,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             from flask import current_app
             current_app.logger.exception("Falha ao publicar JAR no Bootstrap")
             flash("A publicação não pôde ser confirmada no catálogo assinado.", "erro")
-        return redirect(url_for("hype_mod_admin.mod_releases"))
+        return respond_to_library()
 
     @bp.post("/admin/modulos/releases/upload")
     def mod_release_upload():
@@ -706,15 +718,16 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         file = request.files.get("jar")
         if not file or not (file.filename or "").lower().endswith(".jar"):
             flash("Escolha um arquivo .jar.", "erro")
-            return redirect(url_for("hype_mod_admin.mod_releases"))
+            return respond_to_library()
         raw = file.stream.read(MAX_UPLOAD + 1)
         try:
             report = inspect_original(raw)
         except InvalidJar as exc:
             flash(str(exc), "erro")
-            return redirect(url_for("hype_mod_admin.mod_releases"))
+            return respond_to_library()
         path = f'{report["module_id"]}/{uuid4().hex}/{report["sha256"]}.jar'
         uploaded = False
+        uploaded_draft_id = None
         try:
             assert_private_bucket(db.storage)
             db.storage.from_(BUCKET).upload(
@@ -735,6 +748,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                          "compatibility": report["compatibility"], "static_audit": static_audit,
                          "library_upload": True, "mod_name": report["name"]},
             }).execute()
+            uploaded_draft_id = (saved.data or [{}])[0].get("id")
             if registrar_log:
                 try:
                     registrar_log("upload_jar_biblioteca", "hype_mods", TABLE,
@@ -784,7 +798,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 except Exception:
                     pass
             flash("Falha no armazenamento privado. Verifique tabela, bucket e permissões.", "erro")
-        return redirect(url_for("hype_mod_admin.mod_releases"))
+        return respond_to_library(draft_id=uploaded_draft_id)
 
 
     @bp.post("/admin/modulos/releases/protegido")
@@ -1092,7 +1106,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             abort(404)
         if request.form.get("confirm_delete") != "yes":
             flash("Confirme a exclusão do JAR antes de continuar.", "erro")
-            return redirect(url_for("hype_mod_admin.mod_releases"))
+            return respond_to_library()
         try:
             draft_id = parse_draft_id(request.form.get("draft_id"))
             rows = (db.table(TABLE).select(
@@ -1208,7 +1222,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         pass
                 flash("Registro removido, mas a limpeza do armazenamento falhou. "
                       "É necessária conferência administrativa.", "erro")
-                return redirect(url_for("hype_mod_admin.mod_releases"))
+                return respond_to_library()
             if registrar_log:
                 try:
                     registrar_log("excluir_jar_privado", "hype_mods", TABLE, draft_id,
@@ -1224,7 +1238,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash(str(exc), "erro")
         except Exception:
             flash("Não foi possível excluir o JAR. Nenhuma versão publicada foi liberada.", "erro")
-        return redirect(url_for("hype_mod_admin.mod_releases"))
+        return respond_to_library()
 
 
     @bp.post("/admin/modulos/releases/revisar")
