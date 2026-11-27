@@ -46,6 +46,9 @@ class Query:
     def limit(self, _count):
         return self
 
+    def order(self, *_args, **_kwargs):
+        return self
+
     def delete(self):
         self.is_delete = True
         return self
@@ -142,14 +145,20 @@ class PrivateCleanupTests(unittest.TestCase):
         self.assertEqual(self.delete().status_code, 302)
         self.assertEqual(self.db.storage.removed, [self.original, protected])
 
-    def test_testing_and_approved_builds_are_not_deleted(self):
+    def test_testing_and_approved_unreferenced_builds_can_be_deleted(self):
         self.login()
         for status in ("em_teste", "pronto_para_aprovacao"):
             with self.subTest(status=status):
-                self.db.drafts[0]["status"] = status
+                self.db.drafts[:] = [{
+                    "id": self.draft_id, "module_id": "hypeclient",
+                    "version": "TEST-1", "status": status,
+                    "sha256": self.sha, "storage_path": self.original,
+                    "meta": {},
+                }]
+                self.db.storage.removed.clear()
                 self.assertEqual(self.delete().status_code, 302)
-                self.assertEqual(len(self.db.drafts), 1)
-                self.assertEqual(self.db.storage.removed, [])
+                self.assertEqual(self.db.drafts, [])
+                self.assertEqual(self.db.storage.removed, [self.original])
 
     def test_published_reference_blocks_even_rejected_draft(self):
         self.login()
