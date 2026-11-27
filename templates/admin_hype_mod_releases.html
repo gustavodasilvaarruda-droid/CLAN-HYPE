@@ -26,7 +26,9 @@
             <span id="hpub-upload-file-note">Vários JARs Fabric · até 10 MiB por arquivo</span>
           </label>
           <input id="hpub-quick-file" name="jar" type="file" accept=".jar,application/java-archive" multiple>
+          {% if quick_publish_enabled %}
           <label class="hpub-upload-check"><input type="checkbox" id="hpub-publish-new"> Publicar os novos arquivos no Bootstrap ao salvar (JAR original público)</label>
+          {% endif %}
           <button class="hpub-main-button" id="hpub-submit-upload" type="submit">Enviar arquivos</button>
         </form>
       {% else %}
@@ -35,7 +37,10 @@
     </section>
 
     {% if staging_enabled %}
-    <section class="hpub-batch-toolbar" id="hpub-batch-toolbar" aria-label="Ações em lote">
+    <section class="hpub-batch-toolbar" id="hpub-batch-toolbar" aria-label="Ações em lote"
+             data-upload-url="{{ url_for('hype_mod_admin.mod_release_upload') }}"
+             data-publish-url="{{ url_for('hype_mod_admin.mod_release_distribute_bootstrap') if quick_publish_enabled else '' }}"
+             data-delete-url="{{ url_for('hype_mod_admin.mod_release_delete') }}">
       <input type="hidden" id="hpub-batch-csrf" value="{{ csrf_token() }}">
       <p>Prepare tudo na tela e confirme uma vez só. As ações podem ser selecionadas individualmente ou em grupo.</p>
       <div class="hpub-batch-controls">
