@@ -606,7 +606,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/publicar-bootstrap")
-    def mod_release_publish_bootstrap():
+    def mod_release_distribute_bootstrap():
         """One explicit admin action publishes a verified original to Bootstrap.
 
         This does NOT protect/obfuscate the original. Enabling the channel makes
