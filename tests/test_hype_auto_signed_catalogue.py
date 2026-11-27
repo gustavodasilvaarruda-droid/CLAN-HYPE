@@ -216,6 +216,54 @@ class RenderSignerTests(unittest.TestCase):
             with self.assertRaises(AutoCatalogUnavailable):
                 signed_catalog_for_uploaded_client(self.db)
 
+
+    def test_protected_only_mode_does_not_list_unapproved_originals(self):
+        with patch.dict(os.environ, {"HYPE_AUTO_REQUIRE_APPROVED_CANDIDATE": "1"}):
+            doc = verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))
+            self.assertEqual(doc["mods"], [])
+            with self.assertRaises(AutoCatalogUnavailable):
+                uploaded_client_binary(self.db, self.sha)
+
+    def test_protected_only_mode_serves_tested_candidate_not_original(self):
+        buf = io.BytesIO()
+        with ZipFile(buf, "w") as archive:
+            archive.writestr("fabric.mod.json", json.dumps({
+                "schemaVersion": 1, "id": "hypeclient", "version": "1.4",
+                "name": "HYPE Client",
+            }))
+            archive.writestr("assets/padding.bin", b"Y" * 1400)
+        candidate_bytes = buf.getvalue()
+        candidate_sha = hashlib.sha256(candidate_bytes).hexdigest()
+        draft_id = "a1b2c3d4-1234-4567-89ab-001122334455"
+        path = f"hypeclient/{draft_id}/protected/{'b' * 32}/{candidate_sha}.jar"
+        self.row.update(id=draft_id, status="pronto_para_aprovacao")
+        self.row["meta"] = {
+            "library_upload": True,
+            "protected": {"storage_path": path, "sha256": candidate_sha,
+                          "size_bytes": len(candidate_bytes)},
+            "automatic_review": {"status": "passed", "candidate_sha256": candidate_sha},
+            "manual_review": {"candidate_sha256": candidate_sha,
+                              "checks": {"game_launch": True, "menus": True,
+                                         "server_connection": True, "no_crashes": True}},
+        }
+        self.db.storage.blobs[path] = candidate_bytes
+        with patch.dict(os.environ, {"HYPE_AUTO_REQUIRE_APPROVED_CANDIDATE": "1"}):
+            cat = verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))
+            self.assertEqual(cat["mods"][0]["sha256"], candidate_sha)
+            self.assertEqual(cat["mods"][0]["size"], len(candidate_bytes))
+            self.assertEqual(uploaded_client_binary(self.db, candidate_sha), candidate_bytes)
+            with self.assertRaises(AutoCatalogUnavailable):
+                uploaded_client_binary(self.db, self.sha)
+            self.row["meta"]["manual_review"]["candidate_sha256"] = self.sha
+            self.assertEqual(
+                verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))["mods"], []
+            )
+            self.row["meta"]["manual_review"]["candidate_sha256"] = candidate_sha
+            self.row["meta"]["protected"]["storage_path"] = "../not-a-private-candidate.jar"
+            self.assertEqual(
+                verify_auto_catalogue(signed_catalog_for_uploaded_mods(self.db))["mods"], []
+            )
+
     def test_both_distribution_switches_are_required(self):
         for flag_a, flag_b, expected in [
             ("0", "0", False), ("1", "0", False), ("0", "1", False), ("1", "1", True),
