@@ -94,10 +94,52 @@ def _eligible(row):
     return True
 
 
+
+def _release_candidate(row):
+    """Opt-in, fail-closed distribution of a game-tested private candidate.
+
+    This verifies release evidence and paths, NOT whether obfuscation succeeded.
+    The default legacy auto-catalogue behavior is unchanged when the switch is off.
+    """
+    if os.getenv("HYPE_AUTO_REQUIRE_APPROVED_CANDIDATE", "").lower() not in ("1", "true", "yes"):
+        return row
+    if row.get("status") != "pronto_para_aprovacao":
+        return None
+    meta = row.get("meta") or {}
+    protected = meta.get("protected")
+    automatic = meta.get("automatic_review")
+    manual = meta.get("manual_review")
+    if not all(isinstance(v, dict) for v in (protected, automatic, manual)):
+        return None
+    sha, size, path = (protected.get("sha256"), protected.get("size_bytes"),
+                       protected.get("storage_path"))
+    draft_id = str(row.get("id") or "")
+    if not re.fullmatch(r"(?:[1-9][0-9]*|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})", draft_id):
+        return None
+    if (not isinstance(sha, str) or not signed.SHA.fullmatch(sha)
+            or sha == row.get("sha256")
+            or type(size) is not int or not 1000 <= size <= 10 * 1024 * 1024):
+        return None
+    expected_path = re.escape(row["module_id"]) + "/" + re.escape(draft_id) + r"/protected/[a-f0-9]{32}/" + sha + r"\.jar"
+    if not isinstance(path, str) or not re.fullmatch(expected_path, path):
+        return None
+    if (automatic.get("status") != "passed"
+            or automatic.get("candidate_sha256") != sha
+            or manual.get("candidate_sha256") != sha):
+        return None
+    checks = manual.get("checks")
+    if not isinstance(checks, dict) or not all(
+        checks.get(key) is True for key in
+        ("game_launch", "menus", "server_connection", "no_crashes")
+    ):
+        return None
+    return dict(row, sha256=sha, size_bytes=size, storage_path=path)
+
+
 def _uploaded_rows(db):
     try:
         return (db.table(TABLE)
-                .select("module_id,version,sha256,size_bytes,storage_path,status,meta,original_filename,created_at")
+                .select("id,module_id,version,sha256,size_bytes,storage_path,status,meta,original_filename,created_at")
                 .order("created_at", desc=True)
                 .limit(1000)
                 .execute().data or [])
@@ -111,7 +153,10 @@ def latest_uploaded_mods(db):
     seen = set()
     for row in _uploaded_rows(db):
         if _eligible(row) and row["module_id"] not in seen:
-            result.append(row)
+            release = _release_candidate(row)
+            if release is None:
+                continue
+            result.append(release)
             seen.add(row["module_id"])
         if len(result) > MAX_MODS:
             raise AutoCatalogUnavailable("Excesso de mods no catalogo")
