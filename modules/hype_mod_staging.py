@@ -1164,7 +1164,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         try:
             draft_id = parse_draft_id(request.form.get("draft_id"))
             rows = (db.table(TABLE).select(
-                "id,module_id,version,status,sha256,storage_path,meta"
+                "id,module_id,version,status,sha256,size_bytes,storage_path,original_filename,created_at,meta"
             ).eq("id", draft_id).limit(1).execute().data or [])
             if not rows:
                 raise ValueError("Arquivo não encontrado. Atualize a página.")

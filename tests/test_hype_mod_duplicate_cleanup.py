@@ -118,6 +118,18 @@ class DuplicateCleanupTests(unittest.TestCase):
             "confirm_duplicate_retire": "yes" if confirmed else "no",
         }, headers={"X-HYPE-BATCH": "1"})
 
+    def test_delete_query_includes_all_eligibility_fields(self):
+        # Regression: the delete route used to omit size/filename, causing
+        # _eligible(draft) to always reject old published copies.
+        from pathlib import Path
+        src = (Path(__file__).resolve().parents[1] / "modules" /
+               "hype_mod_staging.py").read_text(encoding="utf-8")
+        delete_route = src.split('def mod_release_delete():', 1)[1]
+        self.assertIn(
+            '"id,module_id,version,status,sha256,size_bytes,storage_path,original_filename,created_at,meta"',
+            delete_route.split("if not rows:", 1)[0],
+        )
+
     def test_catalog_selects_exactly_one_live_copy(self):
         from modules.hype_auto_signed_catalogue import latest_uploaded_mods
         selected = latest_uploaded_mods(self.db)
