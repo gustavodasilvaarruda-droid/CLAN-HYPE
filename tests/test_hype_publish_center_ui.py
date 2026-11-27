@@ -1,4 +1,4 @@
-"""Only JAR upload and grouped mod files are exposed in the owner UI."""
+"""One-save multi-JAR uploads and grouped mod files in the owner UI."""
 import unittest
 from pathlib import Path
 from jinja2 import Environment
@@ -24,6 +24,10 @@ class MinimalModLibraryTests(unittest.TestCase):
         self.assertIn('id="hpub-unified-upload-form"', self.html)
         self.assertIn('id="hpub-quick-file"', self.html)
         self.assertIn("mod_release_upload", self.html)
+        self.assertIn("multiple>", self.html)
+        self.assertIn("hpub-batch-toolbar", self.html)
+        self.assertIn("hpub-save-batch", self.html)
+        self.assertIn("hpub-batch-select", self.html)
         self.assertIn('name="csrf_token"', self.html)
         for old in ("hpub-mode-picker", "hpub-quick-target", "hpub-quick-protected",
                     "mod_release_protected_upload", "mod_release_request_protection"):
@@ -40,18 +44,24 @@ class MinimalModLibraryTests(unittest.TestCase):
 
     def test_no_status_or_publication_wizard_visible(self):
         for old in ("status</", "hpub-file-status", "hpub-publishing-tools",
-                    "hpub-summary", "hpub-flow", "hpub-publish",
+                    "hpub-summary", "hpub-flow", "hpub-publishing-tools",
                     "manifest", "confirm_release", "owner_pilot_enabled",
                     "mod_release_publish", "JAR protegido", "hpub-stepper"):
             with self.subTest(old=old):
                 self.assertNotIn(old, self.html)
 
-    def test_js_checks_jar_and_prevents_oversized_upload(self):
-        self.assertIn("MAX_BYTES = 10 * 1024 * 1024", self.js)
-        self.assertIn("file.size > MAX_BYTES", self.js)
+    def test_js_checks_jars_and_uses_ajax_without_reloads(self):
+        self.assertIn("maxBytes = 10 * 1024 * 1024", self.js)
+        self.assertIn("file.size > maxBytes", self.js)
         self.assertIn("event.preventDefault()", self.js)
+        self.assertIn("fetch(", self.js)
+        self.assertIn("await refreshLibrary()", self.js)
+        self.assertIn("X-HYPE-BATCH", self.js)
+        self.assertIn("csrf_token", self.js)
+        self.assertIn("window.confirm(", self.js)
         self.assertNotIn("sessionStorage", self.js)
-        self.assertNotIn("fetch(", self.js)
+        self.assertNotIn("window.location.reload(", self.js)
+        self.assertNotIn("location.href =", self.js)
 
     def test_compact_mobile_design(self):
         self.assertIn("hpub-folder", self.css)
@@ -59,6 +69,8 @@ class MinimalModLibraryTests(unittest.TestCase):
         self.assertIn("max-width:560px", self.css)
         self.assertIn("prefers-reduced-motion", self.css)
         self.assertIn("focus-visible", self.css)
+        self.assertIn("hpub-js-enhanced", self.css)
+        self.assertIn("hpub-batch-controls", self.css)
 
     def test_download_is_owner_only_and_sha_checked(self):
         src = (ROOT / "modules" / "hype_mod_staging.py").read_text(encoding="utf-8")
