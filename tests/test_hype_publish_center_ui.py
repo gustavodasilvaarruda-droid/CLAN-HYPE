@@ -46,6 +46,9 @@ class MinimalModLibraryTests(unittest.TestCase):
         self.assertIn("Ativo no Bootstrap", self.html)
         self.assertIn("Apagar cópia repetida", self.html)
         self.assertIn("confirm_duplicate_retire", self.html)
+        self.assertIn("confirm_live_retire", self.html)
+        self.assertIn("delete_active", self.html)
+        self.assertIn("Apagar e retirar do Bootstrap", self.html)
 
     def test_no_status_or_publication_wizard_visible(self):
         for old in ("status</", "hpub-publishing-tools",
@@ -64,6 +67,9 @@ class MinimalModLibraryTests(unittest.TestCase):
         self.assertIn("X-HYPE-BATCH", self.js)
         self.assertIn("csrf_token", self.js)
         self.assertIn("confirm_duplicate_retire", self.js)
+        self.assertIn("confirm_live_retire", self.js)
+        self.assertIn("delete_active", self.js)
+        self.assertIn("Send and publish replacements first", self.js)
         self.assertIn("window.confirm(", self.js)
         self.assertNotIn("sessionStorage", self.js)
         self.assertNotIn("window.location.reload(", self.js)
