@@ -253,7 +253,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 and os.getenv("HYPE_AUTO_REQUIRE_APPROVED_CANDIDATE", "").lower()
                 not in ("1", "true", "yes"))
 
-    def respond_to_library(draft_id=None):
+    def respond_to_library(draft_id=None, duplicate=False):
         """Keep legacy HTML forms working; batch UI receives an explicit result."""
         if request.headers.get("X-HYPE-BATCH") == "1":
             from flask import jsonify, get_flashed_messages
@@ -262,6 +262,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 "ok": not any(category in ("erro", "error", "danger") for category, _ in messages),
                 "messages": [{"type": category, "text": message} for category, message in messages],
                 "draft_id": str(draft_id) if draft_id is not None else None,
+                "duplicate": duplicate,
             })
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
@@ -272,8 +273,32 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         rows = (db.table(TABLE).select(
             "id,module_id,version,status,created_at,sha256,meta,size_bytes,original_filename"
         ).order("created_at", desc=True).limit(100).execute().data or [])
+        # Only one eligible row per Fabric ID is actually offered by the
+        # signed catalog; historical publication receipts are not live releases.
+        active_by_id = {}
+        if quick_publish_enabled:
+            try:
+                from modules.hype_auto_signed_catalogue import latest_uploaded_mods
+                active_by_id = {r["module_id"]: r for r in latest_uploaded_mods(db)}
+            except Exception:
+                # Fail closed: never mark a row deletable without a known live copy.
+                active_by_id = {}
         for row in rows:
             meta = row.get("meta") or {}
+            publication = meta.get("bootstrap_publication")
+            active = active_by_id.get(row.get("module_id"))
+            is_active = bool(active and str(active.get("id")) == str(row.get("id")))
+            is_redundant = bool(
+                isinstance(publication, dict) and active and not is_active
+                and active.get("sha256") == row.get("sha256")
+                and active.get("version") == row.get("version")
+                and row.get("status") in ("aguardando_protecao", "rejeitado")
+                and not meta.get("protected") and not meta.get("pilot_original")
+                and not meta.get("owner_pilot")
+            )
+            row["bootstrap_active"] = is_active
+            row["bootstrap_history"] = bool(publication) and not is_active
+            row["bootstrap_duplicate"] = is_redundant
             candidate = meta.get("protected") or {}
             automatic = meta.get("automatic_review") or {}
             manual = meta.get("manual_review") or {}
@@ -648,6 +673,15 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 raise ValueError("Não é permitido publicar um JAR rejeitado.")
             if row.get("module_id") in ("hypebootstrap", "hypeegg"):
                 raise ValueError("Este mod não pode ser publicado pelo catálogo comum.")
+            from modules.hype_auto_signed_catalogue import latest_uploaded_mods
+            currently_active = next(
+                (item for item in latest_uploaded_mods(db)
+                 if item["module_id"] == row["module_id"]), None,
+            )
+            if (currently_active and currently_active["sha256"] == row["sha256"]
+                    and currently_active["version"] == row["version"]):
+                flash("Este mesmo JAR já está ativo no Bootstrap. Não foi criada outra publicação.", "sucesso")
+                return respond_to_library()
             # Use the existing strict Fabric/metadata/storage rules. During
             # publication, _eligible also requires the explicit receipt; check
             # against the validated, in-memory release row with that receipt.
@@ -725,6 +759,26 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         except InvalidJar as exc:
             flash(str(exc), "erro")
             return respond_to_library()
+        # Do not archive another exact copy of the same Fabric mod binary.
+        # A new hash is an actual update, even if the version string is equal.
+        try:
+            previous = (db.table(TABLE)
+                        .select("id,module_id,version,sha256,status")
+                        .order("created_at", desc=True).limit(1000)
+                        .execute().data or [])
+            existing = next(
+                (row for row in previous
+                 if row.get("module_id") == report["module_id"]
+                 and row.get("sha256") == report["sha256"]
+                 and row.get("version") == report["version"]
+                 and row.get("status") != "rejeitado"), None,
+            )
+        except Exception:
+            flash("Não foi possível conferir arquivos existentes. Nenhum novo registro criado.", "erro")
+            return respond_to_library()
+        if existing:
+            flash("Esse JAR já existe na biblioteca; evitei criar outra cópia.", "sucesso")
+            return respond_to_library(draft_id=existing["id"], duplicate=True)
         path = f'{report["module_id"]}/{uuid4().hex}/{report["sha256"]}.jar'
         uploaded = False
         uploaded_draft_id = None
@@ -814,7 +868,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             if not file or not (file.filename or "").lower().endswith(".jar"):
                 raise InvalidJar("Escolha um build protegido .jar.")
             rows = (db.table(TABLE).select(
-                "id,module_id,version,status,sha256,storage_path,meta"
+                "id,module_id,version,status,sha256,size_bytes,original_filename,storage_path,meta"
             ).eq("id", draft_id).limit(1).execute().data or [])
             if not rows:
                 abort(404)
@@ -1135,7 +1189,26 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
             pilot_meta = draft.get("meta") or {}
             if pilot_meta.get("bootstrap_publication"):
-                raise ValueError("Este JAR foi publicado para o Bootstrap e não pode ser apagado pela biblioteca.")
+                if (request.form.get("confirm_duplicate_retire") != "yes"
+                        or not is_simple_bootstrap_enabled()
+                        or pilot_meta.get("protected") or pilot_meta.get("pilot_original")
+                        or pilot_meta.get("owner_pilot")):
+                    raise ValueError("Versão publicada protegida. Só cópias idênticas e antigas podem ser removidas.")
+                # The current live release must remain available. Deletion is
+                # limited to old, identical published copies (same SHA/version).
+                from modules.hype_auto_signed_catalogue import (
+                    _eligible, latest_uploaded_mods,
+                )
+                if not _eligible(draft):
+                    raise ValueError("Publicação histórica inconsistente; exclusão bloqueada.")
+                active = next(
+                    (item for item in latest_uploaded_mods(db)
+                     if item["module_id"] == module_id), None,
+                )
+                if (not active or str(active.get("id")) == str(draft_id)
+                        or active.get("sha256") != sha
+                        or active.get("version") != draft.get("version")):
+                    raise ValueError("Este arquivo não é uma duplicata da versão ativa; exclusão bloqueada.")
             # An old owner-only test release can be retired explicitly. This is
             # never allowed for signed public, restricted or pilot_original releases.
             if pilot_meta.get("pilot_original"):
@@ -1203,6 +1276,17 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                 if not removed_job:
                     raise ValueError("A fila de proteção mudou durante a exclusão. "
                                      "Atualize a página e tente novamente.")
+            # Recheck the live catalogue before destroying a historical copy.
+            # The active row must never be the one deleted.
+            if pilot_meta.get("bootstrap_publication"):
+                active_now = next(
+                    (item for item in latest_uploaded_mods(db)
+                     if item["module_id"] == module_id), None,
+                )
+                if (not active_now or str(active_now.get("id")) == str(draft_id)
+                        or active_now.get("sha256") != sha
+                        or active_now.get("version") != draft.get("version")):
+                    raise ValueError("A versão ativa mudou; exclusão interrompida.")
             # Delete the database record first. A published release's FK protects
             # it even if another admin starts publication between the two checks.
             # Then remove ONLY the paths belonging to this now-deleted draft.
