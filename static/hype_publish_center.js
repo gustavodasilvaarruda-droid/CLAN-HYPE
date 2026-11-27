@@ -26,7 +26,8 @@
       .map(el => ({
         action: el.value, id: el.dataset.draftId,
         modId: el.dataset.modId,
-        ownerPilot: el.dataset.ownerPilot === '1'
+        ownerPilot: el.dataset.ownerPilot === '1',
+        duplicate: el.dataset.duplicate === '1'
       }));
 
     function say(message, error = false) {
@@ -86,7 +87,7 @@
       return result;
     }
 
-    async function performAction(action, id, ownerPilot = false) {
+    async function performAction(action, id, ownerPilot = false, duplicate = false) {
       if (action === 'publish') {
         return post(toolbar.dataset.publishUrl, fields({
           draft_id: id, confirm_public_distribution: 'yes'
@@ -95,7 +96,8 @@
       if (action === 'delete') {
         return post(toolbar.dataset.deleteUrl, fields({
           draft_id: id, confirm_delete: 'yes',
-          confirm_owner_pilot_retire: ownerPilot ? 'yes' : 'no'
+          confirm_owner_pilot_retire: ownerPilot ? 'yes' : 'no',
+          confirm_duplicate_retire: duplicate ? 'yes' : 'no'
         }));
       }
       throw new Error('Ação desconhecida.');
@@ -151,7 +153,7 @@
       for (const task of actions) {
         say('Aplicando alterações: ' + (completed.length + failures.length + 1) + '/' + (actions.length + files.length) + '...');
         try {
-          const result = await performAction(task.action, task.id, task.ownerPilot);
+          const result = await performAction(task.action, task.id, task.ownerPilot, task.duplicate);
           completed.push((task.action === 'publish' ? 'Publicado: ' : 'Apagado: ') + task.modId);
           if (result.messages?.length) {
             // Per-file server messages are retained in the status summary.
@@ -167,7 +169,7 @@
           const data = fields({});
           data.set('jar', file, file.name);
           const uploaded = await post(toolbar.dataset.uploadUrl, data);
-          completed.push('Enviado: ' + file.name);
+          completed.push((uploaded.duplicate ? 'Já existia: ' : 'Enviado: ') + file.name);
           if (publishNew?.checked) {
             if (!uploaded.draft_id) {
               throw new Error('O envio foi registrado, mas o servidor não informou o ID para publicar.');
@@ -217,10 +219,17 @@
       updateCount();
     });
     root.querySelector('#hpub-mark-deletable')?.addEventListener('click', () => {
+      let selected = 0;
       selections().forEach(sel => {
-        if ([...sel.options].some(option => option.value === 'delete')) sel.value = 'delete';
+        if ([...sel.options].some(option => option.value === 'delete')) {
+          sel.value = 'delete';
+          selected++;
+        }
       });
       updateCount();
+      if (!selected) {
+        say('Nenhum arquivo liberado para exclusão. As versões ativas estão protegidas; apenas cópias repetidas e rascunhos podem ser apagados.', true);
+      }
     });
     root.querySelector('#hpub-clear-choices')?.addEventListener('click', () => {
       selections().forEach(sel => { sel.value = ''; });

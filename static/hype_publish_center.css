@@ -68,3 +68,10 @@
 .hpub-js-enhanced .hpub-batch-choice select:focus-visible{outline:2px solid #f4d88d;outline-offset:2px}
 .hpub-js-enhanced[aria-busy=true] .hpub-batch-controls button{cursor:wait;opacity:.62}
 @media(max-width:560px){.hpub-batch-controls{display:grid;grid-template-columns:1fr 1fr}.hpub-batch-controls .hpub-main-button{grid-column:1 / -1;margin:0;width:100%}.hpub-batch-choice{width:100%;min-width:0}.hpub-batch-toolbar{padding:14px}}
+
+/* Distinguish one active release from previous/duplicate receipts. */
+.hpub-library-help{margin:0 0 15px;color:#bac0c9;font-size:.89rem;line-height:1.55}
+.hpub-file-status{display:inline-flex;align-items:center;min-height:36px;padding:7px 12px;border:1px solid rgba(201,172,105,.34);border-radius:9px;font-size:.82rem;font-weight:700}
+.hpub-status-active{color:#eacb89;background:rgba(207,161,63,.12)}
+.hpub-status-copy{color:#b4cfea;background:rgba(99,133,175,.12)}
+.hpub-status-history{color:#c8c5bd;background:rgba(143,143,143,.1)}

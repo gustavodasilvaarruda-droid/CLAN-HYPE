@@ -41,9 +41,14 @@ class MinimalModLibraryTests(unittest.TestCase):
         self.assertIn("mod_release_library_download", self.html)
         self.assertIn("hpub-older-files", self.html)
         self.assertIn("mod_release_delete", self.html)
+        self.assertIn("item.bootstrap_active", self.html)
+        self.assertIn("item.bootstrap_duplicate", self.html)
+        self.assertIn("Ativo no Bootstrap", self.html)
+        self.assertIn("Apagar cópia repetida", self.html)
+        self.assertIn("confirm_duplicate_retire", self.html)
 
     def test_no_status_or_publication_wizard_visible(self):
-        for old in ("status</", "hpub-file-status", "hpub-publishing-tools",
+        for old in ("status</", "hpub-publishing-tools",
                     "hpub-summary", "hpub-flow", "hpub-publishing-tools",
                     "manifest", "confirm_release", "owner_pilot_enabled",
                     "mod_release_publish", "JAR protegido", "hpub-stepper"):
@@ -58,6 +63,7 @@ class MinimalModLibraryTests(unittest.TestCase):
         self.assertIn("await refreshLibrary()", self.js)
         self.assertIn("X-HYPE-BATCH", self.js)
         self.assertIn("csrf_token", self.js)
+        self.assertIn("confirm_duplicate_retire", self.js)
         self.assertIn("window.confirm(", self.js)
         self.assertNotIn("sessionStorage", self.js)
         self.assertNotIn("window.location.reload(", self.js)
@@ -71,6 +77,8 @@ class MinimalModLibraryTests(unittest.TestCase):
         self.assertIn("focus-visible", self.css)
         self.assertIn("hpub-js-enhanced", self.css)
         self.assertIn("hpub-batch-controls", self.css)
+        self.assertIn("hpub-status-active", self.css)
+        self.assertIn("hpub-status-copy", self.css)
 
     def test_download_is_owner_only_and_sha_checked(self):
         src = (ROOT / "modules" / "hype_mod_staging.py").read_text(encoding="utf-8")
