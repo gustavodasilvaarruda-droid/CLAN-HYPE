@@ -198,6 +198,16 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
     original_test_download_enabled = staging_enabled and os.getenv(
         "HYPE_MOD_ORIGINAL_TEST_DOWNLOAD_ENABLED", ""
     ).lower() in ("1", "true", "yes")
+    # Explicit one-click release to the signed Bootstrap catalogue. This is a
+    # public binary channel, opt-in, and never publishes drafts on upload.
+    from modules.hype_updates import _auto_client_distribution_enabled
+    from modules.hype_auto_signed_catalogue import _simple_publish_enabled
+    quick_publish_enabled = (
+        staging_enabled and _auto_client_distribution_enabled()
+        and _simple_publish_enabled()
+        and os.getenv("HYPE_AUTO_REQUIRE_APPROVED_CANDIDATE", "").lower()
+        not in ("1", "true", "yes")
+    )
     # Explicit independent gate; must never be enabled by ordinary staging.
     private_publish_enabled = publish_enabled and os.getenv("HYPE_MOD_PRIVATE_PUBLISH_ENABLED", "").lower() in ("1", "true", "yes")
     from modules.hype_mod_pilot_scope import pilot_scope_status
@@ -233,6 +243,15 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             from modules.hype_mod_pilot_scope import can_account_download_private_mods
             if not can_account_download_private_mods(email):
                 abort(403)
+
+    def is_simple_bootstrap_enabled():
+        # Dynamic check on POST so changing Render flags cannot silently
+        # authorize a publication using stale request-scoped config.
+        return (staging_enabled
+                and _auto_client_distribution_enabled()
+                and _simple_publish_enabled()
+                and os.getenv("HYPE_AUTO_REQUIRE_APPROVED_CANDIDATE", "").lower()
+                not in ("1", "true", "yes"))
 
     def load_drafts():
         """Display the actual release blockers without changing publication rules."""
@@ -539,6 +558,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
             protection_jobs=protection_jobs, staging_enabled=staging_enabled,
+            quick_publish_enabled=quick_publish_enabled,
             report=None, error=None,
         )
 
@@ -562,6 +582,7 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
         return render_template(
             "admin_hype_mod_releases.html", drafts=drafts,
             protection_jobs={}, staging_enabled=staging_enabled,
+            quick_publish_enabled=quick_publish_enabled,
             report=report, error=error,
         )
 
@@ -582,6 +603,99 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash(str(exc), "erro")
         except Exception:
             flash("Nao foi possivel agendar a protecao. Confira a fila e o banco de dados.", "erro")
+        return redirect(url_for("hype_mod_admin.mod_releases"))
+
+    @bp.post("/admin/modulos/releases/publicar-bootstrap")
+    def mod_release_publish_bootstrap():
+        """One explicit admin action publishes a verified original to Bootstrap.
+
+        This does NOT protect/obfuscate the original. Enabling the channel makes
+        the file publicly downloadable, so an affirmative confirmation is required.
+        """
+        admin_only()
+        if db is None or not is_simple_bootstrap_enabled():
+            abort(404)
+        if request.form.get("confirm_public_distribution") != "yes":
+            flash("Confirme a publicação pública do JAR para o Bootstrap.", "erro")
+            return redirect(url_for("hype_mod_admin.mod_releases"))
+
+        try:
+            from modules.hype_auto_signed_catalogue import (
+                _eligible, _load_signing_key, signed_catalog_for_uploaded_mods,
+                verify_auto_catalogue,
+            )
+
+            draft_id = parse_draft_id(request.form.get("draft_id"))
+            rows = (db.table(TABLE).select(
+                "id,module_id,version,status,sha256,size_bytes,storage_path,meta,original_filename"
+            ).eq("id", draft_id).limit(2).execute().data or [])
+            if len(rows) != 1:
+                raise ValueError("JAR não encontrado.")
+            row = rows[0]
+            if row.get("status") == "rejeitado":
+                raise ValueError("Não é permitido publicar um JAR rejeitado.")
+            if row.get("module_id") in ("hypebootstrap", "hypeegg"):
+                raise ValueError("Este mod não pode ser publicado pelo catálogo comum.")
+            # Use the existing strict Fabric/metadata/storage rules. During
+            # publication, _eligible also requires the explicit receipt; check
+            # against the validated, in-memory release row with that receipt.
+            sha = row.get("sha256")
+            publication = {
+                "source": "original",
+                "module_id": row.get("module_id"),
+                "version": row.get("version"),
+                "sha256": sha,
+                "published_by": session["usuario_email"],
+                "published_at": datetime.now(timezone.utc).isoformat(),
+            }
+            meta = dict(row.get("meta") or {})
+            meta["bootstrap_publication"] = publication
+            if not _eligible(dict(row, meta=meta)):
+                raise ValueError("JAR não elegível para o catálogo do Bootstrap.")
+            # Verify the exact private bytes before marking this version public.
+            assert_private_bucket(db.storage)
+            raw = db.storage.from_(BUCKET).download(row["storage_path"])
+            validate_binary(raw, expected_sha=sha)
+            report = inspect_original(raw)
+            if (report["module_id"] != row["module_id"]
+                    or report["version"] != row["version"]
+                    or report["size_bytes"] != row["size_bytes"]):
+                raise ValueError("O JAR no armazenamento não corresponde ao registro.")
+            # Fail before DB mutation if the Render private key cannot sign.
+            _load_signing_key()
+            written = (db.table(TABLE).update({"meta": meta})
+                       .eq("id", draft_id).eq("status", row["status"])
+                       .eq("sha256", sha).execute().data or [])
+            if not written:
+                raise ValueError("Esta versão mudou; atualize a página e tente novamente.")
+            if registrar_log:
+                try:
+                    registrar_log("publicar_mod_bootstrap", "hype_mods", TABLE,
+                                  str(draft_id),
+                                  {"module_id": row["module_id"], "sha256": sha,
+                                   "source": "original"})
+                except Exception:
+                    pass  # Release integrity never depends on audit-log uptime.
+            signed = verify_auto_catalogue(signed_catalog_for_uploaded_mods(db))
+            current = next((m for m in signed["mods"]
+                            if m["id"] == row["module_id"]), None)
+            if current is None or current["sha256"] != sha:
+                flash(
+                    "A publicação foi registrada, mas o catálogo ainda não "
+                    "mostra este JAR. Confira os canais e a assinatura.", "erro",
+                )
+            else:
+                flash(
+                    f"{row['module_id']} publicado no catálogo do Bootstrap! "
+                    "O jogador receberá a atualização na próxima verificação "
+                    "e a instalará depois de fechar o Minecraft.", "sucesso",
+                )
+        except (InvalidJar, InvalidRelease, ValueError) as exc:
+            flash(str(exc) or "Não foi possível publicar este JAR.", "erro")
+        except Exception:
+            from flask import current_app
+            current_app.logger.exception("Falha ao publicar JAR no Bootstrap")
+            flash("A publicação não pôde ser confirmada no catálogo assinado.", "erro")
         return redirect(url_for("hype_mod_admin.mod_releases"))
 
     @bp.post("/admin/modulos/releases/upload")
@@ -1006,6 +1120,8 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                     )):
                 raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
             pilot_meta = draft.get("meta") or {}
+            if pilot_meta.get("bootstrap_publication"):
+                raise ValueError("Este JAR foi publicado para o Bootstrap e não pode ser apagado pela biblioteca.")
             # An old owner-only test release can be retired explicitly. This is
             # never allowed for signed public, restricted or pilot_original releases.
             if pilot_meta.get("pilot_original"):
