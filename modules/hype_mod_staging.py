@@ -1154,7 +1154,11 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
 
     @bp.post("/admin/modulos/releases/excluir")
     def mod_release_delete():
-        """Delete an unused private draft and its stored JARs, never a live release."""
+        """Delete a chosen owner JAR; active mod removal first retires its catalog.
+
+        Previous release receipts must not silently reactivate an older version.
+        Existing signed / restricted release references and running jobs stay locked.
+        """
         admin_only()
         if not staging_enabled or db is None:
             abort(404)
@@ -1162,23 +1166,30 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
             flash("Confirme a exclusão do JAR antes de continuar.", "erro")
             return respond_to_library()
         try:
+            from modules.hype_auto_signed_catalogue import latest_uploaded_mods
+            from modules.hype_mod_protection_queue import JOBS
+
             draft_id = parse_draft_id(request.form.get("draft_id"))
             rows = (db.table(TABLE).select(
                 "id,module_id,version,status,sha256,size_bytes,storage_path,original_filename,created_at,meta"
-            ).eq("id", draft_id).limit(1).execute().data or [])
-            if not rows:
-                raise ValueError("Arquivo não encontrado. Atualize a página.")
+            ).eq("id", draft_id).limit(2).execute().data or [])
+            if len(rows) != 1:
+                raise ValueError("Arquivo não encontrado; atualize a biblioteca.")
             draft = rows[0]
             state = draft.get("status")
-            if state not in {"aguardando_protecao", "rejeitado"}:
-                raise ValueError("Apenas arquivos pendentes ou rejeitados podem ser apagados. "
-                                 "Versões em teste, aprovadas ou publicadas estão protegidas.")
+            if state not in {
+                "aguardando_protecao", "rejeitado", "em_teste",
+                "pronto_para_aprovacao", "protegido",
+            }:
+                raise ValueError(
+                    "Este mod está sendo processado. Aguarde o fim da proteção para apagá-lo."
+                )
 
-            # Storage paths always come from trusted DB records, never a browser field.
-            module_id = draft.get("module_id")
-            sha = draft.get("sha256")
-            original_path = draft.get("storage_path")
-            if (not isinstance(module_id, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", module_id)
+            module_id, sha, original_path = (
+                draft.get("module_id"), draft.get("sha256"), draft.get("storage_path")
+            )
+            if (not isinstance(module_id, str)
+                    or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", module_id)
                     or not isinstance(sha, str)
                     or not re.fullmatch(r"[0-9a-f]{64}", sha)
                     or not isinstance(original_path, str)
@@ -1186,142 +1197,174 @@ def register_mod_release_routes(bp, is_admin, registrar_log, db=None):
                         rf"{re.escape(module_id)}/[0-9a-f]{{32}}/{sha}\.jar",
                         original_path,
                     )):
-                raise ValueError("Caminho do original inválido; exclusão bloqueada por segurança.")
-            pilot_meta = draft.get("meta") or {}
-            if pilot_meta.get("bootstrap_publication"):
-                if (request.form.get("confirm_duplicate_retire") != "yes"
-                        or not is_simple_bootstrap_enabled()
-                        or pilot_meta.get("protected") or pilot_meta.get("pilot_original")
-                        or pilot_meta.get("owner_pilot")):
-                    raise ValueError("Versão publicada protegida. Só cópias idênticas e antigas podem ser removidas.")
-                # The current live release must remain available. Deletion is
-                # limited to old, identical published copies (same SHA/version).
-                from modules.hype_auto_signed_catalogue import (
-                    _eligible, latest_uploaded_mods,
+                raise ValueError("Caminho do JAR inválido. Exclusão bloqueada.")
+
+            meta = draft.get("meta") or {}
+            if meta.get("pilot_original"):
+                raise ValueError(
+                    "Este arquivo pertence a uma release piloto assinada. "
+                    "Retire a release desse canal antes de excluir o arquivo."
                 )
-                if not _eligible(draft):
-                    raise ValueError("Publicação histórica inconsistente; exclusão bloqueada.")
-                active = next(
-                    (item for item in latest_uploaded_mods(db)
-                     if item["module_id"] == module_id), None,
-                )
-                if (not active or str(active.get("id")) == str(draft_id)
-                        or active.get("sha256") != sha
-                        or active.get("version") != draft.get("version")):
-                    raise ValueError("Este arquivo não é uma duplicata da versão ativa; exclusão bloqueada.")
-            # An old owner-only test release can be retired explicitly. This is
-            # never allowed for signed public, restricted or pilot_original releases.
-            if pilot_meta.get("pilot_original"):
-                raise ValueError("Arquivo vinculado a um piloto assinado; não pode ser apagado.")
-            owner_pilot = pilot_meta.get("owner_pilot")
+            owner_pilot = meta.get("owner_pilot")
             if owner_pilot:
                 publisher = owner_pilot.get("published_by") if isinstance(owner_pilot, dict) else None
                 email = session.get("usuario_email")
                 if (request.form.get("confirm_owner_pilot_retire") != "yes"
-                        or not isinstance(publisher, str) or not isinstance(email, str)
+                        or not isinstance(publisher, str)
+                        or not isinstance(email, str)
                         or publisher.strip().casefold() != email.strip().casefold()):
-                    raise ValueError(
-                        "Este JAR foi liberado num teste particular. Confirme "
-                        "a retirada desse teste para apagá-lo."
-                    )
+                    raise ValueError("Confirme a retirada do teste privado do proprietário.")
+
             paths = [original_path]
-            protected = (draft.get("meta") or {}).get("protected") or {}
+            protected = meta.get("protected") or {}
             if protected:
-                protected_sha = protected.get("sha256")
-                protected_path = protected.get("storage_path")
+                protected_sha, protected_path = (
+                    protected.get("sha256"), protected.get("storage_path")
+                )
                 if (not isinstance(protected_sha, str)
                         or not re.fullmatch(r"[0-9a-f]{64}", protected_sha)
                         or not isinstance(protected_path, str)
                         or not re.fullmatch(
                             rf"{re.escape(module_id)}/{re.escape(str(draft_id))}/protected/"
-                            rf"[0-9a-f]{{32}}/{protected_sha}\.jar",
-                            protected_path,
+                            rf"[0-9a-f]{{32}}/{protected_sha}\.jar", protected_path,
                         )):
-                    raise ValueError("Caminho do build protegido inválido; exclusão bloqueada.")
+                    raise ValueError("Caminho do JAR protegido inválido.")
                 paths.append(protected_path)
 
-            # Keep actively running protection locked. An idle queued/failed/
-            # completed job may be removed when its private draft is deleted.
-            # The job row is removed with a status compare-and-delete so a worker
-            # that just claimed the job cannot be cancelled underneath it.
-            from modules.hype_mod_protection_queue import JOBS
-            linked_jobs = (db.table(JOBS).select("id,status")
-                           .eq("draft_id", str(draft_id)).limit(1).execute().data or [])
-            job = linked_jobs[0] if linked_jobs else None
-            if job and job["status"] not in ("queued", "failed", "completed"):
-                raise ValueError("A proteção deste arquivo está em andamento. "
-                                 "Aguarde a conclusão para poder excluí-lo.")
+            jobs = (db.table(JOBS).select("id,status")
+                    .eq("draft_id", str(draft_id)).limit(100).execute().data or [])
+            if len(jobs) >= 100 or any(
+                job.get("status") not in ("queued", "failed", "completed") for job in jobs
+            ):
+                raise ValueError("Proteção em execução; aguarde antes de excluir.")
 
-            # Never delete a release referenced in the catalog, including disabled
-            # releases retained for rollback and old versions still in use.
-            # Both the Client and the restricted-mod catalogues can retain
-            # previously published files for rollback, even when disabled.
-            # If either catalogue is unavailable, fail closed: do not delete.
+            # Do not remove bytes needed by signed/restricted release channels.
             for catalog in (PUBLISHED, "hype_mod_restricted_releases"):
                 if (db.table(catalog).select("release").eq("draft_id", draft_id)
                         .limit(1).execute().data or []):
-                    raise ValueError("Esta versão está vinculada a uma publicação e não pode ser apagada.")
+                    raise ValueError(
+                        "Arquivo usado por outra release assinada. Retire essa release primeiro."
+                    )
                 for path in paths:
                     if (db.table(catalog).select("release").eq("storage_path", path)
                             .limit(1).execute().data or []):
-                        raise ValueError("Este arquivo faz parte de uma publicação e não pode ser apagado.")
+                        raise ValueError(
+                            "Arquivo referenciado por outra publicação. Exclusão bloqueada."
+                        )
 
             assert_private_bucket(db.storage)
-            # Cancel pending protection only after all publication checks passed.
-            # Comparing the status guards a queued -> running worker race.
-            if job:
-                removed_job = (db.table(JOBS).delete().eq("id", job["id"])
-                               .eq("draft_id", str(draft_id))
-                               .eq("status", job["status"]).execute().data or [])
-                if not removed_job:
-                    raise ValueError("A fila de proteção mudou durante a exclusão. "
-                                     "Atualize a página e tente novamente.")
-            # Recheck the live catalogue before destroying a historical copy.
-            # The active row must never be the one deleted.
-            if pilot_meta.get("bootstrap_publication"):
+            active = next(
+                (item for item in latest_uploaded_mods(db)
+                 if item["module_id"] == module_id), None,
+            )
+            is_active = bool(active and str(active["id"]) == str(draft_id))
+            was_published = bool(meta.get("bootstrap_publication"))
+            if (was_published or is_active) and not is_simple_bootstrap_enabled():
+                raise ValueError(
+                    "Não é seguro apagar uma release ativa no modo antigo de distribuição."
+                )
+            if is_active and request.form.get("confirm_live_retire") != "yes":
+                raise ValueError(
+                    "Este é o mod ATIVO no Bootstrap. Confirme 'Apagar e retirar do Bootstrap'."
+                )
+            if (was_published and not is_active
+                    and request.form.get("confirm_duplicate_retire") != "yes"):
+                raise ValueError(
+                    "Confirme a exclusão do histórico publicado. O arquivo ativo permanece."
+                )
+
+            # Before deleting the active row, retire all older simple publications
+            # of the same mod, so removing the active row cannot trigger rollback.
+            # Always retire HISTORICAL receipts first. If a write fails, the
+            # active record is left untouched and its JAR is not deleted.
+            if is_active:
+                candidates = (db.table(TABLE).select(
+                    "id,module_id,sha256,status,meta"
+                ).eq("module_id", module_id)
+                 .order("created_at", desc=True).limit(1000)
+                 .execute().data or [])
+                if len(candidates) >= 1000:
+                    raise ValueError("Há arquivos demais para retirar com segurança.")
+                retirement = {
+                    "by": session["usuario_email"],
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "reason": "exclusive_owner_removal",
+                }
+                for record in candidates:
+                    if str(record["id"]) == str(draft_id):
+                        continue
+                    old_meta = record.get("meta") or {}
+                    if not old_meta.get("bootstrap_publication"):
+                        continue
+                    new_meta = dict(old_meta)
+                    new_meta.pop("bootstrap_publication", None)
+                    new_meta["bootstrap_retired"] = retirement
+                    changed = (db.table(TABLE).update({"meta": new_meta})
+                               .eq("id", record["id"])
+                               .eq("sha256", record["sha256"])
+                               .eq("status", record["status"])
+                               .execute().data or [])
+                    if len(changed) != 1:
+                        raise ValueError(
+                            "Não foi possível desativar todas as versões antigas. "
+                            "O mod ativo foi preservado."
+                        )
                 active_now = next(
                     (item for item in latest_uploaded_mods(db)
                      if item["module_id"] == module_id), None,
                 )
-                if (not active_now or str(active_now.get("id")) == str(draft_id)
-                        or active_now.get("sha256") != sha
-                        or active_now.get("version") != draft.get("version")):
-                    raise ValueError("A versão ativa mudou; exclusão interrompida.")
-            # Delete the database record first. A published release's FK protects
-            # it even if another admin starts publication between the two checks.
-            # Then remove ONLY the paths belonging to this now-deleted draft.
+                if not active_now or str(active_now["id"]) != str(draft_id):
+                    raise ValueError(
+                        "A publicação ativa mudou durante a exclusão. Tente novamente."
+                    )
+
+            for job in jobs:
+                removed_job = (db.table(JOBS).delete().eq("id", job["id"])
+                               .eq("draft_id", str(draft_id))
+                               .eq("status", job["status"]).execute().data or [])
+                if len(removed_job) != 1:
+                    raise ValueError("A fila de proteção mudou; exclusão interrompida.")
+
             removed = (db.table(TABLE).delete().eq("id", draft_id)
-                       .eq("status", state).execute().data or [])
-            if not removed:
-                raise ValueError("O arquivo mudou de estado. Atualize a página.")
+                       .eq("status", state)
+                       .eq("sha256", sha).execute().data or [])
+            if len(removed) != 1:
+                raise ValueError(
+                    "O arquivo mudou durante a exclusão; confira a biblioteca."
+                )
             try:
                 db.storage.from_(BUCKET).remove(paths)
             except Exception:
-                # Orphaned files are private; no active release is ever broken.
                 if registrar_log:
                     try:
-                        registrar_log("limpeza_jar_pendente", "hype_mods", TABLE, draft_id,
-                                      {"storage_paths": paths, "motivo": "falha_no_storage"})
+                        registrar_log("limpeza_jar_pendente", "hype_mods", TABLE,
+                                      str(draft_id), {"storage_paths": paths})
                     except Exception:
                         pass
-                flash("Registro removido, mas a limpeza do armazenamento falhou. "
-                      "É necessária conferência administrativa.", "erro")
+                flash(
+                    "Registro removido, mas o armazenamento privado precisa de limpeza. "
+                    "Confira o histórico antes de repetir.", "erro",
+                )
                 return respond_to_library()
             if registrar_log:
                 try:
-                    registrar_log("excluir_jar_privado", "hype_mods", TABLE, draft_id,
-                                  {"modulo": module_id, "status": state,
-                                   "sha256": sha, "arquivos": len(paths),
-                                   "owner_pilot_retired": bool(owner_pilot),
-                                   "protection_job_cancelled": job["id"] if job else None,
-                                   "previous_job_status": job["status"] if job else None})
+                    registrar_log("excluir_jar_admin", "hype_mods", TABLE, str(draft_id),
+                                  {"modulo": module_id, "sha256": sha,
+                                   "retirado_do_bootstrap": is_active,
+                                   "arquivos": len(paths)})
                 except Exception:
                     pass
-            flash("JAR privado antigo excluído com segurança.", "sucesso")
+            flash(
+                "JAR removido e mod retirado do catálogo do Bootstrap."
+                if is_active else "JAR removido da biblioteca sem alterar a versão ativa.",
+                "sucesso",
+            )
         except ValueError as exc:
             flash(str(exc), "erro")
         except Exception:
-            flash("Não foi possível excluir o JAR. Nenhuma versão publicada foi liberada.", "erro")
+            from flask import current_app
+            current_app.logger.exception("Falha na exclusão do JAR HYPE")
+            flash("Não foi possível concluir a exclusão. Confira o catálogo.", "erro")
         return respond_to_library()
 
 
