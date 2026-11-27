@@ -188,10 +188,12 @@ def latest_uploaded_mods(db):
     if _simple_publish_enabled():
         # Publication time, not upload time, decides the active version.
         # Re-publishing an older JAR is an intentional rollback.
-        rows.sort(
-            key=lambda r: ((r.get("meta") or {}).get("bootstrap_publication") or {}).get("published_at") or "",
-            reverse=True,
-        )
+        def publication_time(row):
+            meta = row.get("meta")
+            publication = meta.get("bootstrap_publication") if isinstance(meta, dict) else None
+            timestamp = publication.get("published_at") if isinstance(publication, dict) else None
+            return timestamp if isinstance(timestamp, str) else ""
+        rows.sort(key=publication_time, reverse=True)
     for row in rows:
         if _eligible(row) and row["module_id"] not in seen:
             release = _release_candidate(row)
