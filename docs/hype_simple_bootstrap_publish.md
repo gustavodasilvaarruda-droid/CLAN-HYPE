@@ -67,3 +67,32 @@ não habilite para todo o clã antes de validar.
 para não esperar proteção manual; ela não deve substituir a modalidade
 alternativa `HYPE_AUTO_REQUIRE_APPROVED_CANDIDATE=1`, usada quando a
 obfuscação/revisão é obrigatória.
+
+## Central em lote (27/11/2026)
+
+A tela **Meus Mods** pode selecionar até **30 JARs** de uma vez. Com JavaScript
+habilitado, o botão **Salvar tudo** executa o envio dos arquivos selecionados
+e as ações marcadas nos registros da biblioteca, sem navegação/reload da página.
+O usuário pode marcar **Publicar os novos arquivos no Bootstrap ao salvar**
+para enviar e distribuir cada JAR em uma única interação. O servidor exige
+sessão administrativa, CSRF, chave de assinatura e confirmação explícita de
+que o original ficará público. Os endpoints existentes continuam responsáveis
+por validar cada arquivo.
+
+**Publicar versões recentes:** marca no máximo o registro mais recente de cada
+ID Fabric. **Marcar pendentes para apagar:** permite remover rascunhos privados
+e rejeitados elegíveis; não marca itens publicados, protegidos ou de testes
+restritos. **Limpar seleção** cancela alterações pendentes na tela.
+
+Uma nova publicação do mesmo ID Fabric torna-se a única versão ativa no
+catálogo assinado, independentemente do nome do arquivo ou da string de
+versão. Isso **não elimina automaticamente versões antigas da biblioteca
+ou backups**. JARs publicados anteriormente não podem ser apagados pelo
+fluxo comum enquanto puderem estar em uso ou associados a um rollback.
+O Bootstrap faz a substituição local após o Minecraft fechar.
+
+A interface mostra sucesso/erro por item e atualiza a lista **uma vez** ao
+final. A interação é única, mas os pedidos ao servidor são processados
+individualmente: **não é uma transação de tudo-ou-nada**. Se um JAR falhar, os
+demais podem ser concluídos; confira o resumo antes de repetir a operação.
+Sem JavaScript, os formulários individuais continuam disponíveis.
