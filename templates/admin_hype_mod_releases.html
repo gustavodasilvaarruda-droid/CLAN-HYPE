@@ -70,7 +70,7 @@
               {% endif %}
               {% if quick_publish_enabled and item.status != 'rejeitado'
                     and item.module_id not in ('hypebootstrap', 'hypeegg') %}
-              <form method="post" action="{{ url_for('hype_mod_admin.mod_release_publish_bootstrap') }}"
+              <form method="post" action="{{ url_for('hype_mod_admin.mod_release_distribute_bootstrap') }}"
                     onsubmit="return confirm('PUBLICAÇÃO PARA TODOS: esse JAR poderá ser baixado por qualquer jogador que tenha o Bootstrap. O arquivo NÃO será ofuscado automaticamente. Publicar mesmo assim?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="draft_id" value="{{ item.id }}">
