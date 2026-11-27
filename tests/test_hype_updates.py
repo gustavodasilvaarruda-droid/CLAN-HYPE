@@ -154,5 +154,110 @@ class HypeUpdatesTest(unittest.TestCase):
             self.client.post('/hype-updates/auto-ovo/manifest.properties').status_code, 405
         )
 
+    def test_multimod_health_reports_disabled_without_leaking_drafts(self):
+        with patch.dict(os.environ, {
+            'HYPE_AUTO_SIGNED_CATALOG_ENABLED': '0',
+            'HYPE_AUTO_SIGNED_DOWNLOADS_ENABLED': '0',
+            'HYPE_MULTI_MOD_CATALOG_ENABLED': '0',
+            'HYPE_MULTI_MOD_DOWNLOADS_ENABLED': '0',
+        }):
+            response = self.client.get('/hype-updates/mods/health')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['mode'], 'disabled')
+        self.assertEqual(response.json['reason'], 'disabled')
+        self.assertFalse(response.json['ready'])
+        self.assertNotIn('mods', response.json)
+        self.assertIn('no-store', response.headers['Cache-Control'])
+
+    def test_multimod_health_detects_half_enabled_auto_distribution(self):
+        with patch.dict(os.environ, {
+            'HYPE_AUTO_SIGNED_CATALOG_ENABLED': '1',
+            'HYPE_AUTO_SIGNED_DOWNLOADS_ENABLED': '0',
+            'HYPE_MULTI_MOD_CATALOG_ENABLED': '0',
+            'HYPE_MULTI_MOD_DOWNLOADS_ENABLED': '0',
+        }):
+            result = self.client.get('/hype-updates/mods/health').json
+        self.assertEqual(result['reason'], 'auto_switches_incomplete')
+        self.assertFalse(result['ready'])
+        self.assertFalse(result['downloads_enabled'])
+
+    def test_multimod_health_detects_missing_release_db(self):
+        with patch.dict(os.environ, {
+            'HYPE_AUTO_SIGNED_CATALOG_ENABLED': '1',
+            'HYPE_AUTO_SIGNED_DOWNLOADS_ENABLED': '1',
+            'HYPE_MULTI_MOD_CATALOG_ENABLED': '0',
+            'HYPE_MULTI_MOD_DOWNLOADS_ENABLED': '0',
+        }):
+            result = self.client.get('/hype-updates/mods/health').json
+        self.assertEqual(result['reason'], 'release_db_unavailable')
+        self.assertFalse(result['ready'])
+
+    def test_multimod_health_reports_effective_catalogue_revision(self):
+        import hashlib
+        from unittest.mock import Mock
+        db = Mock()
+        self.client.application.extensions['hype_release_db'] = db
+        self.addCleanup(self.client.application.extensions.pop, 'hype_release_db', None)
+        with patch.dict(os.environ, {
+            'HYPE_AUTO_SIGNED_CATALOG_ENABLED': 'true',
+            'HYPE_AUTO_SIGNED_DOWNLOADS_ENABLED': 'yes',
+            'HYPE_MULTI_MOD_CATALOG_ENABLED': '0',
+            'HYPE_MULTI_MOD_DOWNLOADS_ENABLED': '0',
+        }), patch(
+            'modules.hype_auto_signed_catalogue.signed_catalog_for_uploaded_mods',
+            return_value=b'signed-catalogue',
+        ), patch(
+            'modules.hype_auto_signed_catalogue.verify_auto_catalogue',
+            return_value={'mods': [{'id': 'hypeclient'}]},
+        ):
+            response = self.client.get('/hype-updates/mods/health')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json['ready'])
+        self.assertEqual(response.json['reason'], 'ok')
+        self.assertEqual(response.json['mod_count'], 1)
+        self.assertEqual(
+            response.json['revision'],
+            hashlib.sha256(b'signed-catalogue').hexdigest()[:16],
+        )
+        self.assertFalse(response.json['binary_contents_checked'])
+
+    def test_multimod_health_distinguishes_empty_catalogue(self):
+        from unittest.mock import Mock
+        self.client.application.extensions['hype_release_db'] = Mock()
+        self.addCleanup(self.client.application.extensions.pop, 'hype_release_db', None)
+        with patch.dict(os.environ, {
+            'HYPE_AUTO_SIGNED_CATALOG_ENABLED': '1',
+            'HYPE_AUTO_SIGNED_DOWNLOADS_ENABLED': '1',
+            'HYPE_MULTI_MOD_CATALOG_ENABLED': '0',
+            'HYPE_MULTI_MOD_DOWNLOADS_ENABLED': '0',
+        }), patch(
+            'modules.hype_auto_signed_catalogue.signed_catalog_for_uploaded_mods',
+            return_value=b'signed-empty',
+        ), patch(
+            'modules.hype_auto_signed_catalogue.verify_auto_catalogue',
+            return_value={'mods': []},
+        ):
+            response = self.client.get('/hype-updates/mods/health')
+        self.assertEqual(response.json['reason'], 'empty_catalogue')
+        self.assertFalse(response.json['ready'])
+        self.assertTrue(response.json['catalogue_valid'])
+
+    def test_multimod_health_legacy_requires_download_switch(self):
+        catalog_dir = self.directory / 'mods'
+        catalog_dir.mkdir()
+        (catalog_dir / 'catalog.json').write_bytes(b'legacy-signed')
+        with patch.dict(os.environ, {
+            'HYPE_AUTO_SIGNED_CATALOG_ENABLED': '0',
+            'HYPE_AUTO_SIGNED_DOWNLOADS_ENABLED': '0',
+            'HYPE_MULTI_MOD_CATALOG_ENABLED': '1',
+            'HYPE_MULTI_MOD_DOWNLOADS_ENABLED': '0',
+        }), patch('modules.hype_updates.verify_signed_catalogue',
+                 return_value={'mods': [{'id': 'hypeclient'}]}):
+            response = self.client.get('/hype-updates/mods/health')
+        self.assertEqual(response.json['mode'], 'legacy-signed')
+        self.assertEqual(response.json['reason'], 'downloads_disabled')
+        self.assertFalse(response.json['ready'])
+
+
 if __name__ == '__main__':
     unittest.main()
