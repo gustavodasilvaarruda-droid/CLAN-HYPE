@@ -64,9 +64,10 @@ class Query:
 
     def execute(self):
         if self.to_insert is not None:
-            self.database.saved.append(self.to_insert)
-            return SimpleNamespace(data=[{"id": len(self.database.saved)}])
-        return SimpleNamespace(data=[])
+            row = dict(self.to_insert, id=len(self.database.saved) + 1)
+            self.database.saved.append(row)
+            return SimpleNamespace(data=[{"id": row["id"]}])
+        return SimpleNamespace(data=[dict(row) for row in self.database.saved])
 
 
 class Database:
@@ -137,6 +138,20 @@ class PrivateUploadTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["draft_id"], "1")
         self.assertEqual(len(self.db.saved), 1)
+
+    def test_upload_same_binary_twice_does_not_create_another_jar(self):
+        self.login()
+        self.upload()
+        first = self.db.saved[0]
+        response = self.client.post("/admin/modulos/releases/upload", data={
+            "jar": (io.BytesIO(sample_jar()), "hypeclient-test-copy.jar")
+        }, content_type="multipart/form-data", headers={"X-HYPE-BATCH": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        self.assertTrue(response.get_json()["duplicate"])
+        self.assertEqual(response.get_json()["draft_id"], str(first["id"]))
+        self.assertEqual(len(self.db.saved), 1)
+        self.assertEqual(len(self.db.storage.uploads), 1)
 
     def test_ajax_invalid_upload_fails_without_saving(self):
         self.login()
